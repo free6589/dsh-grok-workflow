@@ -1,0 +1,15 @@
+# cmd: npx vitest run test/progress-tab.spec.ts 2>&1 | tee .rsi/evidence/progress-flowchart-2026-11-25/green-data.out
+# head: 57dcf0410c62454b0ad62e1ca6b195c6e1da213d (feat/progress-flowchart), working tree carrying the flow model in src/progress-tab.ts
+# at: 2026-11-25T23:06:19+08:00
+# why green: src/progress-tab.ts now exports deriveProgressFlow / ProgressFlowKind / ProgressFlowNode / ProgressFlow, and the story model the page no longer reads is deleted.
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-progress-flowchart
+
+ ✓ test/progress-tab.spec.ts (69 tests) 54ms
+
+ Test Files  1 passed (1)
+      Tests  69 passed (69)
+   Start at  23:06:20
+   Duration  412ms (transform 207ms, setup 0ms, import 233ms, tests 54ms, environment 0ms)
+

@@ -115,8 +115,8 @@ interface ProgressBundle {
   nodeState(members: ProgressMember[], ended: boolean): string
   percent(members: ProgressMember[]): { settled: number, declared: number, value: number } | undefined
   deriveTrack(run: ProgressRun | undefined, labelFor: (key: string) => string): ProgressTrack | undefined
-  /** The one-page story: the hand-written mirror of `deriveProgressStory` in `src/progress-tab.ts`. */
-  deriveProgressStory(run: ProgressRun): ProgressStory
+  /** The flowchart: the hand-written mirror of `deriveProgressFlow` in `src/progress-tab.ts`. */
+  deriveProgressFlow(run: ProgressRun): ProgressFlow
   createStatus(): { getSnapshot(): string, getMessage(): string | undefined, subscribe(fn: () => void): () => void, set(state: string, message?: string): void }
   recoveredFailures(members: ProgressMember[]): Set<number>
   currentFailureCount(members: ProgressMember[]): number
@@ -245,52 +245,33 @@ type ProgressTrack = {
   percent?: { settled: number, declared: number, value: number }
 }
 
-/** One capsule of a plan task's fixed `执行 → 检查 → 复核` chain. */
-type ProgressChainSlot = {
+/** One node of the flowchart, as `deriveProgressFlow` reports it (`flowchart-contract` §2). */
+type ProgressFlowNode = {
+  /** Stable identity: `flow:start` / `flow:end` / `flow:<position>:<kind>:<ordinal>`. */
   key: string
+  kind: string
+  /** The visit of that leg (1-based); both ends are 0. */
+  ordinal: number
+  state: string
+  /** The calls that spoke as this leg, in `seq` order; both ends are empty. */
   members: ProgressMember[]
-  state: string
-  reached: boolean
-}
-
-/** One step of the story's track, as `deriveProgressStory` reports it. */
-type ProgressStoryStep = {
-  key: string
-  number?: number
-  title: string
-  state: string
-  chain: ProgressChainSlot[]
-  members: ProgressMember[]
-}
-
-/** One line of the story's history. */
-type ProgressStoryLogRow = {
-  seq: number
-  at?: number
-  role: string
-  title: string
-  state: string
-  shipped?: true
 }
 
 /**
- * The one-page story (`DESIGN-progress-tab.md` §19.2), as the browser bundle derives it.
+ * The flowchart, as the browser bundle derives it (`.tmp/flowchart-contract.md` §2).
  *
- * The typed half is `deriveProgressStory` in `src/progress-tab.ts`; this is the shape the
+ * The typed half is `deriveProgressFlow` in `src/progress-tab.ts`; this is the shape the
  * hand-written mirror must reproduce field for field, because the two copies cannot import
  * each other.
  */
-type ProgressStory = {
+type ProgressFlow = {
   state: string
-  steps: ProgressStoryStep[]
+  nodes: ProgressFlowNode[]
+  /** The highlighted node's 1-based index in `nodes`; never 0. */
   at: number
   total: number
-  now: { titleKey?: string, title: string, role?: string }
-  attempt?: { n: number, retrying: boolean }
-  rest: string[]
-  log: ProgressStoryLogRow[]
-  final?: { draft: number, label: string, row?: ProgressStoryLogRow }
-  dock: string
+  remaining: number
+  final?: { draft: number, seq: number }
 }
 
 type Route = { provider?: string, model?: string, maxInFlight?: number }
@@ -1996,22 +1977,23 @@ describe('client progress tab: registration', () => {
 })
 
 /**
- * The progress page, as the browser bundle draws it: one page, three screens.
+ * The progress page, as the browser bundle draws it: one flowchart, three screens.
  *
- * The reference is `DESIGN-progress-tab.md` §19 and the two local design drafts
- * (`.progress.html` / `.progress-desktop.png`): the header (run name + five-state chip),
- * the "现在" headline, one equal segment per step, the amber bar, the "后面还有" line, the
- * step list, the "经过" log, the "交卷" card, the Guardian card, and the dock.
+ * The reference is `.tmp/flowchart-contract.md` (the contract that replaced
+ * `DESIGN-progress-tab.md` §19–§20): the header (run name + five-state chip), one node per
+ * leg with the ends around them, the measured wire layer behind them, each node's own
+ * calls behind a toggle, the Guardian card, the count line and the dock. There is no
+ * sentence on the page: what a node is, is a word and a colour.
  *
  * Every string below is asserted **verbatim** in Chinese, because a page that renders the
  * right structure with the wrong words is still the wrong page. The fixtures are the
- * recorder's own event stream (`src/records.ts`), folded by the bundle, so the story is
+ * recorder's own event stream (`src/records.ts`), folded by the bundle, so the flow is
  * derived from events and not hand-built. `test/progress-tab.spec.ts` states the same
- * fixtures against the typed `deriveProgressStory`; the two copies of the derivation
+ * fixtures against the typed `deriveProgressFlow`; the two copies of the derivation
  * cannot import each other, so they are compared through those fixtures.
  */
 
-describe('client progress tab: the one-page story (three screens)', () => {
+describe('client progress tab: the flowchart (three screens)', () => {
   const progress = bundle.GROK_WORKFLOW_PROGRESS
 
   /**
@@ -2032,10 +2014,6 @@ describe('client progress tab: the one-page story (three screens)', () => {
   /**
    * The recorder's stream for one run: `run-start`, one start/settle pair per declared
    * call, then the optional `summary-final` claim and `run-end`.
-   *
-   * The calls are the typed suite's own fixtures, so both halves of the derivation are
-   * exercised by the same stream; only the clock is local (`STORY_BASE`), because it is
-   * displayed.
    */
   function streamOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number } = {}) {
     const records: Array<Record<string, unknown>> = [
@@ -2057,11 +2035,11 @@ describe('client progress tab: the one-page story (three screens)', () => {
     return records
   }
 
-  /** The folded run of one fixture, and the story derived from it. */
-  function storyOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number } = {}) {
+  /** The folded run of one fixture, and the flow derived from it. */
+  function flowOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number } = {}) {
     const runs = progress.fold(streamOf(calls, options))
     expect(runs, 'the fixture must fold into one run').toHaveLength(1)
-    return { run: runs[0]!, story: progress.deriveProgressStory(runs[0]!) }
+    return { run: runs[0]!, flow: progress.deriveProgressFlow(runs[0]!) }
   }
 
   /** Render the tab for one run; `extra` is the injected props the shell would add. */
@@ -2069,6 +2047,18 @@ describe('client progress tab: the one-page story (three screens)', () => {
     const t = translator('zh')
     const snapshot = run === undefined ? { runs: [], activeRun: undefined } : { runs: [run], activeRun: run }
     return progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select(snapshot),
+      ...extra,
+    })
+  }
+
+  /** Render one run with real hook cells, so a click on a node is a real second render. */
+  function mount(run: ProgressRun, extra: Record<string, unknown> = {}) {
+    const t = translator('zh')
+    const snapshot = { runs: [run], activeRun: run }
+    return renderProgress({
       t,
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select(snapshot),
@@ -2099,15 +2089,15 @@ describe('client progress tab: the one-page story (three screens)', () => {
     return texts(page).filter((text) => text !== css)
   }
 
-  /** The visible text of the element carrying one hook, joined for a single comparison. */
-  function textOf(tree: unknown, name: string): string {
-    return texts(hookOf(tree, name)).join(' ')
-  }
-
   /** The log time of the call with this `seq`, as the page spells it (`8:03`). */
   function clockOf(seq: number): string {
     const date = new Date(STORY_BASE + seq * 60_000)
     return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+
+  /** Every node of one page, in document order, by the hook the contract names. */
+  function nodesOf(page: unknown): Element[] {
+    return hooksOf(page, 'data-gw-progress-node')
   }
 
   /** 等你点头: the run announced itself and declared nothing yet. */
@@ -2130,7 +2120,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
     [4, '汇总·第1稿', '汇总', 'completed'],
   ]
 
-  /** 没过: one task failed and is being rechecked, one was cancelled after it. */
+  /** 没过: one task failed and is being retried, one was cancelled after it. */
   const brokenCalls: readonly Call[] = [
     [1, '执行', '任务 1 · 修复登录', 'completed'],
     [2, '执行', '任务 2 · 写文档', 'failed'],
@@ -2138,235 +2128,263 @@ describe('client progress tab: the one-page story (three screens)', () => {
     [4, '执行', '任务 3 · 补测试', 'cancelled'],
   ]
 
-  it('mirrors the typed story field for field (the two copies cannot import each other)', () => {
+  it('mirrors the typed flow field for field (the two copies cannot import each other)', () => {
     // The bundle is served verbatim, so the mirror is compared through the fixtures the
     // typed suite uses: a field renamed on one side fails here, not on screen.
-    const { story } = storyOf(runningCalls)
-    expect(story.state).toBe('running')
-    expect(story.total).toBe(3)
-    expect(story.at).toBe(2)
-    expect(story.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
-    expect(story.attempt).toBeUndefined()
-    expect(story.rest).toEqual(['任务 3 · 补测试'])
-    expect(story.dock).toBe('quiet')
-    expect(story.final).toBeUndefined()
-    expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
-      ['phase:任务 1 · 修复登录', 1, '任务 1 · 修复登录', 'done'],
-      ['phase:任务 2 · 写文档', 2, '任务 2 · 写文档', 'doing'],
-      ['phase:任务 3 · 补测试', 3, '任务 3 · 补测试', 'done'],
+    const { flow } = flowOf(runningCalls)
+    expect(flow.state).toBe('running')
+    expect(flow.total).toBe(6)
+    expect(flow.at).toBe(5)
+    expect(flow.remaining).toBe(1)
+    expect(flow.final).toBeUndefined()
+    // One node per leg, in `seq` order, with the ends around them; `key` names the leg and
+    // its visit, `ordinal` counts visits of that leg only.
+    expect(flow.nodes.map((node) => [node.key, node.kind, node.ordinal, node.state])).toEqual([
+      ['flow:start', 'start', 0, 'done'],
+      ['flow:0:plan:1', 'plan', 1, 'done'],
+      ['flow:1:execute:1', 'execute', 1, 'done'],
+      ['flow:2:check:1', 'check', 1, 'done'],
+      ['flow:3:execute:1', 'execute', 1, 'doing'],
+      ['flow:end', 'end', 0, 'pending'],
     ])
-    // The chain is the task's own gates, and an unreached one is part of the answer.
-    expect(story.steps[0]!.chain.map((slot) => [slot.key, slot.reached, slot.state])).toEqual([
-      ['execute', true, 'done'],
-      ['check', true, 'done'],
-      ['review', false, 'pending'],
+    expect(flow.nodes.map((node) => node.members.map((member) => member.seq))).toEqual([
+      [], [1], [2], [3], [4, 5], [],
     ])
-    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state])).toEqual([
-      [1, '规划助手', '规划', 'done'],
-      [2, '执行', '任务 1 · 修复登录', 'done'],
-      [3, '检查', '任务 1 · 修复登录', 'done'],
-      [4, '执行', '任务 2 · 写文档', 'doing'],
-      [5, '执行', '任务 3 · 补测试', 'done'],
-    ])
-    expect(story.log[0]!.at).toBe(STORY_BASE + 60_000)
+    expect(flow.nodes[4]!.members.map((member) => member.phase)).toEqual(['任务 2 · 写文档', '任务 3 · 补测试'])
   })
 
-  it('waiting: 等你点头 — planning, no steps, and the start button', () => {
-    const { run, story } = storyOf(waitingCalls)
-    expect(story.state).toBe('waiting')
-    expect(story.steps).toEqual([])
-    expect(story.total).toBe(0)
-    expect(story.at).toBe(0)
-    expect(story.now).toEqual({ titleKey: 'planning', title: '' })
-    expect(story.rest).toEqual([])
-    expect(story.log).toEqual([])
-    expect(story.final).toBeUndefined()
-    expect(story.dock).toBe('start')
+  it('mirrors the shipped draft as the draft number and the row that carried it', () => {
+    const { flow } = flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+    expect(flow.final).toEqual({ draft: 1, seq: 4 })
+    // No `summary-final` in the stream: no `final` field at all, never a guessed draft.
+    expect(flowOf(doneCalls, { stopReason: 'completed' }).flow.final).toBeUndefined()
+  })
+
+  it('numbers a second visit of the same leg instead of merging the two attempts', () => {
+    const { flow } = flowOf(brokenCalls)
+    // The retry carries a number in its label, so it is a node of its own: attempt 1 stays
+    // amber and attempt 2 is the one being worked.
+    expect(flow.nodes.map((node) => [node.kind, node.ordinal, node.state])).toEqual([
+      ['start', 0, 'done'],
+      ['execute', 1, 'failed'],
+      ['execute', 2, 'doing'],
+      ['end', 0, 'pending'],
+    ])
+    expect(flow.at).toBe(3)
+    expect(flow.remaining).toBe(1)
+  })
+
+  it('keeps a row it cannot read as a leg on the node before it, never on the floor', () => {
+    const { flow } = flowOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '旁听者', '任务 1 · 修复登录', 'completed'],
+    ])
+    expect(flow.nodes.map((node) => node.members.map((member) => member.seq))).toEqual([[], [1, 2], []])
+  })
+
+  it('leaves the guardian’s own call off the flow: it has its own panel', () => {
+    const { flow } = flowOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, 'Guardian', 'Guardian', 'completed'],
+    ])
+    expect(flow.nodes.flatMap((node) => node.members.map((member) => member.seq))).toEqual([1])
+  })
+
+  it('waiting: 等你点头 — a start, an end, and nothing between them', () => {
+    const { run, flow } = flowOf(waitingCalls)
+    expect(flow.state).toBe('waiting')
+    expect(flow.total).toBe(2)
+    // Nothing to walk yet, so the page highlights the start rather than the end (§4.3).
+    expect(flow.at).toBe(1)
+    expect(flow.remaining).toBe(1)
+    expect(flow.nodes.map((node) => [node.kind, node.state])).toEqual([['start', 'done'], ['end', 'pending']])
 
     const page = pageOf(run, { fillDraft: () => true })
-    // The whole screen, in document order — this array is the "等你点头" design draft.
+    // The whole screen, in document order — this array is the "等你点头" design draft: two
+    // node words, the count line, and the one button. No sentence explains any of it.
     expect(pageTexts(page)).toEqual([
       '任务团队 · 3 个任务',
       '等你点头',
-      '现在',
-      '正在拆活',
-      '交卷',
-      '这一轮没有交卷稿',
+      '起点',
+      '终点',
+      '还剩 1 步 / 共 2 步',
       '开工',
-      '要改就说一声，我重拆',
     ])
     expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('waiting')
-    expect(textOf(page, 'data-gw-progress-run')).toBe('任务团队 · 3 个任务')
-    expect(textOf(page, 'data-gw-progress-now-label')).toBe('现在')
-    expect(textOf(page, 'data-gw-progress-now')).toBe('正在拆活')
-    // Nothing to step through, so no track and no list: the page draws no step it cannot
-    // name (§19.7.1). The small print has nothing to say either.
-    expect(hooksOf(page, 'data-gw-progress-steps')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-step')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-plan')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-log')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-flag')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-rest')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-sub')).toHaveLength(0)
-    expect(textOf(page, 'data-gw-progress-final-missing')).toBe('这一轮没有交卷稿')
-    expect(textOf(page, 'data-gw-progress-dock-fill')).toBe('开工')
-    expect(textOf(page, 'data-gw-progress-dock-hint')).toBe('要改就说一声，我重拆')
+    expect(texts(hookOf(page, 'data-gw-progress-run'))).toEqual(['任务团队 · 3 个任务'])
+    expect(nodesOf(page).map((node) => node.props['data-kind'])).toEqual(['start', 'end'])
+    expect(nodesOf(page).map((node) => node.props['data-current'])).toEqual(['true', 'false'])
+    // No calls were declared, so no node offers to open one.
+    expect(hooksOf(page, 'data-gw-progress-node-toggle')).toHaveLength(0)
+    expect(texts(hookOf(page, 'data-gw-progress-dock-fill'))).toEqual(['开工'])
+    expect(texts(hookOf(page, 'data-gw-progress-left')).join(' ')).toBe('还剩 1 步 / 共 2 步')
   })
 
-  it('running: 进行中 — the step being worked, and the ones around it', () => {
-    const { run } = storyOf(runningCalls)
+  it('running: 进行中 — one node per leg, the leg being worked highlighted', () => {
+    const { run } = flowOf(runningCalls)
     const page = pageOf(run)
 
-    expect(textOf(page, 'data-gw-progress-run')).toBe('任务团队 · 3 个任务')
-    expect(textOf(page, 'data-gw-progress-chip')).toBe('进行中')
+    expect(texts(hookOf(page, 'data-gw-progress-run'))).toEqual(['任务团队 · 3 个任务'])
+    expect(texts(hookOf(page, 'data-gw-progress-chip'))).toEqual(['进行中'])
     expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('running')
-    expect(textOf(page, 'data-gw-progress-now-label')).toBe('现在')
-    // The headline is the current step's own title, verbatim: not shortened, not renumbered.
-    expect(textOf(page, 'data-gw-progress-now')).toBe('任务 2 · 写文档')
-    // The small print: the role of the line still running, then the position.
-    expect(texts(hookOf(page, 'data-gw-progress-sub'))).toEqual(['执行', '正在看', '·', '第 2 步，共 3 步'])
 
-    // One equal segment per step, in plan order, each with its own state.
-    const steps = hooksOf(page, 'data-gw-progress-step')
-    expect(steps.map((step) => [step.props['data-gw-progress-step'], step.props['data-state']])).toEqual([
-      ['phase:任务 1 · 修复登录', 'done'],
-      ['phase:任务 2 · 写文档', 'doing'],
-      ['phase:任务 3 · 补测试', 'done'],
+    // The legs, the ends and the visits, in the order they happened.
+    expect(nodesOf(page).map((node) => [
+      node.props['data-gw-progress-node'],
+      node.props['data-kind'],
+      node.props['data-ordinal'],
+      node.props['data-state'],
+      node.props['data-current'],
+    ])).toEqual([
+      ['flow:start', 'start', '0', 'done', 'false'],
+      ['flow:0:plan:1', 'plan', '1', 'done', 'false'],
+      ['flow:1:execute:1', 'execute', '1', 'done', 'false'],
+      ['flow:2:check:1', 'check', '1', 'done', 'false'],
+      ['flow:3:execute:1', 'execute', '1', 'doing', 'true'],
+      ['flow:end', 'end', '0', 'pending', 'false'],
     ])
-    expect(hookOf(page, 'data-gw-progress-steps').props['aria-label']).toBe('进度：第 2 步，共 3 步')
-
-    // No failure is current, so no amber bar; the step after the current one is named.
-    expect(hooksOf(page, 'data-gw-progress-flag')).toHaveLength(0)
-    expect(textOf(page, 'data-gw-progress-rest')).toBe('后面还有：任务 3 · 补测试')
-
-    // The step list: number, title, the gates the task reached, and its state word.
-    expect(textOf(page, 'data-gw-progress-plan-title')).toBe('要干的 3 件事')
-    const plan = hooksOf(page, 'data-gw-progress-plan-row')
-    expect(plan.map((row) => texts(row).join(' '))).toEqual([
-      '1 任务 1 · 修复登录 执行 → 检查 过了',
-      '2 任务 2 · 写文档 执行 在做',
-      '3 任务 3 · 补测试 执行 过了',
+    // The visible words are the leg words and nothing else: the state is colour, and a
+    // screen reader hears it through the node's own label.
+    expect(nodesOf(page).map((node) => texts(node))).toEqual([
+      ['起点'], ['规划'], ['执行'], ['检查'], ['执行'], ['终点'],
     ])
-    expect(plan.map((row) => row.props['data-state'])).toEqual(['done', 'doing', 'done'])
-
-    // The history: one line per declared call, its clock, its role, its title, its word.
-    expect(textOf(page, 'data-gw-progress-log-title')).toBe('经过')
-    const log = hooksOf(page, 'data-gw-progress-log-row')
-    expect(log.map((row) => [row.props['data-gw-progress-log-row'], row.props['data-state']])).toEqual([
-      [1, 'done'], [2, 'done'], [3, 'done'], [4, 'doing'], [5, 'done'],
+    // A first visit is the normal case and carries no badge; the state word is spoken, not
+    // printed: 腿词 + 状态词.
+    expect(hooksOf(page, 'data-gw-progress-node-ord')).toHaveLength(0)
+    expect(nodesOf(page).map((node) => node.props['aria-label'])).toEqual([
+      '起点 过了',
+      '规划 过了',
+      '执行 过了',
+      '检查 过了',
+      '执行 在做',
+      '终点 等着',
     ])
-    expect(log.map((row) => texts(row).join(' '))).toEqual([
-      `${clockOf(1)} 规划助手 规划 做完`,
-      `${clockOf(2)} 执行 任务 1 · 修复登录 做完`,
-      `${clockOf(3)} 检查 任务 1 · 修复登录 过了`,
+    // Every node with calls in it can be opened, and no other node can.
+    expect(hooksOf(page, 'data-gw-progress-node-toggle').map((toggle) => toggle.props['data-gw-progress-node-toggle']))
+      .toEqual(['flow:0:plan:1', 'flow:1:execute:1', 'flow:2:check:1', 'flow:3:execute:1'])
+    expect(texts(hookOf(page, 'data-gw-progress-left')).join(' ')).toBe('还剩 1 步 / 共 6 步')
+    // The count line is the only number on the page, and it is a count over nodes.
+    expect(pageTexts(page).join('\n')).not.toContain('%')
+  })
+
+  it('done: 已完成 — every node green, the shipped draft numbered on its node', () => {
+    const { run, flow } = flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+    expect(flow.state).toBe('done')
+    expect(flow.at).toBe(6)
+    expect(flow.remaining).toBe(0)
+    expect(flow.nodes.every((node) => node.state === 'done')).toBe(true)
+
+    const page = pageOf(run, { canOpen: (childId: string) => childId === 'child-4', fillDraft: () => true })
+    expect(texts(hookOf(page, 'data-gw-progress-chip'))).toEqual(['已完成'])
+    expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('done')
+    expect(nodesOf(page).map((node) => [node.props['data-kind'], node.props['data-state']])).toEqual([
+      ['start', 'done'], ['plan', 'done'], ['execute', 'done'], ['check', 'done'], ['summarize', 'done'], ['end', 'done'],
+    ])
+    // The summary leg is numbered on every visit: the draft number is the one badge the
+    // page prints, because a run may ship a second or third draft.
+    expect(texts(hookOf(page, 'data-gw-progress-node-ord'))).toEqual(['第 1 稿'])
+    expect(pageTexts(page)).toEqual([
+      '任务团队 · 3 个任务',
+      '已完成',
+      '起点',
+      '规划',
+      '执行',
+      '检查',
+      '汇总',
+      '第 1 稿',
+      '终点',
+      '还剩 0 步 / 共 6 步',
+      '收下这版',
+    ])
+  })
+
+  it('failed: 未通过 — the broken leg is amber, and the retry is the one highlit', () => {
+    const running = flowOf(brokenCalls)
+    expect(running.flow.state).toBe('running')
+    expect(nodesOf(pageOf(running.run)).map((node) => node.props['data-state'])).toEqual(['done', 'failed', 'doing', 'pending'])
+    // A retry is a second visit of the same leg, so it says so.
+    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-node-ord')).join(' ')).toBe('第 2 次')
+    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-left')).join(' ')).toBe('还剩 1 步 / 共 4 步')
+
+    // The same stream once the run ends: no retry is in flight, so nothing claims to be
+    // working, and the chip says 未通过.
+    const ended = flowOf(brokenCalls, { stopReason: 'error' })
+    expect(ended.flow.state).toBe('failed')
+    expect(ended.flow.nodes.map((node) => node.state)).toEqual(['done', 'failed', 'blocked', 'failed'])
+    // The call that was still open is the node the page is waiting on, ended run or not:
+    // the open call outranks the general "first broken node" rule (§4.3).
+    expect(ended.flow.at).toBe(3)
+    expect(ended.flow.remaining).toBe(1)
+    const page = pageOf(ended.run)
+    expect(texts(hookOf(page, 'data-gw-progress-chip'))).toEqual(['未通过'])
+    expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('failed')
+    expect(nodesOf(page).map((node) => node.props['data-state'])).toEqual(['done', 'failed', 'blocked', 'failed'])
+
+    // The engine's own word survives: a cancelled run says 已取消, never 未通过.
+    const cancelled = flowOf(brokenCalls, { stopReason: 'cancelled' })
+    expect(cancelled.flow.state).toBe('cancelled')
+    expect(cancelled.flow.nodes[cancelled.flow.nodes.length - 1]!.state).toBe('cancelled')
+    expect(texts(hookOf(pageOf(cancelled.run), 'data-gw-progress-chip'))).toEqual(['已取消'])
+  })
+
+  it('opens one node into its own calls, and closes it again', () => {
+    const { run } = flowOf(runningCalls)
+    const view = mount(run)
+    const closed = view.run()
+    expect(hooksOf(closed, 'data-gw-progress-node-calls')).toHaveLength(0)
+    expect(hooksOf(closed, 'data-gw-progress-log-row')).toHaveLength(0)
+
+    const toggles = hooksOf(closed, 'data-gw-progress-node-toggle')
+    expect(toggles).toHaveLength(4)
+    const last = toggles[3]!
+    expect(last.type).toBe('button')
+    expect(last.props['type']).toBe('button')
+    expect(last.props['aria-expanded']).toBe(false)
+    expect(last.props['aria-controls']).toBe('gw-progress-node-calls-4')
+    expect(last.props['title']).toBe('详情')
+    // The control says what it opens and nothing else: the node's words are outside it.
+    expect(texts(last)).toEqual([])
+
+    ;(last.props['onClick'] as () => void)()
+    const opened = view.run()
+    const calls = hookOf(opened, 'data-gw-progress-node-calls')
+    expect(calls.type).toBe('ol')
+    expect(calls.props['data-gw-progress-node-calls']).toBe('flow:3:execute:1')
+    expect(calls.props['id']).toBe('gw-progress-node-calls-4')
+    expect(hooksOf(opened, 'data-gw-progress-node-toggle')[3]!.props['aria-expanded']).toBe(true)
+
+    // One line per call of *that* node, in `seq` order, from the page's one row renderer.
+    const rows = hooksOf(calls, 'data-gw-progress-log-row')
+    expect(rows.map((row) => row.props['data-gw-progress-log-row'])).toEqual([4, 5])
+    expect(rows.map((row) => row.props['data-state'])).toEqual(['doing', 'done'])
+    expect(rows.map((row) => texts(row).join(' '))).toEqual([
       `${clockOf(4)} 执行 任务 2 · 写文档 正在看`,
       `${clockOf(5)} 执行 任务 3 · 补测试 做完`,
     ])
-    // Nothing is shipped yet, so the card names the gap instead of guessing a draft.
-    expect(hooksOf(page, 'data-gw-progress-final')).toHaveLength(0)
-    expect(textOf(page, 'data-gw-progress-final-missing')).toBe('这一轮没有交卷稿')
-    // A run that is still working asks for no click: the dock is one quiet line.
-    expect(hooksOf(page, 'data-gw-progress-dock-fill')).toHaveLength(0)
-    expect(textOf(page, 'data-gw-progress-quiet')).toBe('不用你说话，好了叫你')
-  })
 
-  it('done: 已完成 — every step passed, the shipped draft named', () => {
-    const { run, story } = storyOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
-    expect(story.state).toBe('done')
-    expect(story.now).toEqual({ titleKey: 'done', title: '' })
-    expect(story.now.role).toBeUndefined()
-    expect(story.attempt).toBeUndefined()
-    expect(story.rest).toEqual([])
-    expect(story.final?.draft).toBe(1)
-    expect(story.final?.label).toBe('汇总')
+    // A second node opens on its own, and the first one stays open.
+    ;(hooksOf(opened, 'data-gw-progress-node-toggle')[1]!.props['onClick'] as () => void)()
+    const both = view.run()
+    // Both are open, and they read in document order: the node earlier in the flow first,
+    // whatever order the reader clicked them in.
+    expect(hooksOf(both, 'data-gw-progress-node-calls').map((tree) => tree.props['data-gw-progress-node-calls']))
+      .toEqual(['flow:1:execute:1', 'flow:3:execute:1'])
 
-    const page = pageOf(run, { canOpen: (childId: string) => childId === 'child-4', fillDraft: () => true })
-    expect(textOf(page, 'data-gw-progress-chip')).toBe('已完成')
-    expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('done')
-    // The finished page stops naming a step; it states what the run settled.
-    expect(textOf(page, 'data-gw-progress-now')).toBe('做好了')
-    expect(texts(hookOf(page, 'data-gw-progress-sub'))).toEqual(['1 步全过'])
-    expect(hooksOf(page, 'data-gw-progress-step').map((step) => step.props['data-state'])).toEqual(['done'])
-    // A recovered failure is history: no amber bar on a page whose run ended clean.
-    expect(hooksOf(page, 'data-gw-progress-flag')).toHaveLength(0)
-    expect(hooksOf(page, 'data-gw-progress-rest')).toHaveLength(0)
-
-    expect(hooksOf(page, 'data-gw-progress-plan-row').map((row) => texts(row).join(' '))).toEqual([
-      '1 任务 1 · 修复登录 执行 → 检查 过了',
-    ])
-    expect(hooksOf(page, 'data-gw-progress-log-row').map((row) => texts(row).join(' '))).toEqual([
-      `${clockOf(1)} 规划助手 规划 做完`,
-      `${clockOf(2)} 执行 任务 1 · 修复登录 做完`,
-      `${clockOf(3)} 检查 任务 1 · 修复登录 过了`,
-      `${clockOf(4)} 汇总·第1稿 汇总 交卷`,
-    ])
-
-    // The card: the draft the gate shipped, its mark, and the one control that opens it.
-    expect(textOf(page, 'data-gw-progress-final-title')).toBe('交卷')
-    expect(textOf(page, 'data-gw-progress-final-name')).toBe('汇总·第1稿')
-    expect(textOf(page, 'data-gw-progress-final-mark')).toBe('（定稿）')
-    const open = hookOf(page, 'data-gw-progress-open')
-    expect(open.props['data-gw-progress-open']).toBe('child-4')
-    expect(open.props['type']).toBe('button')
-    expect(open.props['aria-label']).toBe('打开子会话')
-    // The events never carried the draft's text, so the card carries no body (§19.7.2).
-    expect(texts(page).join('\n')).not.toContain('登录修好了')
-
-    expect(textOf(page, 'data-gw-progress-dock-fill')).toBe('收下这版')
-    expect(textOf(page, 'data-gw-progress-dock-hint')).toBe('不满意就说，我重做')
-    expect(hooksOf(page, 'data-gw-progress-quiet')).toHaveLength(0)
-  })
-
-  it('failed: 未通过 — the amber bar counts the attempt of the unit still broken', () => {
-    const running = storyOf(brokenCalls)
-    expect(running.story.state).toBe('running')
-    expect(running.story.at).toBe(2)
-    expect(running.story.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
-    expect(running.story.attempt).toEqual({ n: 2, retrying: true })
-    expect(running.story.steps.map((step) => [step.number, step.state])).toEqual([[1, 'done'], [2, 'failed'], [3, 'cancelled']])
-
-    const live = pageOf(running.run)
-    expect(textOf(live, 'data-gw-progress-chip')).toBe('进行中')
-    expect(textOf(live, 'data-gw-progress-flag')).toBe('第 2 遍没过，正在重看')
-    expect(textOf(live, 'data-gw-progress-rest')).toBe('后面还有：任务 3 · 补测试')
-    expect(hooksOf(live, 'data-gw-progress-step').map((step) => step.props['data-state'])).toEqual(['done', 'failed', 'cancelled'])
-    // The step list says 没过 for the broken step and 没做 for the cancelled one.
-    expect(hooksOf(live, 'data-gw-progress-plan-row').map((row) => texts(row).join(' '))).toEqual([
-      '1 任务 1 · 修复登录 执行 过了',
-      '2 任务 2 · 写文档 执行 没过',
-      '3 任务 3 · 补测试 执行 没做',
-    ])
-    // …and the log keeps each attempt's own line, with its own word.
-    expect(hooksOf(live, 'data-gw-progress-log-row').map((row) => texts(row).join(' '))).toEqual([
-      `${clockOf(1)} 执行 任务 1 · 修复登录 做完`,
-      `${clockOf(2)} 执行 任务 2 · 写文档 没过`,
-      `${clockOf(3)} 执行 任务 2 · 写文档 正在看`,
-      `${clockOf(4)} 执行 任务 3 · 补测试 取消`,
-    ])
-
-    // The same stream once the run ends: the chip says 未通过 and the bar stops claiming a
-    // recheck is running.
-    const ended = storyOf(brokenCalls, { stopReason: 'error' })
-    expect(ended.story.state).toBe('failed')
-    expect(ended.story.attempt).toEqual({ n: 2, retrying: false })
-    const page = pageOf(ended.run)
-    expect(textOf(page, 'data-gw-progress-chip')).toBe('未通过')
-    expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('failed')
-    expect(textOf(page, 'data-gw-progress-flag')).toBe('第 2 遍没过')
-    // The engine's own word survives: a cancelled run says 已取消, never 未通过.
-    const cancelled = storyOf(brokenCalls, { stopReason: 'cancelled' })
-    expect(cancelled.story.state).toBe('cancelled')
-    expect(textOf(pageOf(cancelled.run), 'data-gw-progress-chip')).toBe('已取消')
+    // Clicking the first one again closes only that one.
+    ;(hooksOf(both, 'data-gw-progress-node-toggle')[3]!.props['onClick'] as () => void)()
+    const one = view.run()
+    expect(hooksOf(one, 'data-gw-progress-node-calls').map((tree) => tree.props['data-gw-progress-node-calls']))
+      .toEqual(['flow:1:execute:1'])
   })
 
   it('adds no number the events did not report', () => {
-    // No percentage, no ETA, no pass rate, no planned total: the page states steps and
-    // lines, and every figure it prints is one of those counts (§19.7.3).
+    // No percentage, no ETA, no pass rate: the page states nodes and calls, and the one
+    // count line is a count over nodes (§19.7.3).
     const runs = [
-      storyOf(waitingCalls).run,
-      storyOf(runningCalls).run,
-      storyOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' }).run,
-      storyOf(brokenCalls).run,
+      flowOf(waitingCalls).run,
+      flowOf(runningCalls).run,
+      flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' }).run,
+      flowOf(brokenCalls).run,
     ]
     for (const run of runs) {
       const copy = pageTexts(pageOf(run)).join('\n')
@@ -2384,7 +2402,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
    * all, `update` folds it into the state, `buildViewNode` turns the state into the node
    * the component reads. A field the fold knows and the view definition forgets is
    * invisible to a fold-only test, and that is exactly how a shipped draft went missing:
-   * the card said 「这一轮没有交卷稿」 for a run whose recorder had written the claim.
+   * the page said 「这一轮没有交卷稿」 for a run whose recorder had written the claim.
    */
   describe("the shell's own path: match, update, buildViewNode", () => {
     type Match = { id: string, role: string, event: Record<string, unknown> }
@@ -2428,8 +2446,8 @@ describe('client progress tab: the one-page story (three screens)', () => {
           expect(node, 'the tab must still build a node').not.toBeNull()
           return node!.data
         },
-        story(): ProgressStory {
-          return progress.deriveProgressStory(this.run())
+        flow(): ProgressFlow {
+          return progress.deriveProgressFlow(this.run())
         },
       }
     }
@@ -2447,19 +2465,18 @@ describe('client progress tab: the one-page story (three screens)', () => {
       // A dropped type is silent in production and fatal here: the tab never hears it.
       expect(fed, 'no recorder event may be dropped by the tab').not.toContain('dropped')
       expect(fed[fed.length - 1]).toBe('update')
-      // The state, the node's data and the story all have to carry it: the component only
+      // The state, the node's data and the flow all have to carry it: the component only
       // ever sees the node's data.
       expect((tab as unknown as { run(): ProgressRun }).run().summaryFinalDraft).toBe(1)
-      expect(tab.story().final?.draft).toBe(1)
+      expect(tab.flow().final?.draft).toBe(1)
       // …then the run closes, still in that order.
       for (const event of events.slice(claimAt + 1)) fed.push(tab.feed(event))
       expect(fed).not.toContain('dropped')
-      expect(tab.story().final?.draft, 'run-end must not forget the shipped draft').toBe(1)
-      expect(tab.story().state).toBe('done')
-      // And the page shows the card instead of the gap.
+      expect(tab.flow().final?.draft, 'run-end must not forget the shipped draft').toBe(1)
+      expect(tab.flow().state).toBe('done')
+      // And the page numbers the summary node with the draft it shipped.
       const page = pageOf(tab.run(), { fillDraft: () => true })
-      expect(textOf(page, 'data-gw-progress-final-name')).toBe('汇总·第1稿')
-      expect(pageTexts(page)).not.toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.final.missing'])
+      expect(texts(hookOf(page, 'data-gw-progress-node-ord'))).toEqual(['第 1 稿'])
     })
 
     it('keeps every recorder event type on the tab\'s own update list', () => {
@@ -2495,106 +2512,74 @@ describe('client progress tab: the one-page story (three screens)', () => {
   })
 
   /**
-   * The two rules that only show up on a run with **no plan tasks** (§19.9).
+   * A run with no plan tasks.
    *
-   * A run whose calls are its own legs — no `任务 n · 标题` phase anywhere — used to be
-   * stepped by every row, so the planner and the synthesizer became "things to do" and a
-   * real run shipped 「第 1 步，共 1 步：要干的 1 件事 · 规划 在做」. The steps are now the
-   * work legs only, read off each row's label with the chain's own words; the planner and
-   * the synthesizer keep their history lines and take no step.
-   *
-   * The three expectations below are the typed suite's own, copied verbatim.
+   * Its legs are the whole flow: the planner writes the plan, the worker does the work, the
+   * verifier checks it and the reviewer approves it, and each of them is a node of its own.
    */
-  describe('a run with no plan tasks: the work legs are the steps', () => {
-    /** One story, projected onto the fields the typed side pins. */
-    function projection(story: ProgressStory) {
-      return {
-        state: story.state,
-        at: story.at,
-        total: story.total,
-        now: story.now,
-        rest: story.rest,
-        dock: story.dock,
-        steps: story.steps.map((step) => ({ key: step.key, title: step.title, state: step.state })),
-        log: story.log.map((row) => ({ seq: row.seq, role: row.role, title: row.title, state: row.state })),
-      }
-    }
-
-    it('steps only the do / check / review legs, and names the leg it is on', () => {
-      // seq 4 is open: the review leg is the one being worked, and it is the headline.
-      const { story } = storyOf([
+  describe('a run with no plan tasks: the legs are the nodes', () => {
+    it('draws one node per leg, in declaration order, and highlights the open one', () => {
+      const { flow } = flowOf([
         [1, '规划助手', '规划', 'completed'],
         [2, '执行', '执行', 'completed'],
         [3, '检查', '检查', 'completed'],
         [4, '复核', '复核', undefined],
       ])
-      expect(projection(story)).toEqual({
-        state: 'running',
-        at: 3,
-        total: 3,
-        now: { title: '复核', role: '复核' },
-        rest: [],
-        dock: 'quiet',
-        steps: [
-          { key: 'seq:2', title: '执行', state: 'done' },
-          { key: 'seq:3', title: '检查', state: 'done' },
-          { key: 'seq:4', title: '复核', state: 'doing' },
-        ],
-        log: [
-          { seq: 1, role: '规划助手', title: '规划', state: 'done' },
-          { seq: 2, role: '执行', title: '执行', state: 'done' },
-          { seq: 3, role: '检查', title: '检查', state: 'done' },
-          { seq: 4, role: '复核', title: '复核', state: 'doing' },
-        ],
-      })
+      expect(flow.nodes.map((node) => [node.kind, node.ordinal, node.state])).toEqual([
+        ['start', 0, 'done'],
+        ['plan', 1, 'done'],
+        ['execute', 1, 'done'],
+        ['check', 1, 'done'],
+        ['review', 1, 'doing'],
+        ['end', 0, 'pending'],
+      ])
+      expect(flow.at).toBe(5)
+      expect(flow.remaining).toBe(1)
+      expect(texts(hookOf(pageOf(flowOf([
+        [1, '规划助手', '规划', 'completed'],
+        [2, '执行', '执行', 'completed'],
+        [3, '检查', '检查', 'completed'],
+        [4, '复核', '复核', undefined],
+      ]).run), 'data-gw-progress-left')).join(' ')).toBe('还剩 1 步 / 共 6 步')
     })
 
-    it('says it is still planning when nothing has run yet, not that it is on step 0', () => {
-      const { story } = storyOf([[1, '规划助手', '规划', 'completed']])
-      expect(projection(story)).toEqual({
-        state: 'running',
-        at: 0,
-        total: 0,
-        now: { titleKey: 'planning', title: '' },
-        rest: [],
-        dock: 'quiet',
-        steps: [],
-        log: [{ seq: 1, role: '规划助手', title: '规划', state: 'done' }],
-      })
-    })
+    it('keeps the planner and the synthesizer as legs of their own, never as steps', () => {
+      // One planner row and nothing else: the run is still running, and the page's count is
+      // over nodes, not over a plan nobody wrote.
+      const planned = flowOf([[1, '规划助手', '规划', 'completed']])
+      expect(planned.flow.nodes.map((node) => node.kind)).toEqual(['start', 'plan', 'end'])
+      expect(planned.flow.state).toBe('running')
+      expect(planned.flow.at).toBe(3)
+      expect(planned.flow.remaining).toBe(0)
 
-    it('says the run is done when the synthesizer ends it, with no step to count', () => {
-      const { story } = storyOf([[1, '汇总助手', '汇总', 'completed']], { stopReason: 'completed' })
-      expect(projection(story)).toEqual({
-        state: 'done',
-        at: 0,
-        total: 0,
-        now: { titleKey: 'done', title: '' },
-        rest: [],
-        dock: 'accept',
-        steps: [],
-        log: [{ seq: 1, role: '汇总助手', title: '汇总', state: 'done' }],
-      })
+      const shipped = flowOf([[1, '汇总助手', '汇总', 'completed']], { stopReason: 'completed' })
+      expect(shipped.flow.nodes.map((node) => node.kind)).toEqual(['start', 'summarize', 'end'])
+      expect(shipped.flow.state).toBe('done')
+      expect(shipped.flow.at).toBe(3)
+      const page = pageOf(shipped.run, { fillDraft: () => true })
+      expect(texts(hookOf(page, 'data-gw-progress-dock-fill'))).toEqual(['收下这版'])
     })
   })
 
   /**
-   * One history line is one line (§19.5).
+   * One call line is one line (§19.5).
    *
-   * The row is a three-column grid — clock, then role and task, then the state word — and a
-   * real session showed every line drawn twice: the task name was a fourth child of a
-   * three-column grid, so it took the word's column and pushed the word onto a second row,
-   * leaving a green 「做完」 hanging under the clock. The task name belongs in the middle
-   * cell beside the role, and a name identical to the role says nothing at all.
+   * The row is a three-column grid — clock, then the gate and word — and a real session
+   * showed every line drawn twice: the task name was a fourth child of a three-column grid,
+   * so it took the word's column and pushed the word onto a second row.
    */
-  describe('one history line is one line', () => {
-    it('keeps the clock, the role + task and the word on one row', () => {
-      const { run, story } = storyOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
-      const page = pageOf(run, { fillDraft: () => true })
+  describe('one call line is one line', () => {
+    it('keeps the clock, the gate and the word on one row', () => {
+      const { run } = flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+      const view = mount(run, { fillDraft: () => true })
+      // Every node with calls, opened: the widest page this design can draw.
+      for (const toggle of hooksOf(view.run(), 'data-gw-progress-node-toggle')) {
+        ;(toggle.props['onClick'] as () => void)()
+      }
+      const page = view.run()
       const rows = hooksOf(page, 'data-gw-progress-log-row')
-      expect(rows).toHaveLength(story.log.length)
+      expect(rows).toHaveLength(doneCalls.length)
       for (const row of rows) {
-        // Three cells and no fourth: the row's own children are clock, line, word.
         const children = row.children as Element[]
         expect(children.map((cell) => cell.props['data-gw-progress-log-time'] === true ? 'time'
           : cell.props['data-gw-progress-log-line'] === true ? 'line'
@@ -2606,7 +2591,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
         const words = (line.children as Element[]).filter((child) => child.props['data-gw-progress-log-word'] === true)
         expect(words).toHaveLength(0)
       }
-      // The role leads the middle cell, and a differing task name follows it.
+      // The gate leads the middle cell, and a differing task name follows it.
       const firstNamed = rows.find((row) => hooksOf(row, 'data-gw-progress-log-name').length === 1)!
       const line = (firstNamed.children as Element[])[1]!
       expect((line.children as Element[]).map((child) => child.props['data-gw-progress-log-role'] === true ? 'role' : 'name'))
@@ -2616,14 +2601,17 @@ describe('client progress tab: the one-page story (three screens)', () => {
     it('does not print a task name that is only the role said twice', () => {
       // Every row of this run has `phase === role` (`执行 执行`), which is the shape a run
       // with no plan tasks logs. The name is dropped; the role and the word stay.
-      const { run, story } = storyOf([
+      const { run } = flowOf([
         [1, '规划助手', '规划', 'completed'],
         [2, '执行', '执行', 'completed'],
         [3, '检查', '检查', 'completed'],
       ])
-      expect(story.log.map((row) => [row.role, row.title])).toEqual([['规划助手', '规划'], ['执行', '执行'], ['检查', '检查']])
-      const page = pageOf(run)
-      const rows = hooksOf(page, 'data-gw-progress-log-row')
+      const view = mount(run)
+      for (const toggle of hooksOf(view.run(), 'data-gw-progress-node-toggle')) {
+        ;(toggle.props['onClick'] as () => void)()
+      }
+      const rows = hooksOf(view.run(), 'data-gw-progress-log-row')
+      expect(rows).toHaveLength(3)
       // 规划助手 ≠ 规划: that one still names its task.
       expect(hooksOf(rows[0]!, 'data-gw-progress-log-name')).toHaveLength(1)
       // 执行 === 执行 and 检查 === 检查: neither repeats itself.
@@ -2643,6 +2631,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
     expect(pageTexts(page)).toEqual([bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title']])
     expect(hooksOf(page, 'data-gw-progress-dock')).toHaveLength(0)
     expect(hooksOf(page, 'data-gw-progress-chip')).toHaveLength(0)
+    expect(hooksOf(page, 'data-gw-progress-flow')).toHaveLength(0)
     // The stylesheet is part of the tab's own tree, so it leaves when the tab unmounts.
     expect(hooksOf(page, 'data-gw-progress-css')).toHaveLength(1)
   })
@@ -2658,7 +2647,8 @@ describe('client progress tab: the one-page story (three screens)', () => {
     }
     const tree = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select(broken) })
     expect(hooksOf(tree, 'data-gw-progress-chip')).toHaveLength(1)
-    expect(textOf(tree, 'data-gw-progress-now')).toBe('正在拆活')
+    // A row it cannot read as a leg keeps the page standing: it lands on the start node.
+    expect(nodesOf(tree).map((node) => node.props['data-kind'])).toEqual(['start', 'end'])
     expect(pageTexts(tree).join('\n')).not.toContain('NaN')
     // The undamaged opposite: no run at all is the empty page, and nothing else.
     const empty = { runs: [], activeRun: undefined }
@@ -2795,11 +2785,17 @@ describe('client progress tab: the button fills the box instead of sending', () 
   })
 
   it('renders no button at all when the composition has no conversation service', () => {
-    // The tab is a bonus: without the face it degrades to the quiet line instead of
-    // pretending it filled something.
+    // The tab is a bonus: without the face it draws no button rather than pretending it
+    // filled something — and it says nothing about it either, because the quiet line and
+    // every other sentence left with the four-zone page.
     const view = renderWith(injectedProps(servicesOf(undefined)), waitingRun())
-    expect(walk(view.run()).filter((element) => element.props['data-gw-progress-dock-fill'] === true)).toHaveLength(0)
-    expect(texts(walk(view.run()).find((element) => element.props['data-gw-progress-quiet'] === true)!).join('')).toBe('不用你说话，好了叫你')
+    const tree = walk(view.run())
+    expect(tree.filter((element) => element.props['data-gw-progress-dock-fill'] === true)).toHaveLength(0)
+    // The dock is still there, with nothing in it: no button, no line.
+    const dock = tree.find((element) => element.props['data-gw-progress-dock'] === true)!
+    expect(dock).toBeDefined()
+    expect(texts(dock)).toEqual([])
+    expect(tree.filter((element) => element.props['data-gw-progress-quiet'] === true)).toHaveLength(0)
   })
 
   it('never claims the box was filled when the editor refuses', () => {
@@ -2813,7 +2809,7 @@ describe('client progress tab: the button fills the box instead of sending', () 
     expect(texts(view.run()).join('\n')).not.toContain('已填进输入框')
   })
 
-  it('keeps the page inert apart from the button and the open capsule', () => {
+  it('keeps the page inert apart from the node toggles and the dock button', () => {
     const record = recorder()
     const run: ProgressRun = {
       runId: 'r-inert',
@@ -2829,16 +2825,15 @@ describe('client progress tab: the button fills the box instead of sending', () 
     const view = renderWith(injectedProps(servicesOf(record)), run)
     const tree = walk(view.run())
     const controls = tree.filter((element) => element.props['onClick'] !== undefined)
-    // Four kinds of control, and nothing else: the task row that opens its own lines, the
-    // capsule that opens the shipped row, and the dock's one button. (This history is two
-    // lines long, so the fold's toggle deliberately does not exist here.)
+    // Two kinds of control, and nothing else: a node opens its own calls, the dock offers
+    // its one button, and the run's end is the only other node — it holds no call, so it
+    // has no toggle at all.
     expect(controls.map((element) =>
       element.props['data-gw-progress-dock-fill'] === true ? 'dock'
-        : element.props['data-gw-progress-plan-toggle'] === true ? 'row'
-          : element.props['data-gw-progress-log-toggle'] === true ? 'fold'
-            : 'open')).toEqual(['row', 'open', 'dock'])
-    // Everything else — the header, the segments, the plan rows, the log rows, the card —
-    // is a static mark: no handler, no tab stop.
+        : element.props['data-gw-progress-node-toggle'] !== undefined ? 'node'
+          : 'stray')).toEqual(['node', 'node', 'dock'])
+    // Everything else — the header, the nodes, the count line — is a static mark: no
+    // handler, no tab stop.
     for (const element of tree) {
       if (element.props['onClick'] !== undefined) continue
       expect(element.props['tabIndex']).toBeUndefined()
@@ -2922,17 +2917,18 @@ describe('client progress tab: Guardian monitor side lane', () => {
 
 
 /**
- * The layout detail: the Guardian beside the page, a task row that opens, a history that
- * folds.
+ * The flowchart's body: one column of nodes, a measured wire layer, and a call list that
+ * opens under the node it belongs to.
  *
- * Three contracts are pinned here, and each is one a reader would otherwise have to trust.
- * The two-column body exists **only** when the stream recorded a started guardian — a run
- * without one keeps exactly the page that shipped before, with no wrapper and no empty
- * column. A task row opens into the *same* lines the history draws, so the detail cannot
- * drift into a second, incompatible row shape. And a long history is capped instead of
- * pushing the dock off the page.
+ * What is pinned here is geometry and colour, because both are hand-written JavaScript the
+ * host serves verbatim and neither can be type-checked. The text of each screen is
+ * `test/client.spec.ts`'s earlier block; the retirement list is
+ * `test/progress-connector.spec.ts`'s. Four facts a reader would otherwise have to trust:
+ * the page reads down one column (no second column, ever), a node's calls open from that
+ * node and from nowhere else, every node state has exactly one colour token and none of
+ * them is red, and the wires are measured from the laid-out nodes instead of invented.
  */
-describe('client progress tab: the two-column body, open task rows and the folded history', () => {
+describe('client progress tab: nodes, calls and the wire layer', () => {
   const progress = bundle.GROK_WORKFLOW_PROGRESS
   const t = translator('zh')
 
@@ -3008,18 +3004,6 @@ describe('client progress tab: the two-column body, open task rows and the folde
     [4, '汇总·第1稿', '任务 1 · 修复登录', 'completed'],
   ]
 
-  /** Eight declared calls: one more than the fold leaves standing open. */
-  const eightLines: readonly Call[] = [
-    [1, '执行', '任务 1 · 读代码', 'completed'],
-    [2, '检查', '任务 1 · 读代码', 'completed'],
-    [3, '执行', '任务 2 · 写代码', 'completed'],
-    [4, '检查', '任务 2 · 写代码', 'completed'],
-    [5, '执行', '任务 3 · 补测试', 'completed'],
-    [6, '检查', '任务 3 · 补测试', 'completed'],
-    [7, '执行', '任务 4 · 收尾', 'completed'],
-    [8, '检查', '任务 4 · 收尾', 'completed'],
-  ]
-
   /** Render the tab for one run without the hook cells (a single pass). */
   function pageOf(run: ProgressRun | undefined, extra: Record<string, unknown> = {}): unknown {
     const snapshot = run === undefined ? { runs: [], activeRun: undefined } : { runs: [run], activeRun: run }
@@ -3059,6 +3043,11 @@ describe('client progress tab: the two-column body, open task rows and the folde
     return texts(row).join(' ')
   }
 
+  /** The page's own copy, without the scoped stylesheet (which is a text child of the tree). */
+  function pageTexts(page: unknown): string[] {
+    return texts(page).filter((text) => text !== progress.css)
+  }
+
   /** Click the element carrying one hook. */
   function click(element: Element): void {
     const onClick = element.props['onClick']
@@ -3066,53 +3055,55 @@ describe('client progress tab: the two-column body, open task rows and the folde
     ;(onClick as () => void)()
   }
 
-  it('puts the guardian in a right column only when a guardian started', () => {
+  /**
+   * The bundle the host serves, read once: the wire layer's own code is part of its
+   * contract, and no render can show a measurement a stub renderer never runs.
+   */
+  const PROGRESS_SOURCE = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+
+  /** One rule of the scoped stylesheet, by its selector, or `undefined` when it is not there. */
+  function ruleOf(selector: string): string | undefined {
+    return progress.css.split('\n').find((line) => line.trim().startsWith(`${selector} {`))
+  }
+
+  /** The stylesheet from one media query on, or `''` when the query is not there. */
+  function mediaBlock(query: string): string {
+    const at = progress.css.indexOf(`@media (${query})`)
+    return at === -1 ? '' : progress.css.slice(at)
+  }
+
+  it('reads down the page: the header, the flow, the Guardian, then the count and the dock', () => {
     const page = pageOf(withGuardian(runOf(twoTasks)))
-    const columns = elementOf(page, 'data-gw-progress-columns')
-    expect(columns.props['className']).toBe('gw-progress-columns')
-    expect(columns.type).toBe('div')
-    // The body is [main, side]: the reading order is already the stacking order under 720px.
-    expect((columns.children as Element[]).map((child) =>
-      child.props['data-gw-progress-main'] === true ? 'main' : child.props['data-gw-progress-side'] === true ? 'side' : 'stray'))
-      .toEqual(['main', 'side'])
-
-    const main = elementOf(page, 'data-gw-progress-main')
-    expect(main.props['className']).toBe('gw-progress-main')
-    // The three sections the page reads in order, and not the guardian.
-    expect((main.children as Element[]).map((child) =>
-      child.props['data-gw-progress-plan-section'] === true ? 'plan'
-        : child.props['data-gw-progress-log-section'] === true ? 'log'
-          : child.props['data-gw-progress-final-section'] === true ? 'final' : 'stray'))
-      .toEqual(['plan', 'log', 'final'])
-    expect(elementsOf(main, 'data-gw-progress-guardian')).toHaveLength(0)
-
-    const side = elementOf(page, 'data-gw-progress-side')
-    // The panel keeps its own `aside` identity, its state and its reader label.
-    const panel = elementsOf(side, 'data-gw-progress-guardian')
-    expect(panel).toHaveLength(1)
-    expect(panel[0]!.props['data-state']).toBe('active')
-    expect(panel[0]!.props['aria-label']).toBe('Guardian 监控')
-
-    // The header, the step bar, the amber bar and the rest line stay above the grid, and the
-    // dock stays below it at full width.
-    for (const above of ['data-gw-progress-bar', 'data-gw-progress-now', 'data-gw-progress-steps']) {
-      expect(elementsOf(columns, above), above).toHaveLength(0)
-    }
-    expect(elementsOf(columns, 'data-gw-progress-dock')).toHaveLength(0)
-    expect(elementsOf(page, 'data-gw-progress-dock')).toHaveLength(1)
+    const order = walk(page)
+    const at = (hook: string) => order.indexOf(elementOf(page, hook))
+    expect(at('data-gw-progress-bar')).toBeGreaterThanOrEqual(0)
+    expect(at('data-gw-progress-flow')).toBeGreaterThan(at('data-gw-progress-bar'))
+    // The wire layer sits inside the flow, before the nodes it is drawn behind.
+    expect(at('data-gw-progress-wires')).toBeGreaterThan(at('data-gw-progress-flow'))
+    expect(at('data-gw-progress-wires')).toBeLessThan(at('data-gw-progress-nodes'))
+    expect(at('data-gw-progress-guardian')).toBeGreaterThan(at('data-gw-progress-nodes'))
+    expect(at('data-gw-progress-left')).toBeGreaterThan(at('data-gw-progress-guardian'))
+    expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-left'))
+    // The count line and the dock share the footer, which closes the page.
+    const footer = order.filter((element) => element.props['className'] === 'gw-progress-foot')
+    expect(footer, 'the footer is missing, or drawn twice').toHaveLength(1)
+    expect(elementsOf(footer[0]!, 'data-gw-progress-left')).toHaveLength(1)
+    expect(elementsOf(footer[0]!, 'data-gw-progress-dock')).toHaveLength(1)
   })
 
-  it('keeps a run without a guardian as the plain page: no wrapper, no empty column', () => {
-    const page = pageOf(runOf(twoTasks))
-    expect(elementsOf(page, 'data-gw-progress-columns')).toHaveLength(0)
-    expect(elementsOf(page, 'data-gw-progress-main')).toHaveLength(0)
-    expect(elementsOf(page, 'data-gw-progress-side')).toHaveLength(0)
-    expect(elementsOf(page, 'data-gw-progress-plan-section')).toHaveLength(1)
-    expect(elementsOf(page, 'data-gw-progress-log-section')).toHaveLength(1)
-    expect(elementsOf(page, 'data-gw-progress-final-section')).toHaveLength(1)
-    // A guardian that never started is not a column either.
-    const never = pageOf(withGuardian(runOf(twoTasks), { ...GUARDIAN, started: false }))
-    expect(elementsOf(never, 'data-gw-progress-columns')).toHaveLength(0)
+  it('wraps the Guardian in no column of its own: the page is one flow, top to bottom', () => {
+    const page = pageOf(withGuardian(runOf(twoTasks)))
+    // The retired two-column body is gone with its names, so nothing may reintroduce it.
+    for (const gone of ['data-gw-progress-columns', 'data-gw-progress-main', 'data-gw-progress-side']) {
+      expect(elementsOf(page, gone), gone).toHaveLength(0)
+    }
+    // The panel is a sibling of the flow, and it is the only one on the page.
+    expect(elementsOf(page, 'data-gw-progress-guardian')).toHaveLength(1)
+    expect(elementsOf(elementOf(page, 'data-gw-progress-flow'), 'data-gw-progress-guardian')).toHaveLength(0)
+    // A run that recorded no Guardian draws none, and the flow is still the page.
+    const plain = pageOf(runOf(twoTasks))
+    expect(elementsOf(plain, 'data-gw-progress-guardian')).toHaveLength(0)
+    expect(elementsOf(plain, 'data-gw-progress-nodes')).toHaveLength(1)
   })
 
   it('draws the guardian as blocks: three tiles and a full-width findings block', () => {
@@ -3153,150 +3144,156 @@ describe('client progress tab: the two-column body, open task rows and the folde
     expect(progress.css).toMatch(/\.gw-progress-guardian-block \{[^}]*min-width: 0/)
   })
 
-  it('opens one task row into its own lines, and closes it again', () => {
+  it('opens one node into its own calls: clock, gate, task, word and the capsule', () => {
     const view = mount(runOf(twoTasks), { canOpen: (childId: string) => childId === 'child-2' })
-    const closed = view.run()
-    expect(elementsOf(closed, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['false', 'false'])
-    expect(elementsOf(closed, 'data-gw-progress-task-detail')).toHaveLength(0)
+    // The second node is the `执行` leg: one task, so one line — the node above names the
+    // leg, the line names the task that ran inside it.
+    click(elementsOf(view.run(), 'data-gw-progress-node-toggle')[1]!)
+    const calls = elementOf(view.run(), 'data-gw-progress-node-calls')
 
-    const toggles = elementsOf(closed, 'data-gw-progress-plan-toggle')
-    expect(toggles).toHaveLength(2)
-    const first = toggles[0]!
-    expect(first.type).toBe('button')
-    expect(first.props['type']).toBe('button')
-    expect(first.props['aria-expanded']).toBe(false)
-    expect(first.props['aria-controls']).toBe('gw-progress-task-detail-0')
-    expect(first.props['title']).toBe('详情')
-    // The row's visible text is today's: number, title, gates — the state word stays outside.
-    expect(wordsOf(first)).toBe('1 任务 1 · 修复登录 执行 → 检查')
-    expect(elementsOf(elementsOf(closed, 'data-gw-progress-plan-row')[0]!, 'data-gw-progress-plan-word')).toHaveLength(1)
-    // The toggles carry no glyph of their own: the affordance is the CSS `::after` chevron.
-    expect(texts(first).join('')).not.toMatch(/[▸▾►▼›⌄+−]/u)
-
-    // A click opens exactly that row.
-    click(first)
-    const opened = view.run()
-    expect(elementsOf(opened, 'data-gw-progress-plan-row')[0]!.props['data-open']).toBe('true')
-    expect(elementsOf(opened, 'data-gw-progress-plan-toggle')[0]!.props['aria-expanded']).toBe(true)
-    const detail = elementOf(opened, 'data-gw-progress-task-detail')
-    expect(detail.props['data-gw-progress-task-detail']).toBe('phase:任务 1 · 修复登录')
-    expect(detail.props['id']).toBe('gw-progress-task-detail-0')
-    expect(detail.props['className']).toBe('gw-progress-plan-detail')
-    // The lines below are list items, so the container is a list: valid nesting, and a
-    // screen reader hears one list of two lines instead of two orphans.
-    expect(detail.type).toBe('ol')
-
-    // One line per member of that step, in `seq` order, drawn by the history's own renderer.
-    // The row's header one line up already says the task and the gates, so the line says
-    // only what the header cannot: the moment, the gate, the result, and the entry — the
-    // gate as the chain chip, which *is* the role word, so the word is not printed twice.
-    const lines = elementsOf(detail, 'data-gw-progress-log-row')
-    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3])
-    expect(lines.map((line) => line.props['data-state'])).toEqual(['done', 'done'])
-    expect(lines.map(wordsOf)).toEqual([
-      `${clockOf(2)} 执行 做完 打开子会话`,
-      `${clockOf(3)} 检查 过了`,
-    ])
-    // Neither the role nor the task title is said twice: the chip is the one word for the
-    // gate, and the title lives on the header above.
-    for (const line of lines) {
-      expect(elementsOf(line, 'data-gw-progress-log-name')).toHaveLength(0)
-      expect(elementsOf(line, 'data-gw-progress-log-role')).toHaveLength(0)
-      expect(elementsOf(line, 'data-gw-progress-task-chain')).toHaveLength(1)
-      expect(texts(line).filter((text) => text === '任务 1 · 修复登录')).toHaveLength(0)
-    }
+    const lines = elementsOf(calls, 'data-gw-progress-log-row')
+    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2])
+    expect(lines.map((line) => line.props['data-state'])).toEqual(['done'])
+    expect(lines.map(wordsOf)).toEqual([`${clockOf(2)} 执行 任务 1 · 修复登录 做完 打开子会话`])
+    // The role is not said twice: the chip is the one word for the gate, and the role word
+    // behind it would be the same word again.
+    const line = lines[0]!
+    expect(elementsOf(line, 'data-gw-progress-log-role')).toHaveLength(0)
+    expect(elementsOf(line, 'data-gw-progress-log-name')).toHaveLength(1)
+    expect(elementsOf(line, 'data-gw-progress-task-chain')).toHaveLength(1)
     // The chain chip names the slot the row's role reached, with the chain's own word.
-    const chips = elementsOf(detail, 'data-gw-progress-task-chain')
-    expect(chips.map((chip) => chip.props['className'])).toEqual(['gw-progress-plan-chain', 'gw-progress-plan-chain'])
-    expect(chips.map((chip) => texts(chip).join(''))).toEqual(['执行', '检查'])
+    const chip = elementOf(calls, 'data-gw-progress-task-chain')
+    expect(chip.props['className']).toBe('gw-progress-call-chain')
+    expect(texts(chip).join('')).toBe('执行')
     // The capsule is the page's own, and only an openable child gets one.
-    const pill = elementsOf(lines[0]!, 'data-gw-progress-open')
+    const pill = elementsOf(line, 'data-gw-progress-open')
     expect(pill).toHaveLength(1)
     expect(pill[0]!.props['data-gw-progress-open']).toBe('child-2')
     expect(pill[0]!.props['type']).toBe('button')
-    expect(elementsOf(lines[1]!, 'data-gw-progress-open')).toHaveLength(0)
 
-    // A second row opens on its own, and the first one stays open: the rows are independent.
-    click(elementsOf(opened, 'data-gw-progress-plan-toggle')[1]!)
-    const both = view.run()
-    expect(elementsOf(both, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['true', 'true'])
-    expect(elementsOf(both, 'data-gw-progress-task-detail').map((node) => node.props['data-gw-progress-task-detail']))
-      .toEqual(['phase:任务 1 · 修复登录', 'phase:任务 2 · 写文档'])
-    expect(elementsOf(both, 'data-gw-progress-task-detail').map((node) => node.props['id']))
-      .toEqual(['gw-progress-task-detail-0', 'gw-progress-task-detail-1'])
-
-    // Clicking the first again closes it and leaves the second alone.
-    click(elementsOf(both, 'data-gw-progress-plan-toggle')[0]!)
-    const one = view.run()
-    expect(elementsOf(one, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['false', 'true'])
-    expect(elementsOf(one, 'data-gw-progress-task-detail').map((node) => node.props['data-gw-progress-task-detail']))
-      .toEqual(['phase:任务 2 · 写文档'])
+    // The `检查` leg is its own node, so its line stands alone and nobody could open it.
+    const check = mount(runOf(twoTasks), { canOpen: (childId: string) => childId === 'child-2' })
+    click(elementsOf(check.run(), 'data-gw-progress-node-toggle')[2]!)
+    const checkCalls = elementOf(check.run(), 'data-gw-progress-node-calls')
+    const checkLine = elementOf(checkCalls, 'data-gw-progress-log-row')
+    expect(wordsOf(checkLine)).toBe(`${clockOf(3)} 检查 任务 1 · 修复登录 过了`)
+    expect(elementsOf(checkLine, 'data-gw-progress-open')).toHaveLength(0)
   })
 
   it('leaves the chain chip off a line whose role names no slot', () => {
     const view = mount(runOf(mixedRoles))
-    click(elementOf(view.run(), 'data-gw-progress-plan-toggle'))
-    const detail = elementOf(view.run(), 'data-gw-progress-task-detail')
-    const lines = elementsOf(detail, 'data-gw-progress-log-row')
-    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3, 4])
-    // The summary row shares the task's phase but speaks the 汇总 role: no slot, no chip,
-    // and the row is still there — the detail drops no declared line. With no chip to stand
-    // in for it, the role word stays: the line never ends up wordless about who ran.
-    expect(elementsOf(detail, 'data-gw-progress-task-chain')).toHaveLength(2)
-    expect(elementsOf(lines[2]!, 'data-gw-progress-log-role')).toHaveLength(1)
-    expect(texts(lines[2]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 做完`)
+    // The summary row shares the task's phase but speaks the 汇总 role: no slot, so it keeps
+    // its role word instead of a chip, and the row is still there — the calls drop no
+    // declared line, and the line never ends up wordless about who ran.
+    click(elementsOf(view.run(), 'data-gw-progress-node-toggle')[3]!)
+    const calls = elementOf(view.run(), 'data-gw-progress-node-calls')
+    const lines = elementsOf(calls, 'data-gw-progress-log-row')
+    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([4])
+    expect(elementsOf(calls, 'data-gw-progress-task-chain')).toHaveLength(0)
+    expect(elementsOf(lines[0]!, 'data-gw-progress-log-role')).toHaveLength(1)
+    expect(texts(lines[0]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 任务 1 · 修复登录 做完`)
   })
 
-  it('folds a history longer than six lines behind one toggle', () => {
-    const run = runOf(eightLines)
-    const view = mount(run)
-    const closed = view.run()
-    const list = elementOf(closed, 'data-gw-progress-log')
-    expect(list.props['id']).toBe('gw-progress-log-list')
-    expect(list.props['data-expanded']).toBe('false')
-
-    const toggle = elementOf(closed, 'data-gw-progress-log-toggle')
-    expect(toggle.type).toBe('button')
-    expect(toggle.props['type']).toBe('button')
-    expect(toggle.props['aria-expanded']).toBe(false)
-    expect(toggle.props['aria-controls']).toBe('gw-progress-log-list')
-    expect(texts(toggle).join('')).toBe('展开全部')
-    // The toggle sits in the history section, beside the heading it belongs to.
-    expect(elementsOf(elementOf(closed, 'data-gw-progress-log-section'), 'data-gw-progress-log-title')).toHaveLength(1)
-
-    click(toggle)
-    const opened = view.run()
-    expect(elementOf(opened, 'data-gw-progress-log').props['data-expanded']).toBe('true')
-    const unfolded = elementOf(opened, 'data-gw-progress-log-toggle')
-    expect(unfolded.props['aria-expanded']).toBe(true)
-    expect(texts(unfolded).join('')).toBe('收起')
-    // All eight lines are still drawn: the fold caps the height, it deletes nothing.
-    expect(elementsOf(opened, 'data-gw-progress-log-row')).toHaveLength(run.members.length)
-
-    // A short history keeps no toggle at all, and still says which side of the fold it is on.
-    const short = pageOf(runOf(twoTasks))
-    expect(elementsOf(short, 'data-gw-progress-log-toggle')).toHaveLength(0)
-    expect(elementOf(short, 'data-gw-progress-log').props['data-expanded']).toBe('false')
+  it('carries the flow geometry in the stylesheet: one wrapped row, one column when narrow', () => {
+    const nodes = ruleOf('.gw-progress-nodes')
+    expect(nodes, 'the node list has no rule').toBeDefined()
+    expect(nodes).toContain('display: flex')
+    expect(nodes).toContain('flex-wrap: wrap')
+    expect(nodes).toContain('min-width: 0')
+    expect(ruleOf('.gw-progress-node')).toContain('min-width: 0')
+    expect(ruleOf('.gw-progress-node')).toContain('max-width: 100%')
+    // The wire layer is painted behind the nodes, and it never takes a click.
+    const wires = ruleOf('.gw-progress-wires')
+    expect(wires, 'the wire layer has no rule').toBeDefined()
+    expect(wires).toContain('position: absolute')
+    expect(wires).toContain('pointer-events: none')
+    const drawn = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-wires path {'))
+    expect(drawn, 'the wires carry no stroke').toBeDefined()
+    expect(drawn).toContain('stroke: var(--dsw-alias-border-l2')
+    // Under 720px the nodes stand in one column, and the measured wires follow them down.
+    const narrow = mediaBlock('max-width: 720px')
+    expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
+    expect(narrow).toMatch(/\.gw-progress-nodes \{[^}]*flex-direction: column/)
+    // Under 480px the dock stacks and the call rows drop their clock column.
+    const small = mediaBlock('max-width: 480px')
+    expect(small, 'the 480px breakpoint is gone').not.toBe('')
+    expect(small).toMatch(/\.gw-progress-dock \{[^}]*flex-direction: column/)
+    expect(small).toMatch(/\.gw-progress-node-calls \.gw-progress-log-time \{[^}]*display: none/)
+    // Nothing on this page scrolls sideways at any width.
+    expect(progress.css).not.toContain('overflow-x')
+    expect(progress.css).not.toContain('scroll-snap')
   })
 
-  it('carries the grid, the stacking rule and the height cap in the stylesheet', () => {
-    expect(progress.css).toMatch(/\.gw-progress-columns \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) 240px;[^}]*gap: 16px;[^}]*align-items: start;/)
-    expect(progress.css).toMatch(/\.gw-progress-main \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*min-width: 0;/)
-    expect(progress.css).toMatch(/\.gw-progress-side \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*gap: 10px;[^}]*min-width: 0;/)
-    // Under 720px the side column stacks under the main one: one column, DOM order decides.
-    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
-    expect(narrow, 'the 720px stacking rule is gone').not.toBe('')
-    expect(narrow).toMatch(/\.gw-progress-columns \{[^}]*grid-template-columns: minmax\(0, 1fr\);/)
-    // The cap is a fold, not a scroller in both directions.
-    expect(progress.css).toMatch(/\.gw-progress-log\[data-expanded="false"\] \{[^}]*max-height: 264px;[^}]*overflow-y: auto;/)
-    expect(progress.css).toMatch(/\.gw-progress-log\[data-expanded="true"\] \{[^}]*max-height: none;[^}]*overflow-y: visible;/)
-    expect(progress.css).not.toContain('overflow-x: auto')
-    // …and every rule is still scoped to the tab and free of literal colours.
-    const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
-    for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+  it('gives every node state exactly one colour token, and never a red one', () => {
+    // Four families, six states: a cancelled leg and a leg not reached yet are both "grey"
+    // only in the sense that neither is green — the cancelled one is amber, because the
+    // engine cancelled it, and only the unreached one is grey.
+    const states: Array<[string, string]> = [
+      ['done', '--dsw-alias-state-success-primary'],
+      ['doing', '--dsw-alias-state-business-primary'],
+      ['pending', '--dsw-alias-state-idle-primary'],
+      ['failed', '--dsw-alias-state-warn-primary'],
+      ['blocked', '--dsw-alias-state-warn-primary'],
+      ['cancelled', '--dsw-alias-state-warn-primary'],
+    ]
+    for (const [state, token] of states) {
+      const rule = ruleOf(`.gw-progress-node[data-state="${state}"] .gw-progress-node-dot`)
+      expect(rule, `no dot rule for ${state}`).toBeDefined()
+      expect(rule).toContain(token)
+    }
+    // The unreached node is the only dashed one, and the current one is the only one that
+    // breathes: two facts the eye reads without a sentence.
+    expect(ruleOf('.gw-progress-node[data-state="pending"]')).toContain('border-style: dashed')
+    expect(progress.css).toContain('.gw-progress-node[data-state="doing"] .gw-progress-node-dot')
+    expect(progress.css).toContain('@keyframes gw-progress-breathe')
+    // …and a reader who asked for less motion loses only the decoration.
+    const reduced = mediaBlock('prefers-reduced-motion: reduce')
+    expect(reduced, 'the reduced-motion block is gone').not.toBe('')
+    expect(reduced).toContain('animation: none')
+    expect(reduced).toContain('.gw-progress-node')
+    expect(reduced).toContain('.gw-progress-chip')
+  })
+
+  it('lays the wires from measured positions, and draws none where the layout has no line', () => {
+    // The layer exists on every page with a flow, it is decoration, and a host without
+    // layout (this stub renderer) measures nothing — so it draws nothing rather than
+    // inventing coordinates.
+    const page = pageOf(runOf(twoTasks))
+    const svg = elementOf(page, 'data-gw-progress-wires')
+    expect(svg.type).toBe('svg')
+    expect(svg.props['aria-hidden']).toBe('true')
+    expect((svg.children as unknown[]).flat(Infinity)).toHaveLength(0)
+    // The measurement is the only thing that knows where a node is, so the bundle must
+    // ship it, and it must re-measure on both things that move the nodes.
+    for (const part of ['measureProgressFlowWires', 'sameProgressWires', 'progressWireLine', 'ResizeObserver', "addEventListener('resize'"]) {
+      expect(PROGRESS_SOURCE, `${part} is missing`).toContain(part)
+    }
+    // The two retired measurements of the spine stay retired.
+    for (const gone of ['progressWireDraw', 'progressWireHead', 'PROGRESS_WIRE_PAD', 'PROGRESS_CARD_INDENT']) {
+      expect(PROGRESS_SOURCE, `${gone} is still shipped`).not.toContain(gone)
+    }
+  })
+
+  it('adds no literal colour, no error token and no new scroll container', () => {
+    expect(progress.css).toContain('color-mix(')
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
     expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(progress.css).not.toMatch(/\brgba?\(/)
-    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+    expect(progress.css).not.toMatch(/\bhsla?\(/)
+    // Every rule is scoped to the tab: nothing leaks into the rest of the shell.
+    const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
+    for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+    expect(progress.css).toContain('var(--dsw-font-family-sans')
+  })
+
+  it('prints no percentage, no estimate and no pass rate on the widest page it can draw', () => {
+    const view = mount(withGuardian(runOf(twoTasks)), { canOpen: () => true })
+    for (const toggle of elementsOf(view.run(), 'data-gw-progress-node-toggle')) click(toggle)
+    const copy = pageTexts(view.run()).join('\n')
+    expect(copy).toContain(zh('progress.log.done'))
+    expect(copy).not.toContain('%')
+    expect(copy).not.toMatch(/ETA|预计|通过率|剩余|大约/iu)
+    expect(elementsOf(view.run(), 'data-gw-progress-node-calls').length).toBeGreaterThan(0)
   })
 })
 

@@ -1,0 +1,22 @@
+CROSS-CHECK — the browser mirror against the typed derivation, same streams, field by field.
+command: node .rsi/evidence/progress-flowchart-2026-11-25/cross-check.mjs   (run from the worktree root; the script is kept beside this transcript)
+HEAD: 57dcf0410c62454b0ad62e1ca6b195c6e1da213d
+time: 2026-11-25T23:20:44+08:00
+src/progress-tab.ts sha256: eb237ff7143eee9538fd2938103dfe92ec92d07e511adcfc4e7c7968b6f0fdd5
+src/client/index.js sha256: d954f6c2e68d8db780cae8aef88089f350e7f745c78be3aaacca7ec0e3059863
+compared fields: state / at / total / remaining / final / every node key,kind,ordinal,state,member seqs
+
+===== transcript =====
+SAME  waiting
+SAME  real run, second draft shipped
+SAME  two planning visits
+SAME  one leg declared out of order
+SAME  a row naming no leg
+SAME  the guardian call
+SAME  a failed attempt being retried
+SAME  the same stream, ended broken
+SAME  a cancelled run
+SAME  english boundary calls
+ALL SAME
+
+===== exit: 0 =====

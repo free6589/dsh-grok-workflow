@@ -1,0 +1,32 @@
+GREEN — the same five spec files against the flowchart implementation.
+command: npx vitest run test/client.spec.ts test/progress-flow.spec.ts test/progress-connector.spec.ts test/progress-hint-absent.spec.ts test/i18n-parity.spec.ts
+HEAD: 57dcf0410c62454b0ad62e1ca6b195c6e1da213d  (branch feat/progress-flowchart, baseline main tip 57dcf04)
+time: 2026-11-25T23:20:50+08:00
+worktree: /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-progress-flowchart
+subject under test: src/client/index.js (340995 bytes, sha256 d954f6c2e68d8db780cae8aef88089f350e7f745c78be3aaacca7ec0e3059863)
+rebuilt artefacts: lib/client.js (340995 bytes, byte-identical to the source)
+the bundle export `deriveProgressFlow` was compared with `src/progress-tab.ts` field by field: cross-check.out
+
+===== transcript =====
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-progress-flowchart
+
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ✓ test/client.spec.ts (146 tests) 466ms
+ ✓ test/progress-connector.spec.ts (11 tests) 30ms
+ ✓ test/progress-flow.spec.ts (15 tests) 18ms
+ ✓ test/progress-hint-absent.spec.ts (7 tests) 14ms
+ ✓ test/i18n-parity.spec.ts (8 tests) 11ms
+
+ Test Files  5 passed (5)
+      Tests  187 passed (187)
+   Start at  23:20:51
+   Duration  1.73s (transform 424ms, setup 0ms, import 605ms, tests 540ms, environment 1ms)
+
+
+===== exit: 0 =====

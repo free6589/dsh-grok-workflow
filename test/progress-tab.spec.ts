@@ -7,20 +7,21 @@ import {
   PROGRESS_NODE_KIND,
   PROGRESS_STAGES,
   PROGRESS_VIEW_TARGET,
-  deriveProgressStory,
+  deriveProgressFlow,
   deriveTrack,
   detailFor,
   detailSourcesOf,
   foldProgressRuns,
   formatDuration,
   currentFailureCount,
+  isGuardianCard,
   nodeState,
   parseCoordinationBlock,
   percentOf,
   recoveredFailureSeqs,
   selectActiveRun,
 } from '../src/progress-tab.js'
-import type { ProgressEventRecord, ProgressMemberFact, ProgressRunFacts } from '../src/progress-tab.js'
+import type { ProgressEventRecord, ProgressFlow, ProgressMemberFact, ProgressRunFacts } from '../src/progress-tab.js'
 
 /**
  * The progress tab's pure rules.
@@ -905,226 +906,319 @@ describe('progress tab: the numbered names a run repeats', () => {
 })
 
 /**
- * The one-page story: the three screens (§19) as one pure derivation.
+ * The flow the page draws: one node per leg of the run.
  *
- * `src/client/index.js` repeats this function as hand-written JavaScript, so every case
- * here is also a fixture `test/client.spec.ts` renders. The rules are the contract's own
- * (§19.2): the five chip states read the run's facts and never the plan size, a step is a
- * plan task when the run declared any and one call otherwise, and the amber bar only
- * speaks for a failure of the *current* step that no later attempt replaced.
+ * `src/client/index.js` repeats `deriveProgressFlow` as hand-written JavaScript, so every
+ * case here is a fixture the browser half renders too. The rules pinned below are the
+ * contract's own (`.tmp/flowchart-contract.md` §3 / §4): a leg is read off a row's
+ * **label** (never its phase), a leg that ran again under its own number is its own node,
+ * a leg that ran again with no number folds into the node beside it, a row that names no
+ * leg is kept on the step before it, and the current node is the one a reader waits on.
  */
-describe('progress tab: the one-page story', () => {
-  /**
-   * The recorder's own stream for one run.
-   *
-   * `run-start`, one start/settle pair per declared call, then the optional
-   * `summary-final` claim and `run-end` — exactly what `src/records.ts` writes, so the
-   * fixtures below exercise the fold (labels, the shipped-draft mark) instead of
-   * hand-building a run nobody recorded.
-   */
+describe('progress tab: the flow of one run', () => {
+  /** The recorder's own stream for one run, as `src/records.ts` writes it. */
   function streamOf(
     calls: ReadonlyArray<readonly [number, string, string, (string | undefined)?]>,
     options: { stopReason?: string, summaryFinal?: number } = {},
   ): ProgressEventRecord[] {
     const records: ProgressEventRecord[] = [
-      rec('tool-workflow/run-start', { runId: 'r-story', name: '任务团队 · 3 个任务' }, 1, 1_000),
+      rec('tool-workflow/run-start', { runId: 'r-flow', name: '任务团队 · 2 个任务' }, 1, 1_000),
     ]
     let at = 2
     for (const [seq, label, phase, outcome] of calls) {
-      records.push(rec('tool-workflow/agent-start', { runId: 'r-story', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
+      records.push(rec('tool-workflow/agent-start', { runId: 'r-flow', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
       at += 1
       if (outcome === undefined) continue
-      records.push(rec('tool-workflow/agent-end', { runId: 'r-story', seq, outcome }, at, 1_500 + seq * 100))
+      records.push(rec('tool-workflow/agent-end', { runId: 'r-flow', seq, outcome }, at, 1_500 + seq * 100))
       at += 1
     }
     if (options.summaryFinal !== undefined) {
-      records.push(rec('tool-workflow/summary-final', { runId: 'r-story', draft: options.summaryFinal }, at))
+      records.push(rec('tool-workflow/summary-final', { runId: 'r-flow', draft: options.summaryFinal }, at))
       at += 1
     }
-    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-story', stopReason: options.stopReason }, at))
+    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-flow', stopReason: options.stopReason }, at))
     return records
   }
 
-  /** The folded run and its story. */
-  function storyOf(events: ProgressEventRecord[]) {
+  /** The folded run and its flow. */
+  function flowOf(events: ProgressEventRecord[]): ProgressFlow {
     const [run] = foldProgressRuns(events)
     expect(run, 'the fixture must fold into one run').toBeDefined()
-    return deriveProgressStory(run!)
+    return deriveProgressFlow(run!)
   }
 
-  it('waiting: nothing declared yet — a planning headline, no steps, and the start button', () => {
-    const story = storyOf(streamOf([]))
-    expect(story.state).toBe('waiting')
-    expect(story.steps).toEqual([])
-    expect(story.total).toBe(0)
-    expect(story.at).toBe(0)
-    expect(story.now).toEqual({ titleKey: 'planning', title: '' })
-    expect(story.attempt).toBeUndefined()
-    expect(story.rest).toEqual([])
-    expect(story.log).toEqual([])
-    expect(story.final).toBeUndefined()
-    expect(story.dock).toBe('start')
+  /** One real run's order (§20.11): two tasks worked in waves, then the two summary drafts. */
+  const realRun = [
+    [1, '执行', '任务 1 · 修复登录', 'completed'],
+    [2, '执行', '任务 2 · 写文档', 'completed'],
+    [3, '检查', '任务 1 · 修复登录', 'completed'],
+    [4, '检查', '任务 2 · 写文档', 'completed'],
+    [5, '复核', '任务 1 · 修复登录', 'completed'],
+    [6, '复核', '任务 2 · 写文档', 'completed'],
+    [7, '汇总·第1稿', '汇总', 'completed'],
+    [8, '汇总·第2稿', '汇总', 'completed'],
+  ] as const
+
+  it('draws one node per leg of a real run: the two ends, three work legs, both drafts', () => {
+    const flow = flowOf(streamOf(realRun, { summaryFinal: 2, stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => [node.key, node.kind, node.ordinal, node.state])).toEqual([
+      ['flow:start', 'start', 0, 'done'],
+      ['flow:0:execute:1', 'execute', 1, 'done'],
+      ['flow:1:check:1', 'check', 1, 'done'],
+      ['flow:2:review:1', 'review', 1, 'done'],
+      ['flow:3:summarize:1', 'summarize', 1, 'done'],
+      ['flow:4:summarize:2', 'summarize', 2, 'done'],
+      ['flow:end', 'end', 0, 'done'],
+    ])
+    // The two workers of one wave are one step, not two: the leg ran once.
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1, 2])
+    expect(flow.nodes[2]!.members.map((row) => row.seq)).toEqual([3, 4])
+    expect(flow.nodes[3]!.members.map((row) => row.seq)).toEqual([5, 6])
+    expect(flow.nodes[4]!.members.map((row) => row.seq)).toEqual([7])
+    expect(flow.nodes[5]!.members.map((row) => row.seq)).toEqual([8])
+    // The two ends are structure, not calls: no rows of their own.
+    expect(flow.nodes[0]!.members).toEqual([])
+    expect(flow.nodes[6]!.members).toEqual([])
+    expect(flow.state).toBe('done')
+    expect(flow.total).toBe(7)
+    expect(flow.at).toBe(7)
+    expect(flow.remaining).toBe(0)
+    // The draft the gate shipped is the closed line, read back off its own row.
+    expect(flow.final).toEqual({ draft: 2, seq: 8 })
   })
 
-  it('running: one step per plan task, the first open one current, the ones after it named', () => {
-    const story = storyOf(streamOf([
-      [1, '规划助手', '规划', 'completed'],
-      [2, '执行', '任务 1 · 修复登录', 'completed'],
-      [3, '检查', '任务 1 · 修复登录', 'completed'],
-      [4, '执行', '任务 2 · 写文档'],
-      [5, '执行', '任务 3 · 补测试', 'completed'],
-    ]))
-    expect(story.state).toBe('running')
-    // A step is a plan task: its own phase header, its own position, its own chain.
-    expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
-      ['phase:任务 1 · 修复登录', 1, '任务 1 · 修复登录', 'done'],
-      ['phase:任务 2 · 写文档', 2, '任务 2 · 写文档', 'doing'],
-      ['phase:任务 3 · 补测试', 3, '任务 3 · 补测试', 'done'],
-    ])
-    expect(story.steps[0]!.chain.map((slot) => slot.key)).toEqual(['execute', 'check', 'review'])
-    expect(story.steps[0]!.members.map((row) => row.seq)).toEqual([2, 3])
-    expect(story.total).toBe(3)
-    expect(story.at).toBe(2)
-    // The headline is the current step's own title, verbatim: no re-numbering, no cut.
-    expect(story.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
-    expect(story.rest).toEqual(['任务 3 · 补测试'])
-    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state])).toEqual([
-      [1, '规划助手', '规划', 'done'],
-      [2, '执行', '任务 1 · 修复登录', 'done'],
-      [3, '检查', '任务 1 · 修复登录', 'done'],
-      [4, '执行', '任务 2 · 写文档', 'doing'],
-      [5, '执行', '任务 3 · 补测试', 'done'],
-    ])
-    // Nothing is shipped yet, and a running page asks for no click.
-    expect(story.log.every((row) => row.shipped === undefined)).toBe(true)
-    expect(story.final).toBeUndefined()
-    expect(story.dock).toBe('quiet')
-  })
-
-  it('done: the whole plan passed — the finished headline, the shipped draft marked', () => {
-    const story = storyOf(streamOf([
-      [1, '规划助手', '规划', 'completed'],
-      [2, '执行', '任务 1 · 修复登录', 'completed'],
-      [3, '检查', '任务 1 · 修复登录', 'completed'],
-      [4, '汇总·第1稿', '汇总', 'completed'],
-    ], { summaryFinal: 1, stopReason: 'completed' }))
-    expect(story.state).toBe('done')
-    expect(story.steps.map((step) => [step.key, step.number, step.state])).toEqual([
-      ['phase:任务 1 · 修复登录', 1, 'done'],
-    ])
-    expect(story.total).toBe(1)
-    expect(story.at).toBe(1)
-    expect(story.now).toEqual({ titleKey: 'done', title: '' })
-    expect(story.now.role).toBeUndefined()
-    expect(story.rest).toEqual([])
-    // The shipped row keeps its own line and says so; no other line claims the mark, and
-    // the mark never leaks into the role the line is spoken as.
-    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state, row.shipped === true])).toEqual([
-      [1, '规划助手', '规划', 'done', false],
-      [2, '执行', '任务 1 · 修复登录', 'done', false],
-      [3, '检查', '任务 1 · 修复登录', 'done', false],
-      [4, '汇总·第1稿', '汇总', 'done', true],
-    ])
-    expect(story.final?.draft).toBe(1)
-    expect(story.final?.label).toBe('汇总')
-    expect(story.final?.row).toBe(story.log[3])
-    expect(story.dock).toBe('accept')
-  })
-
-  it('failed: the amber bar counts the attempt of the unit that is still broken', () => {
-    const calls = [
-      [1, '执行', '任务 1 · 修复登录', 'completed'],
-      [2, '执行', '任务 2 · 写文档', 'failed'],
-      [3, '执行（尝试 2）', '任务 2 · 写文档', undefined],
-      [4, '执行', '任务 3 · 补测试', 'cancelled'],
-    ] as const
-    const running = storyOf(streamOf(calls))
-    expect(running.state).toBe('running')
-    expect(running.steps.map((step) => [step.number, step.state])).toEqual([[1, 'done'], [2, 'failed'], [3, 'cancelled']])
-    // No step is running, so the first broken one is the one the page is about.
-    expect(running.at).toBe(2)
-    expect(running.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
-    // Attempt 2 is the one still open: the bar says the second pass failed, not the first.
-    expect(running.attempt).toEqual({ n: 2, retrying: true })
-    // The steps after the current one keep their names, grey and unticked as they are.
-    expect(running.rest).toEqual(['任务 3 · 补测试'])
-
-    // The same stream once the run ends: the bar stops claiming a recheck is running.
-    const ended = storyOf(streamOf(calls, { stopReason: 'error' }))
-    expect(ended.state).toBe('failed')
-    expect(ended.at).toBe(2)
-    expect(ended.now.role).toBeUndefined()
-    expect(ended.attempt).toEqual({ n: 2, retrying: false })
-
-    // A failure a later attempt of the same unit replaced is history, not a bar.
-    const recovered = storyOf(streamOf([
-      [1, '执行', '任务 2 · 写文档', 'failed'],
-      [2, '执行（尝试 2）', '任务 2 · 写文档', 'completed'],
-      [3, '检查（尝试 2）', '任务 2 · 写文档', 'completed'],
+  it('gives a leg that ran twice two nodes, numbered, instead of one node of two rows', () => {
+    const flow = flowOf(streamOf([
+      [1, '规划（第1次）', '规划', 'completed'],
+      [2, '规划（第2次）', '规划', 'completed'],
     ], { stopReason: 'completed' }))
-    expect(recovered.state).toBe('done')
-    expect(recovered.steps.map((step) => step.state)).toEqual(['done'])
-    expect(recovered.attempt).toBeUndefined()
+    expect(flow.nodes.map((node) => [node.key, node.ordinal])).toEqual([
+      ['flow:start', 0],
+      ['flow:0:plan:1', 1],
+      ['flow:1:plan:2', 2],
+      ['flow:end', 0],
+    ])
+    expect(flow.nodes[1]!.members.map((row) => row.label)).toEqual(['规划（第1次）'])
+    expect(flow.nodes[2]!.members.map((row) => row.label)).toEqual(['规划（第2次）'])
+    expect(flow.total).toBe(4)
   })
 
-  it('falls back to the work legs when the run planned no tasks', () => {
-    // A triage / single-call run declares no `任务 n · …` phase, so the track steps through
-    // the calls that do the work: 执行 → 检查 → 复核. The planner and the synthesizer are the
-    // run's own two ends — one writes the plan, one writes the answer — so they are not
-    // "things to do": they keep their history lines and take no step (§19.2, §19.9).
-    const story = storyOf(streamOf([
-      [1, '规划助手', '规划', 'completed'],
-      [2, '执行', '执行', 'completed'],
-      [3, '检查', '检查', 'completed'],
-      [4, '复核', '复核', undefined],
+  it('folds the rows of one leg into one node, in seq order', () => {
+    // Two calls of the same leg with no number of their own are one step: the wave the
+    // workers ran in. Declared out of order, still read in `seq` order.
+    const flow = flowOf(streamOf([
+      [2, '执行', '任务 2 · 写文档', 'completed'],
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => node.kind)).toEqual(['start', 'execute', 'end'])
+    expect(flow.nodes[1]!.ordinal).toBe(1)
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1, 2])
+  })
+
+  it('keeps a retry as its own node: the numbered visit a reader can tell from the first', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'failed'],
+      [2, '执行（尝试 2）', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => [node.key, node.ordinal])).toEqual([
+      ['flow:start', 0],
+      ['flow:0:execute:1', 1],
+      ['flow:1:execute:2', 2],
+      ['flow:end', 0],
+    ])
+    // Each attempt keeps its own mark: the first pass did fail, and that is its own step.
+    expect(flow.nodes[1]!.state).toBe('failed')
+    expect(flow.nodes[2]!.state).toBe('done')
+    expect(flow.final).toBeUndefined()
+  })
+
+  it('clears a failure a later attempt of the same call replaced', () => {
+    // The failure and its replacement speak for the same call (same phase, same role word),
+    // so the node's own `nodeState` reads the pair as recovered: a row that failed and was
+    // then re-answered inside the same node must not dye that node amber.
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'failed'],
+      [2, '执行', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1, 2])
+    expect(flow.nodes[1]!.state).toBe('done')
+    expect(flow.at).toBe(3)
+    expect(flow.remaining).toBe(0)
+  })
+
+  it('marks a failure nothing replaced, and stops the highlight on it', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'failed'],
+      [2, '检查', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'error' }))
+    expect(flow.state).toBe('failed')
+    expect(flow.nodes[1]!.state).toBe('failed')
+    // The end of a run that did not complete is not green either.
+    expect(flow.nodes[3]!.state).toBe('failed')
+    expect(flow.at).toBe(2)
+    expect(flow.remaining).toBe(2)
+  })
+
+  it('highlights the node holding the call a reader is waiting on', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '检查', '任务 1 · 修复登录'],
     ]))
-    expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
-      ['seq:2', undefined, '执行', 'done'],
-      ['seq:3', undefined, '检查', 'done'],
-      ['seq:4', undefined, '复核', 'doing'],
-    ])
-    expect(story.steps.every((step) => step.chain.length === 0)).toBe(true)
-    expect(story.total).toBe(3)
-    expect(story.at).toBe(3)
-    expect(story.now).toEqual({ title: '复核', role: '复核' })
-    // The planner is still a line of the history: a call that happened, just not a thing
-    // to do. Dropping it from the steps must not drop it from the page.
-    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state])).toEqual([
-      [1, '规划助手', '规划', 'done'],
-      [2, '执行', '执行', 'done'],
-      [3, '检查', '检查', 'done'],
-      [4, '复核', '复核', 'doing'],
-    ])
-    expect(story.dock).toBe('quiet')
+    expect(flow.state).toBe('running')
+    expect(flow.nodes[2]!.state).toBe('doing')
+    // Nothing is drawn as green past the step that is still working.
+    expect(flow.nodes[3]!.state).toBe('pending')
+    expect(flow.at).toBe(3)
+    expect(flow.total).toBe(4)
+    expect(flow.remaining).toBe(1)
   })
 
-  it('has no step while only the planner has been declared', () => {
-    // The real-machine window that changed this contract: a run that has announced itself
-    // and declared its planner, nothing else. There is nothing to do yet, so the track is
-    // empty and the headline says the run is still turning the ask into steps — it must not
-    // invent a step out of the planner call, which is what shipped as 「第 1 步，共 1 步：
-    // 要干的 1 件事 · 规划 在做」.
-    const story = storyOf(streamOf([[1, '规划助手', '规划', 'completed']]))
-    expect(story.state).toBe('running')
-    expect(story.steps).toEqual([])
-    expect(story.total).toBe(0)
-    expect(story.at).toBe(0)
-    expect(story.now).toEqual({ titleKey: 'planning', title: '' })
-    expect(story.now.role).toBeUndefined()
-    expect(story.rest).toEqual([])
-    expect(story.attempt).toBeUndefined()
-    expect(story.dock).toBe('quiet')
-    // The planner is still in the history, which is where a leg that is not a step lives.
-    expect(story.log.map((row) => [row.seq, row.role, row.title])).toEqual([[1, '规划助手', '规划']])
+  it('calls a hole left by a finished run blocked, and points at it', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '检查', '任务 1 · 修复登录'],
+    ], { stopReason: 'error' }))
+    expect(flow.nodes[2]!.state).toBe('blocked')
+    expect(flow.at).toBe(3)
+  })
 
-    // The same emptiness on a *finished* run keeps the finished headline: 「做好了」 is a
-    // fact about the run, while `planning` would claim it is still working.
-    const finished = storyOf(streamOf([[1, '汇总助手', '汇总', 'completed']], { stopReason: 'completed' }))
-    expect(finished.state).toBe('done')
-    expect(finished.steps).toEqual([])
-    expect(finished.total).toBe(0)
-    expect(finished.now).toEqual({ titleKey: 'done', title: '' })
-    expect(finished.dock).toBe('accept')
+  it('writes the engine’s own word on the end of a cancelled run', () => {
+    const flow = flowOf(streamOf([[1, '执行', '任务 1 · 修复登录', 'completed']], { stopReason: 'cancelled' }))
+    expect(flow.state).toBe('cancelled')
+    expect(flow.nodes[1]!.state).toBe('done')
+    expect(flow.nodes[2]!.kind).toBe('end')
+    expect(flow.nodes[2]!.state).toBe('cancelled')
+    expect(flow.at).toBe(3)
+  })
+
+  it('draws only the two ends before anything was declared, with the start as the current node', () => {
+    const flow = flowOf(streamOf([]))
+    expect(flow.state).toBe('waiting')
+    expect(flow.nodes.map((node) => [node.key, node.state])).toEqual([
+      ['flow:start', 'done'],
+      ['flow:end', 'pending'],
+    ])
+    expect(flow.total).toBe(2)
+    expect(flow.at).toBe(1)
+    expect(flow.remaining).toBe(1)
+    expect(flow.final).toBeUndefined()
+  })
+
+  it('keeps a row whose label names no leg on the step before it', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '自定义子代理', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => node.kind)).toEqual(['start', 'execute', 'end'])
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1, 2])
+  })
+
+  it('hangs a row that arrives before any step on the start', () => {
+    const flow = flowOf(streamOf([
+      [1, '自定义子代理', '规划', 'completed'],
+      [2, '执行', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes[0]!.members.map((row) => row.seq)).toEqual([1])
+    expect(flow.nodes[1]!.kind).toBe('execute')
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([2])
+  })
+
+  it('leaves the guardian call out of the flow: its own monitor speaks for it', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, 'guardian adjudication', 'Guardian', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => node.kind)).toEqual(['start', 'execute', 'end'])
+    // A guardian row is not a step and is not hung on a step either.
+    expect(flow.nodes.some((node) => node.members.some((row) => isGuardianCard(row.label)))).toBe(false)
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1])
+  })
+
+  it('reads the English role labels the same way', () => {
+    const flow = flowOf(streamOf([
+      [1, 'Plan (call 2)', 'Plan', 'completed'],
+      [2, 'Execute', 'Task 1 · Fix login', 'completed'],
+      [3, 'Check', 'Task 1 · Fix login', 'completed'],
+      [4, 'Reviewer', 'Task 1 · Fix login', 'completed'],
+      [5, 'Summarize · draft 2', 'Synthesize', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => [node.kind, node.ordinal])).toEqual([
+      ['start', 0],
+      ['plan', 2],
+      ['execute', 1],
+      ['check', 1],
+      ['review', 1],
+      ['summarize', 2],
+      ['end', 0],
+    ])
+  })
+
+  it('folds a resubmit of one numbered visit into that same visit', () => {
+    // A draft asked twice is still one draft (the fold marks only the row that landed), so
+    // the second row claims a visit that is already open: one step, two calls.
+    const flow = flowOf(streamOf([
+      [1, '汇总·第2稿', '汇总', 'completed'],
+      [2, '汇总·第2稿', '汇总', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(flow.nodes.map((node) => [node.key, node.ordinal])).toEqual([
+      ['flow:start', 0],
+      ['flow:0:summarize:2', 2],
+      ['flow:end', 0],
+    ])
+    expect(flow.nodes[1]!.members.map((row) => row.seq)).toEqual([1, 2])
+  })
+
+  it('waits on the earliest call still open when two are open at once', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录'],
+      [2, '检查', '任务 1 · 修复登录'],
+    ]))
+    expect(flow.nodes.map((node) => node.state)).toEqual(['done', 'doing', 'doing', 'pending'])
+    expect(flow.at).toBe(2)
+  })
+
+  it('stops at the end of a run whose last call settled but which has not closed yet', () => {
+    const flow = flowOf(streamOf([
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '检查', '任务 1 · 修复登录', 'completed'],
+    ]))
+    expect(flow.state).toBe('running')
+    expect(flow.nodes.every((node) => node.state !== 'doing')).toBe(true)
+    // The end is not reached yet, so it stays grey; the flow stands on it.
+    expect(flow.nodes[3]!.state).toBe('pending')
+    expect(flow.at).toBe(4)
+    expect(flow.remaining).toBe(0)
+  })
+
+  it('keys every node by its position and leg, once and only once', () => {
+    const flows = [
+      flowOf(streamOf(realRun, { stopReason: 'completed' })),
+      flowOf(streamOf([
+        [1, '规划（第1次）', '规划', 'completed'],
+        [2, '规划（第2次）', '规划', 'completed'],
+        [3, '执行', '任务 1 · 修复登录', 'completed'],
+        [4, '执行（尝试 2）', '任务 1 · 修复登录', 'completed'],
+      ])),
+      flowOf(streamOf([])),
+    ]
+    for (const flow of flows) {
+      const keys = flow.nodes.map((node) => node.key)
+      expect(new Set(keys).size).toBe(keys.length)
+      // `flow:start` / `flow:end`, and `flow:<position>:<kind>:<ordinal>` for the middle,
+      // where the position counts the middle nodes only, from 0.
+      expect(keys).toEqual(flow.nodes.map((node, index) => {
+        if (node.kind === 'start') return 'flow:start'
+        if (node.kind === 'end') return 'flow:end'
+        return `flow:${index - 1}:${node.kind}:${node.ordinal}`
+      }))
+    }
+    // `at` and `remaining` are read off the same list the keys describe.
+    for (const flow of flows) {
+      expect(flow.total).toBe(flow.nodes.length)
+      expect(flow.remaining).toBe(flow.total - flow.at)
+      expect(flow.at).toBeGreaterThanOrEqual(1)
+      expect(flow.at).toBeLessThanOrEqual(flow.total)
+    }
   })
 })
 

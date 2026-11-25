@@ -1,0 +1,321 @@
+# cmd: npx vitest run test/progress-tab.spec.ts 2>&1 | tee .rsi/evidence/progress-flowchart-2026-11-25/red-data.out
+# head: 57dcf0410c62454b0ad62e1ca6b195c6e1da213d (feat/progress-flowchart) — src/progress-tab.ts at that commit, test/progress-tab.spec.ts as delivered
+# at: 2026-11-25T23:06:09+08:00
+# why red: the spec is rewritten against the new flow model (.tmp/flowchart-contract.md §2/§3/§4) before src/progress-tab.ts carries deriveProgressFlow.
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-progress-flowchart
+
+ ❯ test/progress-tab.spec.ts (69 tests | 18 failed) 48ms
+     ✓ folds the progress and Guardian event contract and namespaces its view target and node kind 3ms
+     ✓ keeps both copies of PROGRESS_EVENT_TYPES identical, entry for entry 10ms
+     ✓ folds the recorded stream into one run with its rows and settlement 1ms
+     ✓ is order-insensitive, idempotent and settles a row whose start arrives late 0ms
+     ✓ drops a settlement for a row nobody declared and a run nobody announced 0ms
+     ✓ keeps an observe finding as observed, not as a run cancellation 0ms
+     ✓ takes the newest run as the active one and prefers the still-open one on a tie 0ms
+     ✓ pending: a declared-but-unstarted stage, and the percentage stays absent 1ms
+     ✓ doing: an open run with an unsettled row 1ms
+     ✓ done: every row of the stage settled as completed 0ms
+     ✓ failed wins over every other state, including an unfinished row 1ms
+     ✓ blocked: derived from a run that ended over a row it never settled, and says why 0ms
+     ✓ blocked: an outcome that is neither completed nor cancelled is derived, not renamed 0ms
+     ✓ cancelled: keeps the engine’s own word instead of deriving one 0ms
+     ✓ an unfinished row on a still-open run is doing, never blocked 0ms
+     ✓ clears the card only when a later attempt of that same call completed 1ms
+     ✓ keeps the stage that ran the recovered task out of red, and the bar count at zero 0ms
+     ✓ keeps a failure red when the retry has not settled yet, and when it failed again 0ms
+     ✓ never lets another task’s success recover this task’s failure 0ms
+     ✓ treats a resubmit inside one attempt as recovered: same label, same attempt 0ms
+     ✓ binds the engine’s own phases to the spine and appends plan tasks as real nodes 1ms
+     ✓ binds a Latin token only on word boundaries, so a substring is not a stage 1ms
+     ✓ names no stage for the three words the old spine mis-read: ui, tag and sync 1ms
+     ✓ puts a numbered plan task mentioning a stage word on its own card, never on the spine 0ms
+     ✓ keys a plan-task node by its whole phase header, so two identical titles stay apart 0ms
+     ✓ gives an unphased row its own node rather than hiding it from the track 0ms
+     ✓ binds plan-task rows to the stage their role label names, so execute and verify are not "not reported" 0ms
+     ✓ derives the work stage from its evidence: failed when a task row failed, doing while one is open 0ms
+     ✓ keeps a stage’s own rows authoritative over its evidence 0ms
+     ✓ invents no evidence for a label that names no stage 0ms
+     ✓ binds the English role labels too, where the verifier is called Check 0ms
+     ✓ reports rows settled over rows declared, not a task verdict 0ms
+     ✓ prefers a stage-detail payload, then the coordination block, then reports nothing 1ms
+     ✓ reports the seven AGENTS.md facts in the order a reader needs them 0ms
+     ✓ degrades to seven not-reported rows when no source exists 0ms
+     ✓ accepts the AGENTS.md labelled block, fenced or bare, and rejects prose 1ms
+     ✓ accepts a nested coordination object and a JSON fence with two known fields 0ms
+     ✓ normalizes lists and numbers without inventing a value for an empty one 0ms
+     ✓ folds a stage-detail event onto the node whose phase it names, and feeds the ladder 1ms
+     ✓ uses a phase-less payload as the run-level fallback and lets an injected source win 0ms
+     ✓ ignores an empty payload instead of claiming a stage was measured and found blank 0ms
+     ✓ formats a duration only when both ends were recorded 0ms
+     ✓ binds 规划（第N次） to the plan stage, one row per call 0ms
+     ✓ binds 汇总·第N稿 to the synthesize stage as two rows in two units 0ms
+     ✓ marks the summary draft the gate shipped, and only that draft 1ms
+     ✓ marks only the row that landed when one draft was asked twice 0ms
+     ✓ stays idempotent and order-insensitive, and never invents a mark 0ms
+     ✓ names the right stage from a numbered label when the phase is a task group 0ms
+     × draws one node per leg of a real run: the two ends, three work legs, both drafts 6ms
+     × gives a leg that ran twice two nodes, numbered, instead of one node of two rows 1ms
+     × folds the rows of one leg into one node, in seq order 0ms
+     × keeps a retry as its own node: the numbered visit a reader can tell from the first 0ms
+     × clears a failure a later attempt of the same call replaced 0ms
+     × marks a failure nothing replaced, and stops the highlight on it 0ms
+     × highlights the node holding the call a reader is waiting on 0ms
+     × calls a hole left by a finished run blocked, and points at it 0ms
+     × writes the engine’s own word on the end of a cancelled run 0ms
+     × draws only the two ends before anything was declared, with the start as the current node 0ms
+     × keeps a row whose label names no leg on the step before it 0ms
+     × hangs a row that arrives before any step on the start 0ms
+     × leaves the guardian call out of the flow: its own monitor speaks for it 0ms
+     × reads the English role labels the same way 0ms
+     × folds a resubmit of one numbered visit into that same visit 0ms
+     × waits on the earliest call still open when two are open at once 0ms
+     × stops at the end of a run whose last call settled but which has not closed yet 0ms
+     × keys every node by its position and leg, once and only once 0ms
+     ✓ quotes the six-stage spine the code exports, with no answer stage 0ms
+     ✓ no live sentence reads the fixed spine as seven stages again 0ms
+     ✓ states the spine’s stage count, and states it as PROGRESS_STAGES.length 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 18 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > draws one node per leg of a real run: the two ends, three work legs, both drafts
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:963:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > gives a leg that ran twice two nodes, numbered, instead of one node of two rows
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:991:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > folds the rows of one leg into one node, in seq order
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1009:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > keeps a retry as its own node: the numbered visit a reader can tell from the first
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1019:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > clears a failure a later attempt of the same call replaced
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1039:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > marks a failure nothing replaced, and stops the highlight on it
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1050:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > highlights the node holding the call a reader is waiting on
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1063:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > calls a hole left by a finished run blocked, and points at it
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1077:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > writes the engine’s own word on the end of a cancelled run
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1086:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > draws only the two ends before anything was declared, with the start as the current node
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1095:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > keeps a row whose label names no leg on the step before it
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1108:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > hangs a row that arrives before any step on the start
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1117:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > leaves the guardian call out of the flow: its own monitor speaks for it
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1127:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > reads the English role labels the same way
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1138:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > folds a resubmit of one numbered visit into that same visit
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1159:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > waits on the earliest call still open when two are open at once
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1172:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > stops at the end of a run whose last call settled but which has not closed yet
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1181:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the flow of one run > keys every node by its position and leg, once and only once
+TypeError: deriveProgressFlow is not a function
+ ❯ flowOf test/progress-tab.spec.ts:947:12
+    945|     const [run] = foldProgressRuns(events)
+    946|     expect(run, 'the fixture must fold into one run').toBeDefined()
+    947|     return deriveProgressFlow(run!)
+       |            ^
+    948|   }
+    949|
+ ❯ test/progress-tab.spec.ts:1195:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  18 failed | 51 passed (69)
+   Start at  23:06:09
+   Duration  983ms (transform 743ms, setup 0ms, import 768ms, tests 48ms, environment 0ms)
+
