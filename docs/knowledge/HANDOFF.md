@@ -1,3 +1,33 @@
+## 2026-11-26 — `fix/settled-rows`：边界子读到的是结算行本身（判决 + 标题），不再是 `[undefined] `；真机两道边界都读对了；未合 `main`、未 push、未发版
+
+- **From:** 包工头（`agent-193`）· **To:** 下一个接手者
+- **这一轮是什么**：修 `fix/replan-shape` 在真机上照实记下、当时判「留给下一块」的那条观察。调用点把
+  「编号 → 状态」的字符串表交给 `requestReplan`，而 `replanPrompt` 按 `row.status` / `row.task.title` 读，
+  于是 `SETTLED TASKS` 每一行印成 `- count-agents [undefined] `——边界子看不到已沉淀任务过了没有、叫什么。
+- **身份**：分支 **`fix/settled-rows`**，从 `main` 尖端 **`d6c338e`** 开出（worktree `.tmp/wt-settled-rows`）。
+  改动面：`src/script.ts`（调用点交**结算行本身**、`requestReplan` 形参改名 `settledRows` 并原样传给
+  `replanPrompt`、给 `mergeReplan` 的状态从同一批行派生）、`test/replan.spec.ts`（+1 例 `runReal`）、
+  重建 `lib/`、`CHANGELOG` 一条、`D-165`、证据目录、`STATE` / `VALIDATION` 与本文件。
+  **`replanPrompt` 的渲染一行没改，`src/replan.ts` 一个字没动。**
+- **用户看到的一件事**：跑中加进来的要求，是拿一份「做完的那一半看得见」的计划来判的。
+- **块内门禁**：`tsc` 0、`oxlint 15 warnings / 0 errors / 184 files`、定向 3 份 spec **`45 passed`**、
+  `client bundle: 348559 bytes`（浏览器包没动）；红：`git stash push -- src` → **`1 failed | 24 skipped`**，
+  读作 `expected '- a [undefined] ' to be '- a [verified] Task a'`；全量 `npm run ci` `NOT_RUN`（§12）。
+- **真机读数（`CONFIRMED`）**：隔离档案 `settled-clone`（克隆自 live web，只删 `mode: triage`、把默认模型与六个角色
+  钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`）、端口 3487、headless Chromium + 上一轮的 CDP 驱动；
+  装本轮 tgz（`lib/script.js` `sha256 233d327e…2e22` 与工作树逐字节相同、版本读回 `0.13.44`）后跑一次三波的小活：
+  `Plan: planner; 3 task(s); 3 verified`、`COMPLETED`；边界 1 读作 `- count_readme [verified] 统计 README.md 行数`，
+  边界 2 读作 `- count_readme [verified] …` + `- count_changelog [verified] …`，**两份提示词都不含 `undefined`**。
+  证据 `.rsi/evidence/settled-rows-2026-11-26/`（`soak/boundary-settled-lines.txt` 是逐字抽取）。
+- **下一个人的三条**：① **真机只跑了「两道边界、都 `none`」这一态**——「合并被拒 / 边界子补丁式编辑」两态没跑
+  （合并器契约没改、单测覆盖）；要补就在同一条隔离档案里让边界子回一条 `apply`。② **`SETTLED TASKS` 的 `- none`
+  分支没在真机上出现**（要有边界而一个任务都没沉淀），只有单测；③ 合 `main`、push、发版、live 档案升级
+  **都没做**，live 档案在本会话里仍只读（写探测 `Read-only file system`）。
+- **清理（已做完）**：scratch `.tmp/soak`（**275 MB**：档案克隆 + tgz + chromium 用户目录 + 解压后的会话日志 + npm cache）
+  整棵删除，3487 / 9223 已关；worktree 与它的 `node_modules` 留着（分支未合）。
+
+---
+
 ## 2026-11-26 — `0.13.44` 已发布并收口：一个发布提交（8 文件 / +22 −20）、一份门禁 `GATE_EXIT=0`（`103 files / 1947 tests`）、`main` 单父前进（无合并提交）、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**
 
 - **From:** 包工头（`agent-191`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

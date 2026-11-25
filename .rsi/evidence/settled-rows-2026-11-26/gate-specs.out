@@ -1,0 +1,17 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-settled-rows
+
+(node:101) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/replan.spec.ts (25 tests) 620ms
+ ✓ test/steering-inbox.spec.ts (14 tests) 443ms
+(node:124) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/naming-sequence.spec.ts (6 tests) 274ms
+
+ Test Files  3 passed (3)
+      Tests  45 passed (45)
+   Start at  04:54:30
+   Duration  4.27s (transform 2.27s, setup 0ms, import 2.58s, tests 1.34s, environment 0ms)
+
+SPECS_EXIT=0
