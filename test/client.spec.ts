@@ -2087,6 +2087,17 @@ describe('client progress tab: the one-page story (three screens)', () => {
     return walk(tree).filter((element) => Object.prototype.hasOwnProperty.call(element.props, name))
   }
 
+  /**
+   * The page's readable strings, in document order, without the scoped stylesheet.
+   *
+   * The stylesheet is a real text child of the tree (React renders and removes it with the
+   * tab), so a whole-page assertion has to leave it out — it is not copy.
+   */
+  function pageTexts(page: unknown): string[] {
+    const css = progress.css
+    return texts(page).filter((text) => text !== css)
+  }
+
   /** The visible text of the element carrying one hook, joined for a single comparison. */
   function textOf(tree: unknown, name: string): string {
     return texts(hookOf(tree, name)).join(' ')
@@ -2171,9 +2182,9 @@ describe('client progress tab: the one-page story (three screens)', () => {
     expect(story.final).toBeUndefined()
     expect(story.dock).toBe('start')
 
-    const page = pageOf(run)
+    const page = pageOf(run, { fillDraft: () => true })
     // The whole screen, in document order — this array is the "等你点头" design draft.
-    expect(texts(page)).toEqual([
+    expect(pageTexts(page)).toEqual([
       '任务团队 · 3 个任务',
       '等你点头',
       '现在',
@@ -2268,7 +2279,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
     expect(story.final?.draft).toBe(1)
     expect(story.final?.label).toBe('汇总')
 
-    const page = pageOf(run, { canOpen: (childId: string) => childId === 'child-4' })
+    const page = pageOf(run, { canOpen: (childId: string) => childId === 'child-4', fillDraft: () => true })
     expect(textOf(page, 'data-gw-progress-chip')).toBe('已完成')
     expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('done')
     // The finished page stops naming a step; it states what the run settled.
@@ -2357,7 +2368,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
       storyOf(brokenCalls).run,
     ]
     for (const run of runs) {
-      const copy = texts(pageOf(run)).join('\n')
+      const copy = pageTexts(pageOf(run)).join('\n')
       expect(copy).not.toContain('%')
       expect(copy).not.toMatch(/ETA|预计|通过率|剩余|大约/iu)
     }
@@ -2366,7 +2377,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
   it('renders the empty state, and no dock, when the session has no run', () => {
     const page = pageOf(undefined)
     expect(hooksOf(page, 'data-progress-empty')).toHaveLength(1)
-    expect(texts(page)).toEqual([bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title']])
+    expect(pageTexts(page)).toEqual([bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title']])
     expect(hooksOf(page, 'data-gw-progress-dock')).toHaveLength(0)
     expect(hooksOf(page, 'data-gw-progress-chip')).toHaveLength(0)
     // The stylesheet is part of the tab's own tree, so it leaves when the tab unmounts.
@@ -2374,17 +2385,23 @@ describe('client progress tab: the one-page story (three screens)', () => {
   })
 
   it('survives a damaged snapshot instead of throwing', () => {
-    // The worst a damaged session can hand the tab: a run with no members, a member with
-    // no phase, and a snapshot whose activeRun is present but empty.
+    // The worst a damaged session can hand the tab: a run whose name and rows are empty,
+    // and a row whose `seq` is not a number. The page still draws what it has and claims
+    // nothing it does not know.
+    const t = translator('zh')
     const broken = {
       runs: [{ runId: 'r', name: '', anchorSeq: 0, members: [{ seq: Number.NaN, label: '', childId: '', order: 0 }] }],
       activeRun: { runId: 'r', name: '', anchorSeq: 0, members: [] },
     }
-    const t = translator('zh')
     const tree = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select(broken) })
-    // No number is invented and nothing is claimed for a run that declared nothing.
-    expect(hooksOf(tree, 'data-progress-empty')).toHaveLength(1)
-    expect(texts(tree)).toEqual([bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title']])
+    expect(hooksOf(tree, 'data-gw-progress-chip')).toHaveLength(1)
+    expect(textOf(tree, 'data-gw-progress-now')).toBe('正在拆活')
+    expect(pageTexts(tree).join('\n')).not.toContain('NaN')
+    // The undamaged opposite: no run at all is the empty page, and nothing else.
+    const empty = { runs: [], activeRun: undefined }
+    const blank = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select(empty) })
+    expect(hooksOf(blank, 'data-progress-empty')).toHaveLength(1)
+    expect(pageTexts(blank)).toEqual([bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title']])
   })
 
   it('returns the same snapshot object when nothing the page renders changed', () => {
@@ -2444,7 +2461,9 @@ describe('client progress tab: the button fills the box instead of sending', () 
       },
       sessions: {
         binding: (sessionId: string) => ({ sessionId, ctx: SCOPE_CTX }),
-        subagentAddress: () => undefined,
+        // One openable child, so the page has both controls: the dock's button and the
+        // capsule that jumps to the session that wrote the shipped draft.
+        subagentAddress: (childId: string) => (childId === 'child-2' ? { parentSessionId: 'session-1', mode: 'continuable' } : undefined),
       },
     }
   }
@@ -2547,8 +2566,9 @@ describe('client progress tab: the button fills the box instead of sending', () 
     const view = renderWith(injectedProps(servicesOf(record)), run)
     const tree = walk(view.run())
     const controls = tree.filter((element) => element.props['onClick'] !== undefined)
-    // Exactly two controls: the dock button and the capsule that opens the shipped row.
-    expect(controls.map((element) => element.props['data-gw-progress-dock-fill'] === true ? 'dock' : 'open')).toEqual(['dock', 'open'])
+    // Exactly two controls, in reading order: the capsule that opens the shipped row and
+    // the dock's one button.
+    expect(controls.map((element) => element.props['data-gw-progress-dock-fill'] === true ? 'dock' : 'open')).toEqual(['open', 'dock'])
     // Everything else — the header, the segments, the plan rows, the log rows, the card —
     // is a static mark: no handler, no tab stop.
     for (const element of tree) {

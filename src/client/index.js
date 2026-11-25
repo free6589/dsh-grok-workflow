@@ -28,7 +28,7 @@ window.__ModuleLoader__.load({
     const exports = module.exports
     const React = require('react')
     const h = React.createElement
-    const { useState, useEffect, useMemo, useRef, useSyncExternalStore } = React
+    const { useState, useEffect, useMemo, useSyncExternalStore } = React
 
     const NS = 'grok-workflow'
 
@@ -2171,7 +2171,7 @@ window.__ModuleLoader__.load({
         'phase.empty': '空阶段名',
         'status.running': '运行中',
         'status.completed': '已完成',
-        'status.failed': '失败',
+        'status.failed': '未通过',
         'status.cancelled': '已取消',
         'status.interrupted': '已中断',
         // A status outside the five above is one this panel does not word: it says so
@@ -2179,7 +2179,7 @@ window.__ModuleLoader__.load({
         'status.unknown': '状态未知',
         'statusCount.running': '运行中 {count}',
         'statusCount.completed': '已完成 {count}',
-        'statusCount.failed': '失败 {count}',
+        'statusCount.failed': '未通过 {count}',
         'statusCount.cancelled': '已取消 {count}',
         'statusCount.interrupted': '已中断 {count}',
         'statusCount.unknown': '状态未知 {count}',
@@ -2194,7 +2194,7 @@ window.__ModuleLoader__.load({
         'phase.empty': 'Empty phase',
         'status.running': 'Running',
         'status.completed': 'Completed',
-        'status.failed': 'Failed',
+        'status.failed': 'Not passed',
         'status.cancelled': 'Cancelled',
         'status.interrupted': 'Interrupted',
         // A status outside the five above is one this panel does not word; it says so
@@ -2202,7 +2202,7 @@ window.__ModuleLoader__.load({
         'status.unknown': 'Unknown',
         'statusCount.running': 'Running {count}',
         'statusCount.completed': 'Completed {count}',
-        'statusCount.failed': 'Failed {count}',
+        'statusCount.failed': 'Not passed {count}',
         'statusCount.cancelled': 'Cancelled {count}',
         'statusCount.interrupted': 'Interrupted {count}',
         'statusCount.unknown': 'Unknown {count}',
@@ -2253,7 +2253,10 @@ window.__ModuleLoader__.load({
     const PANEL_STATUS_COLOR = {
       running: STATUS_COLOR.doing,
       completed: STATUS_COLOR.done,
-      failed: STATUS_COLOR.failed,
+      // Amber, not red: the progress page's own rule (§19.2) is that red is not a word
+      // this plugin uses for a task that did not pass, and the chat card speaks the same
+      // vocabulary as the tab it summarizes.
+      failed: STATUS_COLOR.blocked,
       cancelled: STATUS_COLOR.blocked,
       interrupted: STATUS_COLOR.blocked,
     }
@@ -2780,46 +2783,58 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Ring glyph per state.
+     * The five words a run is described by, one per chip state (§19.2).
      *
-     * The ring is 28px and the state word already exists, so the glyph is redundant on
-     * purpose: a reader can tell the stages apart without relying on colour, and the
-     * `aria-label` still carries the words.
+     * The chip reads the run's own facts, never the size of a plan: `waiting` is an open
+     * run that declared nothing yet, `running` is an open run that did, and the three
+     * closed states are the engine's `stopReason` — `completed` already means "every task
+     * was checked", so `done` claims no more than that.
      */
-    const PROGRESS_STATE_GLYPH = {
-      pending: '',
-      doing: '▸',
-      done: '✓',
-      blocked: '!',
-      cancelled: '×',
-      failed: '✕',
+    const PROGRESS_CHIP_KEY = {
+      waiting: 'progress.chip.waiting',
+      running: 'progress.chip.running',
+      done: 'progress.chip.done',
+      failed: 'progress.chip.failed',
+      cancelled: 'progress.chip.cancelled',
     }
 
     /**
-     * Ring colour per state, all through DSH design tokens.
+     * The word under one step of the list, per step state.
      *
-     * No hex fallback: a wrong colour in a dark composition is worse than an inherited
-     * one, and the tokens are what make the track follow a theme or a contrast pass.
-     * `cancelled` shares the warning colour because it is neither a success nor a
-     * failure — the engine's own word is what distinguishes it, and the label says so.
+     * `blocked` is a step the run ended over without settling: it did not pass, so it
+     * borrows `没过` rather than the grey "still waiting" word that would claim the page is
+     * still working on it.
      */
-    const PROGRESS_STATE_COLOR = {
-      doing: 'var(--dsw-alias-state-business-primary)',
-      done: 'var(--dsw-alias-state-success-primary)',
-      failed: 'var(--dsw-alias-state-error-primary)',
-      blocked: 'var(--dsw-alias-state-warn-primary)',
-      cancelled: 'var(--dsw-alias-state-warn-primary)',
-      pending: 'var(--dsw-alias-state-idle-primary)',
+    const PROGRESS_PLAN_KEY = {
+      pending: 'progress.plan.waiting',
+      doing: 'progress.plan.running',
+      done: 'progress.plan.done',
+      failed: 'progress.plan.failed',
+      blocked: 'progress.plan.failed',
+      cancelled: 'progress.plan.cancelled',
     }
 
-    /** The state word, from the same table the settings page uses. */
-    const PROGRESS_STATE_KEY = {
-      pending: 'progress.state.pending',
-      doing: 'progress.state.doing',
-      done: 'progress.state.done',
-      blocked: 'progress.state.blocked',
-      cancelled: 'progress.state.cancelled',
-      failed: 'progress.state.failed',
+    /** The word of one history line, when its own state decides it. */
+    const PROGRESS_LOG_STATE_KEY = {
+      pending: 'progress.log.running',
+      doing: 'progress.log.running',
+      done: 'progress.log.done',
+      failed: 'progress.log.failed',
+      blocked: 'progress.log.failed',
+      cancelled: 'progress.log.cancelled',
+    }
+
+    /**
+     * The word of a finished line, when the role that spoke it decides it.
+     *
+     * A finished `执行` did the work, a finished `检查` passed it and a finished `复核`
+     * approved it: three different verbs, so one `done` word would flatten the log into a
+     * column of identical sentences.
+     */
+    const PROGRESS_LOG_ROLE_KEY = {
+      execute: 'progress.log.done',
+      check: 'progress.log.passed',
+      review: 'progress.log.reviewed',
     }
 
     /** One empty track, shared so a session with no run keeps one snapshot identity. */
@@ -3419,6 +3434,208 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The 1-based attempt a label names (`执行（尝试 2）` → 2), and 1 when it names none.
+     *
+     * Mirror of `attemptNumberOf` in `src/progress-tab.ts`: one trailing bracketed word
+     * that carries a number is the attempt suffix `naming.ts` appends, and nothing else.
+     */
+    function progressAttemptNumber(label) {
+      const text = typeof label === 'string' ? label.trim() : ''
+      const match = /[（(][^（()）]*?(\d+)[^（()）]*[)）]$/u.exec(text)
+      if (match === null) return 1
+      const value = Number(match[1])
+      return Number.isInteger(value) && value > 0 ? value : 1
+    }
+
+    /**
+     * A label with its shipped-draft mark taken off.
+     *
+     * The mark says what the *row* is (the draft the gate shipped), not what role spoke, so
+     * it must not end up in the role column beside the `交卷` word that already says it.
+     */
+    function progressWithoutFinalMark(text) {
+      for (const language of ['zh', 'en']) {
+        const mark = PROGRESS_SUMMARY_DRAFTS[language].final
+        for (const suffix of [mark, mark.trim()]) {
+          if (suffix === '' || text.slice(-suffix.length) !== suffix) continue
+          return text.slice(0, text.length - suffix.length).trim()
+        }
+      }
+      return text
+    }
+
+    /** The role a log line is spoken as: `执行（尝试 2）` → `执行`, `汇总·第2稿（定稿）` → `汇总·第2稿`. */
+    function progressStoryRole(member) {
+      return progressWithoutFinalMark(progressAttemptBaseLabel(member.label))
+    }
+
+    /**
+     * The state of one declared call (mirror of `rowState`).
+     *
+     * A row is the smallest thing the stream settles, so its state is its own outcome and
+     * nothing else: an unsettled row is `doing`, and an outcome that is neither a
+     * completion, a cancellation nor a failure stays `blocked` rather than being renamed.
+     */
+    function progressRowState(member) {
+      if (member.outcome === undefined) return 'doing'
+      if (member.outcome === 'completed') return 'done'
+      if (member.outcome === 'cancelled') return 'cancelled'
+      if (member.outcome === 'failed') return 'failed'
+      return 'blocked'
+    }
+
+    /**
+     * The row `summary-final` names, read back off the rows the fold already marked.
+     *
+     * The fold writes the mark onto the row that landed (the highest `order` of that draft
+     * name, in whichever language the label was written), so matching the marked name is
+     * the same fact rather than a second guess at it. A stream whose rows were never
+     * marked — the bare draft name is all it carries — still names its row here.
+     */
+    function progressShippedRow(members, draft) {
+      const latestNamed = (name) => {
+        let named
+        for (const member of members) {
+          if (member.label !== name) continue
+          if (named === undefined || member.order > named.order) named = member
+        }
+        return named
+      }
+      for (const language of ['zh', 'en']) {
+        const marked = latestNamed(progressSummaryDraftName(draft, language, true))
+        if (marked !== undefined) return marked
+      }
+      for (const language of ['zh', 'en']) {
+        const bare = latestNamed(progressSummaryDraftName(draft, language, false))
+        if (bare !== undefined) return bare
+      }
+      return undefined
+    }
+
+    /**
+     * Derive the one-page story for one run (mirror of `deriveProgressStory` in
+     * `src/progress-tab.ts`, §19.2).
+     *
+     * Three screens out of the facts the fold already produced, and no others:
+     *
+     * - `waiting` — the run is open and no call was declared; the page says it is planning
+     *   and draws no track, because there is nothing to step through yet;
+     * - `running` / `failed` / `cancelled` — one step per declared thing, the current step
+     *   chosen by `doing` → `failed` → first unfinished → the last step;
+     * - `done` — every declared row passed, so the headline stops naming a step.
+     *
+     * A step is a **plan task** when the run declared one (`任务 n · 标题`, never the
+     * guardian call): those are the units a reader waits for. A run that planned nothing (a
+     * triage or single-call run) steps through its declared calls instead, so the track's
+     * length is always what the stream announced and never a plan nobody wrote down.
+     *
+     * The field names are the typed half's, verbatim: the host serves this file, so the two
+     * copies cannot import each other and `test/client.spec.ts` compares them through the
+     * same fixtures.
+     * @param run - folded run facts.
+     * @returns the story model.
+     */
+    function deriveProgressStory(run) {
+      const ended = run.stopReason !== undefined
+      const declared = run.members.length
+      const state = !ended
+        ? (declared === 0 ? 'waiting' : 'running')
+        : run.stopReason === 'completed' ? 'done' : run.stopReason === 'cancelled' ? 'cancelled' : 'failed'
+      const track = deriveProgressTrack(run, () => '')
+      const planNodes = track.nodes.filter(
+        (node) => node.kind === 'extra' && node.taskNumber !== undefined && node.guardian !== true,
+      )
+      const steps = planNodes.length > 0
+        ? planNodes.map((node) => ({
+          key: node.key,
+          number: node.taskNumber,
+          title: node.label,
+          state: node.state,
+          chain: Array.isArray(node.chain) ? node.chain : [],
+          members: node.members,
+        }))
+        // A call step's own `seq` is its identity: two calls can share one stage
+        // (`规划（第1次）` and `规划（第2次）`), so a node key would repeat.
+        : [...run.members].sort((left, right) => left.seq - right.seq).map((member) => ({
+          key: `seq:${member.seq}`,
+          title: progressStoryRole(member),
+          state: progressRowState(member),
+          chain: [],
+          members: [member],
+        }))
+      const total = steps.length
+      const firstOf = (predicate) => {
+        const index = steps.findIndex(predicate)
+        return index === -1 ? -1 : index + 1
+      }
+      const doing = firstOf((step) => step.state === 'doing')
+      const failed = firstOf((step) => step.state === 'failed')
+      const open = firstOf((step) => step.state !== 'done')
+      const at = total === 0 ? 0 : doing !== -1 ? doing : failed !== -1 ? failed : open !== -1 ? open : total
+      const current = at === 0 ? undefined : steps[at - 1]
+      const now = state === 'waiting'
+        ? { titleKey: 'planning', title: '' }
+        : state === 'done'
+          ? { titleKey: 'done', title: '' }
+          : { title: current === undefined ? '' : current.title }
+      if (state === 'running') {
+        // The line a reader is waiting on: the current step's own open call, or — when the
+        // current step is finished under a still-open run — the run's first unsettled one.
+        const currentMembers = current === undefined ? [] : current.members
+        const running = currentMembers.find((member) => member.outcome === undefined)
+          || run.members.find((member) => member.outcome === undefined)
+        if (running !== undefined) now.role = progressStoryRole(running)
+      }
+      let attempt
+      if (current !== undefined) {
+        const recovered = progressRecoveredFailures(current.members)
+        const broken = current.members.find((member) => member.outcome === 'failed' && !recovered.has(member.seq))
+        if (broken !== undefined) {
+          const unit = progressAttemptUnit(broken)
+          let n = 1
+          for (const member of current.members) {
+            if (progressAttemptUnit(member) !== unit) continue
+            n = Math.max(n, progressAttemptNumber(member.label))
+          }
+          attempt = { n, retrying: !ended }
+        }
+      }
+      const rest = []
+      for (const step of steps.slice(at)) {
+        if (rest[rest.length - 1] === step.title) continue
+        rest.push(step.title)
+      }
+      const shipped = run.summaryFinalDraft === undefined ? undefined : progressShippedRow(run.members, run.summaryFinalDraft)
+      const log = [...run.members]
+        .sort((left, right) => left.seq - right.seq)
+        .map((member) => ({
+          seq: member.seq,
+          ...member.startedAt === undefined ? {} : { at: member.startedAt },
+          role: progressStoryRole(member),
+          title: member.phase === undefined ? '' : member.phase,
+          state: progressRowState(member),
+          ...member === shipped ? { shipped: true } : {},
+        }))
+      const shippedLine = shipped === undefined ? undefined : log.find((row) => row.seq === shipped.seq)
+      const final = run.summaryFinalDraft === undefined || shippedLine === undefined
+        ? undefined
+        : { draft: run.summaryFinalDraft, label: shippedLine.title, row: shippedLine }
+      const dock = state === 'waiting' ? 'start' : state === 'done' ? 'accept' : 'quiet'
+      return {
+        state,
+        steps,
+        at,
+        total,
+        now,
+        ...attempt === undefined ? {} : { attempt },
+        rest,
+        log,
+        ...final === undefined ? {} : { final },
+        dock,
+      }
+    }
+
+    /**
      * Parse a coordination block out of child-session text.
      *
      * Only an explicit block is accepted: a fenced `grok-coordination` block, or a fenced
@@ -3532,87 +3749,109 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Format one duration for the engine-facts section; `undefined` when it was not measured. */
-    function progressDuration(ms) {
-      if (ms === undefined || !Number.isFinite(ms) || ms < 0) return undefined
-      if (ms < 1000) return `${Math.round(ms)} ms`
-      const seconds = ms / 1000
-      if (seconds < 60) return `${seconds.toFixed(1)} s`
-      const minutes = Math.floor(seconds / 60)
-      return `${minutes} m ${Math.round(seconds - minutes * 60)} s`
-    }
-
     /**
-     * The band's wire geometry, shared by the stylesheet and the measurement.
+     * The page's stylesheet, scoped to `.gw-progress`.
      *
-     * The left gutter is a constant. It used to be the right-most owner's trunk position,
-     * so a row owned by a later stage widened the indent and pushed every card right: the
-     * band moved when nothing about the cards had changed. Attribution now comes from the
-     * wire, not from how far a card is indented.
+     * Every colour is a `--dsw-alias-*` token (mixed with `color-mix()` where a surface is
+     * needed) and every family is a `--dsw-font-*` token, so the page follows the theme,
+     * the contrast pass and dark mode instead of freezing a shade. The rules that cannot be
+     * inline styles live here: the equal-segment grid, the flowing segment, the reduced
+     * motion stop, and the narrow layout.
      *
-     * Inside that gutter the whole band uses **one** elbow lane under the spine and **one**
-     * channel: every owner descends to that single rail, and the rail is drawn once. The
-     * earlier per-owner lanes and channels made the cross-stage lines outnumber the stages
-     * themselves (2026-11-21 request: too many lines, merge into one); attribution now
-     * rides on each owner's own drop and on its stubs, not on how many lanes it occupies.
-     */
-    const PROGRESS_WIRE_PAD = 40
-    const PROGRESS_WIRE_BAND_GAP = 12
-    const PROGRESS_WIRE_CHANNEL_X = 18
-    const PROGRESS_WIRE_LANE_GAP = 4
-    const PROGRESS_WIRE_LANE_CLEARANCE = 4
-
-    /**
-     * Q11: the step a plan-task card takes in from the band's own edge.
-     *
-     * A plan task is a child of the execute group, so it sits one step in; the guardian
-     * adjudication card is not a plan task, so it keeps the band's edge. The stylesheet
-     * below is built from this number, so the rule and the number cannot disagree.
-     */
-    const PROGRESS_CARD_INDENT = 16
-
-    /**
-     * The track's stylesheet, scoped to `.gw-progress`.
-     *
-     * Every colour is a `--dsw-alias-*` token and every family is a `--dsw-font-*` token,
-     * so the tab follows the theme (light/dark/user/contrast) instead of freezing a shade,
-     * and no light block is baked in. The rules that cannot be inline styles live here:
-     * the running pulse, the reduced-motion stop, and the two width breakpoints.
+     * One rule per line is deliberate: a rule that spans lines cannot be read by the guard
+     * that every selector is scoped to `.gw-progress`, and `@keyframes` bodies stay on their
+     * `@` line for the same reason.
      */
     const PROGRESS_CSS = [
-      '.gw-progress { position: relative; box-sizing: border-box; width: 100%; min-width: 0; color: var(--dsw-alias-label-primary);',
-      '  font-family: var(--dsw-font-family-sans, inherit); font-size: 13px; }',
-      '.gw-progress-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 4px 0; }',
-      '.gw-progress-title { margin: 0; font-size: 14px; font-weight: 600; }',
-      '.gw-progress-percent { font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary, inherit); }',
-      // D (settle bar): one 100%-wide bar split by outcome, plus the same counts as words.
-      // Every width is a count over the declared rows — nothing here is an estimate.
-      '.gw-progress-settle { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0;',
-      '  font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); }',
-      '.gw-progress-settle-bar { flex: 1 1 auto; display: flex; height: 8px; border-radius: 999px; overflow: hidden;',
-      '  background: var(--dsw-alias-fill-l2, transparent); border: 1px solid var(--dsw-alias-border-l2, currentColor); }',
-      '.gw-progress-settle-part { display: block; height: 100%; }',
-      '.gw-progress-settle-part[data-tone="ok"] { background: var(--dsw-alias-state-success-primary, currentColor); }',
-      '.gw-progress-settle-part[data-tone="bad"] { background: var(--dsw-alias-state-error-primary, currentColor); }',
-      '.gw-progress-settle-part[data-tone="warn"] { background: var(--dsw-alias-state-warn-primary, currentColor); }',
-      // A row that failed and was then replaced by a completed attempt: settled, not red
-      // (nothing is broken now), and not `ok` either (that attempt did fail).
-      '.gw-progress-settle-part[data-tone="retried"] { background: var(--dsw-alias-label-secondary, currentColor); }',
-      '.gw-progress-settle-part[data-tone="open"] { background: repeating-linear-gradient(90deg, var(--dsw-alias-state-idle-primary, currentColor) 0 5px, transparent 5px 9px); }',
-      '.gw-progress-settle-legend { flex: none; font-variant-numeric: tabular-nums; }',
-      // Fresh mint and soft sky surfaces are mixed with semantic DSH tokens, so
-      // contrast and dark-mode colours remain owned by the active theme.
-      '.gw-progress-overview { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(230px, .9fr); gap: 12px; align-items: stretch; margin: 8px 4px 4px; }',
-      '.gw-progress-overview .gw-progress-settle { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-width: 0; margin: 0; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
-      '.gw-progress-overview .gw-progress-settle-bar { height: 10px; border: 0; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent); }',
-      '.gw-progress-guardian { box-sizing: border-box; min-width: 0; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
+      '.gw-progress { position: relative; box-sizing: border-box; display: flex; flex-direction: column; width: 100%; min-width: 0; color: var(--dsw-alias-label-primary); font-family: var(--dsw-font-family-sans, inherit); font-size: 13px; }',
+      // ── header: the run's own name and the five-state chip ────────────────────────
+      '.gw-progress-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px 9px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-chip { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 12%, transparent); color: var(--dsw-alias-label-secondary, inherit); font-size: 12px; font-weight: 600; white-space: nowrap; }',
+      '.gw-progress-chip-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }',
+      '.gw-progress-chip[data-state="waiting"] { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-inverse, inherit); }',
+      '.gw-progress-chip[data-state="running"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent); color: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-chip[data-state="running"] .gw-progress-chip-dot { animation: gw-progress-pulse 1.7s ease-in-out infinite; }',
+      '.gw-progress-chip[data-state="done"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent); color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-chip[data-state="failed"], .gw-progress-chip[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-state-warn-primary); }',
+      // ── now: the small heading, the one headline, and the line under it ───────────
+      '.gw-progress-now { padding: 14px 4px 0; }',
+      '.gw-progress-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-headline { margin: 6px 0 0; font-size: 22px; line-height: 1.25; font-weight: 650; letter-spacing: -.01em; overflow-wrap: anywhere; }',
+      '.gw-progress-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-actor { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-sep { color: var(--dsw-alias-label-secondary, inherit); }',
+      // ── the track: one equal segment per step ─────────────────────────────────────
+      '.gw-progress-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin: 12px 4px 0; padding: 0; list-style: none; }',
+      '.gw-progress-step { position: relative; height: 6px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 30%, transparent); }',
+      '.gw-progress-step[data-state="done"] { background: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-step[data-state="doing"] { background: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-step[data-state="doing"]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dsw-alias-label-inverse, currentColor) 55%, transparent), transparent); animation: gw-progress-sweep 1.9s linear infinite; }',
+      '.gw-progress-step[data-state="failed"] { background: var(--dsw-alias-state-warn-primary); }',
+      '.gw-progress-step[data-state="blocked"] { background: var(--dsw-alias-state-warn-primary); }',
+      '.gw-progress-step[data-state="cancelled"] { background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 30%, transparent); }',
+      '.gw-progress-step[data-state="pending"] { background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 30%, transparent); }',
+      // The amber bar speaks for one unit's own attempt, so it sits under the track and
+      // never inside a segment: the segment is a proportion, the bar is a sentence.
+      '.gw-progress-flag { align-self: flex-start; margin: 10px 4px 0; padding: 4px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-state-warn-primary); font-size: 12px; font-weight: 600; }',
+      '.gw-progress-rest { margin: 10px 4px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
+      // ── sections: the step list and the history share one heading shape ───────────
+      '.gw-progress-section { margin-top: 16px; }',
+      '.gw-progress-h2 { margin: 0 4px 6px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-plan { display: flex; flex-direction: column; margin: 0; padding: 0 4px; list-style: none; }',
+      '.gw-progress-plan-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-plan-row:last-child { border-bottom: 0; }',
+      '.gw-progress-plan-n { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
+      '.gw-progress-plan-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }',
+      '.gw-progress-plan-name { font-size: 13px; overflow-wrap: anywhere; }',
+      '.gw-progress-plan-roles { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-plan-word { flex: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; }',
+      '.gw-progress-plan-row[data-state="done"] .gw-progress-plan-word { color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-plan-row[data-state="doing"] .gw-progress-plan-word { color: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-plan-row[data-state="failed"] .gw-progress-plan-word { color: var(--dsw-alias-state-warn-primary); }',
+      '.gw-progress-plan-row[data-state="blocked"] .gw-progress-plan-word { color: var(--dsw-alias-state-warn-primary); }',
+      // ── the history: one line per declared call ──────────────────────────────────
+      '.gw-progress-log { display: flex; flex-direction: column; margin: 0; padding: 0 4px; list-style: none; }',
+      '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-log-row:last-child { border-bottom: 0; }',
+      '.gw-progress-log-time { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
+      '.gw-progress-log-role { font-size: 13px; font-weight: 600; }',
+      '.gw-progress-log-name { min-width: 0; font-size: 13px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
+      '.gw-progress-log-word { flex: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; }',
+      '.gw-progress-log-row[data-state="done"] .gw-progress-log-word { color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-log-row[data-state="doing"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent); }',
+      '.gw-progress-log-row[data-state="doing"] .gw-progress-log-word { color: var(--dsw-alias-state-business-primary); font-weight: 600; }',
+      '.gw-progress-log-row[data-state="failed"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); }',
+      '.gw-progress-log-row[data-state="blocked"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); }',
+      '.gw-progress-log-row[data-state="failed"] .gw-progress-log-word { color: var(--dsw-alias-state-warn-primary); font-weight: 600; }',
+      '.gw-progress-log-row[data-state="blocked"] .gw-progress-log-word { color: var(--dsw-alias-state-warn-primary); font-weight: 600; }',
+      // ── the shipped draft: a name and the one control that opens it ───────────────
+      '.gw-progress-final { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 4px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 30%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 6%, transparent); }',
+      '.gw-progress-final-name { min-width: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }',
+      '.gw-progress-final-mark { font-size: 12px; font-weight: 600; color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-final-missing { margin: 0 4px; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-open { display: inline-flex; align-items: center; height: 22px; margin-left: auto; padding: 0 9px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 11px; white-space: nowrap; }',
+      '.gw-progress-open[type="button"] { cursor: pointer; }',
+      '.gw-progress-open[type="button"]:hover { border-color: var(--dsw-alias-state-business-primary); }',
+      // ── the dock: one button, or one quiet line ───────────────────────────────────
+      '.gw-progress-dock { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 18px; padding: 12px 4px 4px; border-top: 1px solid var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-dock-fill { display: block; width: 100%; height: 40px; border: 0; border-radius: 12px; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-inverse, inherit); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }',
+      '.gw-progress-dock-fill:hover { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 85%, var(--dsw-alias-label-primary, currentColor)); }',
+      '.gw-progress-dock-fill:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }',
+      '.gw-progress-dock-hint { margin: 0; text-align: center; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-filled { margin: 0; text-align: center; font-size: 12px; color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-quiet { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; font-size: 13px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-quiet-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-business-primary); animation: gw-progress-pulse 1.7s ease-in-out infinite; }',
+      '.gw-progress-empty { padding: 14px 4px; color: var(--dsw-alias-label-secondary, inherit); }',
+      // ── the Guardian lane (kept from the previous page, colour only) ──────────────
+      '.gw-progress-guardian { box-sizing: border-box; min-width: 0; margin-top: 16px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian[data-state="active"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, transparent); }',
-      '.gw-progress-guardian[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 38%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 5%, transparent); }',
+      '.gw-progress-guardian[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 38%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); }',
       '.gw-progress-guardian-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; }',
       '.gw-progress-guardian-title { font-size: 12px; font-weight: 650; }',
       '.gw-progress-guardian-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px; font-size: 11px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent); color: var(--dsw-alias-state-business-primary); }',
       '.gw-progress-guardian[data-state="finished"] .gw-progress-guardian-status { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent); color: var(--dsw-alias-state-success-primary); }',
-      '.gw-progress-guardian[data-state="cancelled"] .gw-progress-guardian-status { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, transparent); color: var(--dsw-alias-state-error-primary); }',
+      '.gw-progress-guardian[data-state="cancelled"] .gw-progress-guardian-status { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 9%, transparent); color: var(--dsw-alias-state-warn-primary); }',
       '.gw-progress-guardian-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-top: 8px; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; font-variant-numeric: tabular-nums; }',
       '.gw-progress-guardian-empty { margin: 9px 0 0; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; }',
       '.gw-progress-guardian-list { display: grid; gap: 6px; margin: 9px 0 0; padding: 0; list-style: none; }',
@@ -3620,297 +3859,26 @@ window.__ModuleLoader__.load({
       '.gw-progress-guardian-list li[data-action="rescue"] { border-inline-start-color: var(--dsw-alias-state-success-primary, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian-finding-label { font-weight: 600; }',
       '.gw-progress-guardian-finding-action { color: var(--dsw-alias-label-secondary, inherit); }',
-      // A (two tracks): the spine keeps the full width for the six fixed stages, and the
-      // rows hang from it in their own vertical band. A `width: 100%` card inside the
-      // horizontal flex line would take its width out of the segments and crush them.
-      '.gw-progress-flow { position: relative; margin-top: 2px; }',
-      '.gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
-      '.gw-progress-wire { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 2; }',
-      '.gw-progress-wire-head { stroke: none; fill: var(--dsw-alias-border-l2, currentColor); }',
-      '.gw-progress-track, .gw-progress-tasks { position: relative; z-index: 1; box-sizing: border-box; margin: 0; list-style: none; }',
-      '.gw-progress-track { display: flex; align-items: stretch; gap: 0; width: 100%; min-width: 0; padding: 10px 12px 4px; }',
-      '.gw-progress-seg { flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column;',
-      '  padding: 6px 10px 10px; border: 0; border-right: 1px solid var(--dsw-alias-border-l2, currentColor); text-align: left; }',
-      '.gw-progress-seg:last-child { border-right: 0; }',
-      // The head wraps instead of squeezing: the ring keeps its 28px, and a long label
-      // moves to the next line rather than collapsing to 0.
-      '.gw-progress-seg-head { position: relative; z-index: 1; display: flex; align-items: center; flex-wrap: wrap;',
-      '  gap: 4px 8px; min-width: 0; width: 100%; min-height: 28px; background: transparent; }',
-      // The ring is the state mark: geometry here, colour on the inline `borderColor`
-      // (PROGRESS_STATE_COLOR). `pending` renders an empty ring, so "not reported" is a
-      // visible hollow circle instead of a blank head.
-      '.gw-progress-ring { flex: none; box-sizing: border-box; width: 28px; height: 28px;',
-      '  border: 2px solid var(--dsw-alias-state-idle-primary, currentColor); border-radius: 50%;',
-      '  display: inline-flex; align-items: center; justify-content: center; }',
-      '.gw-progress-glyph { font-size: 12px; line-height: 1; }',
-      '.gw-progress-seg[data-state="doing"] .gw-progress-ring { animation: gw-progress-pulse 1.6s ease-in-out infinite; }',
-      '.gw-progress-seg-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary, currentColor); }',
-      '.gw-progress-seg[data-state="failed"] .gw-progress-seg-dot { background: var(--dsw-alias-state-error-primary, currentColor); }',
-      '.gw-progress-label { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
-      '  font-size: 13px; font-weight: 600; }',
-      '.gw-progress-badge { display: inline-block; min-width: 20px; text-align: center;',
-      '  font-size: 11px; border-radius: 999px; padding: 0 6px;',
-      '  border: 1px solid var(--dsw-alias-border-l2, currentColor); color: var(--dsw-alias-label-secondary, inherit); }',
-      '.gw-progress-badge[data-tone="red"] { background: var(--dsw-alias-state-error-primary, currentColor);',
-      '  border-color: var(--dsw-alias-state-error-primary, currentColor); color: var(--dsw-alias-label-inverse, inherit); }',
-      '.gw-progress-meta { margin-top: 4px; min-width: 0; width: 100%; color: var(--dsw-alias-label-secondary, inherit);',
-      '  font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-      // B (duration rail): a 3px rail whose fill is this stage's measured row time over the
-      // slowest stage's. Both timestamps must exist to draw a fill; a stage measured to have
-      // no duration keeps the dashed rail instead of a zero-length green lie.
-      '.gw-progress-dur { display: block; height: 3px; margin-top: 7px; border-radius: 999px; overflow: hidden;',
-      '  background: var(--dsw-alias-fill-l2, transparent); }',
-      '.gw-progress-dur i { display: block; height: 100%; border-radius: 999px; background: var(--dsw-alias-state-success-primary, currentColor); }',
-      '.gw-progress-dur[data-state="doing"] i { background: var(--dsw-alias-state-business-primary, currentColor); }',
-      '.gw-progress-dur[data-state="failed"] i, .gw-progress-dur[data-state="blocked"] i,',
-      '.gw-progress-dur[data-state="cancelled"] i { background: var(--dsw-alias-state-warn-primary, currentColor); }',
-      '.gw-progress-dur[data-empty="true"] { background: repeating-linear-gradient(90deg, var(--dsw-alias-border-l2, currentColor) 0 3px, transparent 3px 6px); }',
-      // The connector between two segments: a hairline on the rings' centre line (6px pad +
-      // 14px half-ring = 19px) that fills only where the track has actually passed.
-      '.gw-progress-link { flex: 0 0 auto; align-self: flex-start; width: 18px; height: 2px; margin-top: 19px;',
-      '  border-radius: 999px; background: var(--dsw-alias-border-l2, currentColor); }',
-      '.gw-progress-link[data-filled="true"] { background: var(--dsw-alias-state-success-primary, currentColor); }',
-      '.gw-progress-link[data-flowing="true"] {',
-      '  background: repeating-linear-gradient(90deg, var(--dsw-alias-state-business-primary, currentColor) 0 6px, transparent 6px 10px);',
-      '  animation: gw-progress-flow 1s linear infinite; }',
-      // The task band: one card per task group, behind a fixed left gutter wide enough for
-      // every wire channel. The gutter is a constant so the cards do not move when a later
-      // stage owns a task; only the top margin grows, because that is where the elbow lanes
-      // under the spine live and a lane may not run across a card.
-      `.gw-progress-tasks { width: 100%; margin-top: calc(${PROGRESS_WIRE_BAND_GAP}px + var(--gw-wire-depth, 0px)); padding: 0 12px 0 ${PROGRESS_WIRE_PAD}px; }`,
-      // The gutter keeps every channel left of the cards: a card must never have a wire
-      // running through it, and a stub only ever spans the gutter itself.
-      '.gw-progress-task { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; box-sizing: border-box; min-height: 40px;',
-      '  width: 100%; max-width: 100%; margin: 0 0 10px; padding: 6px 10px;',
-      '  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, var(--dsw-alias-border-l2, currentColor)); border-radius: 13px;',
-      '  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 3%, transparent); text-align: left; }',
-      '.gw-progress-task[data-state="failed"] { border-left: 3px solid var(--dsw-alias-state-error-primary, currentColor); padding-left: 8px; }',
-      '.gw-progress-task[data-state="doing"] { border-color: var(--dsw-alias-state-business-primary, currentColor); }',
-      // Q11: a plan-task card steps in one indent from the band's edge (the guardian card
-      // keeps the edge). `max-width` is what keeps the rule free of horizontal overflow:
-      // an indented card may not exceed the band's own content box, at any width.
-      `.gw-progress-task[data-indent="true"] { margin-left: ${PROGRESS_CARD_INDENT}px; max-width: calc(100% - ${PROGRESS_CARD_INDENT}px); }`,
-      '.gw-progress-task .gw-progress-ring { width: 20px; height: 20px; }',
-      '.gw-progress-task .gw-progress-glyph { font-size: 10px; }',
-      // Q10(b): the task name is the one thing a reader needs whole, so it wraps onto
-      // the card's second line instead of being ellipsized. `anywhere` keeps a long
-      // unbroken token inside the card rather than pushing the pills off it.
-      '.gw-progress-task-name { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere;',
-      '  font-size: 12px; font-weight: 600; line-height: 1.35; }',
-      '.gw-progress-task-meta { flex: none; color: var(--dsw-alias-label-secondary, inherit);',
-      '  font-size: 11px; font-variant-numeric: tabular-nums; }',
-      '.gw-progress-subs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 0; margin-left: auto; flex: none; }',
-      // The pill is the only clickable thing in the band, and only for a row whose child the
-      // shell can actually open. Colour is never the only encoding: the pill carries the
-      // state ring and the row's own label.
-      '.gw-progress-pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;',
-      '  border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; background: transparent;',
-      '  color: inherit; font: inherit; font-size: 11px; text-decoration: none; }',
-      '.gw-progress-pill[data-open="true"] { cursor: pointer; }',
-      '.gw-progress-pill[data-open="true"]:hover { border-color: var(--dsw-alias-state-business-primary, currentColor); }',
-      '.gw-progress-pill[data-state="failed"] { border-color: var(--dsw-alias-state-error-primary, currentColor); }',
-      '.gw-progress-pill[data-state="doing"] { border-color: var(--dsw-alias-state-business-primary, currentColor); }',
-      '.gw-progress-pill .gw-progress-ring { width: 12px; height: 12px; border-width: 2px; }',
-      '.gw-progress-pill .gw-progress-glyph { font-size: 8px; }',
-      // The mini arrow between two rows of one task: the tone names the row it points at.
-      '.gw-progress-mini { position: relative; flex: none; width: 22px; height: 2px; margin: 0 2px;',
-      '  background: var(--dsw-alias-border-l2, currentColor); }',
-      '.gw-progress-mini::after { content: ""; position: absolute; right: -1px; top: -3px; border-left: 5px solid var(--dsw-alias-border-l2, currentColor);',
-      '  border-top: 4px solid transparent; border-bottom: 4px solid transparent; }',
-      '.gw-progress-mini[data-tone="ok"] { background: var(--dsw-alias-state-success-primary, currentColor); }',
-      '.gw-progress-mini[data-tone="ok"]::after { border-left-color: var(--dsw-alias-state-success-primary, currentColor); }',
-      '.gw-progress-mini[data-tone="bad"] { background: var(--dsw-alias-state-error-primary, currentColor); }',
-      '.gw-progress-mini[data-tone="bad"]::after { border-left-color: var(--dsw-alias-state-error-primary, currentColor); }',
-      '.gw-progress-mini[data-tone="pending"] { background: repeating-linear-gradient(90deg, var(--dsw-alias-border-l2, currentColor) 0 3px, transparent 3px 6px); }',
-      '.gw-progress-empty { padding: 12px 4px; color: var(--dsw-alias-label-secondary, inherit); }',
-      '@keyframes gw-progress-flow { to { background-position: 10px 0; } }',
+      // ── motion: two decorations, both stoppable ──────────────────────────────────
+      '@keyframes gw-progress-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }',
       '@keyframes gw-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }',
-      // Motion is decoration here: the state word already says "running".
+      // Motion is decoration here: the state word and the segment colour already say
+      // "running", so a reader who asked for less motion loses nothing.
       '@media (prefers-reduced-motion: reduce) {',
-      '  .gw-progress-seg[data-state="doing"] .gw-progress-ring,',
-      '  .gw-progress-link[data-flowing="true"] { animation: none; } }',
-      '@media (max-width: 720px) { .gw-progress-overview { grid-template-columns: minmax(0, 1fr); }',
-      '  .gw-progress-seg { padding-left: 6px; padding-right: 6px; }',
-      // Narrow columns stack the ring above its label, so the label keeps a line of its
-      // own instead of being ellipsized to nothing beside a 28px ring.
-      '  .gw-progress-seg-head { flex-direction: column; align-items: flex-start; gap: 4px; }',
-      '  .gw-progress-link { width: 10px; }',
-      '  .gw-progress-subs { flex-wrap: wrap; } }',
-      // Under 480px the spine turns into a vertical step list (Ant vertical Steps
-      // semantics: icon + title + one line each), and the task band follows it as a plain
-      // list: there is no room for a trunk beside a 360px-wide card, so the wires go and
-      // the cards take the full width. Order still carries the topology.
+      '  .gw-progress-step[data-state="doing"]::after, .gw-progress-chip[data-state="running"] .gw-progress-chip-dot, .gw-progress-quiet-dot { animation: none; }',
+      '}',
+      // Under 480px the page stacks: the headline keeps the width, the plan and the log
+      // rows drop their number column, and the dock keeps one full-width button. Nothing
+      // here scrolls sideways — the segments share the width at every size.
       '@media (max-width: 480px) {',
-      '  .gw-progress-track { flex-direction: column; }',
-      '  .gw-progress-seg { border-right: 0; border-inline-start: 2px solid var(--dsw-alias-border-l2, currentColor);',
-      '    padding-left: 10px; }',
-      '  .gw-progress-seg[data-state="done"] { border-inline-start-color: var(--dsw-alias-state-success-primary, currentColor); }',
-      '  .gw-progress-seg[data-state="doing"] { border-inline-start-color: var(--dsw-alias-state-business-primary, currentColor); }',
-      '  .gw-progress-seg[data-state="failed"] { border-inline-start-color: var(--dsw-alias-state-error-primary, currentColor); }',
-      '  .gw-progress-seg[data-state="blocked"], .gw-progress-seg[data-state="cancelled"] {',
-      '    border-inline-start-color: var(--dsw-alias-state-warn-primary, currentColor); }',
-      '  .gw-progress-link, .gw-progress-wires { display: none; }',
-      `  .gw-progress-tasks { padding-left: 12px; margin-top: ${PROGRESS_WIRE_BAND_GAP}px; }`,
+      '  .gw-progress-dock { flex-direction: column; align-items: stretch; }',
+      '  .gw-progress-headline { font-size: 19px; }',
+      '  .gw-progress-plan-row, .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }',
+      '  .gw-progress-plan-n, .gw-progress-log-time { display: none; }',
       '}',
     ].join('\n')
 
-    /**
-     * The state of one recorded row, from its outcome alone.
-     *
-     * `doing` is "no settlement yet", never "queued": an unsettled row belongs to a call
-     * that started. The catch-all for an outcome that is neither a completion nor a
-     * cancellation is `blocked`, the same word the stage states use.
-     * @param member - one folded row.
-     * @returns its render state.
-     */
-    function progressMemberState(member) {
-      if (member.outcome === undefined) return 'doing'
-      if (member.outcome === 'completed') return 'done'
-      if (member.outcome === 'cancelled') return 'cancelled'
-      if (member.outcome === 'failed') return 'failed'
-      return 'blocked'
-    }
-
-    /**
-     * Measured time of one node: the sum of its rows' own spans.
-     *
-     * Both end points must exist — a row whose start or settlement the stream never
-     * carried contributes nothing rather than an estimate. `undefined` (not `0`) when no
-     * row was measurable, so the rail can say "not measured" instead of drawing a
-     * zero-length fill that would read as a fast stage.
-     * @param node - derived node model.
-     * @returns milliseconds, or `undefined` when nothing was measurable.
-     */
-    function progressNodeDuration(node, now) {
-      let total
-      const members = Array.isArray(node.members) ? node.members : []
-      for (const member of members) {
-        // Q10(b): a running row has no settlement time, so its span is measured
-        // against the clock the panel ticks. A settled row keeps its measured value;
-        // a row the stream never started contributes nothing.
-        const end = typeof member.endedAt === 'number'
-          ? member.endedAt
-          : (member.outcome === undefined && typeof now === 'number' ? now : undefined)
-        if (typeof member.startedAt !== 'number' || typeof end !== 'number') continue
-        const span = end - member.startedAt
-        if (!Number.isFinite(span) || span < 0) continue
-        total = (total === undefined ? 0 : total) + span
-      }
-      return total
-    }
-
-    /**
-     * The one-line count under a segment.
-     *
-     * A stage whose rows render in their own task cards is not "not reported": it says
-     * how many rows ran under it, because an empty row list is not an absence. The
-     * measured time is appended when both timestamps exist; it is never invented.
-     * @param node - derived node model.
-     * @param t - translator.
-     * @returns the meta sentence.
-     */
-    function progressNodeMeta(node, t, now) {
-      const evidence = Array.isArray(node.evidence) ? node.evidence : []
-      if (node.members.length === 0) {
-        return evidence.length > 0 ? t('progress.branch.evidenceRows', { count: evidence.length }) : t('progress.notReported')
-      }
-      const failedCount = progressCurrentFailureCount(node.members)
-      const doingCount = node.members.filter((member) => member.outcome === undefined).length
-      const settled = node.members.filter((member) => member.outcome !== undefined).length
-      const duration = progressDuration(progressNodeDuration(node, now))
-      return [
-        t('progress.branch.settledOf', { settled, declared: node.members.length }),
-        ...(doingCount > 0 ? [t('progress.branch.running', { count: doingCount })] : []),
-        ...(failedCount > 0 ? [t('progress.branch.failedCount', { count: failedCount })] : []),
-        ...(duration === undefined ? [] : [duration]),
-      ].join(' · ')
-    }
-
-    /**
-     * The state ring: geometry from CSS, colour from the state table.
-     * @param state - render state.
-     * @returns the ring element.
-     */
-    function progressRing(state) {
-      return h('span', {
-        className: 'gw-progress-ring',
-        style: { borderColor: PROGRESS_STATE_COLOR[state], color: PROGRESS_STATE_COLOR[state] },
-        'aria-hidden': 'true',
-      },
-      h('span', { className: 'gw-progress-glyph', 'data-gw-progress-glyph': state }, PROGRESS_STATE_GLYPH[state] || ''))
-    }
-
-    /**
-     * One spine segment.
-     *
-     * The segment is a static mark, not a button — clicking it does nothing, and it is not
-     * in the tab order. The head carries the ring, the label and a failure red dot plus
-     * badge when the segment has failures; the meta line carries the counts and the
-     * measured time; the rail under it draws that time as length (B).
-     * @param node - derived node model.
-     * @param props - translator plus the rail's scale.
-     * @returns the segment element.
-     */
-    function ProgressNode(node, props) {
-      const t = (props === undefined || props.t === undefined) ? translator(FALLBACK_LOCALE) : props.t
-      const now = props === undefined ? undefined : props.now
-      const stateText = t(PROGRESS_STATE_KEY[node.state])
-      const label = node.label === '' ? t('progress.unphased') : node.label
-      // Rows that ran under this stage but render as their own task cards. Read once: the
-      // tooltip and the meta line both report it instead of saying "not reported".
-      const evidence = Array.isArray(node.evidence) ? node.evidence : []
-      const tip = node.state === 'blocked' && node.reason !== undefined
-        ? t(`progress.derived.${node.reason}`)
-        : (node.phases.length > 0
-          ? node.phases.join(' · ')
-          : (node.kind === 'extra'
-            ? t('progress.extraHint')
-            : (evidence.length > 0 ? t('progress.evidenceHint') : t('progress.notReported'))))
-      const failedCount = progressCurrentFailureCount(node.members)
-      const meta = progressNodeMeta(node, t, now)
-      const duration = progressNodeDuration(node, now)
-      // The rail's baseline is the slowest stage of this run, so the lengths compare the
-      // stages of one run with each other and claim nothing across runs.
-      const scale = props === undefined || !(props.railScale > 0) ? undefined : props.railScale
-      const railWidth = duration === undefined || scale === undefined ? undefined : Math.max(2, Math.round((duration / scale) * 100))
-      return h('li', {
-        key: node.key,
-        className: 'gw-progress-seg',
-        'data-gw-progress-node': true,
-        'data-node-key': node.key,
-        'data-kind': node.kind,
-        'data-state': node.state,
-        'data-derived': node.derived ? 'true' : undefined,
-        title: tip,
-        'aria-label': `${label} · ${stateText} · ${meta}`,
-      },
-      h('span', { className: 'gw-progress-seg-head' },
-        progressRing(node.state),
-        node.state === 'failed'
-          ? h('span', { className: 'gw-progress-seg-dot', 'data-gw-progress-faildot': true, 'aria-hidden': 'true' })
-          : null,
-        h('span', { className: 'gw-progress-label', 'data-gw-progress-label': true, title: label }, label),
-        failedCount > 0
-          ? h('span', { className: 'gw-progress-badge', 'data-tone': 'red', 'data-gw-progress-failbadge': failedCount }, t('progress.branch.failedCount', { count: failedCount }))
-          : null),
-      // The meta line is ellipsized by CSS in a narrow column, so the full sentence needs
-      // its own tooltip instead of being clipped with no way to read it.
-      h('span', { className: 'gw-progress-meta', 'data-gw-progress-meta': true, title: meta }, meta),
-      // The rail is geometry only: the same number is in the meta line above it, and a
-      // screen reader has already been given that sentence.
-      h('span', {
-        className: 'gw-progress-dur',
-        'data-gw-progress-dur': true,
-        'data-state': node.state,
-        'data-empty': railWidth === undefined ? 'true' : undefined,
-        'aria-hidden': 'true',
-      }, railWidth === undefined ? null : h('i', { style: { width: `${railWidth}%` } })))
-    }
-
-    /** The mini connector's tone: the capsule (or row) it points at, folded onto three tones. */
-    const PROGRESS_MINI_TONE = { done: 'ok', failed: 'bad' }
-
-    /** Copy key of one chain capsule's own name (`progress.chain.execute`). */
+    /** The one word a chain capsule is called by, when that gate was reached. */
     const PROGRESS_CHAIN_LABEL_KEY = {
       execute: 'progress.chain.execute',
       check: 'progress.chain.check',
@@ -3918,358 +3886,189 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The arrow between two capsules: the tone names the capsule it points at.
-     * @param key - the capsule key (`check` / `review`) or `row:<seq>` for an unchained row.
-     * @param state - the state of what it points at.
-     * @returns the connector element.
+     * The role words a task's chain reached, in chain order (`执行 → 检查`).
+     *
+     * Only reached capsules are named: the chain's unreached steps are a fact about a
+     * different page (the task never got there), and printing a placeholder for them here
+     * would claim a gate that has not run.
+     * @param chain - the task's chain slots.
+     * @param t - translator.
+     * @returns the words joined by an arrow, or `''` when nothing was reached.
      */
-    function ProgressMini(key, state) {
-      return h('span', {
-        key: `mini:${key}`,
-        className: 'gw-progress-mini',
-        'data-gw-progress-mini': key,
-        'data-tone': PROGRESS_MINI_TONE[state] || 'pending',
+    function progressChainWords(chain, t) {
+      const words = []
+      for (const slot of Array.isArray(chain) ? chain : []) {
+        if (slot.reached !== true) continue
+        const key = PROGRESS_CHAIN_LABEL_KEY[slot.key]
+        if (key !== undefined) words.push(t(key))
+      }
+      return words.join(' → ')
+    }
+
+    /**
+     * The word of one history line.
+     *
+     * The state decides first (a failed line says 没过 whatever role spoke it), then the
+     * shipped mark, then the role — a finished `执行`, `检查` and `复核` are three different
+     * verbs, so one `done` word would flatten the log into a column of identical sentences.
+     */
+    function progressLogWord(row, t) {
+      if (row.state !== 'done') return t(PROGRESS_LOG_STATE_KEY[row.state] === undefined ? 'progress.log.done' : PROGRESS_LOG_STATE_KEY[row.state])
+      if (row.shipped === true) return t('progress.log.shipped')
+      const chain = progressChainForLabel(row.role)
+      return t(chain === undefined ? 'progress.log.done' : PROGRESS_LOG_ROLE_KEY[chain.key])
+    }
+
+    /**
+     * The wall clock of one row's start, as the log prints it (`8:02`).
+     *
+     * Minutes are padded and hours are not: the column reads as a time, not as a table
+     * cell, and a two-digit hour still fits the column.
+     */
+    function progressClockText(at) {
+      const date = new Date(at)
+      const hours = date.getHours()
+      const minutes = date.getMinutes()
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return ''
+      return `${hours}:${String(minutes).padStart(2, '0')}`
+    }
+
+    /**
+     * The shipped draft's name, in the language its own row was recorded in.
+     *
+     * The name is the naming table's own (`汇总·第 n 稿`), never the row's label: the label
+     * carries the mark too, and the card prints the mark as its own element so it can be
+     * the one green word on the card.
+     */
+    function progressFinalName(final) {
+      const label = final.row === undefined || typeof final.row.role !== 'string' ? '' : final.row.role
+      for (const language of ['zh', 'en']) {
+        const head = PROGRESS_SUMMARY_DRAFTS[language].draft.split('{n}')[0]
+        if (head !== '' && label.indexOf(head) === 0) return progressSummaryDraftName(final.draft, language, false)
+      }
+      return progressSummaryDraftName(final.draft, 'zh', false)
+    }
+
+    /**
+     * One segment of the step bar: geometry and state only, no text.
+     *
+     * The bar is `aria-hidden`-free and carries one `aria-label` on its own container, so a
+     * screen reader hears one sentence ("step 2 of 3") instead of one utterance per block.
+     * @param step - one story step.
+     * @returns the segment element.
+     */
+    function ProgressStep(step) {
+      return h('li', {
+        key: step.key,
+        className: 'gw-progress-step',
+        'data-gw-progress-step': step.key,
+        'data-state': step.state,
         'aria-hidden': 'true',
       })
     }
 
     /**
-     * One pill in a task card: the row's own state ring plus its own label.
+     * The one control on a row: opens that child session, and only when the shell can.
      *
-     * A pill is a button exactly when the shell can open that child session — the same
-     * `canOpen` rule the chat panel uses. Otherwise it is a plain span, so an unopenable
-     * row cannot be clicked into the wrong session.
-     * @param member - one folded row.
-     * @param props - translator, the open gate, the open callback.
-     * @param chainKey - the chain capsule this pill fills, when it fills one.
-     * @returns the pill element.
+     * A capsule the shell cannot open is a plain mark rather than a button, so an
+     * unopenable row cannot be clicked into the wrong session.
+     * @param childId - the child session the row belongs to, when it has one.
+     * @param props - translator, the open gate and the open callback.
+     * @returns the capsule element.
      */
-    function ProgressPill(member, props, chainKey) {
-      const t = props.t
-      const state = progressMemberState(member)
-      const name = member.label === '' ? t('progress.unphased') : member.label
-      const openable = member.childId !== '' && props.canOpen(member.childId)
-      const label = openable
-        ? `${t('progress.member.open')} · ${name}`
-        : `${name} · ${t(PROGRESS_STATE_KEY[state])}`
+    function ProgressOpenPill(childId, props) {
+      const label = props.t('progress.member.open')
+      const known = typeof childId === 'string' && childId !== ''
+      const openable = known && props.canOpen(childId)
       return h(openable ? 'button' : 'span', {
-        key: `pill:${member.seq}`,
-        className: 'gw-progress-pill',
+        className: 'gw-progress-open',
         type: openable ? 'button' : undefined,
-        'data-gw-progress-pill': member.seq,
-        'data-gw-progress-chain': chainKey === undefined ? undefined : chainKey,
-        'data-gw-progress-open': openable ? member.childId : undefined,
-        'data-open': openable ? 'true' : undefined,
-        'data-state': state,
+        'data-gw-progress-open': known ? childId : undefined,
         title: label,
         'aria-label': label,
-        onClick: openable ? () => props.openChild(member.childId) : undefined,
-      },
-      progressRing(state),
-      h('span', { className: 'gw-progress-pill-name' }, name))
+        onClick: openable ? () => props.openChild(childId) : undefined,
+      }, label)
     }
 
     /**
-     * One capsule of a task card's fixed chain.
+     * The step list: one row per step, with its number, its title, the gates it reached and
+     * its own state word.
      *
-     * A reached capsule is the row's own pill, so the click wiring is the one a reader
-     * already has; an unreached one is a dashed `pending` capsule that names the step,
-     * because "this task never reached the check" is the answer the chain exists for.
-     * @param slot - one chain slot of the card.
-     * @param props - translator plus the pill wiring.
-     * @returns the capsule: one pill, several pills on a retry, or the dashed placeholder.
+     * The title keeps the `data-gw-progress-task-name` hook the plan-task cards used, so an
+     * external reader that already looks for a plan task's name finds it here instead of
+     * losing the row with the card.
      */
-    function ProgressChainCapsule(slot, props) {
-      if (slot.reached) return slot.members.map((member) => ProgressPill(member, props, slot.key))
+    function ProgressPlan(story, props) {
       const t = props.t
-      const label = t(PROGRESS_CHAIN_LABEL_KEY[slot.key])
-      const tip = `${label} · ${t(PROGRESS_STATE_KEY.pending)} · ${t('progress.chain.pendingHint')}`
-      return h('span', {
-        key: `chain:${slot.key}`,
-        className: 'gw-progress-pill',
-        'data-gw-progress-chain': slot.key,
-        'data-pending': 'true',
-        'data-state': 'pending',
-        title: tip,
-        'aria-label': tip,
-      },
-      progressRing('pending'),
-      h('span', { className: 'gw-progress-pill-name' }, label))
+      if (story.steps.length === 0) return null
+      return h('section', { className: 'gw-progress-section', 'data-gw-progress-plan-section': true },
+        h('h4', { className: 'gw-progress-h2', 'data-gw-progress-plan-title': true }, t('progress.plan.title', { count: story.total })),
+        h('ol', { className: 'gw-progress-plan', 'data-gw-progress-plan': true },
+          story.steps.map((step, index) => {
+            const roles = progressChainWords(step.chain, t)
+            return h('li', {
+              key: step.key,
+              className: 'gw-progress-plan-row',
+              'data-gw-progress-plan-row': step.key,
+              'data-state': step.state,
+            },
+            h('span', { className: 'gw-progress-plan-n', 'data-gw-progress-plan-n': true }, String(index + 1)),
+            h('span', { className: 'gw-progress-plan-body' },
+              h('span', { className: 'gw-progress-plan-name', 'data-gw-progress-task-name': true }, step.title),
+              roles === '' ? null : h('span', { className: 'gw-progress-plan-roles', 'data-gw-progress-plan-roles': true }, roles)),
+            h('span', { className: 'gw-progress-plan-word', 'data-gw-progress-plan-word': true },
+              t(PROGRESS_PLAN_KEY[step.state] === undefined ? 'progress.plan.waiting' : PROGRESS_PLAN_KEY[step.state])))
+          })))
     }
 
     /**
-     * One card in the task band: a plan task, or a stage that carries rows of its own.
+     * The history: one line per declared call, in the order the calls were declared.
      *
-     * The card is inert (Q2): a click anywhere on it, including its blank area, does
-     * nothing. The only actions are the pills. `data-owner` names the spine segment the
-     * card hangs from, which is what the wires are drawn against — a plan task belongs to
-     * `执行`, the slot the engine announces it in.
-     *
-     * A plan-task card shows the fixed `执行 → 检查 → 复核` chain (Q11): three capsules,
-     * the unreached ones dashed, and after them any row whose role names no capsule, so no
-     * declared row is hidden. The guardian card is not a plan task: it keeps its own pills
-     * and the band's own left edge, while every plan-task card steps in by
-     * `PROGRESS_CARD_INDENT`.
-     * @param node - derived node model.
-     * @param props - translator plus the pill wiring.
-     * @returns the card element.
+     * The clock is the call's own `agent-start` time and is omitted — not zeroed — when the
+     * stream carried none, because "8:00" would be a claim about a moment nobody recorded.
      */
-    function ProgressTaskCard(node, props) {
+    function ProgressLog(story, props) {
       const t = props.t
-      const now = props.now
-      // Q10(b): the card carries the task name and its time only. The `1/3` counter
-      // moved a reader's eye away from the name and answered a question nobody asked
-      // ("how many attempts?"), while the attempts a failure spent stay visible on the
-      // row's own pills.
-      const duration = progressDuration(progressNodeDuration(node, now))
-      const meta = duration === undefined ? '' : duration
-      const name = node.label === '' ? t('progress.unphased') : node.label
-      const chain = Array.isArray(node.chain) ? node.chain : []
-      const subs = []
-      if (chain.length > 0) {
-        const chained = []
-        chain.forEach((slot) => { slot.members.forEach((member) => { chained.push(member.seq) }) })
-        chain.forEach((slot, index) => {
-          if (index > 0) subs.push(ProgressMini(slot.key, slot.state))
-          const capsule = ProgressChainCapsule(slot, props)
-          if (Array.isArray(capsule)) subs.push(...capsule)
-          else subs.push(capsule)
-        })
-        // A row whose label names no capsule is still a declared row: it follows the chain
-        // instead of being dropped from the card.
-        node.members.forEach((member) => {
-          if (chained.indexOf(member.seq) !== -1) return
-          subs.push(ProgressMini(`row:${member.seq}`, progressMemberState(member)))
-          subs.push(ProgressPill(member, props))
-        })
-      } else {
-        node.members.forEach((member, index) => {
-          if (index > 0) subs.push(ProgressMini(`row:${member.seq}`, progressMemberState(member)))
-          subs.push(ProgressPill(member, props))
-        })
-      }
-      const indented = node.kind === 'extra' && node.guardian !== true
-      return h('li', { key: node.key },
-        h('div', {
-          className: 'gw-progress-task',
-          'data-gw-progress-task': node.key,
-          'data-key': node.key,
-          'data-kind': node.kind,
-          'data-state': node.state,
-          'data-owner': `stage:${node.kind === 'extra' ? 'execute' : node.key.slice('stage:'.length)}`,
-          'data-indent': indented ? 'true' : undefined,
-        },
-        progressRing(node.state),
-        h('span', { className: 'gw-progress-task-name', 'data-gw-progress-task-name': true }, name),
-        meta === '' ? null : h('span', { className: 'gw-progress-task-meta', 'data-gw-progress-task-meta': true }, meta),
-        h('span', { className: 'gw-progress-subs' }, subs)))
-    }
-
-    /** No wires and no lane depth: what a host without layout gets. */
-    const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, depth: 0, paths: [] }
-
-    /**
-     * Whether two measured wire sets are the same, so a re-measure does not re-render.
-     * @param left - current set.
-     * @param right - freshly measured set.
-     * @returns whether every vertex and the lane depth match.
-     */
-    function sameProgressWires(left, right) {
-      if (left === right) return true
-      if (left.width !== right.width || left.height !== right.height || left.depth !== right.depth) return false
-      if (left.paths.length !== right.paths.length) return false
-      for (let index = 0; index < left.paths.length; index += 1) {
-        const a = left.paths[index]
-        const b = right.paths[index]
-        if (a.kind !== b.kind || a.owner !== b.owner || a.card !== b.card) return false
-        if (a.points.length !== b.points.length) return false
-        for (let at = 0; at < a.points.length; at += 1) {
-          if (a.points[at][0] !== b.points[at][0] || a.points[at][1] !== b.points[at][1]) return false
-        }
-      }
-      return true
+      if (story.log.length === 0) return null
+      return h('section', { className: 'gw-progress-section', 'data-gw-progress-log-section': true },
+        h('h4', { className: 'gw-progress-h2', 'data-gw-progress-log-title': true }, t('progress.log.title')),
+        h('ol', { className: 'gw-progress-log', 'data-gw-progress-log': true },
+          story.log.map((row) => h('li', {
+            key: row.seq,
+            className: 'gw-progress-log-row',
+            'data-gw-progress-log-row': row.seq,
+            'data-state': row.state,
+          },
+          h('span', { className: 'gw-progress-log-time', 'data-gw-progress-log-time': true },
+            typeof row.at === 'number' ? progressClockText(row.at) : ''),
+          h('span', { className: 'gw-progress-log-role', 'data-gw-progress-log-role': true }, row.role),
+          row.title === '' ? null : h('span', { className: 'gw-progress-log-name', 'data-gw-progress-log-name': true }, row.title),
+          h('span', { className: 'gw-progress-log-word', 'data-gw-progress-log-word': true }, progressLogWord(row, t))))))
     }
 
     /**
-     * Measure the elbow and stub geometry from the laid-out DOM.
+     * The shipped draft, or the sentence that says there is none.
      *
-     * Only the owner's ring centre has to be read: it is a flex result, not a number anyone
-     * can derive, so it is measured after layout — the same thing the mockup does. Every
-     * other coordinate is either a constant of the left gutter or the card's own rect.
-     *
-     * One group is one unwind: down from the ring, one lane leftwards under the spine, then
-     * down the group's own channel in the gutter. A card's stub is the last step — a short
-     * arrow into its left edge — so the group's line is readable without indenting the card.
-     *
-     * A host without layout (a stub renderer, a zero-width column) yields no paths: the band
-     * then renders as a plain list instead of as a graph with invented coordinates.
-     * @param flow - the `.gw-progress-flow` element, when there is one.
-     * @returns the measured wire set.
+     * The events never carry the draft's text — the final answer is delivered in the turn's
+     * own message, not as a child call — so the card prints the name and one capsule that
+     * opens the row that wrote it. A run with no `summary-final` gets the gap, never a
+     * guess at which draft was the final one.
      */
-    function measureProgressWires(flow) {
-      if (flow === null || flow === undefined) return EMPTY_PROGRESS_WIRES
-      if (typeof flow.querySelectorAll !== 'function' || typeof flow.querySelector !== 'function') return EMPTY_PROGRESS_WIRES
-      if (typeof flow.getBoundingClientRect !== 'function') return EMPTY_PROGRESS_WIRES
-      const frame = flow.getBoundingClientRect()
-      if (!(frame.width > 1) || !(frame.height > 1)) return EMPTY_PROGRESS_WIRES
-      const track = flow.querySelector('[data-gw-progress-track]')
-      if (track === null || track === undefined || typeof track.getBoundingClientRect !== 'function') return EMPTY_PROGRESS_WIRES
-      const cards = Array.from(flow.querySelectorAll('[data-gw-progress-task]'))
-      if (cards.length === 0) return EMPTY_PROGRESS_WIRES
-      const groups = new Map()
-      for (const card of cards) {
-        const owner = card.getAttribute('data-owner')
-        if (owner === null) continue
-        const list = groups.get(owner)
-        if (list === undefined) groups.set(owner, [card])
-        else list.push(card)
-      }
-      const trackBottom = Math.round(track.getBoundingClientRect().bottom - frame.top)
-      const paths = []
-      let depth = 0
-      // One lane and one channel for the whole band: the rail every owner unwinds onto.
-      const laneY = trackBottom + PROGRESS_WIRE_LANE_GAP
-      const channel = PROGRESS_WIRE_CHANNEL_X
-      let railEnd = laneY
-      for (const [owner, members] of groups) {
-        const segment = flow.querySelector(`.gw-progress-track [data-node-key="${owner}"]`)
-        const anchor = segment === null || segment === undefined || typeof segment.querySelector !== 'function'
-          ? null
-          : segment.querySelector('.gw-progress-ring')
-        // Without a measured ring there is no origin for the line: a stub alone would pin an
-        // arrow on a card to an owner the reader cannot see.
-        if (anchor === null || typeof anchor.getBoundingClientRect !== 'function') continue
-        const ring = anchor.getBoundingClientRect()
-        const x = Math.round(ring.left - frame.left + ring.width / 2)
-        const stubs = []
-        let last = laneY
-        for (const card of members) {
-          const rect = card.getBoundingClientRect()
-          const y = Math.round(rect.top - frame.top + rect.height / 2)
-          if (y > last) last = y
-          stubs.push({
-            kind: 'branch',
-            owner,
-            card: card.getAttribute('data-gw-progress-task'),
-            // The stub ends on the card's own left edge, so the arrow lands on the border
-            // however the card's padding and border weight are styled.
-            points: [[channel, y], [Math.round(rect.left - frame.left), y]],
-          })
-        }
-        // The owner's own drop ends on the shared rail: from its ring down through the one
-        // lane, then left into the same channel every other owner uses.
-        paths.push({
-          kind: 'trunk',
-          owner,
-          card: undefined,
-          points: [[x, trackBottom], [x, laneY], [channel, laneY]],
-        })
-        paths.push(...stubs)
-        // The rail runs once, from the lane down to the deepest card any owner hangs.
-        if (last > railEnd) railEnd = last
-        // The band's top margin has to clear the one lane, or the elbow would run across
-        // the first card; the gutter itself never moves, so the cards keep their left edge.
-        depth = Math.max(depth, laneY - trackBottom + PROGRESS_WIRE_LANE_CLEARANCE - PROGRESS_WIRE_BAND_GAP)
-      }
-      // One rail for every owner: the request was fewer cross-stage lines, and this is the
-      // one line they all share instead of one run per group.
-      if (railEnd > laneY) {
-        paths.push({
-          kind: 'rail',
-          owner: 'rail',
-          card: undefined,
-          points: [[channel, laneY], [channel, railEnd]],
-        })
-      }
-      return {
-        width: Math.round(frame.width),
-        height: Math.round(frame.height),
-        depth: Math.max(0, depth),
-        paths,
-      }
+    function ProgressFinal(story, run, props) {
+      const t = props.t
+      const shipped = story.final === undefined || story.final.row === undefined
+        ? undefined
+        : run.members.find((member) => member.seq === story.final.row.seq)
+      return h('section', { className: 'gw-progress-section', 'data-gw-progress-final-section': true },
+        h('h4', { className: 'gw-progress-h2', 'data-gw-progress-final-title': true }, t('progress.final.title')),
+        story.final === undefined || story.final.row === undefined
+          ? h('p', { className: 'gw-progress-final-missing', 'data-gw-progress-final-missing': true }, t('progress.final.missing'))
+          : h('div', { className: 'gw-progress-final', 'data-gw-progress-final': true },
+            h('span', { className: 'gw-progress-final-name', 'data-gw-progress-final-name': true }, progressFinalName(story.final)),
+            h('span', { className: 'gw-progress-final-mark', 'data-gw-progress-final-mark': true }, t('progress.final.mark')),
+            ProgressOpenPill(shipped === undefined ? undefined : shipped.childId, props)))
     }
 
-    /**
-     * The settle bar's parts: the declared rows grouped by outcome (D).
-     *
-     * Five tones, and every one of them is a count over rows the stream declared — no
-     * share is estimated. `open` is the unsettled rest, drawn as a dashed gap because a
-     * colour there would read as a result. `retried` is a row that failed and was then
-     * replaced by a completed attempt of the same call: it is settled, it is not red, and
-     * calling it done would be a lie about the attempt that failed.
-     * @param members - the run's rows.
-     * @param t - translator.
-     * @returns the parts, in the order they are drawn.
-     */
-    function progressSettleParts(members, t) {
-      const declared = Array.isArray(members) ? members.length : 0
-      if (declared === 0) return []
-      const recovered = progressRecoveredFailures(members)
-      const count = (predicate) => members.filter(predicate).length
-      const candidates = [
-        { tone: 'ok', count: count((member) => member.outcome === 'completed') },
-        { tone: 'bad', count: count((member) => member.outcome === 'failed' && !recovered.has(member.seq)) },
-        { tone: 'retried', count: count((member) => member.outcome === 'failed' && recovered.has(member.seq)) },
-        {
-          tone: 'warn',
-          count: count((member) => {
-            const state = progressMemberState(member)
-            return state === 'cancelled' || state === 'blocked'
-          }),
-        },
-        { tone: 'open', count: count((member) => member.outcome === undefined) },
-      ]
-      return candidates
-        .filter((part) => part.count > 0)
-        .map((part) => ({
-          tone: part.tone,
-          count: part.count,
-          label: t(`progress.settle.${part.tone}`, { count: part.count }),
-          width: Math.round((part.count / declared) * 1000) / 10,
-        }))
-    }
-
-    /**
-     * One measured wire as an SVG path.
-     *
-     * Every vertex is written out — `V`/`H` would be shorter, but the measurement is the
-     * only thing that knows which axis a leg belongs to, so the path states both numbers.
-     * @param points - measured vertices, already rounded to whole pixels.
-     * @returns the `d` attribute.
-     */
-    function progressWireDraw(points) {
-      return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0]} ${point[1]}`).join(' ')
-    }
-
-    /**
-     * The arrow that lands on a card's left edge and points into the card.
-     * @param points - the stub's measured vertices; the last one is the card edge.
-     * @returns the polygon's point list.
-     */
-    function progressWireHead(points) {
-      const tip = points[points.length - 1]
-      return `${tip[0]},${tip[1]} ${tip[0] - 8},${tip[1] - 4.5} ${tip[0] - 8},${tip[1] + 4.5}`
-    }
-
-    /**
-     * The "进度" view.
-     *
-     * Two tracks over one model, which is what the mockup shows:
-     *
-     * - **the spine** — the six fixed stages of the process template, in one horizontal
-     *   row, with the connector between each pair and the measured-time rail under each;
-     * - **the task band** — one card per group of rows, below the spine, in one fixed left
-     *   gutter. Each owner group unwinds from its stage's ring into its own channel in that
-     *   gutter, and every card takes a short arrow off the channel into its left edge, so
-     *   the line says who owns the card instead of the card's indentation saying it.
-     *
-     * A stage is a static mark and a card is inert: clicking either does nothing. The only
-     * action is a row's pill, rendered exactly when the shell can open that child session,
-     * which jumps straight to it. There is no detail card, no how-to-read paragraph, no
-     * jump-to-failure control and no retry affordance (deferred to Phase 2).
-     * @param props - slot props.
-     * @returns the tab element.
-     */
     /**
      * The Guardian side lane reports liveness interventions only. It does not
      * infer task quality or retry state from a timeout/rescue finding.
@@ -4317,195 +4116,149 @@ window.__ModuleLoader__.load({
           })))
     }
 
+
+    /**
+     * The "进度" view: one page, three screens.
+     *
+     * The page is the run, read top to bottom:
+     *
+     * - the **header**, the run's own name and the five-state chip;
+     * - **现在**, one small heading, one headline and one line of small print — the step the
+     *   page is about, or the fact that the run is planning or finished;
+     * - the **track**, one equal segment per declared step, the amber bar for the current
+     *   step's own unrecovered failure, and the names of the steps after it;
+     * - the **step list** — what the run said it would do, with the gates each task reached;
+     * - the **history** — one line per declared call, in the order they were declared;
+     * - the **shipped draft**, when the gate named one;
+     * - the **Guardian** card, when the stream recorded liveness monitoring;
+     * - the **dock**: one button that fills the input box, or one quiet line.
+     *
+     * Everything except the dock's button and a row's open capsule is inert: a segment, a
+     * row and the card are marks, not controls. The page adds no number the events did not
+     * report — no percentage, no estimate, no pass rate (§19.7).
+     * @param props - slot props.
+     * @returns the tab element.
+     */
     function ProgressView(props) {
       const t = guardedTranslator(props.t, typeof props.progressT === 'function' ? props.progressT : translator(FALLBACK_LOCALE))
       const snapshot = props.useGrokProgress === undefined ? EMPTY_PROGRESS_SNAPSHOT : props.useGrokProgress((value) => value)
-      const track = useMemo(
-        () => deriveProgressTrack(snapshot === undefined ? undefined : snapshot.activeRun, (key) => t(`progress.stage.${key}`)),
-        [snapshot, props.t, props.progressT],
-      )
-      const flowRef = useRef(null)
-      const [wires, setWires] = useState(EMPTY_PROGRESS_WIRES)
-      const nodes = track === undefined ? [] : track.nodes
-      // The spine is the template, never the plan: a `任务 n · …` row group is a card in the
-      // band below, so the six fixed stages keep one row of their own however many tasks
-      // the plan declares.
-      const spine = nodes.filter((node) => node.kind !== 'extra')
-      const cards = nodes.filter((node) => node.kind !== 'edge' && node.members.length > 0)
-      const railScale = spine.reduce((max, node) => {
-        const duration = progressNodeDuration(node)
-        return duration === undefined ? max : Math.max(max, duration)
-      }, 0)
-      const settleParts = snapshot === undefined || snapshot.activeRun === undefined || track === undefined
-        ? []
-        : progressSettleParts(snapshot.activeRun.members, t)
-      const guardianPanel = snapshot === undefined || snapshot.activeRun === undefined
-        ? null
-        : ProgressGuardianPanel(snapshot.activeRun.guardian, t)
-      // Q10(b): a running row's time has to move. One 1 s interval, armed only while
-      // some row is unsettled and cleared when none is, so an idle panel owns no timer;
-      // a reader who asked for reduced motion gets the static measured value instead.
-      const running = nodes.some((node) => node.members.some((member) => member.outcome === undefined))
-      const [clock, setClock] = useState(() => Date.now())
-      useEffect(() => {
-        if (!running) return undefined
-        const view = globalThis
-        if (typeof view.setInterval !== 'function') return undefined
-        if (typeof view.matchMedia === 'function' && view.matchMedia('(prefers-reduced-motion: reduce)').matches === true) return undefined
-        const timer = view.setInterval(() => setClock(Date.now()), 1000)
-        return () => { if (typeof view.clearInterval === 'function') view.clearInterval(timer) }
-      }, [running])
+      const run = snapshot === undefined ? undefined : snapshot.activeRun
+      const story = useMemo(() => (run === undefined ? undefined : deriveProgressStory(run)), [run])
+      // The one stateful thing on the page: whether *this* render already filled the box.
+      const [filled, setFilled] = useState(false)
       const canOpen = typeof props.canOpen === 'function' ? props.canOpen : () => false
       const openChild = (childId) => { if (typeof props.openChild === 'function') props.openChild(childId) }
-      // One draw per render, plus the two things that move the spine under the cards: a host
-      // resize, and a container resize (a sidebar toggle does not resize the window).
-      useEffect(() => {
-        const host = flowRef === null || flowRef === undefined ? undefined : flowRef.current
-        const draw = () => {
-          const next = measureProgressWires(host)
-          setWires((current) => (sameProgressWires(current, next) ? current : next))
+      const shared = { t, canOpen, openChild }
+      // The dock's button is the only thing the `conversation` service is needed for: with
+      // no way to write the box, the page says it needs nothing from the reader instead of
+      // rendering a button that would do nothing (§19.4).
+      const fillDraft = typeof props.fillDraft === 'function' ? props.fillDraft : undefined
+      const dockButton = story === undefined || story.dock === 'quiet' || fillDraft === undefined
+        ? null
+        : h('button', {
+          type: 'button',
+          className: 'gw-progress-dock-fill',
+          'data-gw-progress-dock-fill': true,
+          onClick: () => {
+            if (fillDraft() === true) setFilled(true)
+          },
+        }, t(story.dock === 'start' ? 'progress.dock.start' : 'progress.dock.accept'))
+      const header = story === undefined ? null : h('header', { className: 'gw-progress-bar', 'data-gw-progress-bar': true },
+        h('span', { className: 'gw-progress-run', 'data-gw-progress-run': true, title: run.name }, run.name),
+        h('span', {
+          className: 'gw-progress-chip',
+          'data-gw-progress-chip': story.state,
+          'data-state': story.state,
+          role: 'status',
+        },
+        h('span', { className: 'gw-progress-chip-dot', 'aria-hidden': 'true' }),
+        t(PROGRESS_CHIP_KEY[story.state] === undefined ? 'progress.chip.running' : PROGRESS_CHIP_KEY[story.state])))
+      // The headline names the current step, or the one state that has no step to name.
+      const headline = story === undefined
+        ? ''
+        : story.now.titleKey === 'planning'
+          ? t('progress.now.planning')
+          : story.now.titleKey === 'done'
+            ? t('progress.now.done')
+            : story.now.title
+      // A finished run states what it settled; a live one names the line being read and
+      // where that line sits. Both are counts over declared rows, never over a plan.
+      const subParts = []
+      if (story !== undefined) {
+        if (story.state === 'done') {
+          subParts.push(h('span', { key: 'allPassed', className: 'gw-progress-sub-text', 'data-gw-progress-sub-summary': true },
+            t('progress.now.allPassed', { total: story.total })))
+        } else {
+          if (typeof story.now.role === 'string' && story.now.role !== '') {
+            subParts.push(h('span', { key: 'actor', className: 'gw-progress-actor', 'data-gw-progress-sub-actor': true },
+              story.now.role,
+              h('span', { className: 'gw-progress-actor-suffix' }, t('progress.now.suffix'))))
+          }
+          if (story.total > 0) {
+            if (subParts.length > 0) subParts.push(h('span', { key: 'sep', className: 'gw-progress-sep', 'aria-hidden': 'true' }, '·'))
+            subParts.push(h('span', { key: 'step', className: 'gw-progress-sub-text', 'data-gw-progress-sub-step': true },
+              t('progress.now.step', { at: story.at, total: story.total })))
+          }
         }
-        draw()
-        const ResizeObserverFace = globalThis.ResizeObserver
-        const observer = host !== null && host !== undefined && typeof ResizeObserverFace === 'function'
-          ? new ResizeObserverFace(draw)
-          : undefined
-        if (observer !== undefined) observer.observe(host)
-        const view = globalThis
-        if (typeof view.addEventListener === 'function') view.addEventListener('resize', draw)
-        return () => {
-          if (observer !== undefined) observer.disconnect()
-          if (typeof view.removeEventListener === 'function') view.removeEventListener('resize', draw)
-        }
-      })
-      const header = h('div', { className: 'gw-progress-head' },
-        h('h3', { className: 'gw-progress-title' }, t('progress.title')),
-        // A live region: the number changes while a run works, and a reader who is not
-        // watching the track should hear that it moved. `polite` so it never interrupts.
-        track === undefined || track.percent === undefined
-          ? h('span', { className: 'gw-progress-percent', 'data-progress-percent': 'none', role: 'status', 'aria-live': 'polite' }, t('progress.unsettled'))
-          : h('span', {
-            className: 'gw-progress-percent',
-            'data-progress-percent': track.percent.value,
-            role: 'status',
-            'aria-live': 'polite',
-            title: t('progress.percentHint', { settled: track.percent.settled, declared: track.percent.declared }),
-          }, t('progress.percent', { settled: track.percent.settled, declared: track.percent.declared, percent: track.percent.value })))
-      // The bar is always present once there is a run: an empty bar with "no settled row
-      // yet" is the honest reading of a run that declared nothing, and hiding it would
-      // let the header's number float without the bar it belongs to.
-      const settle = h('div', {
-        key: 'settle',
-        className: 'gw-progress-settle',
-        'data-gw-progress-settle': true,
-        'data-empty': settleParts.length === 0 ? 'true' : undefined,
-        'aria-label': t('progress.settle.aria'),
+      }
+      const now = story === undefined ? null : h('div', { className: 'gw-progress-now' },
+        h('div', { className: 'gw-progress-eyebrow', 'data-gw-progress-now-label': true }, t('progress.now.label')),
+        h('h3', { className: 'gw-progress-headline', 'data-gw-progress-now': true }, headline),
+        subParts.length === 0 ? null : h('div', { className: 'gw-progress-sub', 'data-gw-progress-sub': true }, subParts))
+      // One equal segment per declared step: the bar is a proportion over steps, and a run
+      // that declared none has no proportion to draw.
+      const track = story === undefined || story.steps.length === 0 ? null : h('ol', {
+        className: 'gw-progress-steps',
+        'data-gw-progress-steps': true,
+        'aria-label': t('progress.steps.aria', { at: story.at, total: story.total }),
+      }, story.steps.map((step) => ProgressStep(step)))
+      const flag = story === undefined || story.attempt === undefined ? null
+        : h('p', { className: 'gw-progress-flag', 'data-gw-progress-flag': true, role: 'status' },
+          t(story.attempt.retrying ? 'progress.flag.retrying' : 'progress.flag.failed', { n: story.attempt.n }))
+      const rest = story === undefined || story.rest.length === 0 ? null
+        : h('p', { className: 'gw-progress-rest', 'data-gw-progress-rest': true },
+          t('progress.rest', { list: story.rest.join('、') }))
+      const dock = story === undefined ? null : h('footer', {
+        className: 'gw-progress-dock',
+        'data-gw-progress-dock': true,
+        'data-state': story.dock,
       },
-      h('span', { className: 'gw-progress-settle-bar', 'data-gw-progress-settle-bar': true, 'aria-hidden': 'true' },
-        settleParts.map((part) => h('i', {
-          key: `settle:${part.tone}`,
-          className: 'gw-progress-settle-part',
-          'data-tone': part.tone,
-          'data-gw-progress-settle-part': part.count,
-          style: { width: `${part.width}%` },
-        }))),
-      h('span', { className: 'gw-progress-settle-legend', 'data-gw-progress-settle-legend': true },
-        settleParts.length === 0
-          ? t('progress.settle.unsettled')
-          : settleParts.map((part) => part.label).join(' · ')))
-      // Segments and the connectors between them, in render order. The connector after a
-      // segment fills when that segment is `done` and flows when the next one is running.
-      const trackChildren = []
-      spine.forEach((node, index) => {
-        trackChildren.push(ProgressNode(node, { t, railScale, now: running ? clock : undefined }))
-        if (index < spine.length - 1) {
-          trackChildren.push(h('span', {
-            key: `link:${index}`,
-            className: 'gw-progress-link',
-            'data-gw-progress-link': true,
-            'data-filled': node.state === 'done' ? 'true' : undefined,
-            'data-flowing': spine[index + 1].state === 'doing' ? 'true' : undefined,
-            'aria-hidden': 'true',
-          }))
-        }
-      })
-      const band = cards.length === 0
+      dockButton,
+      dockButton === null
         ? null
-        : h('ul', {
-          key: 'tasks',
-          className: 'gw-progress-tasks',
-          'data-gw-progress-tasks': true,
-          'aria-label': t('progress.tasks.aria'),
-        }, cards.map((node) => ProgressTaskCard(node, { t, canOpen, openChild, now: running ? clock : undefined })))
-      // The wires are structure, not status: they say which segment owns which card and
-      // carry no state colour at all. A line dyed red would implicate every card it
-      // points at (a recovered task, a task still waiting), so status stays on the card's
-      // own ring and pills, where it belongs to one row.
-      const svg = wires.paths.length === 0
-        ? null
-        : h('svg', {
-          key: 'wires',
-          className: 'gw-progress-wires',
-          'data-gw-progress-wires': true,
-          'aria-hidden': 'true',
-          viewBox: `0 0 ${wires.width} ${wires.height}`,
-        }, wires.paths.map((path) => (path.kind === 'trunk'
-          ? h('path', {
-            key: `trunk:${path.owner}`,
-            className: 'gw-progress-wire',
-            'data-gw-progress-wire': 'trunk',
-            'data-owner': path.owner,
-            d: progressWireDraw(path.points),
-          })
-          : path.kind === 'rail'
-            ? h('path', {
-              key: 'rail',
-              className: 'gw-progress-wire',
-              'data-gw-progress-wire': 'rail',
-              d: progressWireDraw(path.points),
-            })
-            : h('g', { key: `branch:${path.owner}:${path.card}`, 'data-gw-progress-wire-branch': path.card },
-              h('path', {
-                className: 'gw-progress-wire',
-                'data-gw-progress-wire': 'branch',
-                'data-owner': path.owner,
-                'data-card': path.card,
-                d: progressWireDraw(path.points),
-              }),
-              h('polygon', {
-                className: 'gw-progress-wire-head',
-                points: progressWireHead(path.points),
-              })))))
+        : h('p', { className: 'gw-progress-dock-hint', 'data-gw-progress-dock-hint': true },
+          t(story.dock === 'start' ? 'progress.dock.hintStart' : 'progress.dock.hintAccept')),
+      // The success line exists only after a write the editor accepted: a refused fill
+      // says nothing rather than claiming the box was filled.
+      filled && dockButton !== null
+        ? h('p', { className: 'gw-progress-filled', 'data-gw-progress-filled': true, role: 'status', 'aria-live': 'polite' },
+          t('progress.dock.filled'))
+        : null,
+      dockButton === null
+        ? h('span', { className: 'gw-progress-quiet', 'data-gw-progress-quiet': true },
+          h('span', { className: 'gw-progress-quiet-dot', 'aria-hidden': 'true' }),
+          t('progress.dock.quiet'))
+        : null)
       return h('section', {
         className: 'gw-progress',
         'data-gw-progress': true,
-
       },
       // Scoped stylesheet, rendered in the tab's own tree: React removes it when the tab
       // unmounts, and every rule is scoped to `.gw-progress`, so nothing leaks either way.
       h('style', { 'data-gw-progress-css': true }, PROGRESS_CSS),
-      header,
-      track === undefined
-        ? h('div', { className: 'gw-progress-empty', 'data-progress-empty': true },
-          h('strong', null, t('progress.empty.title')),
-          h('p', { style: { margin: '4px 0 0' } }, t('progress.empty.body')))
+      story === undefined
+        ? h('div', { className: 'gw-progress-empty', 'data-progress-empty': true }, t('progress.empty.title'))
         : [
-          h('div', { className: 'gw-progress-overview', 'data-gw-progress-overview': true }, settle, guardianPanel),
-          h('div', {
-            key: 'flow',
-            className: 'gw-progress-flow',
-            'data-gw-progress-flow': true,
-            ref: flowRef,
-            style: { '--gw-wire-depth': `${wires.depth}px` },
-          },
-          h('ul', {
-            className: 'gw-progress-track',
-            role: 'group',
-            'aria-label': t('progress.aria'),
-            'data-gw-progress-track': true,
-          }, trackChildren),
-          band,
-          svg),
+          header,
+          now,
+          track,
+          flag,
+          rest,
+          ProgressPlan(story, shared),
+          ProgressLog(story, shared),
+          ProgressFinal(story, run, shared),
+          ProgressGuardianPanel(run.guardian, t),
+          dock,
         ])
     }
 
@@ -4717,6 +4470,36 @@ window.__ModuleLoader__.load({
           sessionId,
         )
       }
+      /**
+       * Fill this session's input box with the approval word, and do nothing else.
+       *
+       * `conversation.input.for(binding.ctx)` is the per-session editor facade, and
+       * `binding.ctx` is the session-scoped context it is addressed by — the same context
+       * the shell hands its own slots, so the write lands in *this* session's composer.
+       * `conversation.send` is deliberately not reachable from here: it would send the
+       * message on the reader's behalf, which is the opposite of filling the box (§19.4).
+       * @param sessionId - the session the tab was mounted for.
+       * @returns whether the draft was written; a refusal is reported, never assumed.
+       */
+      const fillDraftOf = services.conversation === undefined || services.conversation === null
+        || services.conversation.input === undefined || services.conversation.input === null
+        || typeof services.conversation.input.for !== 'function'
+        ? undefined
+        : (sessionId) => {
+          const binding = typeof services.sessions.binding === 'function' ? services.sessions.binding(sessionId) : undefined
+          const actx = binding === undefined || binding === null ? undefined : binding.ctx
+          if (actx === undefined) return false
+          try {
+            const input = services.conversation.input.for(actx)
+            if (input === undefined || input === null || typeof input.setDraft !== 'function') return false
+            input.setDraft(i18n.t('progress.dock.fill'))
+            return true
+          } catch (error) {
+            const message = error && error.message ? error.message : String(error)
+            console.warn(`[grok-workflow] the progress tab could not fill the input box (${message}); the button reports nothing instead of claiming it did.`)
+            return false
+          }
+        }
       const options = {
         name: 'conversation.view',
         id: PROGRESS_VIEW_ID,
@@ -4750,6 +4533,10 @@ window.__ModuleLoader__.load({
           return {
             hooks: { grokProgress: source },
             progressT: i18n.t,
+            // The dock's one button writes the approval word into this session's composer
+            // and stops there (§19.4). Absent when the composition has no `conversation`
+            // service: the page then offers the quiet line instead of a dead button.
+            ...fillDraftOf === undefined ? {} : { fillDraft: () => fillDraftOf(sessionId) },
             canOpen: (childId) => modeOf(sessionId, childId) !== undefined,
             openChild: (childId) => {
               const mode = modeOf(sessionId, childId)
@@ -6059,8 +5846,27 @@ window.__ModuleLoader__.load({
           // record `/grok off` wrote reaches an already-mounted button. Two readers of one
           // injection, so no second optional dependency is added to the graph.
           offerModeSessions(scope.sessions)
+          // `conversation` is the tab's *optional* third face: it is the only way to write
+          // the input box (§19.4), so it is asked for on its own fiber — inside the outer
+          // one, like `uiWorkspace` — rather than added to the list above. Requiring it in
+          // the outer list would leave the whole tab pending in a composition that has no
+          // conversation service, and a missing draft face must cost the button, not the
+          // page. The tab is remounted when it arrives or leaves, so the dock follows it.
+          const stopConversation = scope.inject(['conversation'], (inner) => {
+            progressServices = { ...progressServices, conversation: inner.conversation }
+            restartProgress()
+            return () => {
+              if (progressServices !== undefined) {
+                const rest = { ...progressServices }
+                delete rest.conversation
+                progressServices = rest
+              }
+              restartProgress()
+            }
+          })
           startProgress()
           return () => {
+            if (typeof stopConversation === 'function') stopConversation()
             if (typeof stopProgress === 'function') stopProgress()
             stopProgress = undefined
             progressServices = undefined
@@ -6145,9 +5951,10 @@ window.__ModuleLoader__.load({
       summaryFinalEventType: PROGRESS_SUMMARY_FINAL_EVENT_TYPE,
       stages: PROGRESS_STAGES,
       detailFields: PROGRESS_DETAIL_FIELDS,
-      stateColor: PROGRESS_STATE_COLOR,
-      stateKey: PROGRESS_STATE_KEY,
-      stateGlyph: PROGRESS_STATE_GLYPH,
+      chipKey: PROGRESS_CHIP_KEY,
+      planKey: PROGRESS_PLAN_KEY,
+      logStateKey: PROGRESS_LOG_STATE_KEY,
+      logRoleKey: PROGRESS_LOG_ROLE_KEY,
       css: PROGRESS_CSS,
       component: ProgressView,
       eventDefinition: progressEventDefinition,
@@ -6161,15 +5968,11 @@ window.__ModuleLoader__.load({
       currentFailureCount: progressCurrentFailureCount,
       percent: progressPercent,
       deriveTrack: deriveProgressTrack,
+      deriveProgressStory,
       detailFor: progressDetailFor,
       detailSources: progressDetailSources,
       detailField: progressDetailField,
       parseCoordination: parseProgressCoordination,
-      duration: progressDuration,
-      memberState: progressMemberState,
-      nodeDuration: progressNodeDuration,
-      settleParts: progressSettleParts,
-      measureWires: measureProgressWires,
       createStatus: createProgressStatus,
     }
     /**

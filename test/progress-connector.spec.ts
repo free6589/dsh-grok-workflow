@@ -271,9 +271,11 @@ describe('client progress tab: one equal segment per step', () => {
     expect(ruleOf('.gw-progress-log-row')).toBeDefined()
     expect(ruleOf('.gw-progress-log-row[data-state="failed"]')).toContain('--dsw-alias-state-warn-primary')
     expect(ruleOf('.gw-progress-log-row[data-state="doing"]')).toContain('--dsw-alias-state-business-primary')
-    // The other four states never reach the warning colour: `done` stays neutral, because
-    // a finished line is told by its word and its clock, not by a second green column.
-    for (const state of ['done', 'pending', 'cancelled', 'blocked']) {
+    // A line the run ended over without settling also reads amber: it did not pass.
+    expect(ruleOf('.gw-progress-log-row[data-state="blocked"]')).toContain('--dsw-alias-state-warn-primary')
+    // The other three never reach the warning colour: `done` stays neutral, because a
+    // finished line is told by its word and its clock, not by a second green column.
+    for (const state of ['done', 'pending', 'cancelled']) {
       const rule = ruleOf(`.gw-progress-log-row[data-state="${state}"]`)
       if (rule === undefined) continue
       expect(rule, state).not.toContain('--dsw-alias-state-warn-primary')
