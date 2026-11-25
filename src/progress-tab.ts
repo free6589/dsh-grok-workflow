@@ -54,6 +54,7 @@ export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/agent-start',
   'tool-workflow/agent-end',
   'tool-workflow/summary-final',
+  'tool-workflow/summary-rejected',
   'tool-workflow/guardian-start',
   'tool-workflow/guardian-finding',
   'tool-workflow/guardian-end',
@@ -82,6 +83,17 @@ export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
  * that landed. A stream without it renders exactly what it rendered before.
  */
 export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
+
+/**
+ * The event that says the gate rejected every draft, with the last stage that failed.
+ *
+ * The sibling of {@link PROGRESS_SUMMARY_FINAL_EVENT_TYPE} and never its alternative: a
+ * run either handed one draft in or handed none, so a stream carrying both is not ours
+ * (the fold still has to read one, see {@link deriveProgressStory}). A tab that has never
+ * heard of this event renders a rejected run exactly as it did before — as a run with no
+ * final draft — because the event only ever adds a reading of a gap it already saw.
+ */
+export const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = 'tool-workflow/summary-rejected'
 
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export const PROGRESS_VIEW_TARGET = 'grok-progress'
@@ -215,6 +227,14 @@ export interface ProgressRunFacts {
    * tell "no final draft was recorded" from "draft 1 was final".
    */
   summaryFinalDraft?: number
+  /**
+   * The gate's all-rejected verdict, when the stream said so.
+   *
+   * The other half of the same story slot: "no final draft" and "every draft was
+   * rejected, at this stage, for this reason" are different readings of a run that
+   * handed in nothing, and only the second one lets the page say why.
+   */
+  summaryRejected?: { drafts: number, stage: 'check' | 'verify', reason: string }
 }
 
 /** One spine stage of the track, in render order. */
@@ -468,6 +488,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     details: ProgressStageDetailFact[]
     guardian?: ProgressGuardianFacts
     summaryFinalDraft?: number
+    summaryRejected?: { drafts: number, stage: 'check' | 'verify', reason: string }
   }
   const drafts = new Map<string, Draft>()
   let index = 0
@@ -499,7 +520,8 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     const runId = typeof data['runId'] === 'string' ? data['runId'] : undefined
     const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
     const isSummaryFinal = record.type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE
-    if (!isDetail && !isSummaryFinal && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
+    const isSummaryRejected = record.type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE
+    if (!isDetail && !isSummaryFinal && !isSummaryRejected && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
     if (runId === undefined) continue
     if (record.type === 'tool-workflow/run-start') continue
     const draft = drafts.get(runId)
@@ -525,6 +547,19 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       const draftNumber = Number(data['draft'])
       if (!Number.isFinite(draftNumber) || Math.trunc(draftNumber) < 1) continue
       if (draft.summaryFinalDraft === undefined) draft.summaryFinalDraft = Math.trunc(draftNumber)
+      continue
+    }
+    if (isSummaryRejected) {
+      // The same duplicate rule as `summary-final`, and the same refusal to read a
+      // half-fact: a count below one, a stage that is neither word, or no reason at all
+      // is dropped rather than rendered as "rejected, for some reason".
+      const drafts = Number(data['drafts'])
+      if (!Number.isFinite(drafts) || Math.trunc(drafts) < 1) continue
+      const stage = data['stage']
+      if (stage !== 'check' && stage !== 'verify') continue
+      const reason = typeof data['reason'] === 'string' ? data['reason'].trim() : ''
+      if (reason === '') continue
+      if (draft.summaryRejected === undefined) draft.summaryRejected = { drafts: Math.trunc(drafts), stage, reason }
       continue
     }
     if (record.type === 'tool-workflow/guardian-start') {
@@ -615,6 +650,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       ...draft.endedAt === undefined ? {} : { endedAt: draft.endedAt },
       ...draft.stopReason === undefined ? {} : { stopReason: draft.stopReason },
       ...draft.summaryFinalDraft === undefined ? {} : { summaryFinalDraft: draft.summaryFinalDraft },
+      ...draft.summaryRejected === undefined ? {} : { summaryRejected: draft.summaryRejected },
     })
   }
   return runs.sort((left, right) => left.anchorSeq - right.anchorSeq)
@@ -1179,10 +1215,21 @@ export interface ProgressStory {
   /** The titles of the steps after the current one, consecutive repeats collapsed. */
   rest: string[]
   log: ProgressStoryLogRow[]
-  /** The shipped summary draft, when the stream named one and its own row exists. */
-  final?: { draft: number; label: string; row?: ProgressStoryLogRow }
+  /**
+   * What the run handed in: the shipped draft, or the all-rejected verdict.
+   *
+   * Absent is its own fact — "nothing was recorded" — and it is not the same as a
+   * rejection: a run whose gate never judged a draft says exactly as little as one whose
+   * recorder never wrote a word.
+   */
+  final?: ProgressStoryFinal
   dock: ProgressStoryDock
 }
+
+/** The two ways a run ends its summary: one draft shipped, or every draft rejected. */
+export type ProgressStoryFinal =
+  | { kind: 'shipped', draft: number, label: string, row?: ProgressStoryLogRow }
+  | { kind: 'rejected', drafts: number, stage: 'check' | 'verify', reason: string }
 
 /**
  * The state of one declared call: the row-level half of {@link nodeState}.
@@ -1390,9 +1437,17 @@ export function deriveProgressStory(run: ProgressRunFacts): ProgressStory {
       ...member === shipped ? { shipped: true as const } : {},
     }))
   const shippedLine = log.find((row) => shipped !== undefined && row.seq === shipped.seq)
-  const final = run.summaryFinalDraft === undefined || shippedLine === undefined
-    ? undefined
-    : { draft: run.summaryFinalDraft, label: shippedLine.title, row: shippedLine }
+  // A shipped draft wins over a rejected claim: the recorder never writes both (a run
+  // either handed one draft in or it did not), but a hand-written stream could, and the
+  // card must not deny a draft the run really shipped. With no shipped draft recorded,
+  // the rejection verdict is the only thing this run can say about its summary.
+  const final: ProgressStoryFinal | undefined = run.summaryFinalDraft === undefined
+    ? run.summaryRejected === undefined
+      ? undefined
+      : { kind: 'rejected', drafts: run.summaryRejected.drafts, stage: run.summaryRejected.stage, reason: run.summaryRejected.reason }
+    : shippedLine === undefined
+      ? undefined
+      : { kind: 'shipped', draft: run.summaryFinalDraft, label: shippedLine.title, row: shippedLine }
   const dock: ProgressStoryDock = state === 'waiting' ? 'start' : state === 'done' ? 'accept' : 'quiet'
   return {
     state,

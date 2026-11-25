@@ -1,0 +1,12 @@
+# session event counts (zstd -dc | grep -o tool-workflow/[a-z-]* | sort | uniq -c)
+     13 tool-workflow/agent-end
+     13 tool-workflow/agent-start
+      1 tool-workflow/guardian-end
+      1 tool-workflow/guardian-start
+      1 tool-workflow/run-end
+      1 tool-workflow/run-start
+      1 tool-workflow/summary-final
+
+# gate marker read back from the report string
+check=pass verify=pass drafts=1
+check=pass verify=pass drafts=1 · final: draft 1

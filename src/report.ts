@@ -1175,6 +1175,59 @@ export function shippedSummaryDraft(review: unknown): number | undefined {
   return Number.isInteger(draft) && draft >= 1 ? draft : undefined
 }
 
+/**
+ * What the summary gate ended with, as the script's own marker states it.
+ *
+ * Two facts share one line, and they are never both true: a draft shipped
+ * (`check=pass verify=pass drafts=N`), or every draft was rejected
+ * (`check=fail verify=pass drafts=N reason=<one line>`, or the verify stage's mirror
+ * image). The second fact exists because "no draft passed" without the reason that
+ * stopped it leaves the progress page able to say only that something went wrong.
+ */
+export type SummaryGateOutcome =
+  | { kind: 'shipped', draft: number }
+  | { kind: 'rejected', drafts: number, stage: 'check' | 'verify', reason: string }
+
+/**
+ * The shape a *rejected* marker is read with: the two stage verdicts, the bounded draft
+ * count, then the reason as the rest of the line.
+ *
+ * `reason=` is last on purpose — a reason quoting `drafts=3` therefore cannot move the
+ * parse, because the earlier, leftmost occurrence is the one the writer put there.
+ */
+const SUMMARY_GATE_REJECTED = /(?:^|\s)check=(pass|fail)\s+verify=(pass|fail)\s+drafts=(\d+)\s+reason=(.*)$/
+
+/**
+ * Read the gate's outcome off `report.synthesis.review`.
+ *
+ * One reader for the two things a run can hand in — the draft that shipped, or the
+ * rejection verdict with its last failing stage and reason — so the ledger line and the
+ * host's progress event cannot disagree. A marker that names neither (no draft was ever
+ * produced, the deterministic narrative failed the gate, or the string is malformed) is
+ * not an outcome: guessing one would turn "nothing was recorded" into a claim.
+ * @param review - `report.synthesis.review`, or anything.
+ * @returns the outcome, or undefined when the marker states none.
+ */
+export function summaryGateOutcome(review: unknown): SummaryGateOutcome | undefined {
+  if (typeof review !== 'string') return undefined
+  const shipped = shippedSummaryDraft(review)
+  if (shipped !== undefined) return { kind: 'shipped', draft: shipped }
+  const match = SUMMARY_GATE_REJECTED.exec(review)
+  if (match === null) return undefined
+  const check = match[1]
+  const verify = match[2]
+  // Both words cannot be alike: the gate stops at the first stage that fails, and
+  // `check=pass verify=pass` was already read as a shipped draft above.
+  if (check === verify) return undefined
+  const drafts = Number(match[3])
+  if (!Number.isInteger(drafts) || drafts < 1) return undefined
+  // The reason is the rest of the line. A marker without one claims a rejection and says
+  // nothing about why, which is exactly the state this reader exists to end.
+  const reason = match[4]!.replace(/\s+/g, ' ').trim()
+  if (reason === '') return undefined
+  return { kind: 'rejected', drafts, stage: check === 'fail' ? 'check' : 'verify', reason }
+}
+
 export function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
   const lines: string[] = [
@@ -1245,8 +1298,16 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
     // than assumed from the absence of a rejection. The shipped-draft number rides
     // on the same line: the machine string stays exactly as the script wrote it, and
     // the reader learns which draft the answer came from in the same breath.
-    const shipped = shippedSummaryDraft(report.synthesis.review)
-    lines.push(`Summary review: ${oneLine(report.synthesis.review, 240)}${shipped === undefined ? '' : ` · final: draft ${shipped}`}`)
+    const outcome = summaryGateOutcome(report.synthesis.review)
+    // The suffix reads the parsed value rather than the rendered review: the review is
+    // cut at 240 characters, and a rejection whose reason fell past that cut would
+    // otherwise say "rejected" and nothing about why.
+    const suffix = outcome === undefined
+      ? ''
+      : outcome.kind === 'shipped'
+        ? ` · final: draft ${outcome.draft}`
+        : ` · rejected: draft ${outcome.drafts} (${outcome.stage}: ${oneLine(outcome.reason, 160)})`
+    lines.push(`Summary review: ${oneLine(report.synthesis.review, 240)}${suffix}`)
   }
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)

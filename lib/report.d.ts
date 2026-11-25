@@ -143,5 +143,35 @@ export interface RenderReportOptions {
  * @returns the 1-based draft number, or undefined when nothing passed.
  */
 export declare function shippedSummaryDraft(review: unknown): number | undefined;
+/**
+ * What the summary gate ended with, as the script's own marker states it.
+ *
+ * Two facts share one line, and they are never both true: a draft shipped
+ * (`check=pass verify=pass drafts=N`), or every draft was rejected
+ * (`check=fail verify=pass drafts=N reason=<one line>`, or the verify stage's mirror
+ * image). The second fact exists because "no draft passed" without the reason that
+ * stopped it leaves the progress page able to say only that something went wrong.
+ */
+export type SummaryGateOutcome = {
+    kind: 'shipped';
+    draft: number;
+} | {
+    kind: 'rejected';
+    drafts: number;
+    stage: 'check' | 'verify';
+    reason: string;
+};
+/**
+ * Read the gate's outcome off `report.synthesis.review`.
+ *
+ * One reader for the two things a run can hand in — the draft that shipped, or the
+ * rejection verdict with its last failing stage and reason — so the ledger line and the
+ * host's progress event cannot disagree. A marker that names neither (no draft was ever
+ * produced, the deterministic narrative failed the gate, or the string is malformed) is
+ * not an outcome: guessing one would turn "nothing was recorded" into a claim.
+ * @param review - `report.synthesis.review`, or anything.
+ * @returns the outcome, or undefined when the marker states none.
+ */
+export declare function summaryGateOutcome(review: unknown): SummaryGateOutcome | undefined;
 export declare function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string;
 //# sourceMappingURL=report.d.ts.map

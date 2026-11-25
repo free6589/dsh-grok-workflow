@@ -232,6 +232,18 @@ export declare const PROGRESS_RUN_END = "tool-workflow/run-end";
  * has passed a draft.
  */
 export declare const PROGRESS_SUMMARY_FINAL = "tool-workflow/summary-final";
+/**
+ * The optional event that says the gate rejected every draft, and why.
+ *
+ * A separate event from {@link PROGRESS_SUMMARY_FINAL} because the two facts are never
+ * both true and are not two readings of one value: a rejected run has no "final" draft
+ * at all, so writing its verdict as a `summary-final` payload would either need a
+ * second `draft` meaning ("the count, not a winner") or a card that contradicts itself.
+ * Keeping them apart also means every reader that predates this event keeps rendering
+ * a rejected run exactly as it did — as a run that handed in nothing — instead of
+ * misreading a count as a winning draft number.
+ */
+export declare const PROGRESS_SUMMARY_REJECTED = "tool-workflow/summary-rejected";
 /** Payload of {@link PROGRESS_RUN_START} (`ToolWorkflowRunStartData`). */
 export interface ProgressRunStart {
     runId: string;
@@ -262,6 +274,18 @@ export interface ProgressSummaryFinal {
     /** 1-based draft number that passed the summary gate. */
     draft: number;
 }
+/** Payload of {@link PROGRESS_SUMMARY_REJECTED}: the gate rejected every draft. */
+export interface ProgressSummaryRejected {
+    runId: string;
+    /** How many drafts the gate judged and rejected (1-based count, never a winner). */
+    drafts: number;
+    /** The last stage that failed, in the gate's own two words. */
+    stage: 'check' | 'verify';
+    /** That stage's reason, one bounded line. */
+    reason: string;
+}
+/** The reason bound on {@link PROGRESS_SUMMARY_REJECTED}: the same one the marker uses. */
+export declare const PROGRESS_SUMMARY_REJECTED_REASON_CHARS = 300;
 /**
  * The stop reason the GUI node is closed with, derived from the *task-level* result.
  *
@@ -319,6 +343,12 @@ export interface WorkflowProgressRecorder {
     runEnd(runId: string, stopReason: WorkflowStopReason): void;
     /** Mark which summary draft the run shipped (the one that passed the gate). */
     summaryFinal(runId: string, draft: number): void;
+    /** Announce that every draft was rejected, with the last failing stage and its reason. */
+    summaryRejected(runId: string, rejected: {
+        drafts: number;
+        stage: 'check' | 'verify';
+        reason: string;
+    }): void;
     /** Stop recording and drop any buffered events. */
     dispose(): void;
 }

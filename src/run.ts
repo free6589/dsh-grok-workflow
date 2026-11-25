@@ -29,7 +29,7 @@ import { createRunGuardian, guardianChildBudgetMs, openRunGuardianChildren, unlo
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
-import { assertWorkflowReport, failureReport, guardOf, shippedSummaryDraft } from './report.js'
+import { assertWorkflowReport, failureReport, guardOf, shippedSummaryDraft, summaryGateOutcome } from './report.js'
 import {
   appendUnloadNotice,
   callSiteFrames,
@@ -1567,6 +1567,13 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         // rewritten after `agent-start`.
         const finalDraft = shippedSummaryDraft(report.synthesis.review)
         if (run !== undefined && finalDraft !== undefined) progress?.summaryFinal(run.id, finalDraft)
+        // The other outcome, in the same breath: every draft was rejected, so the page can
+        // say the run handed nothing in and what the last failure was. It is never both —
+        // `summaryRejected` only runs when no draft passed.
+        const rejected = finalDraft === undefined ? summaryGateOutcome(report.synthesis.review) : undefined
+        if (run !== undefined && rejected !== undefined && rejected.kind === 'rejected') {
+          progress?.summaryRejected(run.id, { drafts: rejected.drafts, stage: rejected.stage, reason: rejected.reason })
+        }
         // The ledger is plugin-owned state: the deterministic report is the truth,
         // the record survives for diagnostics and for the next run's audit trail.
         // Run records are a configuration switch: a user who does not want the
@@ -1616,6 +1623,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         const report = settle(kept, cause)
         const keptDraft = shippedSummaryDraft(report.synthesis.review)
         if (run !== undefined && keptDraft !== undefined) progress?.summaryFinal(run.id, keptDraft)
+        // A cancelled run's gate can end the same way: every draft judged and rejected.
+        const keptRejected = keptDraft === undefined ? summaryGateOutcome(report.synthesis.review) : undefined
+        if (run !== undefined && keptRejected !== undefined && keptRejected.kind === 'rejected') {
+          progress?.summaryRejected(run.id, { drafts: keptRejected.drafts, stage: keptRejected.stage, reason: keptRejected.reason })
+        }
         lastReport = report
         lastCause = cause
         return { report, ok: false, cause, delivery: deliver(report) }
