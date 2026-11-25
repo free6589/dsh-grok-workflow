@@ -1,3 +1,55 @@
+## `0.13.39` 发布收口：一个发布提交、一次门禁、快进 `main`、附注标签、两条远端 run、Release 与资产；live 档案升级 `BLOCKED` — 2026-11-25 (`CONFIRMED`)
+
+发布轮，不是代码轮。**这一轮没有合流任何东西**：产品改动在发布之前就已经全在 `main` 上了（`8c9b028` → `ed287e1`
+之间 **18 个提交**，其中 2 个是 `merge:`、**16 个非合并提交**：进度页重画 `a3ed628`…`64b69af`、两条 `merge:` 提交
+`9488890` / `ed287e1`、四条文档提交 `ff5c5ec` / `2d1b378` / `b1b73ac` / `601e2db`）。发布分支从 **`ed287e1`** 切出，
+只带一个发布准备提交 **`18e546332a8c10c6de99ff344886e7fa77b3658c`** `chore(release): prepare v0.13.39`，
+标签 **`v0.13.39`** 打在它上面。下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被外部条件挡住的写 `BLOCKED`。
+**标注规则**：标 `包工头跑` 的行是发布执行方跑出来、本轮记录者**没有重跑**的读数（门禁与推送是包工头跑的，本轮从它留下的
+转录里**逐行核对**过，核对本身是本轮的动作）；标 `本轮自查` 的行是本轮亲手敲的命令。**本轮没有执行任何测试套件**
+（按派单要求：只读转录与 git / `gh` 对象），只在最后为回归跑了 4 个文档守卫 spec（见文末）。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 发布提交与改动面（本轮自查） | `git show --stat 18e5463`；`git show --numstat --format= 18e5463`；`git show ed287e1:package.json \| node -p` | 头部 `18e5463 chore(release): prepare v0.13.39`；**`8 files changed, 33 insertions(+), 20 deletions(-)`**：`CHANGELOG.md` **+13 −0**、`README.md` 5/5、`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、`package-lock.json` 2/2、`package.json` 1/1、`src/client/index.js` 2/2。基线 `ed287e1` 的版本是 **`0.13.38`**。**`CONFIRMED`** |
+| `src/` 与 `lib/` 有没有逻辑改动（本轮自查） | `git diff ed287e1 18e5463 -- src lib`；`git diff --numstat ed287e1 18e5463 -- src lib` | **只有** `PLUGIN_VERSION` / `UPDATE_LATEST` 那一对 `'0.13.38'` → `'0.13.39'`（各 2 行），**没有一行逻辑**。两份 diff 的 blob 前缀同一个 `4cbff67` → 同一个 `30252a2`——即 `lib/client.js` 与 `src/client/index.js` **内容逐字相同**（`lib/` 就是 `src/` 的构建产物，这是最强形态的自证）。**`CONFIRMED`** |
+| `CHANGELOG.md` 与两个 README 的形状（本轮自查） | `sed -n '1,60p' CHANGELOG.md`；`git show --numstat --format= 18e5463 -- CHANGELOG.md` | `CHANGELOG.md` **+13 −0**——**零删除行**：`## [Unreleased]` 留成**空标题**（它原来的 `### Changed / 变更` 子标题已被删掉），`## [0.13.39] - 2026-11-25` 插在 `## [0.13.38]` 之上，三条此前未发布的条目（进度页是一页 / 失败用琥珀不用红 / 按钮只填框不代发）**逐字搬过去、中英各一份**，末尾新增 `### Upgrade note / 升级须知`，说明这一版**不需要准备任何东西**（没有键、schema、默认值或已存记录发生变化）。**`CONFIRMED`** |
+| 门禁（**唯一一遍，就是发布门禁**；包工头跑，本轮逐行核对） | `TMPDIR=$PWD/.tmp npm run ci`（发布 worktree `.tmp/wt-release-0.13.39`，发布提交 **`18e5463`** 那棵树；逐字副本 `.rsi/evidence/release-0.13.39-2026-11-25/gate-18e5463.out`，**22316 字节**） | **`EXIT=0`**：`> dsh-grok-workflow@0.13.39 ci`（第 2 行）、`Found 15 warnings and 0 errors.`（162）、`client bundle: 334321 bytes → lib/client.js`（168）、`lib/ at 18e5463 is the build of src/ at 18e5463 (285 files, byte-identical)`（169）、`Test Files 100 passed (100)`（369）/ **`Tests 1855 passed (1855)`**（370）、**`Duration 90.16s (transform 2.05s, setup 0ms, import 8.32s, tests 70.67s, environment 11ms)`**（372）。跑完 worktree 工作树**干净**（重建可复现）。**`CONFIRMED`** |
+| 转录的字节与指纹（本轮自查） | `sha256sum`、`wc -c`、`cmp`（`.tmp/gate-18e5463.out` 与 `.rsi/evidence/release-0.13.39-2026-11-25/gate-18e5463.out`） | **22316 字节**，`sha256` = **`aed6c3ef42ba4e16977a9bb91309d324c5dd8e797399792526ac8c69d9041b6f`**；`cp` 之后 `cmp` **逐字节相同**。全文 `FAIL` / `✗` **0 行**。`334321 bytes` 在转录里出现**两次**（`verify:lib` 一次、`npm test` 里的 `npm run build` 再一次），同值正好说明重建可复现。**`CONFIRMED`** |
+| 用例与体积的算术，以及**是谁造成的**（本轮自查，只读 git 对象） | `git ls-tree -r --name-only <commit> -- test \| grep -c '\.spec\.ts$'`（`8c9b028` 与 `18e5463` 各一次）；`git diff --name-status 8c9b028 18e5463 -- test`；`git cat-file -s <commit>:lib/client.js`；交叉引用 `.rsi/evidence/progress-redesign-2026-11-25/README.md` **第 41 行** | spec 文件 **100 → 100**（**未变**；`git diff --name-status` 只有 **6 个既有 spec 被改**，**零新增零删除**），用例 **1870 → 1855（−15）**，`lib/client.js` **340426 → 334321** 字节（**−6105**），warnings 同数仍 **15**。**−15 / −6105 不是发布提交干的**：重画证据的第 41 行（「交付 `87f14e1`（产品 `e85c35f`）」那一行）在**交付当时**就写着 `Tests 1855 passed (1855)` 与 `334321 bytes`，同表上一行基线 `ff5c5ec` 是 `1870` / `340426`——减量在 `87f14e1` 就发生了，发布提交只是把它带出去。**`CONFIRMED`** |
+| `main` = 门禁提交 = 标签剥出的提交（本轮自查） | `git rev-parse main v0.13.39^{}`；`git ls-remote origin refs/heads/main` | 三者同值 **`18e546332a8c10c6de99ff344886e7fa77b3658c`**；远端 `refs/heads/main` 实读同一 sha。`git worktree list` 只剩主检出 **`… 18e5463 [main]`**——`main` 用 `git merge --ff-only release/0.13.39` 前进，**不是第二个合并提交**，所以门禁跑的那棵树就是发出去的那棵树。推送原文 `ed287e1..18e5463  main -> main` 是**包工头跑**的读数（本轮没有推送发布提交，只推送本轮的记忆提交）。**`CONFIRMED`** |
+| 标签指向、已发布标签未被移动（本轮自查） | `git rev-parse v0.13.39 v0.13.39^{}`；`git cat-file -p v0.13.39`；`git show v0.13.39^{}:package.json`；`git ls-remote --tags origin` | **`tag 87a0e0e9a52e932d33584fc11434f63a74c87939`** → 剥出 **`18e5463`**；`tagger fish <…> 1795608793 +0800` = **2026-11-25 20:13:13 +0800**；标签里的 `package.json` 读 **`0.13.39`**。远端：`v0.13.35` 对象 `bedf8ba`→**`ffbb6b0`**、`v0.13.36` `0ff357b`→**`26dc370`**、`v0.13.37` `235fa3e`→**`34236f0`**、`v0.13.38` `2f3e548`→**`8c9b028`**、`v0.13.39` `87a0e0e`→**`18e5463`**——**旧标签一个都没被移动**，前四条与上一轮记录逐字同值；新标签是 `* [new tag] v0.13.39 -> v0.13.39`（包工头跑），**没有 force-push**。**`CONFIRMED`** |
+| 远端 Release 工作流（本轮自查，`gh run watch` + `gh run view`） | `gh run watch 45611695688 --exit-status --interval 20`；`gh run view 45611695688 --json databaseId,workflowName,headBranch,headSha,status,conclusion,url` | `workflowName=Release`、`headBranch=v0.13.39`、`headSha=18e5463`、`status=completed`、**`conclusion=success`**（`WATCH_EXIT=0`）。job `Validate and publish v0.13.39` **1m26s** 全绿，含 `Verify tag commit is on main`、`Verify committed build artifacts`、`Test`、`Verify tag, package version, and changelog`、`Package release artifact`、**`Create GitHub Release`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45611695688 。**`CONFIRMED`** |
+| 远端 `main` 的 CI（本轮自查，`gh run view`） | `gh run view 45611690753 --json databaseId,workflowName,headBranch,headSha,status,conclusion,url` | `workflowName=CI`、`headBranch=main`、`headSha=18e5463`、`status=completed`、**`conclusion=success`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45611690753 。**`CONFIRMED`** |
+| run 上的 annotation（本轮自查） | `gh api repos/free6589/dsh-grok-workflow/check-runs/<job>/annotations -q length` | **11 条**：**1 条** runner 弃用（`Node.js 20 is deprecated`）+ **10 条** oxlint 提示。**与门禁的 `15 warnings` 不矛盾**：annotation 是 GitHub 侧展示，不是完整告警清单；权威计数是本地那 15 条，与基线同数、本轮无新增。**`CONFIRMED`** |
+| GitHub Release 的发布面（本轮自查，`gh release view`） | `gh release view v0.13.39 --json name,tagName,isDraft,isPrerelease,publishedAt,targetCommitish,assets,body,url` | `name=`**`Grok Workflow for DSH v0.13.39`**、`tagName=v0.13.39`、`isDraft=false`、`isPrerelease=false`、`publishedAt=`**`2026-11-25T12:14:50Z`**（= 20:14:50 +0800）、`targetCommitish=main`、`url=https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.39`；**唯一资产** `dsh-grok-workflow-0.13.39.tgz`、`size=`**`962715`**、`state=uploaded`、`digest=sha256:30d639274778134521856ae7ad6da212dac988b5797f9a59b59e756f2d126d0d`。上一版资产 **958707** 字节 → 本轮 **962715**（**+4008**）。**`CONFIRMED`** |
+| Release 正文（本轮自查） | `gh release view v0.13.39 --json body` | 首行 **`## [0.13.39] - 2026-11-25`**，**42 行**，与工作树里那一节同形——也就是这一版的用户可得说明。**`CONFIRMED`** |
+| 收尾清理（本轮自查） | `git worktree list`；`git branch -vv`；`ls -d .tmp/wt-release-0.13.39`；`git ls-remote origin 'refs/heads/release*'` | `git worktree list` 只有 **`/home/fish/projects_mine/dsh-grok-workflow 18e5463 [main]`**；`.tmp/wt-release-0.13.39` **不存在**（`No such file or directory`，所以门禁转录的原件已随 worktree 消失，`docs`/`.rsi` 里那一份是唯一 durable 的）；本地 `release/0.13.39` **已删**；远端 `release/*` 只有 `release/0.13.27`。**`CONFIRMED`** |
+| 四条旧分支**不在本版**（本轮自查） | `git rev-list --count <branch>..main`；`git rev-list --count main..<branch>` | `backup/wip-2026-11-24-live-steering` 落后 **381** / 领先 **1**；`backup/wip-2026-11-24-team-dispatch-v1` 落后 **347** / 领先 **4**；`backup/wip-2026-11-24-progress-task-number-first` 落后 **378** / 领先 **1**；`feat/audit-layer` 落后 **638** / 领先 **1**。它们各自的 1–4 个提交**一条都没进这个版本**——**不能读成「已合流」**。**`CONFIRMED`** |
+| live 档案的只读事实（本轮自查，只读） | `sed -n '552,572p' ~/.dsh/profiles/web/cordis.patch.yml`；`grep -n 'mode: triage'`；`node -p` 读已装 `package.json` 的 `version`；`grep -n dsh-grok-workflow ~/.dsh/profiles/web/package.json`；`grep -n -A6 dsh-grok-workflow ~/.dsh/profiles/web/pnpm-lock.yaml`；`stat -c '%n size=%s mtime=%Y'` | 那一行（第 **563** 行）`config:` 下**仍写着 `mode: triage`**；已装版本读回 **`0.13.38`**（**与派单口述的 `0.13.35` 不符，按实测记**）；依赖是**浮动**的 `github:free6589/dsh-grok-workflow`（`package.json` 第 12 行，**无标签**），`pnpm-lock.yaml` 把它解析到 `codeload…/tar.gz/ed287e1ff55cc6b049bd746d2415bb35d9cf6c9a`、`version: 0.13.38`——也就是说 live 档案现在跑的是**发布前的那个 main 尖端**，比本版落后一版。`~/.dsh` size **1548** / mtime **1795362020**、`~/.dsh/profiles` size **226** / mtime **1795337986**，与上一轮记录**同值**。**`CONFIRMED`（未打印任何凭据值）** |
+| live 档案升级（`AGENTS.md` §11） | —— | **`BLOCKED`，只剩一条理由**：本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，且审批提示在本会话被禁用（不能申请提权），**从这里写不进去**。`mode: triage` **不再是**升级的障碍（`D-155`/`0.13.38`：被删键被忽略并点名，不再拒载）。**这是等外部能力，不是升级失败**；live home **未写、未重载、未重启**，3080 上的实例全程没碰。 |
+| 本轮自己跑门禁 | —— | **`NOT_RUN`（按派单）**：本轮只读 git / `gh` 对象与一份转录，不重跑 `npm run ci`。上面门禁的 `EXIT=0` 归**包工头**，逐行核对归**本轮**；文末那 4 个文档守卫 spec 是回归检查，不是门禁复跑。 |
+
+**Changed（本轮改动）：** 只有记忆与证据——`docs/knowledge/STATE.md`（`Last updated:` 头段换成 `0.13.39` 的收口记录，旧块降级保留）、
+`docs/knowledge/HANDOFF.md`（新增同日发布轮一节）、`docs/knowledge/VALIDATION.md`（本节）、
+`.rsi/evidence/release-0.13.39-2026-11-25/README.md`（新），外加**按名暂存**的门禁转录
+`gate-18e5463.out`（`cp` 自主检出 `.tmp/`，不是重新生成）。**没有改任何源码、测试、`lib/`、`CHANGELOG.md`、
+`package.json`/`package-lock.json`、README 或 `.tmp/` 里的东西**；发布准备提交 `18e5463` 改的那 8 个文件是**包工头**改的，
+不是本轮。
+
+**Honest boundary（逐条）：**
+1. **门禁不是本轮跑的**：`EXIT=0` 是发布执行方的读数，本轮做的是**拷副本 + 逐行核对**（读数、`lib/` 自证行、vitest 摘要、`EXIT=0`、无 `FAIL` 行）。核对不等于复跑。
+2. **live 档案已装版本是 `0.13.38`，不是派单说的 `0.13.35`**：`node -p` 与 `pnpm-lock.yaml` 两处互证。这改变不了升级仍 `BLOCKED` 的结论，但改变了「落后几版」这个事实——现在是**落后一版**，不是落后四版。
+3. **派单说 `8c9b028`→`ed287e1` 之间 16 个提交**：实读 **18 个**（`git rev-list --count`），**16** 是去掉 2 个 `merge:` 之后的非合并提交数（`git rev-list --no-merges --count`）。两个数都对，口径不同，本记录写成「18 总 / 16 非合并」。
+4. **派单说旧分支落后 346–637**：实读 **347–638**（`main` 比派单测量时多了一个发布提交，基数跟着加一）。
+5. **`−15 例 / −6105 字节` 不是发布提交造成的**：发布提交只动版本字面量；减量由进度页重画在 `87f14e1` 造成，证据是重画证据 README 第 41 行。
+6. **live 档案升级 `BLOCKED`**：等一个能在 `~/.dsh` 里写入的外部能力；不是失败，也不是没做。
+7. **`lib/ at 18e5463 …` 里的 sha 是跑那一刻的 HEAD 名字**，不是内容指纹；内容指纹要看 `sha256`。
+
+**证据：** `.rsi/evidence/release-0.13.39-2026-11-25/`——`README.md`（逐条读数、指纹、远端对应、能与不能证明的边界）、
+`gate-18e5463.out`（`TMPDIR=$PWD/.tmp npm run ci` 的完整转录，跑在发布提交 `18e5463` 那棵树，**22316 字节**，
+`sha256 aed6c3ef…041b6f`，**这一份就是发布门禁**；原件随发布 worktree 收尾消失）。
+
 ## `0.13.38` 发布收口：零冲突合流、两次门禁、快进 `main`、标签、两条远端 run、Release 与资产；live 档案升级 `BLOCKED` — 2026-11-25 (`CONFIRMED`)
 
 发布轮，不是代码轮。基线 `main` 尖端 **`c3d729f`**，特性分支 `fix-removed-keys-warn`（尖端 **`b6e8598`**），

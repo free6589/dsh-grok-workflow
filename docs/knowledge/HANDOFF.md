@@ -1,3 +1,57 @@
+## 2026-11-25 — `0.13.39` 已发布：一个发布提交、一次门禁跑绿、快进 `main`、附注标签、Release 与资产都在；live 档案升级仍只剩沙箱这一条 `BLOCKED`
+
+- **From:** 记忆收口（`agent-170/memclose-0139`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：**发布轮，不是代码轮**，而且**这一轮没有合流任何东西**。产品改动在发布之前就已经全在 `main` 上了：
+  `8c9b028`（`v0.13.38` 剥出的那个）→ `ed287e1` 之间 **18 个提交**，其中 2 个 `merge:`、**16 个非合并提交**
+  （进度页重画 `a3ed628`…`64b69af`、`9488890` / `ed287e1` 两条合并、`ff5c5ec` / `2d1b378` / `b1b73ac` / `601e2db` 四条文档）。
+  发布分支从 **`ed287e1`**（= `origin/main`，包版本 **`0.13.38`**）切出，只带一个发布提交
+  **`18e546332a8c10c6de99ff344886e7fa77b3658c`** `chore(release): prepare v0.13.39`（**8 文件 / +33 −20**）：
+  `src/` 与 `lib/` 只动了版本字面量那一对 `'0.13.38'` → `'0.13.39'`，没有一行逻辑。
+- **门禁只有一遍，而它就是发布门禁，`EXIT=0`**（`TMPDIR=$PWD/.tmp npm run ci`，发布 worktree `.tmp/wt-release-0.13.39`，
+  发布提交那棵树；包工头跑，本轮**拷副本 + 逐行核对**，没有重跑）：`100 files / 1855 tests`、
+  `Found 15 warnings and 0 errors.`、`client bundle: 334321 bytes`、`lib/ … (285 files, byte-identical)`、`90.16s`。
+  转录 **22316 字节**、`sha256 aed6c3ef…041b6f`，副本与原件 `cmp` 逐字节相同。逐行读数见 `VALIDATION.md` 同日条与
+  `.rsi/evidence/release-0.13.39-2026-11-25/`。
+- **`main` 是快进前进的**：`git merge --ff-only release/0.13.39`，所以 `main` 尖端**就是**门禁提交、也是标签剥出来的那个
+  （`main` = `v0.13.39^{}` = **`18e5463`**；远端 `refs/heads/main` 本轮实读同值，推送 `ed287e1..18e5463  main -> main`）。
+  标签 `v0.13.39` 是附注标签（对象 **`87a0e0e9a52e932d33584fc11434f63a74c87939`** → 剥出 `18e5463`），
+  **没有 force-push，也没有移动任何已发布标签**（`v0.13.35^{}`→`ffbb6b0`、`v0.13.36^{}`→`26dc370`、
+  `v0.13.37^{}`→`34236f0`、`v0.13.38^{}`→`8c9b028` 全部原位）。
+- **远端（`CONFIRMED`，本轮用 `gh` 重读）**：Release 工作流 run **`45611695688`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45611695688 ；`main` 的 CI run **`45611690753`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45611690753 。两个 run 的 head sha 都是 `18e5463`。
+  Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.39 ，名字 `Grok Workflow for DSH v0.13.39`，
+  发布 **`2026-11-25T12:14:50Z`**，非 draft、非 prerelease，target `main`，唯一资产
+  **`dsh-grok-workflow-0.13.39.tgz` = 962715 字节**，正文就是 `## [0.13.39] - 2026-11-25` 那一节（42 行）。
+- **下一个接手的人必须知道（一条，最要紧）**：**live 档案现在跑的是 `0.13.38`，比本版落后一版，而它升不上去的原因只有一个
+  ——沙箱，不是版本。** 本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，审批提示在本会话被禁用（不能申请提权），
+  所以**从这里写不进去**。这一条与前几轮不同、必须说清：`mode: triage` 自 **`0.13.38`（`D-155`）** 起**已经不再是升级障碍**
+  ——被删键被忽略并在载入日志点名一次，不再让整行拒载。所以下一个能写 `~/.dsh` 的人，**直接升级就行，删不删那一行都可以**；
+  谁再把「先删 `mode: triage` 再升级」写回须知，就是把已经作废的前置条件重新塞回用户手里。
+- **live 档案的只读实读（本轮自查，只读，未写/未重载/未重启，3080 上的实例全程没碰）**：`grok-workflow` 那一行
+  （第 **563** 行）`config:` 下**仍写着 `mode: triage`**；**已装版本读回 `0.13.38`**——`node -p` 读
+  `~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json` 得 `0.13.38`，`pnpm-lock.yaml` 也把浮动依赖
+  `github:free6589/dsh-grok-workflow`（`package.json` 第 12 行，**无标签**）解析到 `ed287e1` 的 tarball、`version: 0.13.38`
+  ——两处互证。**这与派单口述的「已装版本 `0.13.35`」不符，按实测记**（那大概是上一轮之前的状态）；
+  `~/.dsh` size 1548 / mtime 1795362020、`~/.dsh/profiles` size 226 / mtime 1795337986，与上一轮记录同值。
+  顺带一条给下一位：live 那一行是**浮动**依赖、没有钉标签，所以它「自己」就能漂到新版本——要钉住请按 `AGENTS.md` §11 钉到确切的标签。
+- **收尾状态（按观察到的事实，不按口述）**：`git worktree list` 只剩主检出
+  （`/home/fish/projects_mine/dsh-grok-workflow 18e5463 [main]`）；`.tmp/wt-release-0.13.39` **已不在盘上**
+  （所以门禁转录的原件已经消失，`.rsi/evidence/` 里那一份是唯一 durable 的副本）；本地 `release/0.13.39` 已删；
+  `git branch` 只剩 `main` 外加三条 `backup/wip-2026-11-24-*` 与 `feat/audit-layer`；远端 `release/*` 只有 `release/0.13.27`。
+  主检出剩下的唯一改动是与发布无关的 `.gitignore` 本地设计稿忽略规则，**从未被暂存**，也不在任何发布提交里。
+- **那四条旧分支很旧，且与本版无关，别读成「已合流」**：`backup/wip-2026-11-24-live-steering` 落后 **381** / 领先 1、
+  `backup/wip-2026-11-24-team-dispatch-v1` 落后 **347** / 领先 4、
+  `backup/wip-2026-11-24-progress-task-number-first` 落后 **378** / 领先 1、`feat/audit-layer` 落后 **638** / 领先 1。
+  它们各自的 1–4 个提交**一条都没进这个版本**。按 `AGENTS.md` §5，`feat/*` 需要一个决定日期（合流、rebase 或删除）。
+- **三处读数偏差，照实记**：① **live 已装版本是 `0.13.38` 不是 `0.13.35`**（见上）。② 派单说 `8c9b028`→`ed287e1`
+  之间 **16 个提交**，实读 **18 个**——**16** 是去掉 2 个 `merge:` 之后的非合并提交数（`git rev-list --no-merges --count`），
+  两个数都对、口径不同。③ 派单说旧分支落后 **346–637**，实读 **347–638**（`main` 比派单测量时多了一个发布提交，基数跟着加一）。
+  另外重申一次别再搞错：**用例 −15 / 体积 −6105 不是发布提交造成的**，是进度页重画在 `87f14e1` 就造成的
+  （重画证据 README 第 41 行交付当时就写着 `1855` / `334321`），发布提交只动版本字面量。
+
+（以下为上一轮的 **`0.13.38` 发布收口** 记录，原样保留。）
+
 ## 2026-11-25 — `0.13.38` 已发布：一次零冲突合流、两次门禁跑绿、标签与 GitHub Release 都在；live 档案升级只剩沙箱这一条 `BLOCKED`
 
 - **From:** 记忆收口（`agent-168/memclose`）· **To:** 操作者 / 下一个接手者
