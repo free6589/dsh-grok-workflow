@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.44] - 2026-11-26
+
 ### Fixed / 修复
 
 - **A refused key is asked once more on the same route before the run pays for it / 钥匙被拒时，运行会先在同一条路由上再问一次** —
