@@ -202,7 +202,7 @@ DSH 启动后，直接提问即可：
 | 键 | 默认值 | 硬上限 | 含义 |
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | 正则 `^[a-z][a-z0-9_]{1,40}$` | 面向模型的工具名（注册时固定） |
-| `grokDefault` | `off` | `on` \| `off` | 会话没有 `/grok` 记录时的默认：`off` 不碰普通对话，`on` 认领每条用户消息 |
+| `grokDefault` | `off` | `on` \| `off` | 会话没有 `/grok` 记录时的默认：`off` 不碰普通对话，`on` 只是一个没有记录的会话报出来的值——它是回退值，不是记录，本身不会让接单台接活 |
 | `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer, supervisor }` 有序链；串行监督在检查之后运行，只能判失败、不能判通过；同时常驻并行监护盯着每个子代理是否卡住（见下） |
 | `guardianModel` | 空路由 | `{provider?, model?}` 各 ≤120 字 | 判停单路由（非链）：子代理卡死先取证再判，判 `wait` 最多延长 5 分钟×2 且不越过运行死线；留空 = 不判停，超时直接按失败重试 |
 | `synthesis` | `layered` | `layered` \| `model` | `layered` 让核验报告保持唯一事实来源；`model` 追加一次模型总结 |

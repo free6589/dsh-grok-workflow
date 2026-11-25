@@ -28,7 +28,7 @@ import { isPromptShapedArgument } from '../src/intake.js'
 import { canAcceptBlock } from '../src/user-source.js'
 
 /** Documented settle texts (also asserted verbatim below). */
-const ON_TEXT = 'Grok workflow ON — every message now runs the full plan→execute→verify workflow.'
+const ON_TEXT = 'Grok workflow ON — the model may commission reviewed blocks of work in this session. Messages themselves are not turned into a workflow.'
 const OFF_TEXT = 'Grok workflow OFF — normal chat.'
 
 /**
@@ -302,7 +302,7 @@ describe('grok command handler (a write that does not land)', () => {
     expect(result.kind).toBe('error')
     expect(result.text).toContain('not readable back')
     expect(result.text).toContain('no toggle was recorded')
-    expect(result.text).not.toContain('every message now runs the full plan')
+    expect(result.text).not.toContain('commission reviewed blocks')
   })
 
   it('settles error on an agent without a session instead of claiming success', () => {
