@@ -286,9 +286,16 @@ describe('progress page: the change explanation stays deleted', () => {
     expect(cardNames(before)).toEqual(['任务 1 · 搭建', '任务 2 · 收尾'])
     expect(cardNames(after)).toEqual(['任务 1 · 收尾', '任务 2 · 搭建'])
     // The only words that changed are the plan's own task names: no sentence arrived to
-    // explain the swap, and none left a "before → after" trace behind.
-    expect(addedText(visible(after), visible(before)).sort()).toEqual(['任务 1 · 收尾', '任务 2 · 搭建'].sort())
-    expect(addedText(visible(before), visible(after)).sort()).toEqual(['任务 1 · 搭建', '任务 2 · 收尾'].sort())
+    // explain the swap, and none left a "before → after" trace behind. Each changed name
+    // appears exactly **twice**, because the one-page redesign draws a task's title on two
+    // faces — one line in the step list, one line in 「经过」 (`ProgressPlan` and
+    // `ProgressLog`). The count is the guard: a third copy, a duplicate line, or any
+    // sentence about the re-plan still fails here, and so does a face that silently stops
+    // printing the title.
+    expect(addedText(visible(after), visible(before)).sort())
+      .toEqual(['任务 1 · 收尾', '任务 1 · 收尾', '任务 2 · 搭建', '任务 2 · 搭建'].sort())
+    expect(addedText(visible(before), visible(after)).sort())
+      .toEqual(['任务 1 · 搭建', '任务 1 · 搭建', '任务 2 · 收尾', '任务 2 · 收尾'].sort())
     expect([...visible(after), ...spoken(after)].filter((text) => forms(text).length > 0)).toEqual([])
   })
 
