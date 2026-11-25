@@ -342,7 +342,9 @@ activates, the stored value reaches nothing, and the leftover is named twice:
 | Half | Where | What a reader sees |
 |---|---|---|
 | Load log | `assertKnownKeys()` records the key in a module buffer; `apply()`'s `readConfig()` drains it through `takeRemovedKeys()` and logs `removedKeyWarning(key)` once per key per load | `configuration key "mode" was removed in an earlier release: its stored value is ignored, and the rest of the row loads normally (delete that line when convenient).` |
-| Settings page | `src/client/index.js` `removedKeyWarn(entry)` reads the **stored** document (`entry.user`; the schema drops a removed key from the effective `value`), renders one line per leftover key in a `data-warn="removed"` banner | `warn.removed.title` / `warn.removed.detail`, both languages, key named in the sentence |
+| Settings page | `GET /grok-workflow/config-notices` (`src/config-notices-surface.ts`, read-only, registered in `child.effect`, absent without a `webServer`) answers `{ok:true,notices:[{key,message}]}` from the same per-load set — read, never drained, so the log's one-line-per-key announcement is untouched. `src/client/index.js` reads it once on mount and renders one line per leftover key in a `data-warn="removed"` banner; an empty list or a failed request renders nothing | `warn.removed.title` / `warn.removed.detail`, both languages, key named in the sentence |
+
+The page cannot read this from the settings document: `settings/describe` publishes `user` **projected through the namespace's schema** (`projectForm` walks the schema's `dict`), and a removed key is by definition not in that schema — a `entry.user` scan is correct code over data that never exists. The plugin is the only party that still sees the leftover (in the raw config the Host hands `apply()`), which is why the list travels over its own route, the same mechanism `src/mode-surface.ts` and `src/update-surface.ts` use.
 
 Mechanism notes, because both halves have a trap:
 

@@ -17,6 +17,8 @@ import { installLoop } from './loop-surface.js'
 import type { LoopHostContext } from './loop-surface.js'
 import { installModeRoute } from './mode-surface.js'
 import type { ModeHostContext } from './mode-surface.js'
+import { installConfigNoticesRoute } from './config-notices-surface.js'
+import type { ConfigNoticesHostContext } from './config-notices-surface.js'
 import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
@@ -415,6 +417,17 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // (`POST /grok-workflow/mode`) instead of a second store. `status` reports the
   // live `grokDefault` fallback, which is what a session with no record reads — the
   // default is stated once, never copied into the button.
+  // D-155, page half: the settings page cannot read a removed key out of
+  // `settings/describe` — the Host projects `user` through the namespace's schema, and a
+  // removed key is by definition not in it. So the list travels over the plugin's own
+  // read-only route, read off the same per-load set the load log drains (reading, never
+  // draining: the warning must still be announced once, whatever the page does).
+  installConfigNoticesRoute({
+    ctx: ctx as unknown as ConfigNoticesHostContext,
+    leftovers: () => [...announcedRemovedKeys],
+    logger,
+  })
+
   installModeRoute({
     ctx: ctx as unknown as ModeHostContext,
     fallback: () => {

@@ -463,18 +463,25 @@ describe('client settings page: bilingual copy (t42)', () => {
     expect(zhKeys).toEqual(enKeys)
   })
 
-  it('names a leftover removed key on the page, in both languages (D-155)', () => {
+  it('reads the notice route into the keys this build names, in both languages (D-155)', () => {
     // The page half of the load warning: the reader is told which line to delete, in the
-    // language the page is in. A copy key that rendered the key id would be worse than no
-    // banner, so both are asserted as prose that carries the key name inside it.
-    const { removedKeyWarn } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
-      removedKeyWarn(entry?: Record<string, unknown>): string[]
+    // language the page is in. The list comes from the plugin's own route (the settings
+    // document cannot carry it — `projectForm` only walks the schema), and the sentence is
+    // composed on this side so a language switch re-renders it.
+    const { parseConfigNotices } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
+      parseConfigNotices(payload?: unknown): string[]
     }
-    // `user` is the document as stored (the schema drops removed keys from `value`).
-    expect(removedKeyWarn({ value: { maxTasks: 10 }, user: { mode: 'triage', maxTasks: 10 } })).toEqual(['mode'])
-    expect(removedKeyWarn({ mode: 'triage', legacyGate: true })).toEqual(['mode', 'legacyGate'])
-    expect(removedKeyWarn({ maxTasks: 10 })).toEqual([])
-    expect(removedKeyWarn(undefined)).toEqual([])
+    expect(parseConfigNotices({ ok: true, notices: [{ key: 'mode', message: 'x' }, { key: 'legacyGate', message: 'y' }] }))
+      .toEqual(['mode', 'legacyGate'])
+    // An empty list is "nothing to say", not an error.
+    expect(parseConfigNotices({ ok: true, notices: [] })).toEqual([])
+    // A key this build does not list as removed is dropped: the page decides what it names.
+    expect(parseConfigNotices({ ok: true, notices: [{ key: 'maxTasks' }, { key: 'mode' }] })).toEqual(['mode'])
+    // Malformed answers degrade to silence instead of throwing on a settings page.
+    expect(parseConfigNotices(undefined)).toEqual([])
+    expect(parseConfigNotices('nope')).toEqual([])
+    expect(parseConfigNotices({ ok: false, notices: [{ key: 'mode' }] })).toEqual([])
+    expect(parseConfigNotices({ ok: true, notices: 'mode' })).toEqual([])
     for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
       const dict = bundle.GROK_WORKFLOW_DICT[locale]!
       expect(dict['warn.removed.title']!.length, locale).toBeGreaterThan(3)
@@ -487,6 +494,30 @@ describe('client settings page: bilingual copy (t42)', () => {
     expect(sentence('zh')).not.toBe('warn.removed.detail')
     expect(sentence('zh')).toContain('mode')
     expect(sentence('en')).not.toBe(sentence('zh'))
+  })
+
+  it('fetches the notice route once, and stays silent when the Host has no answer (D-155)', async () => {
+    const { refreshConfigNotices, configNotices, CONFIG_NOTICES_ROUTE_PATH } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
+      refreshConfigNotices(fetchImpl?: unknown): Promise<string[]>
+      configNotices: { set(next: string[]): void, getSnapshot(): string[] }
+      CONFIG_NOTICES_ROUTE_PATH: string
+    }
+    const calls: string[] = []
+    const answering = async (url: string): Promise<unknown> => {
+      calls.push(url)
+      return { status: 200, json: async () => ({ ok: true, notices: [{ key: 'mode', message: 'ignored' }] }) }
+    }
+    configNotices.set([])
+    expect(await refreshConfigNotices(answering)).toEqual(['mode'])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toContain(CONFIG_NOTICES_ROUTE_PATH)
+    // A transport failure is "no notice", not a page error: the list empties, nothing throws.
+    expect(await refreshConfigNotices(async () => { throw new Error('socket closed') })).toEqual([])
+    expect(configNotices.getSnapshot()).toEqual([])
+    // A 404 (an older Host with no such route) reads the same way.
+    expect(await refreshConfigNotices(async () => ({ status: 404, json: async () => ({}) }))).toEqual([])
+    // A page with no fetch at all degrades instead of throwing.
+    expect(await refreshConfigNotices(undefined)).toEqual([])
   })
 
   it('translates every key the page derives from data (fields, roles, groups)', () => {

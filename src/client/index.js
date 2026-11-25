@@ -1007,41 +1007,85 @@ window.__ModuleLoader__.load({
       return findings
     }
 
+    /** Exact Host route that publishes the removed keys this load still carries (D-155). */
+    const CONFIG_NOTICES_ROUTE_PATH = '/grok-workflow/config-notices'
+
     /**
-     * Leftover removed keys a stored document still carries (D-155).
+     * The removed keys the Host says this load is still carrying, as the page last read them.
      *
-     * The load half of this pair is a warning in the plugin's log, and it can only fire
-     * while the loaded document is the one that was read. The page is where the reader
-     * can act on it, so it reads the *stored* document (`entry.user`) — the schema drops
-     * removed keys before they reach the effective value, so a scan of `value` would
-     * never find one.
+     * Why a route instead of the settings document (D-155): `settings/describe` publishes
+     * `user` **projected through the namespace's schema** (`projectForm` walks the
+     * schema's `dict`), and a removed key is by definition not in that schema — so an
+     * `entry.user` scan can never see one. The plugin still sees the leftover in the raw
+     * config, so it publishes the list over its own read-only route, the same mechanism
+     * the workflow switch above uses. Reading the route is idempotent, which is what lets
+     * the load log keep its own one-line-per-key announcement untouched.
      *
-     * Measured limit (2026-11-25, DSH 0.2.2-rc.3): the Host publishes `user` already
-     * filtered to the schema's own fields, so a leftover that is *only* in the profile
-     * patch (`mode: triage` under the row) does not reach this page — `describe` answered
-     * eight user keys and no `mode` while the patch still carried it. This function is
-     * therefore correct for a document that carries a leftover and silent on this Host;
-     * making it visible here needs the leftover published over a plugin route, which is
-     * recorded as the open half in `docs/knowledge/VALIDATION.md`, not guessed at here. A namespace with no user layer falls back to `value`, exactly like
-     * {@link limitOverrunWarn}, so a bare test fixture reports its leftovers instead of
-     * hiding them.
-     *
-     * Every leftover key is returned, in the page's own key order first and the rest
-     * after, because the point is to name each one: "you have old keys" without saying
-     * which leaves the reader with nothing to delete.
-     * @param entry - the namespace entry as the mirror publishes it (`{ value, user }`),
-     *   or a plain settings document.
-     * @returns the removed keys still present in the stored document.
+     * Deliberately a plain store rather than page state: the settings page mounts, the
+     * settings *card* mounts, and a language switch re-renders — one read serves all
+     * three, and a page that never mounts costs no request.
      */
-    function removedKeyWarn(entry) {
-      if (entry === undefined || entry === null) return []
-      // An entry carrying `value`/`user` is a namespace projection; anything else is a
-      // bare document and is read as itself.
-      const projected = entry.value === undefined || entry.value === null ? entry : entry.value
-      const stored = entry.user === undefined || entry.user === null ? projected : entry.user
-      if (stored === undefined || stored === null || typeof stored !== 'object') return []
-      const found = REMOVED_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(stored, key))
-      return found
+    function createNoticesStore() {
+      /** @type {string[]} */
+      let value = []
+      const listeners = new Set()
+      return {
+        /** @param {string[]} next */
+        set(next) {
+          const same = next.length === value.length && next.every((key, index) => key === value[index])
+          value = next
+          if (same) return
+          for (const listener of listeners) listener()
+        },
+        /** @param {() => void} listener */
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => { listeners.delete(listener) }
+        },
+        getSnapshot: () => value,
+      }
+    }
+
+    const configNotices = createNoticesStore()
+
+    /**
+     * Read the notice route's answer into the keys this build knows are removed.
+     *
+     * The answer is `{ ok: true, notices: [{ key, message }] }`. Only the keys are taken:
+     * the sentence is composed on this side from the page's own dictionary, so a language
+     * switch re-renders the notice instead of stranding the other language's copy. A key
+     * this build does not list as removed is dropped — the route is the Host's answer, but
+     * the page still decides what it is willing to name.
+     * @param payload - the parsed body, if any.
+     * @returns the removed keys to name, in the order the route listed them.
+     */
+    function parseConfigNotices(payload) {
+      if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return []
+      if (payload.ok !== true || !Array.isArray(payload.notices)) return []
+      const keys = []
+      for (const notice of payload.notices) {
+        const key = notice !== null && typeof notice === 'object' ? notice.key : undefined
+        if (typeof key !== 'string' || !REMOVED_KEYS.includes(key) || keys.includes(key)) continue
+        keys.push(key)
+      }
+      return keys
+    }
+
+    /**
+     * Read the notice route once and publish what it says.
+     *
+     * Never throws and never surfaces a failure: a Host without the route (an older
+     * composition, no `webServer`), a closed socket, a body that is not JSON — all of
+     * them mean "no notice to show", not an error on a page whose job is editing
+     * settings. The empty list is therefore also the failure answer.
+     * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
+     * @returns the keys that were published.
+     */
+    async function refreshConfigNotices(fetchImpl) {
+      const answered = await getRoute(CONFIG_NOTICES_ROUTE_PATH, {}, fetchImpl)
+      const keys = answered.failure === undefined && answered.status === 200 ? parseConfigNotices(answered.payload) : []
+      configNotices.set(keys)
+      return keys
     }
 
     /** Settings keys that have a row label, so a finding may name them in words. */
@@ -1806,10 +1850,12 @@ window.__ModuleLoader__.load({
       // draft is re-seeded from the new value). The entry is passed whole so the banner
       // can read the stored `user` layer instead of the clamped `value` (B01).
       const warnLimits = useMemo(() => limitOverrunWarn(entry), [entry, value, stamp])
-      // Same source and same key: the stored document. A removed key is a fact about the
-      // patch, so it survives a save that changes other fields and only disappears when
-      // that line is actually gone from the stored document.
-      const warnRemoved = useMemo(() => removedKeyWarn(entry), [entry, value, stamp])
+      // D-155: the removed keys come from the plugin's own read-only route, not from the
+      // settings document — the Host projects `user` through the namespace's schema, so a
+      // leftover key is never in `entry.user`. Read once per mount, silently: a Host
+      // without the route simply has nothing to say, and that is not a page error.
+      const warnRemoved = useSyncExternalStore(configNotices.subscribe, configNotices.getSnapshot)
+      useEffect(() => { void refreshConfigNotices() }, [])
       const disabled = saving || namespace.status !== 'ready' || entry === undefined || entry.writable === false
       const onChange = (key, next) => setDraft((current) => ({ ...current, [key]: next }))
       const setChain = (role, next) => setDraft((current) => ({ ...current, roles: { ...current.roles, [role]: next } }))
@@ -6062,7 +6108,8 @@ window.__ModuleLoader__.load({
     /** Internals pinned by test/client.spec.ts (no runtime caller). */
     exports.GROK_WORKFLOW_INTERNALS = {
       validate, formatError, fieldLabel, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
-      comboWarn, emptyCapWarn, limitOverrunWarn, removedKeyWarn, EnumField, ROLE_ORDER, UpdateCard,
+      comboWarn, emptyCapWarn, limitOverrunWarn, parseConfigNotices, refreshConfigNotices, configNotices,
+      CONFIG_NOTICES_ROUTE_PATH, EnumField, ROLE_ORDER, UpdateCard,
       PLUGIN_VERSION, UPDATE_LATEST, UPDATE_COMMAND,
       // The upgrade card's route verbs, so `test/update-entry.spec.ts` drives the same
       // normalisation the button does instead of a copy of it.

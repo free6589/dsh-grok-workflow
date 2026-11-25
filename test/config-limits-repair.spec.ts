@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   Config,
   HARD_LIMITS,
@@ -468,7 +468,7 @@ interface PageBundle {
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
   GROK_WORKFLOW_INTERNALS: {
     limitOverrunWarn(value?: Record<string, unknown>): Array<{ key: string, live: number, cap: number }>
-    removedKeyWarn(entry?: Record<string, unknown>): string[]
+    configNotices: { set(next: string[]): void, getSnapshot(): string[] }
     translate(locale: string, key: string, params?: Record<string, unknown>): string
     translator(locale: string): Translator
   }
@@ -510,7 +510,7 @@ function loadBundle(): PageBundle {
 }
 
 const bundle = loadBundle()
-const { limitOverrunWarn, removedKeyWarn, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
+const { limitOverrunWarn, configNotices, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
 
 /** Register the page against a face holding one fixed settings document. */
 function renderWith(value: Record<string, unknown>, user?: Record<string, unknown>): unknown {
@@ -660,25 +660,20 @@ describe('client settings page: over-limit banner (B07, T5: only maxConcurrency/
 })
 
 /**
- * D-155 page half: a stored document that still carries a removed key says so.
+ * D-155 page half: the settings page names every removed key the plugin still carries.
  *
- * The load log names the leftover key once, but a reader who never opens the log learns
- * nothing from it — and the page is the only place the line can be deleted from. The
- * banner reads the *stored* layer for the same reason the over-limit banner does: the
- * schema drops a removed key before it reaches the effective value, so `value` never
- * carries one.
+ * The list does not travel in the settings document: `settings/describe` publishes `user`
+ * projected through the namespace's schema (`projectForm` walks the schema's `dict`), so a
+ * removed key is never in it. It arrives over the plugin's own read-only route, which the
+ * page reads once on mount; these cases drive the store the route fills, so the render
+ * half is the real component and the real dictionary.
  */
 describe('client settings page: leftover removed-key banner (D-155)', () => {
-  it('finds a leftover in the stored document and ignores everything else', () => {
-    expect(removedKeyWarn({ value: { maxTasks: 10 }, user: { mode: 'triage', maxTasks: 10 } })).toEqual(['mode'])
-    expect(removedKeyWarn({ mode: 'triage', legacyGate: true })).toEqual(['mode', 'legacyGate'])
-    // A live key, a removed *value* on a live key, and an empty document say nothing.
-    expect(removedKeyWarn({ maxTasks: 10 })).toEqual([])
-    expect(removedKeyWarn(undefined)).toEqual([])
-  })
+  afterEach(() => { configNotices.set([]) })
 
   it('renders one line per leftover key, naming each one', () => {
-    const tree = renderWith({ maxTasks: 10, roles: {} }, { mode: 'triage', legacyGate: true, maxTasks: 10 })
+    configNotices.set(['mode', 'legacyGate'])
+    const tree = renderWith({ maxTasks: 10, roles: {} })
     const banner = walk(tree).find(element => element.props['data-warn'] === 'removed')
     expect(banner).toBeDefined()
     const keys = walk(banner).map(element => element.props['data-warn-key']).filter(Boolean)
@@ -689,13 +684,12 @@ describe('client settings page: leftover removed-key banner (D-155)', () => {
     expect(copy).toContain('legacyGate')
   })
 
-  it('drops the banner once the stored document no longer carries the key', () => {
-    const tree = renderWith({ maxTasks: 10, roles: {}, mode: 'triage' })
-    // No `user` layer: the stored document is what `value` holds, leftovers included.
-    const banner = walk(tree).find(element => element.props['data-warn'] === 'removed')
-    expect(banner).toBeDefined()
-    const clean = renderWith({ maxTasks: 10, roles: {} })
-    expect(walk(clean).some(element => element.props['data-warn'] === 'removed')).toBe(false)
+  it('renders nothing when the route has nothing to report', () => {
+    // A patch with no leftover key, and a Host that answered an empty list, are the same
+    // page: no banner, no placeholder, no error.
+    expect(walk(renderWith({ maxTasks: 10, roles: {} })).some(element => element.props['data-warn'] === 'removed')).toBe(false)
+    configNotices.set([])
+    expect(walk(renderWith({ maxTasks: 10, roles: {} })).some(element => element.props['data-warn'] === 'removed')).toBe(false)
   })
 
   it('carries the sentence in both languages, not as a key', () => {
