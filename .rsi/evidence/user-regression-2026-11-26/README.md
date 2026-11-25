@@ -77,6 +77,24 @@
   （`grok_open_block`、`grok_accept_block`、`grok_close_block`、`grok_block_status`、`grok_steer`、`grok_stop`），
   证明 `blockIntake` 默认开（0.13.36 起默认 `true`，0.13.34 是 `false`）。
 
+### live 到底碰没碰（说准一点）
+
+    $ stat -c '%y %n' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web
+    2026-11-22 23:40:20  ~/.dsh                        ← 本轮前后同值
+    2026-11-22 16:59:46  ~/.dsh/profiles               ← 本轮前后同值
+    2026-11-25 12:09:52 → 2026-11-25 13:16:10  ~/.dsh/profiles/web   ← **目录** mtime 动了一次
+    $ touch ~/.dsh/.user-regression-write-probe
+    touch: cannot touch '…': Read-only file system
+    $ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/   → 401（前后都是 401）
+    $ node -p require('~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json').version → 0.13.35
+
+`~/.dsh/profiles/web` 这个**目录**的 mtime 在本轮中段动过一次，这一点照实写：但把里面的文件逐条按时间查了一遍
+（`find ~/.dsh/profiles/web -newermt '-90 minutes' -not -path '*/node_modules/*'`），**没有一个文件的内容晚于 12:09:50**
+（`package.json` 12:09:50、`pnpm-lock.yaml` 12:09:33、`.plugin-manager/logs` 12:09:24）。也就是说目录条目出现过又没了，
+不是内容被改。谁造成的**没有查到底**（`HYPOTHESIS`：能写那个目录的进程——运行中的 live 实例或别的会话——的临时件；
+本次 soak 的每一步都在 `DSH_HOME=<scratch>` 下，且本进程对 live 只有读权限）。live 的依赖仍是浮动
+`github:free6589/dsh-grok-workflow`、锁解析到 `84efda0`（= 0.13.35 那棵树），没有被动过。
+
 ## 3. 六项逐一
 
 ### 3.1 开关 — 通（`CONFIRMED`）
