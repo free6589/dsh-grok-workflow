@@ -3877,3 +3877,53 @@ spine 为空，pre-fix 形状会进脊柱。
   文件引用了哪一侧，再决定谁留号，不必重新讨论。代价是「谁留号」不再只看合入顺序，多了一次「哪一侧被证据引用」的检查。
   复核命令：`grep -rn "D-14[1-7]" --include=*.md . | grep -v node_modules`，以及
   `grep -o "^## D-[0-9]*" docs/knowledge/DECISIONS.md | sort | uniq -d` 只应剩既有的 **`D-050` / `D-051`** 两条（它们合并前就有，本轮不碰）。
+
+## D-148 · 量的机制被删了，测试就删掉，不重新指向一个长得像的帮手；`4` 没有出处就不写进守卫（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`d484229` 与 `56f2feb` 两条提交；同一批 12 个文件在 `dde5b09` 的树上 **338** 例、在 `56f2feb` 上 **319** 例；
+  `TMPDIR=$PWD/.tmp npm run ci` 在 `56f2feb` 上 **EXIT=0**，98 文件 / **1832** 例 / `Found 15 warnings and 0 errors.` /
+  `lib/ at 56f2feb is the build of src/ at 56f2feb (281 files, byte-identical)`；逐行读数在 `VALIDATION.md` 同日条）
+- **Date:** 2026-11-25
+- **Context:** `D-143` 把「删掉的模块」与「因它失去调用者的模块」拆成两次删除。第二次（M3.4）一动，`test/` 里就有 12 个文件够到
+  已经不存在的符号：19 条检查项量的是被删掉的机制本身。三种写法都在手边：把测试删掉；在测试文件里重造一个与被删函数同形的
+  小帮手；或者把断言改指向一个「差不多」的存活函数。另有第二条线：`docs-config-keys.spec.ts` 有一条事实是
+  `maxQueuedMessages=${FIXED_MAX_QUEUED_MESSAGES}`，而常量正是那个数字的唯一出处。
+- **Decision:**
+  1. **量的机制没了，那条测试就删掉**，不做「同形重造」。**但只要存活的代码能产出同一个形状，就改指向那条真路径**，并且
+     断言一字不改：`deliverReport(report).text`（诊断关掉时就是原来 relay 标记之间那一段，逐字节相同）取代手工切片；
+     `appendAssistantInStep` 按被删包装器原来的实参调，行形状与两个结果都还钉着；`readModeRecord(s)?.enabled` 取代
+     `isModeEnabled`（同一份持久记录，同样是严格相等）；两个存活的拒绝构造器 `refuseOversizePrompt` / `refuseEmptyPrompt`
+     取代 `inspectPrompt`。**改指向之后必须仍然是同一个失败面**——指过去之后若只剩「函数返回了什么」而没有原来的契约，
+     那就不算替代，按第 1 条删掉。
+  2. **`docs-config-keys.spec.ts` 丢掉 `maxQueuedMessages` 这条事实，不硬写 `4`。** 一份标题写着「每个固定值都有出处」的守卫，
+     不能去断一个**没有出处**的数字：常量被删之后，`4` 只是文档里的一句自述。何况这个键本身就在 `REMOVED_CONFIG_KEYS` 里，
+     它是「已删的配置键」，不是「固化的配置值」——守卫把它当固化值来钉，钉的是一种不存在的形状。
+  3. **`createConfigReader` 的 `logger` 参数跟着 `lastGood()` 一起走**，不留一个没人用的形参。它存在的唯一理由是
+     `lastGood()` 兜底时的那行告警；留着它，下一个读签名的人会以为「这里还会记日志」。
+  4. **`REPORT_BEGIN`/`REPORT_END`/`LEDGER_GUARD` 不趁这轮顺手删。** 它们现在确实零引用，但本轮清单是**封过口的**（派单写死的
+     那一串），而 `D-143` 警告的正是「一次删除拆成两次评审」。既然这一轮的判据是「清单上的符号」，清单外的东西就只报不删，
+     单开一条决定。
+- **Alternatives considered / rejected：**
+  - **在测试文件里重造一个迷你版被删函数。** 否决：那是把自己写的仿制品当成被测对象——测试从此量与生产无关的一段代码，
+    而真正该红的形状（比如 relay 前言要求「默认改写、失败逐字、禁机器词」）既没被钉住也没被记录，只留下一份「我们测过」的错觉。
+  - **把断言改指向一个「差不多」的存活函数。** 否决：本条 Decision 1 的例外是「同形且同失败面」，不是「名字相近」。
+    指向一个形状不同的帮手，等于悄悄换了被测的契约，还让 diff 看起来很干净。
+  - **整份删掉那 12 个 spec 文件。** 否决：这些文件里绝大多数用例量的是还活着的东西（`client` 132 例、`delivery-human-block`
+    46 例、`command` 27 例都基本没动）。整份删是拿 300 多条活覆盖去换 19 条死覆盖。
+  - **把 `maxQueuedMessages=4` 硬写进 `docs-config-keys.spec.ts`。** 否决：见 Decision 2——守卫的标题就是它自己的判据，
+    写成字面量之后它会永远绿，而文档和代码谁都不再有那个数字。
+  - **保留 `logger` 形参，标成 `_logger` 或加注释说「暂未使用」。** 否决：这是灰区，`D-143` 已经同一理由否掉过
+    「留着并注释说已废弃」——要么删，要么留成一条明确的任务。
+  - **顺手把 `REPORT_BEGIN`/`REPORT_END`/`LEDGER_GUARD` 与 `archiveRoundNow` 也删掉。** 否决：见 Decision 4。
+    这四个符号现在**没有消费者**，但也**没有判据**说它们不该存在（三个常量是给外部渲染方看的一份协议文本，`archiveRoundNow`
+    是「没有事件流的调用方」那一个入口）；删它们要回答的是「这是 API 还是死代码」，不是「有没有人调」。
+- **Consequences:**
+  - 覆盖净减 **19** 条，逐条能对上：`delivery` −6、`intake` −5、`final-answer-rewrite` −3、`mode` −2、`memory-archive` /
+    `reliability` / `records-redaction` 各 −1。**丢掉的那部分如实列在 `STATE.md` 与 `VALIDATION.md`**：relay 前言契约、
+    折叠账本信封与跨轮往返、「in-turn 与 relay 一种措辞」、即时回执自己那一轮归档、last-good 快照、投递记录脱敏、
+    准入五行矩阵、mode 兜底值。以后若要重新钉其中任何一条，得从生产路径重新长出断言，不能去 git 历史里把旧测试捞回来
+    （它测的函数已经不在了）。
+  - `docs-config-keys.spec.ts` 的 `facts` 表现在少一条；两个 README 里那句 `maxQueuedMessages=4` **暂时没有代码出处**
+    （见 `HANDOFF.md` 的下一步第 2 条）——这是本条的代价，不是遗漏。
+  - 判据可复用：**「清单封口」比「顺手清干净」更重要**。清单外的零引用符号一律只报不删，各自单开一条决定；
+    否则每一轮都会以「反正都在这儿了」为由扩大范围，`D-143` 那条边界就白画了。
