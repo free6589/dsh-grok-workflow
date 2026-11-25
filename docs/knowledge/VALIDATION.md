@@ -1,3 +1,36 @@
+## 跑中插话接线接回（`fix/steering-reconnect`）：`openSteering()` 的调用链回到 `runWorkflow`，块内 `typecheck` / `lint` / 6 份 spec 绿、红有记录、真机上两道波边界真的叫了边界子并用新令牌调了拉取工具；**跑中并入本身 `NOT_RUN`（形状上仍没有活调用方，见 `D-161`）** — 2026-11-26 (`CONFIRMED`)
+
+这一轮只回答一个问题：M3.3 删前台时一起带走的 `openSteering()` 接线接回去以后，在真机上是不是真的活了。
+分支 `fix/steering-reconnect`，从 `main` 尖端 **`237cf2d`** 开出，产品提交 **`a4753fe`**
+`fix(steering): a run opens its own live channel again`（`src/steering.ts` / `src/run.ts` / `src/index.ts` /
+`src/config.ts` / `src/types.ts` + `test/replan.spec.ts` + 重建的 `lib/` + `CHANGELOG.md`）。证据目录
+**`.rsi/evidence/steering-reconnect-2026-11-26/`**（`README.md` 逐条注明出处）。
+
+| 项目 | 命令 / 来源 | 读数 |
+| --- | --- | --- |
+| 类型 | `npx tsc -p tsconfig.json --noEmit` | `EXIT=0`（无输出），`gate-typecheck.out` |
+| 静态检查 | `npx oxlint src test` | `Found 15 warnings and 0 errors.`、`182 files`、`EXIT=0`（与基线同数，没有新增警告） |
+| 定向 spec（6 份） | `TMPDIR=$PWD/.tmp npx vitest run test/replan.spec.ts test/block-tools.spec.ts test/lifecycle-disposal.spec.ts test/progress.spec.ts test/checkpoint-engine-wire.spec.ts test/plugin-lifecycle.spec.ts` | `Test Files 6 passed (6)` / **`Tests 98 passed (98)`** / `EXIT=0` |
+| 单文件算术 | `git show main:test/replan.spec.ts \| grep -cE '(^\|[^A-Za-z0-9_.$])it\('` 对比工作树；`git ls-tree -r --name-only main -- test \| grep -c '\.spec\.ts$'` | replan **17 → 21**（+4）、spec 文件 **102 → 102**；全量用例数在 `237cf2d` 的 **1923** 上推 **1927**，**`HYPOTHESIS`**（这一遍没跑全量） |
+| 构建 | `TMPDIR=$PWD/.tmp npm run build` | `client bundle: 348559 bytes → lib/client.js`（与 `0.13.40` 同字节数，客户端一字未改） |
+| 提交后的 lib | `node scripts/verify-lib.mjs`（在 `a4753fe` 上） | `lib/ at a4753fe is the build of src/ at a4753fe (285 files, byte-identical)`、`EXIT=0` |
+| 全量门禁 | `npm run ci` | **`NOT_RUN`**（`AGENTS.md` §12：块内不跑全量，发版提交上跑） |
+| 红 | `git stash push -- src` 后只跑新 spec | **`2 failed \| 19 passed`**，红在第一条接线用例的 `replan` 字段（`Received: undefined`），`red-before-fix.out`。第三条「开关关掉就没有通道」两边都绿——它断言的就是"没有" |
+| 真机（隔离档案、真模型） | 复制 live web 档案到 `<scratch>/home/profiles/steer`、`dsh plugin add` 本轮打的 tgz、`DSH_HOME=<scratch>`、端口 **3399** | 装包 `lib/steering.js` 的 `sha256 a6c10bbc…0179` 与工作树逐字节相同、版本读回 `0.13.40`、`closeSteering` 命中 1、21 个 bundle 一个没丢；用 CDP 装置（`soak/drive.mjs`）按用户视角发消息 |
+| 真机：通道真的活了 | session 日志的 `tool-workflow/*` 进度行（`soak/session-progress.txt`） | 一次真模型运行（runId `3c513728…`）：`规划（第1次）` → 任务 1 的 `执行/检查/复核` → **`规划（第2次）` `phase: 规划 · 波 1 边界`** → **`规划（第3次）` `phase: 规划 · 波 2 边界`** → `汇总·第1稿`。修之前 `args` 里没有 `replan`，脚本 `replanChannel` 为 null，这两条边界腿根本不会出现 |
+| 真机：边界子真的调了拉取工具 | 两个边界子各自 session 日志（`soak/boundary-calls.txt`） | 两条都记到 `"name":"grok_replan_intents","arguments":"{\"token\":\"steer-mwwe62zr-1\"}"`，标签 `规划（第2次）` / `规划（第3次）`；令牌正是 `mintSteeringToken()` 铸的形状 |
+| 真机：队列随 run 关闭 | `soak/s5-steer-after.txt` | 运行结束后再 `grok_steer` → 「这一块现在没有在跑的 workflow，没有可投递的边界…」，即 `queue === undefined` 分支 |
+| 真机：跑中插话**没有**并入 | `soak/s4-steer-midrun.png` / `.delta.txt` | 运行中发出的那条消息被 GUI 排队（提示 `Cmd/Ctrl+Enter 插话发送全部排队消息`），模型在这一轮**结束之后**才看到它 → 这一轮不存在"跑中并入"，见 `D-161` Consequences |
+| 那次运行的状态 | `soak/s3-done.txt` | **FAILED**，原因在环境不在接线：子代理沙箱里 `/home` 是只读挂载（`btrfs ro`），`printf > .tmp/soak-steer-note.md` 报 `Read-only file system`，任务 1 两次尝试用尽、任务 2/3 未启动；计划、波次、依赖、边界、汇总都按设计跑完 |
+| 红线 | `stat` / `curl` / 写探测 | `~/.dsh` mtime `2026-11-25 23:14:14`、`~/.dsh/profiles` `2026-11-22 16:59:46`、`profiles/web` 与 `cordis.patch.yml` `2026-11-25 23:04:40`、`.credentials.yaml` `2026-11-14 22:47`（全在本会话之前）；写探测 `: > ~/.dsh/.soak-probe` → `Read-only file system`；live `100.111.111.88:3080` 前后都 401，未重启/未重载 |
+| 没做 | —— | 发版 / 打 tag / 合 `main` / push（派单没要求）、全量门禁、一次成功的「跑中并入」 |
+
+**这一轮真正值钱的两个读数**：① 边界腿在真机上出现了两次，且两个边界子都用**新铸的令牌**调了拉取工具——这是"通道接回去了"的直接证据，
+不是推断；② 同一台机器上"跑中的消息进不了活计划"也被量到了（GUI 排队），所以 `grok_steer` 今天能排队、但**没有能在跑中调用它的角色**。
+第二条是下一块要拍板的东西（拿回宿主侧消息入口，或允许调度子代理跑 workflow 并把通道键到根会话），不是这一轮能靠改接线解决的。
+
+---
+
 ## `0.13.40` 发版收口：发布提交 `3778822` 上跑整套 `npm run ci` 得 `EXIT=0`（`102 files / 1923 tests`、`95.59s`），份数与用例数本轮自己从 git 对象数过并与门禁对上；附注标签、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 这一节记的是**发布那一步**，不是代码轮。合流的细节（16 文件冲突、口径、文档怎么解）在下一节；

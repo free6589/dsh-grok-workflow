@@ -180,13 +180,12 @@ export interface GrokWorkflowConfig {
      */
     childTimeoutMs?: number;
     /**
-     * Mid-run replan switch (`false` by default, `DEFAULT_REPLAN`): keep every
-     * message its own round, or open the main-session channel (`src/channel.ts`):
-     * a message typed while a run is working is answered at once, and it either
-     * stops that run (a bare "停"/"stop"/"取消") or joins its remaining plan at
-     * the next wave boundary through `src/steering.ts` + `src/replan.ts`, so work
-     * already in flight is neither cancelled nor redone. Editable on the settings
-     * page ("自动接着干" group), same boolean-switch shape as `loopEnabled`.
+     * Mid-run replan switch (on by default, `DEFAULT_REPLAN`): off keeps every
+     * message its own round; on gives each run a live channel, so a message that
+     * arrives while the run is working joins its remaining plan at the next wave
+     * boundary through `src/steering.ts` + `src/replan.ts`, and work already in
+     * flight is neither cancelled nor redone. Editable on the settings page
+     * ("自动接着干" group), same boolean-switch shape as `loopEnabled`.
      */
     replan?: boolean;
     /**

@@ -1,0 +1,77 @@
+DSH 本地构建
+0.2.2-rc.3-6b729fe
+会话
+生图
+新会话
+插件
+定时任务
+自动化任务
+网页版
+SDLC
+更多
+工作区
+默认工作区
+用 grok_open_block 的 preview 模式
+用 grok_open_block 的 preview 模式
+待办
+设置
+用 grok_open_block 的 preview 模式
+标准模式
+1 个后台任务
+对话
+轨迹
+进度
+grok
+Grok workflow ON — the model may commission reviewed blocks of work in this session, as long as the block intake is switched on. Messages themselves are not turned into a workflow.
+用 grok_open_block 的 preview 模式开一个块，只要预览、不要 start：标题「跑中插话接线验证」，objective「验证跑中插话能不能并进正在跑的计划」，deliverable「一次真机读数」，acceptance 只有一条「读到 plan.replans」，execution 填 workflow。
+01:19
+已完成
+已完成，用时 10秒
+
+预览已开，没有 start。
+
+预览 id bp-5d3f2b9e-ad02-4333-b196-35ea5dee56cb split_hash 28e5882f…16b0
+
+切出来 1 块：
+
+#	标题	执行	交付物	验收
+1	跑中插话接线验证	workflow	一次真机读数	读到 plan.replans
+
+两个提示（不影响预览，但真开工前值得补）：
+
+没声明 writesPaths —— 并行跑时可能和别人撞文件
+execution: workflow 但没给 owner —— 派单时不知道派给哪个子代理
+
+预览 10 分钟后过期（2026-11-26 01:29:27 +08:00）。要正式开工的话，把 owner / 写范围补上再说一声，我就用这对 id 起单。
+
+用量 58.6K tok
+01:19
+确认。用上面的 preview_id 和 split_hash，以 start 模式把这个块开始。
+01:19
+已完成
+已完成，用时 2分43秒
+
+块已开，状态为 open，但还没有运行任何东西（waited_for_run: false）。
+
+block_id 0f135d39-918a-4873-9782-fc8474b8794d；这一块是 blk-1「跑中插话接线验证」，类型为 workflw，没有声明写文件，也没有依赖。
+状态 open（已记录切分，尚未认领）
+派单信封 派单 1 块：blk-1「跑中插话接线验证」workflow（不写文件，无依赖）。
+账本 .../soak-steer/home/taskboards/grok-workflow/blocks.jsonl
+
+过程中说明一下：第一次提交被拒了，原因是 approval.quote 必须是纯粹的点头词（确认、开工、yes…），不会被当成“包含确认的长句”。因此我把 quote 改成你消息里的「确认」二字才通过；切分和 hash 都没动。
+
+还差一步：这一块是 workflow 执行，但 preview 时没给 owner，真要发包时不知道该派给哪个子代理；写范围也是空的。要跑的话，建议先补上这两项，或直接告诉我派给谁，我再用 grok_accept_block 认领并起跑。
+
+用量 514K tok
+01:22
+发消息或创建任务, / 调用指令, @ 文件或对话
+工作区内修改
+自动接着跑
+关
+自迭代
+关
+工作流开关
+开
+2 轮 17 步·172 tok/s
+573K tok·缓存命中 93%
+8%

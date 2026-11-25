@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { Session } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { resolveConfig } from '../src/config.js'
 import { REPLAN_LIMITS, mergeReplan, replanMergeSource } from '../src/replan.js'
 import type { ReplanState } from '../src/replan.js'
 import { assertWorkflowReport } from '../src/report.js'
+import { createActiveState, runWorkflow } from '../src/run.js'
+import type { RunOutcome, WorkflowLogger } from '../src/run.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
-import { STEERING_TOOL_NAME, SteeringQueue, closeAllSteering, openSteering, pullSteering, steeringForSession } from '../src/steering.js'
+import {
+  STEERING_TOOL_NAME, SteeringQueue, closeAllSteering, closeSteering, openSteering, pullSteering, steeringForSession,
+} from '../src/steering.js'
 import type { NormalizedTask } from '../src/types.js'
 import { execution, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
@@ -218,6 +225,18 @@ describe('steering queue: bounded, consumed exactly once', () => {
     closeAllSteering()
     expect(steeringForSession('session-2')).toBeUndefined()
   })
+
+  it('closes only its own token, so an older run cannot unsteer a newer one', () => {
+    const first = openSteering('session-3')
+    const second = openSteering('session-3')
+    // One queue per session: the newest run owns it.
+    expect(steeringForSession('session-3')?.token).toBe(second.token)
+    closeSteering(first.token)
+    expect(steeringForSession('session-3')?.token).toBe(second.token)
+    expect(pullSteering(second.token)).toEqual({ intents: [], dropped: 0 })
+    closeSteering(second.token)
+    expect(steeringForSession('session-3')).toBeUndefined()
+  })
 })
 
 describe('script: a demand merged at a wave boundary does not restart the round', () => {
@@ -306,5 +325,141 @@ describe('script: a demand merged at a wave boundary does not restart the round'
     expect(run.calls.filter(call => roleOf(call.label) === 'planner')).toHaveLength(1)
     expect(run.report.plan.version).toBe(1)
     expect(run.report.plan.replans).toEqual([])
+  })
+})
+
+/**
+ * Wiring: the run itself owns the live channel.
+ *
+ * The queue, the pull tool and the boundary merge were all in place, but nothing
+ * opened a queue any more: the entry chain that used to do it was deleted as a
+ * whole, taking `openSteering` with it, so a demand queued for a live run had no
+ * channel to land in. These cases pin the restored wiring at the seam that can
+ * prove it without a model — the request the engine is actually handed, and the
+ * module-level registry the pull tool reads — and they pin both directions of the
+ * switch, because "a channel exists" and "the payload never changed for callers
+ * that did not ask for one" are the two halves of the same claim.
+ */
+describe('wiring: the run owns the live channel', () => {
+  const OBJECTIVE = 'Ship the replanned waves'
+
+  interface WireResult { value: unknown, stopReason: string, agentsStarted: number }
+
+  class WireRun {
+    readonly id: string
+    readonly meta: WorkflowStartRequest['meta']
+    readonly dispose = async (): Promise<void> => {}
+    readonly result: Promise<WireResult>
+    private settleWith!: (result: WireResult) => void
+
+    constructor(meta: WorkflowStartRequest['meta'], index: number) {
+      this.id = `wire-run-${index}`
+      this.meta = meta
+      this.result = new Promise(resolve => { this.settleWith = resolve })
+    }
+
+    cancel(): void { this.settle('cancelled') }
+
+    settle(stopReason: string, value: unknown = null): void {
+      this.settleWith({ value, stopReason, agentsStarted: 0 })
+    }
+  }
+
+  class WireEngine {
+    readonly starts: WorkflowStartRequest[] = []
+    readonly runs: WireRun[] = []
+
+    async start(request: WorkflowStartRequest): Promise<WireRun> {
+      this.starts.push(request)
+      const run = new WireRun(request.meta, this.runs.length + 1)
+      this.runs.push(run)
+      return run
+    }
+  }
+
+  function loggerWith(warnings: string[]): WorkflowLogger {
+    return { warn: (message: string) => { warnings.push(message) }, info: () => {} }
+  }
+
+  /** Start one run against the fake engine; `steering: false` asks for no channel. */
+  function begin(
+    engine: WireEngine,
+    warnings: string[],
+    options: { steering?: boolean, config?: Record<string, unknown> } = {},
+  ): Promise<RunOutcome> {
+    const logger = loggerWith(warnings)
+    return runWorkflow({
+      // The fake engine is the whole context these cases touch: no event bus, no
+      // session store, no filesystem seam beyond the suite's scratch directories.
+      ctx: { workflowEngine: engine, logger: () => logger } as never,
+      config: config(options.config ?? {}),
+      state: createActiveState(),
+      logger,
+      agent: { session: Session.create('sess-wire' as SessionId) } as never,
+      objective: OBJECTIVE,
+      callerTasks: [normalized('a')],
+      resumeLister: 'skip',
+      ...options.steering === false ? {} : { steering: { sessionId: 'sess-wire' } },
+      failureMode: 'report',
+    })
+  }
+
+  async function waitForStart(engine: WireEngine): Promise<WorkflowStartRequest> {
+    while (engine.starts.length === 0) await new Promise(resolve => { setImmediate(resolve) })
+    return engine.starts[0]!
+  }
+
+  afterEach(() => closeAllSteering())
+
+  it('hands the boundary planner the live token, then closes the queue with the run', async () => {
+    const engine = new WireEngine()
+    const warnings: string[] = []
+    const pending = begin(engine, warnings)
+    const request = await waitForStart(engine)
+    const replan = (request.args as { replan?: { enabled?: boolean, token?: string, tool?: string } }).replan
+    expect(replan).toEqual({ enabled: true, token: expect.any(String), tool: STEERING_TOOL_NAME })
+
+    // The queue the pull tool reads is the one this run quotes: this is the whole
+    // wiring — a demand pressed into `grok_steer` lands here, and the boundary
+    // child's one call takes it away.
+    const queue = steeringForSession('sess-wire')
+    expect(queue?.token).toBe(replan!.token)
+    queue!.push('also do D')
+    expect(pullSteering(replan!.token).intents.map(intent => intent.text)).toEqual(['also do D'])
+    expect(pullSteering(replan!.token).intents).toEqual([])
+
+    // A demand that arrives after the last boundary is counted, never silently
+    // dropped and never carried under this token into a later run.
+    queue!.push('and cover E')
+    engine.runs[0]!.settle('cancelled')
+    const outcome = await pending
+    expect(outcome.ok).toBe(false)
+    expect(warnings.some(line => line.includes('1 demand(s)'))).toBe(true)
+    expect(steeringForSession('sess-wire')).toBeUndefined()
+    expect(pullSteering(replan!.token)).toEqual({ intents: [], dropped: 0 })
+  })
+
+  it('keeps the payload byte-identical for a caller that asks for no channel', async () => {
+    const engine = new WireEngine()
+    const warnings: string[] = []
+    const pending = begin(engine, warnings, { steering: false })
+    const request = await waitForStart(engine)
+    expect('replan' in (request.args as Record<string, unknown>)).toBe(false)
+    expect(steeringForSession('sess-wire')).toBeUndefined()
+    engine.runs[0]!.settle('cancelled')
+    await pending
+  })
+
+  it('opens nothing when the live replan switch is off, even with a session named', async () => {
+    const engine = new WireEngine()
+    const warnings: string[] = []
+    const pending = begin(engine, warnings, { config: { replan: false } })
+    const request = await waitForStart(engine)
+    expect('replan' in (request.args as Record<string, unknown>)).toBe(false)
+    // No channel, so `grok_steer` says "no live run" instead of queueing into a
+    // run that will never visit a boundary.
+    expect(steeringForSession('sess-wire')).toBeUndefined()
+    engine.runs[0]!.settle('cancelled')
+    await pending
   })
 })

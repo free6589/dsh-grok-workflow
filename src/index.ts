@@ -325,6 +325,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       // session, so it gets the same bounded digest of the earlier rounds that a
       // message-driven run gets. Empty when the session has none.
       const carryover = carryoverForSession(agent.session, carryoverBounds({ historyTurns: FIXED_HISTORY_TURNS, historyChars: FIXED_HISTORY_CHARS }))
+      // L2 live steering: a demand that arrives while this run works is resolved by
+      // the conversation it arrived in (`grok_steer` looks the queue up by session
+      // id), and this is the only frame that knows which conversation the call
+      // belongs to. The run mints the token, hands it to the boundary planner and
+      // closes the queue when it settles; the `replan` switch still decides whether
+      // a channel exists at all.
+      const steeringSessionId = String(agent.session?.id ?? '').trim()
       const outcome = await runWorkflow({
         ctx,
         config: live,
@@ -335,6 +342,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         signals: [exec.signal],
         ...callerTasks === undefined ? {} : { callerTasks },
         ...carryover.digest === '' ? {} : { carryover: carryover.digest },
+        ...steeringSessionId === '' ? {} : { steering: { sessionId: steeringSessionId } },
         failureMode: 'throw',
       })
       return outcome.report as never

@@ -1,0 +1,25 @@
+{
+  "enabled": true,
+  "token": Any<String>,
+  "tool": "grok_replan_intents",
+}
+
++ Received:
+undefined
+
+ ❯ test/replan.spec.ts:420:20
+    418|     const request = await waitForStart(engine)
+    419|     const replan = (request.args as { replan?: { enabled?: boolean, to…
+    420|     expect(replan).toEqual({ enabled: true, token: expect.any(String),…
+       |                    ^
+    421|
+    422|     // The queue the pull tool reads is the one this run quotes: this …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 19 passed (21)
+   Start at  01:07:20
+   Duration  1.34s (transform 523ms, setup 0ms, import 628ms, tests 586ms, environment 0ms)
+
