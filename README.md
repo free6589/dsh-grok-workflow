@@ -1,7 +1,7 @@
 # Grok Workflow for DSH
 
 <p align="center">
-  <strong>Every message meets the front desk; the work that needs it runs plan, parallel execution, independent checks, honest result.</strong>
+  <strong>Plan, parallel execution, independent checks, honest result — one tool the model calls when the work needs it.</strong>
   <br />
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
@@ -13,11 +13,11 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
 </p>
 
-**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It gives DSH a mandatory entry for user messages: a gate intercepts every user message and hands it to the front desk, which picks a tier and says which one. It also registers the `grok_workflow` tool that the model can call directly.
+**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It registers the `grok_workflow` tool the model can call directly, and an optional block intake that lets the model commission that work in reviewed pieces. Since `0.13.34` (M3.3) it puts **nothing** in front of a user message: the entry gate and the front desk it belonged to were deleted, so a message reaches the model exactly as you typed it.
 
-The per-session toggle itself is **off by default** (`grokDefault: off`): until you send `/grok` in a session, its messages pass through as ordinary chat. With the toggle on, the front desk decides per message — a greeting is answered from a template, a small question by one worker, and only an objective that needs the team runs the full workflow.
+The per-session toggle (`/grok on|off`; the config default `grokDefault: off` is the fallback it reports when a session has no record) governs one thing: whether the block intake's tools may accept work in that session. It never changes what happens to a message — a message is delivered either way.
 
-You do not write a workflow script. Install the plugin, restart your profile, and ask a question: a message the front desk sends to the **team** tier is planned, run, verified task by task against its acceptance criteria, and answered in the same turn.
+You do not write a workflow script. Install the plugin, restart your profile, and ask for something that needs several independent steps: the model calls `grok_workflow`, and that work is planned, run, verified task by task against its acceptance criteria, and answered in the same turn.
 
 ![Plan, execute, verify, retry, and report workflow](docs/images/workflow-overview.svg)
 
@@ -25,12 +25,12 @@ You do not write a workflow script. Install the plugin, restart your profile, an
 
 | Requirement | What this plugin does |
 |---|---|
-| **A front desk in front of every message** | An `agent/pre-step` gate claims each user message and the front desk picks a tier — `direct`, `quick`, `team` or `ask` — stating the tier and its reason on the answer's first line. The full plan→execute→verify workflow runs on the `team` tier; nothing falls back silently to ordinary direct answering. |
+| **Nothing in front of your messages** | Since `0.13.34` a user message is never claimed, refused, shortened or annotated: the only `agent/pre-step` listeners are the narrow heartbeat listener and the block intake's observer, and neither decides a user batch. `test/block-flag-baseline.spec.ts` pins that pass-through as bytes for eight payload shapes. |
 | **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. The switch word is matched after trimming and case-insensitively (`/grok ON`, `/grok  Off ` work); anything else answers with `/grok [on|off|status]` and leaves the toggle alone. `/grok status` writes nothing: it reports the last run — its state, why it stopped, what the guard saw, whether a checkpoint can be resumed, and which tasks are unfinished. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
 | **Per-role model choice** | `roles.planner`, `roles.worker`, `roles.verifier`, `roles.synthesizer` each carry their own model. |
 | **Ordered fallback chains per role** | Up to 50 routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
 | **Operable settings** | The exported `Config` *is* the DSH settings page: live values, unknown keys rejected with a suggestion, chains validated against the providers the runtime really has. |
-| **Pluggable workflow shape** | `mode: 'triage'` (default) keeps the front desk; `mode: 'full'` restores the older rule where every claimed message runs the team. |
+| **Pluggable workflow shape** | The workflow shape is the generated script's, not a configuration switch: `test/engine-contract.spec.ts` and `test/engine-harness.ts` drive it through the real engine contract, and the intake's six tools are the only per-profile switch that changes the tool surface. |
 
 ## Install in one command
 
@@ -87,12 +87,10 @@ After DSH starts, just ask something:
 
 > Inspect this repository, find two independent issues, verify each finding against the current files, and summarize what remains uncertain. Do not modify files.
 
-Once the session's toggle is on (`/grok`; `grokDefault` is `off`), the gate claims that message whether or not the model would have called the tool. With the
-default `mode: 'triage'` the front desk decides first: a long objective like the one above runs the
-**team** tier and ends with a short status line (`Grok workflow: COMPLETED`, `PARTIAL` or `FAILED`)
-plus the verified tasks, failures and uncertainties, while "what is today's date" takes the **quick**
-tier and "hello" the **direct** tier — both stating their tier and reason in the first line. Set
-`mode: 'full'` for the older behaviour (everything runs the team).
+Nothing happens to the message itself: it reaches the model exactly as you wrote it. The model then
+decides whether the work needs the tool, and a `grok_workflow` call ends with a short status line
+(`Grok workflow: COMPLETED`, `PARTIAL` or `FAILED`) plus the verified tasks, failures and
+uncertainties. A greeting or a single lookup is answered by the model without the tool at all.
 
 ## How it works
 
@@ -112,52 +110,43 @@ The workflow exists to avoid treating an agent's “done” message as proof tha
 - **`partial`** — some useful work passed, but something remains incomplete or uncertain.
 - **`failed`** — no task was verified, or the run failed before a usable report.
 
-## Mandatory entry: what changes for you
+## The message path: what changes for you
 
-- The gate is **always installed** in `0.10.0` (the former `enforceGate` switch was removed) and inspects every *user* message. Whether a message is *worked on* is a second switch: the per-session toggle, whose config default `grokDefault` is `off` — until `/grok` turns it on for that session, a message passes through to the model as ordinary chat (`reason: mode-off`). Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are never claimed, and an empty batch passes through.
+- **No listener decides a user message** (M3.3). The `agent/pre-step` chain carries the narrow heartbeat listener, which only acts on a `source.kind === 'schedule'` delivery carrying the Loop marker, and the block intake's observer, which records a beat after the decision. Everything else — a typed turn, an answered question card, a webhook, a subagent prompt, an empty batch — reaches the model unchanged.
 - The answer arrives **inside the same turn**. `in-turn` is the only delivery strategy in `0.10.0` — it is the one that survives a one-shot process, and the former `relay`/`append` options were removed.
-- A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 32,000 characters). Nothing is executed and nothing is retried automatically.
-- Delivery is recorded per message: the same batch dispatched twice does not start a second run, and each agent's waiting queue is bounded by `maxQueuedMessages`.
-- To keep only the `grok_workflow` tool and skip interception entirely, leave `grokDefault` at `off` and never run `/grok on`. A deployment that must never degrade silently gets a warning (not a silent pass) when this runtime exposes no `agent/pre-step` hook; `0.10.0` has no `gateRequired` key left to promote that to a load error.
+- A run the plugin will not start is **refused out loud** with the reason (an objective over 32,000 characters on a `grok_workflow` call). The *message* is never refused — only the run is.
+- Every run's route switches are recorded in the session log (`recordRouting`), and each agent's waiting queue is bounded by `maxQueuedMessages`.
+- To keep only the two always-on tools and skip the intake entirely, set `blockIntake: false`; the narrow heartbeat listener stays either way, because it is the only owner of a heartbeat's fate.
 
 ### Objective length limit
 
-The workflow objective limit is **32,000 characters**, measured on the user message itself. The whole message is carried into the objective; it is never shortened to fit.
+The workflow objective limit is **32,000 characters**, measured on the objective a run is given. A user *message* of any length still reaches the model untouched — the bound is on the objective, not on what you may type.
 
-| Message length | What happens |
+| Objective length | What happens |
 |---|---|
-| 1–4,000 characters | Accepted (unchanged from earlier releases). |
-| 4,001–32,000 characters | Accepted; the entire message is kept as the objective. At exactly 32,000 characters the `Current request:` label is dropped instead of trimming the message, and no conversation history is attached. |
-| 32,001 characters or more | Refused out loud with `the message is longer than the 32000-character workflow objective limit`; no run starts. |
+| 1–4,000 characters | Accepted. |
+| 4,001–32,000 characters | Accepted; the whole objective is kept. |
+| 32,001 characters or more | The `grok_workflow` call is rejected with a message naming the 32,000-character limit; no run starts. |
 
 Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters, and the aggregate serialized task budget stays at `48,000` characters. History is fixed in `0.10.0` (`historyTurns=20` / `historyChars=20000`), the run deadline defaults to unlimited and is configurable (`timeoutMs`, `0` = unlimited), and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field or one deadline.
 
 If planning fails, the fallback plan splits the whole objective into contiguous segments that each fit the 4,000-character task-text budget. Concatenating the segments reproduces the objective verbatim, so the fallback is **not** rejected a second time and no character is lost. The run reports `partial` with `planning.source: "fallback"` and the planner error.
 
-## The front desk: four tiers, always stated (t52)
+## What the plugin does with a message (and what it does not)
 
-Every user message passes a **front desk** first, and the answer always says which tier it took and
-why — the plugin may be cheap, but it may not be quiet about it:
+Nothing. A message is delivered to the model as you wrote it, and the plugin's own listeners only
+look at scheduled heartbeats. There is no tier, no greeting, no first-line status and no refusal on
+the message path — those belonged to the front desk, which `0.13.34` (M3.3) deleted along with the
+`mode` and `legacyGate` keys that configured it.
 
-| Tier | What runs | Cost |
-|---|---|---|
-| `直答档` (direct) | small talk answered from a template | no model call |
-| `快手档` (quick) | one worker, one pass | one call (a structured retry if the first returns nothing) |
-| `团队档` (team) | the full workflow, with a greeting and the progress board | the normal run |
-| `确认档` (ask) | it asks `这个要动用团队吗？可回复：简单 / 团队` and remembers your answer | no model call |
+What remains is the tool surface:
 
-You can always force the team by saying `用团队` / "use the team". The wording follows the language
-of your message, not the interface language. `mode: 'full'` restores the older rule (every message
-runs the team, no tier line, no greeting).
-
-Questions are recognised as **shapes**, not from a word list — `A不A` / `A没A` (`多不多`, `有没有`), a `还是`
-choice (`yarn 还是 pnpm`) and `谁` (`被谁占了`) — with the statement boundaries pinned (`他还是走了`,
-`他问是谁`), so "a question never gets the template" holds for the shapes the rules recognise.
-Two honest limits of the confirm tier: the pending question and its answer live in **plugin memory
-for ten minutes** and are consumed when used, so a plugin reload or a longer pause forgets them; the
-next "简单" / "团队" then says so (`档位：直答档 — 上一轮没有待回答的分流问题…`) instead of guessing what
-it was answering. And the front desk answers a *pointer* with no object ("改一下那个") by asking,
-while a pointer that carries a path, an error code or a snippet is taken as work and dispatched.
+- **`grok_workflow`** — the model calls it with an objective (and optionally its own task list). The
+  run plans, executes in parallel, verifies every task against its acceptance criteria, retries
+  within bounds and reports `completed` / `partial` / `failed`.
+- **The block intake** — six `grok_*` tools that let the model commission work in 1–3 reviewed
+  blocks, with a durable ledger of what was approved and what was judged. On by default
+  (`blockIntake: true`), off with one key.
 
 ## Models per role and fallback chains
 
@@ -208,13 +197,12 @@ supervisor keeps that job (fail-only after verification).
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly twenty-one keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the rate-limit switch, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, `guardianModel` the single stall-judge route, `blockIntake` the block-intake switch, and `legacyGate` the old front desk's own switch); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly nineteen keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the rate-limit switch, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, `guardianModel` the single stall-judge route, and `blockIntake` the block-intake switch, on by default); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing. The two keys that routed user messages before M3.3 — `mode` and `legacyGate` — are removed: a patch that still carries either one is rejected with `removed configuration key`:
 
 ```yaml
 - id: grok-workflow
   config:
     toolName: grok
-    mode: triage
     grokDefault: 'on'
     synthesis: layered
     maxConcurrency: 10
@@ -228,7 +216,6 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | Key | Default | Hard limit | Meaning |
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | pattern `^[a-z][a-z0-9_]{1,40}$` | Model-facing tool name (fixed at registration) |
-| `mode` | `triage` | `triage` \| `full` | `triage`: the front desk picks a tier and says so (the settings page shows it as `auto`). `full`: every message runs the team |
 | `grokDefault` | `off` | `on` \| `off` | Session default when no `/grok` record exists. `off` leaves ordinary chat alone; `on` claims every user message |
 | `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer, supervisor }` ordered chains. The serial supervisor runs after verification and can only fail a task, never pass one; alongside it a resident parallel guardian watches every child for stalls (see below) |
 | `guardianModel` | empty route | `{provider?, model?}` ≤120 chars each | Single stall-judge route (not a chain): a stalled child is judged before it is killed — `wait` extends by 5 minutes at most twice, never past the run deadline. Empty = off, a timed-out call fails straight to the task's bounded retry |
@@ -244,14 +231,13 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
 | `loopIntervalMin` | `0` (`0` = the loop's floor) | `10080` (seven days) | Minutes between rounds. The effective wait is never below one worst-case round or 60 minutes, so `0` means "as soon as a round can finish", not "immediately" |
 | `iterateIntervalMin` | `0` (`0` = the heartbeat's floor) | `10080` (seven days) | Minutes between self-iteration heartbeats. Same floor semantics as `loopIntervalMin`: never below one worst-case round or 60 minutes |
-| `iterateTemplate` | built-in default, `docs/iterate-template.md` | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. The shipped default is the round prompt in `docs/iterate-template.md` (POOL-first topic selection, R1–R6, triple review, four brakes, forbidden zones), and `test/iterate-template.spec.ts` keeps the file and the constant byte-identical. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes gate routing |
-| `blockIntake` | `false` | `true` \| `false` | Mounts the block intake: the six `grok_*block*`/`grok_steer`/`grok_stop` tools, the supervisor that judges a finished block, and the intake's own `agent/pre-step` observer of heartbeats. It is a load-time switch (the tools are registered once, at load) and it is not projected to the settings page for that reason. Off registers no block tool and no intake observer, so a profile that leaves it off keeps the surface it had before the feature existed; the heartbeat listener that decides a beat is not part of this switch (it exists on every load), and the intake never changes a routing decision — its observer passes every decision through unchanged |
-| `legacyGate` | `false` | `true` \| `false` | Whether the old front desk is registered at all. Off (the default) registers nothing from it: the narrow heartbeat listener is the only `agent/pre-step` listener a load has, and it is the one owner of a heartbeat's fate. On is an explicit opt-in that puts the old front desk back for user-message routing only — it never decides a heartbeat, because the narrow listener is installed outermost and answers a stopped beat with `reject` before the gate is called. It is a load-time switch (a listener cannot appear without a reload) and it is not projected to the settings page for that reason |
+| `iterateTemplate` | built-in default, `docs/iterate-template.md` | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. The shipped default is the round prompt in `docs/iterate-template.md` (POOL-first topic selection, R1–R6, triple review, four brakes, forbidden zones), and `test/iterate-template.spec.ts` keeps the file and the constant byte-identical. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes what a delivery is treated as |
+| `blockIntake` | `true` | `true` \| `false` | Mounts the block intake: the six `grok_*block*`/`grok_steer`/`grok_stop` tools, the supervisor that judges a finished block, and the intake's own `agent/pre-step` observer of heartbeats. On by default since M3.3, so a profile that says nothing gets the tools. It is a load-time switch (the tools are registered once, at load) and it is not projected to the settings page for that reason. `false` registers no block tool and no intake observer and keeps the two always-on tools; the heartbeat listener that decides a beat is not part of this switch (it exists on every load), and the intake never changes a routing decision — its observer passes every decision through unchanged |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
 The four `loop*` keys configure the repeat-run surface. When a session's loop is opened, the loop service reads `loopMaxRounds`, `loopFailStreak` and `loopIntervalMin` at open time and stores them in a durable Schedule rule; without a composed Schedule service the keys are stored and every message still runs once. `loopEnabled` is the deployment default for an automatic driver and is not read yet — opening a loop stays an explicit user action ([Repeat runs](#repeat-runs-the-loop-heartbeat)). `loopIntervalMin` is a wait, not a budget: it can only raise the loop's floor, and `loopFailStreak` travels into the heartbeat text as guidance because the Host records delivery, not round success.
 
-Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `maxActiveRunsTotal=8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageModel` unset, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn` removed (the built-in fallback policy applies; a stored value is rejected as an unknown key), `subagentProvider` unset, and the gate is always on (the `enforceGate`/`gateRequired`/`gateScope`/`gatePreset` switch is removed).
+Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `maxActiveRunsTotal=8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageModel` unset, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn` removed (the built-in fallback policy applies; a stored value is rejected as an unknown key), `subagentProvider` unset, and the message gate itself is gone: `enforceGate`, `gateRequired`, `gateScope` and `gatePreset` were removed with the earlier slim-down, and M3.3 removed the last two routing keys, `mode` and `legacyGate`, together with the front desk they configured.
 
 **Migration from ≤0.9.4:** delete those keys from your patch. A patch that still carries one is rejected as an unknown key, and there is no replacement for a removed value — the fixed value above applies.
 
@@ -271,9 +257,9 @@ A loop is one durable task in the Host's Schedule service, not a timer inside th
 
 **The dock switch.** The round cap and the interval come from those stored keys, and the switch that spends them sits in the composer dock — the ambient strip under the message box, slot `conversation.composer.dock`, id `grok-workflow-loop`. It reads the loop with `status` once on mount and never on a timer, stays disabled while that read is in flight, and a click sends `open` or `close` for the current session with no numbers of its own: the rule is built from `loopIntervalMin`, `loopMaxRounds` and `loopFailStreak` as stored. A refused click does not flip the switch — it leaves the last known state on the page and states why the click did nothing. The switch is a caller of the route below, not a second implementation: the same durable row, the same service methods.
 
-**The self-iterate switch, beside it.** A second composer-dock switch, id `grok-workflow-iterate`, posts to `/grok-workflow/iterate` and drives a second service whose slot is the `RSI heartbeat` title — so the two switches can never create, report or delete each other's row. Its open sends no prompt and no interval: the stored prompt is the profile's `iterateTemplate` (edited in the settings page's *Self-iteration* group, textarea; empty falls back to the built-in default) and the interval floor is `iterateIntervalMin`. An `RSI heartbeat` delivery routes as an ordinary schedule message — the gate's loop routing never claims it — and the row deliberately outlives the plugin (it is the repository's own beat); disarm it with the same switch or through DSH's own Automation tasks.
+**The self-iterate switch, beside it.** A second composer-dock switch, id `grok-workflow-iterate`, posts to `/grok-workflow/iterate` and drives a second service whose slot is the `RSI heartbeat` title — so the two switches can never create, report or delete each other's row. Its open sends no prompt and no interval: the stored prompt is the profile's `iterateTemplate` (edited in the settings page's *Self-iteration* group, textarea; empty falls back to the built-in default) and the interval floor is `iterateIntervalMin`. An `RSI heartbeat` delivery arrives as an ordinary schedule message that carries none of the Loop marker, so the narrow listener leaves it alone — and the row deliberately outlives the plugin (it is the repository's own beat); disarm it with the same switch or through DSH's own Automation tasks.
 
-**The workflow switch, after them.** A third dock switch, id `grok-workflow-mode`, is the `/grok on|off` toggle in clickable form: it POSTs `{"action":"status"|"set","sessionId":…,"enabled":…}` to `/grok-workflow/mode`, which reads and writes the session's own mode record — the same `plugin:grok-workflow/mode` record the slash command writes and the gate already honors, so the button and the command cannot disagree. It reads once on mount, paints only what the route read back (a refused write leaves the last state and says why), and shows the deployment `grokDefault` when the session has no record yet: the default is never restated in the UI and no second switch store exists. Off is stated three ways — the word, a hollow lamp and the unlit pill — so a grey switch never reads as "still running".
+**The workflow switch, after them.** A third dock switch, id `grok-workflow-mode`, is the `/grok on|off` toggle in clickable form: it POSTs `{"action":"status"|"set","sessionId":…,"enabled":…}` to `/grok-workflow/mode`, which reads and writes the session's own mode record — the same `plugin:grok-workflow/mode` record the slash command writes and the block intake's admission rule reads, so the button and the command cannot disagree. It reads once on mount, paints only what the route read back (a refused write leaves the last state and says why), and shows the deployment `grokDefault` when the session has no record yet: the default is never restated in the UI and no second switch store exists. Off is stated three ways — the word, a hollow lamp and the unlit pill — so a grey switch never reads as "still running".
 
 Opening a loop is one explicit browser request:
 
@@ -284,7 +270,7 @@ POST /grok-workflow/loop
 
 Only that path may open a loop. The model-facing `grok_loop` tool exposes the other two actions: `status` reads the stored loop, `close` deletes it, and `open` is refused with `loop/user-only`, so an agent can report or stop a loop but never start one on your behalf. The route also sits behind the composition's own connection fence (Host/Origin check plus browser authentication), so a cross-site or unauthenticated request is rejected before it reaches the service. A composition without the Schedule service answers `loop/unavailable` (HTTP 503) and everything else keeps working.
 
-**What a heartbeat is.** The stored prompt begins with `[grok-workflow loop]` — the marker cleanup matches on together with the title `Loop heartbeat` — and asks the round to continue this session's unfinished work from where it stopped, not redo completed steps, report and stop when the work is done, and stop and report instead of retrying after the configured number of consecutive failures. A delivery arrives with `source.kind = "schedule"`, so the workflow gate's user-message entry does not claim it: the round is a normal session turn handled by the main model, and it gets no cross-round digest from `carryover` — continuity is whatever the repository and the session already hold.
+**What a heartbeat is.** The stored prompt begins with `[grok-workflow loop]` — the marker cleanup matches on together with the title `Loop heartbeat` — and asks the round to continue this session's unfinished work from where it stopped, not redo completed steps, report and stop when the work is done, and stop and report instead of retrying after the configured number of consecutive failures. A delivery arrives with `source.kind = "schedule"` and the Loop marker, so the narrow listener reviews the brakes before the turn runs: the round itself is a normal session turn handled by the main model, and it gets no cross-round digest from `carryover` — continuity is whatever the repository and the session already hold.
 
 **Breaker semantics.** Four things bound a loop, and only one of them is a host-enforced stop:
 
@@ -306,7 +292,7 @@ Opening a loop that already exists refreshes it instead of minting a second row 
 dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 ```
 
-When disabled or absent, neither the tool nor the gate is registered; normal DSH sessions are unaffected.
+When disabled or absent, neither the tool nor the intake is registered; normal DSH sessions are unaffected.
 
 ## Parallel work and write paths
 
@@ -342,8 +328,8 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 ## If something does not work
 
 - **The tool does not appear:** restart the profile and confirm it contains the workflow engine and a subagent provider.
-- **Every answer looks like a workflow now:** that is the always-on gate plus `grokDefault: on`. Send `/grok off` to turn the toggle off for one session, or leave `grokDefault` at `off` to require an opt-in.
-- **A message is refused instead of answered:** the reason is printed (empty message or an objective over 32,000 characters). Nothing was executed and nothing will be retried automatically.
+- **You want the intake's tools gone:** set `blockIntake: false`. The narrow heartbeat listener stays either way; it is the only owner of a heartbeat's fate.
+- **A `grok_workflow` call is rejected instead of run:** the reason names the bound (an objective over 32,000 characters). No run starts and nothing is retried automatically. A *message* is never rejected.
 - **A key is rejected at load:** the message names the closest accepted key. Silent ignoring is not offered on purpose.
 - **Your DSH version differs:** the package declares `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`, and that range decides whether the bundle loads. DSH evaluates it with prereleases included (that is what lets `0.2.2-rc.3` load at all), so a `0.2.x` prerelease is admitted and `0.3.0` and above are refused — a `0.3.0` *prerelease* still satisfies `<0.3.0` and therefore loads. Behavior is verified on `0.2.1-rc.2`; on `0.2.2-rc.3` the bundle installs, activates (its row is no longer `pending`) and serves its settings namespace.
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md), the [design knowledge base](docs/knowledge/WORKFLOW-DESIGN.md) and the [acceptance checklist](docs/ACCEPTANCE.md).
@@ -366,7 +352,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` runs typecheck, lint, build and **1154 deterministic tests across 63 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+`npm run ci` runs typecheck, lint, build and **1850 deterministic tests across 98 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the message-path pass-through, the delivery path, the block intake, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, recursion, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
 
 ## Security and compatibility
 
@@ -379,13 +365,9 @@ npm run ci
 
 ## Known limitations
 
-- The confirm tier's memory lives in plugin process memory (ten minutes, consumed on use): after a
-  reload or a longer pause a bare "simple / team" is told there is no pending question, so put the
-  task and the choice in one message (DECISIONS D-024).
-- The greeting arrives with the final answer; during the run only the progress board is visible
-  (`in-turn` admits one plugin message per turn).
-- The direct tier's wording is a template with no model text in it. That is the design, not a
-  downgrade.
+- Whether a `grok_workflow` run is worth starting is the model's judgement: the plugin no longer
+  classifies a message, so nothing forces a small question through the workflow and nothing stops a
+  large one from being answered directly.
 - **Not measured with a real settings GUI:** the auto-generated page is proven to exist and to be identified by the runtime, but clicking through it in a live Web GUI, and editing a `roles` array on that page, is NOT_RUN (NR-1/NR-7/NR-8 in the [design ledger](docs/knowledge/WORKFLOW-DESIGN.md)).
 - **Planner fill-rate for `writesPaths` is not established:** in the single measured sample (with the objective explicitly asking for declarations) the planner declared nothing, so nothing was serialized. Only callers that declare their own paths get the mitigation automatically today.
 - **Real-provider failure texts are not exhaustively measured** (NR-5/NR-6): classification is a whitelist, and anything unmatched is reported as `unknown` rather than guessed.

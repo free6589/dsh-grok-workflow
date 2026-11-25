@@ -39,9 +39,9 @@ setting; it is not the default behaviour.
 
 | # | Scenario | Status | Evidence |
 |---|---|---|---|
-| S1 | Mandatory entry (opt-in since 2026-11-25): greeting, simple question and follow-up all run the full workflow | PASS (opt-in) | Historical: `test/gate.spec.ts`; real headless `scripts/e2e-headless-in-turn.sh`. **Corrected 2026-11-25 (M3.2):** the mandatory entry is no longer the default. The old front desk registers only when a profile sets `legacyGate: true`, and the default shape answers a plain message directly — real-machine soak scenario 1 recorded 0 `source.kind=grok-workflow` relay messages and the user's text verbatim in the log (`docs/knowledge/VALIDATION.md`, 2026-11-25). |
-| S2 | Answer delivered in the same turn (in-turn strategy) | PASS | `test/gate.spec.ts` in-turn suite (9 cases). |
-| S3 | Refusal and failure paths are explicit (no silent answer, no zero-output) | PASS | `test/gate.spec.ts`; `E2E_EXPECT=refusal` real headless run. |
+| S1 | Mandatory entry (opt-in since 2026-11-25): greeting, simple question and follow-up all run the full workflow | SUPERSEDED (M3.3) | **Corrected 2026-11-25 (M3.3):** the old front desk was deleted, so an ordinary message now goes straight to the model — nothing claims it, refuses it or appends a notice to it. `test/block-flag-baseline.spec.ts` pins that pass-through as bytes for eight payload shapes (all `enter`, no appended message), and the M3.2 soak had already recorded 0 `source.kind=grok-workflow` relay messages and the user's text verbatim (`docs/knowledge/VALIDATION.md`, 2026-11-25). The historical `test/gate.spec.ts` evidence went with the module. |
+| S2 | Answer delivered in the same turn (in-turn strategy) | PASS | `test/delivery.spec.ts`, `test/delivery-human-block.spec.ts`, `test/final-answer-rewrite.spec.ts`. |
+| S3 | Refusal and failure paths are explicit (no silent answer, no zero-output) | PASS | `test/failure-paths.spec.ts`, `test/delivery.spec.ts`; `scripts/e2e-headless-in-turn.sh`. The `E2E_EXPECT=refusal` variant covered the gate's over-long-message refusal, which M3.3 deleted: an over-long prompt is now delivered unchanged. |
 | S4 | Per-role model selection reaches child activation | PASS | `test/routing.spec.ts`; `test/engine-contract.spec.ts`. |
 | S5 | First successful route stops the chain; route failures switch in order | PASS | `test/routing.spec.ts`. |
 | S6 | Content failures never switch models; chain exhaustion reports honestly | PASS | `test/routing.spec.ts`, `test/failure-paths.spec.ts`. |

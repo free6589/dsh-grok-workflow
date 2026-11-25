@@ -12,6 +12,11 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { ToolRuntime } from '@deepseek-ai/dsh-tools'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Session } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
@@ -20,8 +25,7 @@ import type { GrokCommandAgent, GrokCommandDefinition, GrokCommandResult } from 
 import { apply } from '../src/index.js'
 import { isModeEnabled, readModeRecord, setMode } from '../src/mode.js'
 import { isPromptShapedArgument } from '../src/intake.js'
-import { classifyPreStep } from '../src/gate.js'
-import { resolveConfig } from '../src/config.js'
+import { canAcceptBlock } from '../src/user-source.js'
 
 /** Documented settle texts (also asserted verbatim below). */
 const ON_TEXT = 'Grok workflow ON — every message now runs the full plan→execute→verify workflow.'
@@ -49,12 +53,12 @@ const PASTED_TEAM_PROMPT = [
 
 /* --------------------------------------------------------------- fixtures -- */
 
-/** Real session (mirrors `realSession` in gate.spec.ts). */
+/** Real session, so the record is the durable one the host would persist. */
 function realSession(id: string): Session {
   return Session.create(id as never)
 }
 
-/** Minimal agent fixture (mirrors gate.spec.ts's FakeAgent): session + turn. */
+/** Minimal agent fixture: session + turn. */
 class FakeAgent {
   readonly session: Session
   readonly turn?: number | undefined
@@ -182,49 +186,80 @@ describe('grok command handler (case and whitespace tolerance)', () => {
 /**
  * The command and the settings page's master switch must never disagree.
  *
- * The settings switch persists the deployment default (`grokDefault`), and the
- * command persists the session record; `classifyPreStep` reads the record and
- * falls back to the default (src/gate.ts:521). So "both agree" is a claim about
- * one read: after `/grok on` the gate admits even with the switch stored off,
- * and after `/grok off` it passes even with the switch stored on — and the
- * record the command wrote is the record the gate read.
+ * The settings switch persists the deployment default (`grokDefault`); the command
+ * persists the session record. Since M3.3 deleted the front desk, nothing decides a
+ * *message* from that record any more — so "both agree" is a claim about the surface
+ * that still reads it: the block intake's admission rule (`canAcceptBlock`). After
+ * `/grok on` the block tools accept the session, and after `/grok off` they refuse it —
+ * and the record the command wrote is the record the rule read.
  */
 describe('grok command and the master switch read one state', () => {
-  /** One user message, classified the way the Host classifies it. */
-  function verdict(session: Session, grokDefault: 'on' | 'off'): { kind: string; reason?: string } {
-    const message = createUserMessage({
-      content: [{ type: 'text', text: 'do the thing' }],
-      source: { kind: 'user' } as never,
-    }) as UserMessage
-    return classifyPreStep(
-      { config: resolveConfig({ grokDefault }) },
-      { agent: { session }, messages: [message], turn: 1, step: 1, signal: new AbortController().signal } as never,
-    ) as { kind: string; reason?: string }
-  }
-
-  it('admits after /grok on even when the switch is stored off', () => {
+  it('admits a block after /grok on', () => {
     const session = realSession('sess-cmd-switch-on')
-    expect(verdict(session, 'off')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(canAcceptBlock(session), 'no record, no admission').toBe(false)
     invoke('on', new FakeAgent(session))
-    expect(verdict(session, 'off')).toMatchObject({ kind: 'admit' })
+    expect(canAcceptBlock(session)).toBe(true)
   })
 
-  it('passes after /grok off even when the switch is stored on', () => {
+  it('refuses a block after /grok off', () => {
     const session = realSession('sess-cmd-switch-off')
-    expect(verdict(session, 'on')).toMatchObject({ kind: 'admit' })
+    invoke('on', new FakeAgent(session))
+    expect(canAcceptBlock(session)).toBe(true)
     invoke('off', new FakeAgent(session))
-    expect(verdict(session, 'on')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(canAcceptBlock(session), 'an explicit off is never an admission').toBe(false)
   })
 
-  it('settles with the state the gate will read, and the round trip returns to the switch default', () => {
+  it('settles with the state the readers see, and the round trip returns to the switch default', () => {
     const session = realSession('sess-cmd-switch-round-trip')
     const agent = new FakeAgent(session)
     expect(invoke('OFF', agent)).toEqual({ kind: 'success', text: OFF_TEXT })
-    expect(verdict(session, 'off')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(canAcceptBlock(session)).toBe(false)
     expect(invoke('On', agent)).toEqual({ kind: 'success', text: ON_TEXT })
-    expect(verdict(session, 'off')).toMatchObject({ kind: 'admit' })
+    expect(canAcceptBlock(session)).toBe(true)
     expect(invoke('OFF', agent)).toEqual({ kind: 'success', text: OFF_TEXT })
-    expect(verdict(session, 'on')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(canAcceptBlock(session)).toBe(false)
+  })
+
+  it('no longer decides a user message: the record belongs to the intake, not the chain', async () => {
+    // M3.3 deleted the listener that read this record for admission. A user batch now
+    // enters the step with the objects the loop claimed, whether the session is on or
+    // off — the promise is "nothing stands between the user and the model".
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin({
+      name: 'stub-workflow-engine',
+      apply(inner: Context) { inner.provide('workflowEngine', { start: async () => { throw new Error('not used') } }) },
+    } as never, {} as never)
+    const previousLedger = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+    process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = mkdtempSync(join(tmpdir(), 'command-switch-'))
+    try {
+      apply(ctx as never, {})
+      const session = realSession('sess-cmd-switch-chain')
+      const messages = [createUserMessage({
+        content: [{ type: 'text', text: 'do the thing' }],
+        source: { kind: 'user' } as never,
+      }) as UserMessage]
+      const step = async (): Promise<{ kind: string, messages?: UserMessage[] }> => await ctx.waterfall(
+        'agent/pre-step',
+        { agent: { session }, messages, turn: 1, step: 1, signal: new AbortController().signal } as never,
+        async () => ({ kind: 'enter', messages }),
+      ) as { kind: string, messages?: UserMessage[] }
+
+      expect(await step()).toMatchObject({ kind: 'enter' })
+      invoke('on', new FakeAgent(session))
+      const on = await step()
+      expect(on.kind).toBe('enter')
+      expect(on.messages).toBe(messages)
+      invoke('off', new FakeAgent(session))
+      const off = await step()
+      expect(off.kind).toBe('enter')
+      expect(off.messages).toBe(messages)
+    } finally {
+      if (previousLedger === undefined) delete process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+      else process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = previousLedger
+      await ctx.fiber.dispose()
+    }
   })
 })
 

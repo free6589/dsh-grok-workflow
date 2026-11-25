@@ -327,15 +327,15 @@ describe('client settings page bundle', () => {
   // T5 slim page plus the four repeat-run keys, the two self-iteration keys,
   // the Q8 guardian model, childTimeoutMs, the mid-run replan switch and the
   // 429 switch (Sec.3-2): 15 visible FIELDS
-  // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs/childTimeoutMs,
+  // (grokDefault/maxConcurrency/maxTasks/timeoutMs/childTimeoutMs,
   // replan, the four loop keys, iterateIntervalMin, the iterateTemplate textarea and
-  // guardianModel, switchOnRateLimit) plus the 5 role chains equal the 19-leaf-key configuration
-  // surface (toolName/roles/synthesis/configVersion are structural,
-  // rendered nowhere).
+  // guardianModel, switchOnRateLimit) plus the 5 role chains equal the 19-key configuration
+  // surface (toolName/roles/synthesis/configVersion are structural and `blockIntake`
+  // is load-time only — none of them is rendered here).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 15 fields plus the 5 role chains', () => {
-    const visible = ['childTimeoutMs', 'grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
+  it('renders the visible keys: 14 fields plus the 5 role chains', () => {
+    const visible = ['childTimeoutMs', 'grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'timeoutMs',
       'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate']
@@ -1265,14 +1265,14 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(opsFor(broken, undefined)).toEqual(
       expect.arrayContaining([
         { op: 'set', path: ['grokDefault'], value: 'off' },
-        { op: 'set', path: ['mode'], value: 'triage' },
+        { op: 'set', path: ['replan'], value: true },
       ])
     )
     expect(opsFor(broken, undefined).filter(op => op.path[0] === 'roles')).toEqual([])
   })
 
   it('rejects a stored enum value outside the offered options', () => {
-    const bad = { ...draftOf(undefined), mode: 'auto' }
+    const bad = { ...draftOf(undefined), grokDefault: 'auto' }
     const findings = validate(bad)
     expect(findings.some(finding => finding.key === 'error.badEnum')).toBe(true)
     expect(messagesIn(findings, en).some(text => text.includes('options'))).toBe(true)
@@ -1392,14 +1392,14 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(validate(blank)).toEqual([])
   })
 
-  it('ships the per-route cap and mode-card copy in both languages', () => {
+  it('ships the per-route cap and number-unit copy in both languages', () => {
     for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
-      for (const key of ['roles.capPlaceholder', 'roles.capLabel', 'mode.auto.title', 'mode.auto.detail', 'mode.full.title', 'mode.full.detail', 'unit.jobs', 'unit.tasks']) {
+      for (const key of ['roles.capPlaceholder', 'roles.capLabel', 'unit.jobs', 'unit.tasks', 'unit.deadlineMinutes', 'unit.minutes']) {
         expect(translate(locale!, key), `${locale} ${key}`).not.toBe(key)
       }
     }
     expect(translate('zh', 'roles.capPlaceholder')).not.toBe(translate('en', 'roles.capPlaceholder'))
-    expect(translate('zh', 'mode.auto.title')).not.toBe(translate('en', 'mode.auto.title'))
+    expect(translate('zh', 'unit.jobs')).not.toBe(translate('en', 'unit.jobs'))
   })
 
   // T5: `switchOn` is a fixed internal policy since T4 — the page never reads
@@ -1454,7 +1454,6 @@ describe('client settings page: draft, validation and path ops', () => {
   it('follows a renamed Loader row instead of silently losing the page (t34 residual)', () => {
     const fullValue = () => ({
       grokDefault: 'off',
-      mode: 'triage',
       maxConcurrency: 10,
       maxTasks: 10,
       timeoutMs: 0,
@@ -3110,8 +3109,8 @@ describe('client composer tool row: the loop switch (one Host operation, two cal
  *
  * It sits beside auto-continue and self-iterate and touches neither: no interval, no
  * Schedule task, no `open`/`close` — only the session record `plugin:grok-workflow/mode`
- * that `src/mode.ts` owns, which is the record `src/gate.ts` reads and the record the
- * slash command writes. What is pinned here:
+ * that `src/mode.ts` owns, which is the record the block intake's admission rule reads
+ * and the record the slash command writes. What is pinned here:
  *
  * 1. **The contract with the Host.** Route path, action list and answer shape are
  *    asserted as written, so the button and the route cannot drift into two protocols.

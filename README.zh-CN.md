@@ -1,7 +1,7 @@
 # Grok Workflow for DSH
 
 <p align="center">
-  <strong>每条消息都先过前台；该上工作流的那些，才跑规划、并行执行、独立验证、如实汇报。</strong>
+  <strong>规划、并行执行、独立验证、如实汇报——需要的时候，模型调用一个工具就能拿到。</strong>
   <br />
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
@@ -13,11 +13,11 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
 </p>
 
-**Grok Workflow for DSH** 是 [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) 的外部插件。它给 DSH 的用户消息加了一道强制入口：闸门拦截每条用户消息并交给前台，由前台选定档位、并写明选的是哪一档。它也注册模型可直接调用的 `grok_workflow` 工具。
+**Grok Workflow for DSH** 是 [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) 的外部插件。它注册模型可直接调用的 `grok_workflow` 工具，以及一个可选的接单台，让模型把这项工作分成可复核的块来下单。从 `0.13.34`（M3.3）起，它在用户消息前面**什么都不放**：入口闸门和它所属的前台已经删除，消息按你写的样子原样到达模型。
 
-会话内的开关本身**默认是关的**（`grokDefault: off`）：在某一轮里发过 `/grok` 之前，这个会话的消息按普通聊天放行。开关打开后，前台逐条判定——寒暄用模板回、小问题派一个工人、只有确实需要团队的目标才跑完整工作流。
+会话内的开关（`/grok on|off`；配置默认值 `grokDefault: off` 是会话没有记录时报出的回退值）现在只管一件事：这个会话里接单台的六个工具能不能接活。它从不改变一条消息的遭遇——开或不开，消息都照样送达。
 
-你不需要写工作流脚本。安装插件、重启 profile、直接提问即可：被前台派到**团队档**的消息会做规划、执行任务、逐条对照验收标准验证，并在同一轮内给出答案。
+你不需要写工作流脚本。安装插件、重启 profile，然后提一件需要多个独立步骤的事：模型会调用 `grok_workflow`，那件事被规划、执行、逐条对照验收标准验证，并在同一轮内给出答案。
 
 ![规划、执行、验证、重试与汇报工作流](docs/images/workflow-overview.svg)
 
@@ -25,12 +25,12 @@
 
 | 需求 | 本插件的做法 |
 |---|---|
-| **每条消息前面都有一张前台** | `agent/pre-step` 闸门认领每条用户消息，前台选一档——`直答档`、`快手档`、`团队档` 或 `确认档`——并在答案第一行写明档位与理由。完整「规划→执行→验证」工作流只在**团队档**运行；不会静默退回普通直接回答。 |
+| **消息前面什么都没有** | 从 `0.13.34` 起，用户消息不会被认领、拒绝、截短或加注：`agent/pre-step` 上只剩窄心跳监听与接单台的观测，两者都不决定一条用户消息。`test/block-flag-baseline.spec.ts` 把这条放行钉成了八种 payload 的字节。 |
 | **按会话开启，且如实相告** | `grokDefault: off` 意味着一个会话在 `/grok` 开启之前就是普通聊天；`/grok off` 再关掉。开关词去掉首尾空白后不分大小写（`/grok ON`、`/grok  Off ` 都算），其它参数只回 `/grok [on|off|status]` 并且不动开关；`/grok status` 什么都不写，只报上一次运行——状态、停下的原因、守卫看到了什么、能不能从恢复点接着跑、哪些任务没做完。写不进去的开关会被报成失败，而不是被当成已生效。 |
 | **按角色选模型** | `roles.planner`、`roles.worker`、`roles.verifier`、`roles.synthesizer` 各带自己的模型。 |
 | **每角色有序备用链** | 每个角色最多 50 条路由；路由级失败会推进该角色的链，实际用到的路由会写进报告。 |
 | **可操作的设置** | 导出的 `Config` **就是** DSH 设置页：字段是活值、未知键被拒绝并给出建议、链会对照运行时真实拥有的 provider 校验。 |
-| **工作流形状可选** | `mode: 'triage'`（默认）保留前台分流；`mode: 'full'` 恢复旧规则：每条被认领的消息都跑团队。 |
+| **工作流形状可选** | 工作流形状由生成的脚本决定，不是一个配置开关：`test/engine-contract.spec.ts` 与 `test/engine-harness.ts` 走真实引擎契约来钉它；按档案改变工具面的开关只有接单台那六个工具。 |
 
 ## 一条命令安装
 
@@ -87,7 +87,7 @@ DSH 启动后，直接提问即可：
 
 > 检查这个仓库，找出两个互相独立的问题，逐条对照当前文件验证每个发现，并总结还有哪些不确定的地方。不要修改文件。
 
-在会话开关打开后（发 `/grok`；`grokDefault` 默认是 `off`），无论模型是否会调用工具，闸门都会认领这条消息。默认 `mode: 'triage'` 下先过前台：上面的长目标会走**团队档**并附一行状态（`Grok workflow: COMPLETED`、`PARTIAL` 或 `FAILED`）与已验证的任务、失败项、不确定项；而一句“今天几号”会走**快手档**、一句“你好”走**直答档**，答案第一行都写明档位与理由。想要旧行为（每条都跑团队），把 `mode` 设成 `full`。
+消息本身什么都不经历：它按你写的原样到达模型。之后由模型判断这件事要不要动用工具；一次 `grok_workflow` 调用会以一行状态（`Grok workflow: COMPLETED`、`PARTIAL` 或 `FAILED`）加上已验证的任务、失败项与不确定项收尾。寒暄或一次简单查证，模型根本不会调用这个工具。
 
 ## 工作方式
 
@@ -107,50 +107,36 @@ DSH 启动后，直接提问即可：
 - **`partial`** —— 有实质工作通过，但仍有未完成或不确定的部分。
 - **`failed`** —— 没有任何任务通过验证，或运行在产出可用报告前失败。
 
-## 强制入口：对你意味着什么
+## 消息路径：对你意味着什么
 
-- `0.10.0` 起闸门**恒开**（原先的 `enforceGate` 开关已删除），会检查每一条**用户**消息。但“是否真的动手做”是第二个开关：会话级开关的配置默认值 `grokDefault` 是 `off` —— 在那个会话里发过 `/grok` 之前，消息按普通聊天交给模型（`reason: mode-off`）。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——从不认领；空批直接放行。
+- **没有任何监听器决定一条用户消息**（M3.3）。`agent/pre-step` 上只有窄心跳监听（只对带 Loop 标记的 `source.kind === 'schedule'` 投递动手）和接单台的观测（在决策之后记录一次心跳）。其它一切——打字的一轮、回答的问题卡、webhook、子代理提示词、空批——都原样交给模型。
 - 答案在**同一轮内**到达。`0.10.0` 只剩 `in-turn` 一种投递方式——它是唯一能在一次性进程中存活的策略，原来的 `relay`、`append` 已删除。
-- 插件不会执行的消息会**明确拒绝**并给出原因（消息为空，或目标超过 32,000 字符）。不会执行任何工作，也不会自动重试。
-- 交付按消息记录：同一批消息被派发两次不会启动第二次运行；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
-- 想只保留 `grok_workflow` 工具、完全不拦截，就让 `grokDefault` 保持 `off` 且不要发 `/grok on`。要求“绝不静默降级”的部署会看到“运行时没有 `agent/pre-step` 钩子”的警告（不是静默放行）；`0.10.0` 已没有 `gateRequired` 键可以把它升成载入错误。
+- 插件不会启动的运行会**明确拒绝**并给出原因（`grok_workflow` 调用的目标超过 32,000 字符）。被拒绝的只是运行，不是**消息**。
+- 每次运行的路由换人记录在会话日志里（`recordRouting`）；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
+- 想只留那两个常驻工具、完全不要接单台，就把 `blockIntake` 设为 `false`；窄心跳监听两种情况下都在，因为它是心跳唯一的裁决者。
 
 ### 目标长度上限
 
-工作流目标上限为 **32,000 字符**，按用户消息本身计算；整条消息原样带入目标，绝不为了塞进上限而截短。
+工作流目标上限为 **32,000 字符**，按一次运行拿到的目标计算。任意长度的用户**消息**仍会原样到达模型——上限管的是目标，不是你打多少字。
 
-| 消息长度 | 行为 |
+| 目标长度 | 行为 |
 |---|---|
-| 1–4,000 字符 | 接受（与旧版本一致）。 |
-| 4,001–32,000 字符 | 接受；整条消息原样成为目标。恰好 32,000 字符时会丢弃 `Current request:` 标签而不是裁剪消息，也不再附带历史。 |
-| 32,001 字符及以上 | 明确拒绝，提示 `the message is longer than the 32000-character workflow objective limit`；不会启动任何运行。 |
+| 1–4,000 字符 | 接受。 |
+| 4,001–32,000 字符 | 接受；整个目标原样保留。 |
+| 32,001 字符及以上 | `grok_workflow` 调用被拒绝，提示里写明 32,000 字符上限；不会启动任何运行。 |
 
 其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符，任务 JSON 合计仍限 `48,000` 字符。`0.10.0` 起历史固化（`historyTurns=20` / `historyChars=20000`）；运行时限默认不限时且可配置（`timeoutMs`，`0` = 不限时）；每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段或时限。
 
 规划失败时，fallback 计划会把整个目标切成若干连续分段，每段都不超过 4,000 字符的任务文本上限；分段按序拼接后与原始目标逐字一致，因此**不会**被二次拒绝，也不会丢失任何字符。运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
 
-## 前台：四档分流，条条写明（t52）
+## 插件对一条消息做什么（以及不做什么）
 
-每条用户消息先过一个**前台**，回答的第一行永远写明走了哪一档、为什么——插件可以省钱，但不许闷着省：
+什么都不做。消息按你写的样子交给模型，插件自己的监听器只看定时心跳。消息路径上没有档位、没有迎宾、没有首行状态、也没有拒绝——那些都属于前台，`0.13.34`（M3.3）已经把前台连同配置它的 `mode`、`legacyGate` 两个键一起删除。
 
-| 档位 | 跑什么 | 花多少 |
-|---|---|---|
-| `直答档`（direct） | 闲聊用模板秒回 | 不花模型调用 |
-| `快手档`（quick） | 派一个工人，一趟做完 | 一次调用（第一次没产出时重试一次结构化调用） |
-| `团队档`（team） | 完整工作流，带开工迎宾与进度面板 | 正常的一次运行 |
-| `确认档`（ask） | 反问 `这个要动用团队吗？可回复：简单 / 团队`，并记住你的回答 | 不花模型调用 |
+留下的是工具面：
 
-任何一句 `用团队` / “use the team” 都能强制走团队档。档位措辞跟随**你消息的语言**，不跟随界面语言。
-`mode: 'full'` 恢复旧的规则（每条消息都跑团队、没有档位行、没有迎宾语）。
-
-判定的顺序就是它的正确性：`模式` → 待答/裸档位词 → 点名团队 → 寒暄 → 插件自述 → 模糊指向 →
-长目标 → **多步（先…然后、序号、顿号列表、分号、`并+动词`）** → 团队计分 → **已识别的问句形态（至少快手档，绝不用模板）** → 短而惰性（模板） → 冲突反问 → 快手。带路径、错误码或代码片段的“这个报错”按派工处理，
-不反问；只有**没有对象**的指向（“改一下那个”）才会被问回来。
-
-**两条诚实的限制。** ① 确认档的问题与你的回答存在**插件内存里，10 分钟、用后即消**，所以插件重载或隔了
-十分钟以上再回“简单 / 团队”，它会明说上一轮没有待回答的分流问题（`档位：直答档 — 上一轮没有待回答的
-分流问题…`），而不是猜你在回答什么。② 迎宾语随最终回答一起到达，不是先到：`in-turn` 下一轮只允许一条
-插件消息，所以运行期间你能看到的是进度面板。
+- **`grok_workflow`** —— 模型带着一个目标（也可以带自己拆好的任务表）调用它。运行会规划、并行执行、逐条对照验收标准验证、在有界范围内重试，最后报 `completed` / `partial` / `failed`。
+- **接单台** —— 六个 `grok_*` 工具，让模型把工作拆成 1–3 个可复核的块来下单，并用一本持久账本记下批准了什么、判了什么。默认打开（`blockIntake: true`），一个键就能关。
 
 ## 按角色配置模型与备用链
 
@@ -197,13 +183,12 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为二十一个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键、守卫判停单路由 `guardianModel`、接单台开关 `blockIntake` 与旧闸门开关 `legacyGate`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十九个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键、守卫判停单路由 `guardianModel` 与默认打开的接单台开关 `blockIntake`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"。M3.3 之前负责路由用户消息的两个键 `mode` 与 `legacyGate` 已移除：补丁里还带着它们会直接报 `removed configuration key`：
 
 ```yaml
 - id: grok-workflow
   config:
     toolName: grok
-    mode: triage
     grokDefault: 'on'
     synthesis: layered
     maxConcurrency: 10
@@ -217,7 +202,6 @@ DSH 启动后，直接提问即可：
 | 键 | 默认值 | 硬上限 | 含义 |
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | 正则 `^[a-z][a-z0-9_]{1,40}$` | 面向模型的工具名（注册时固定） |
-| `mode` | `triage` | `triage` \| `full` | `triage`：前台选一档并写明（设置页显示为 `auto`）。`full`：每条消息都跑团队 |
 | `grokDefault` | `off` | `on` \| `off` | 会话没有 `/grok` 记录时的默认：`off` 不碰普通对话，`on` 认领每条用户消息 |
 | `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer, supervisor }` 有序链；串行监督在检查之后运行，只能判失败、不能判通过；同时常驻并行监护盯着每个子代理是否卡住（见下） |
 | `guardianModel` | 空路由 | `{provider?, model?}` 各 ≤120 字 | 判停单路由（非链）：子代理卡死先取证再判，判 `wait` 最多延长 5 分钟×2 且不越过运行死线；留空 = 不判停，超时直接按失败重试 |
@@ -233,14 +217,13 @@ DSH 启动后，直接提问即可：
 | `loopFailStreak` | `3` | `20` | 心跳文案里请这一轮「连败这么多轮就停」的数字。Host 只记录投递、不记录单轮成败，所以这是带进轮次的提示，不是 Host 强制的计数器 |
 | `loopIntervalMin` | `0`（`0` = 用循环自己的下限） | `10080`（七天） | 两轮之间的分钟数。实际等待不会低于一轮最坏耗时、也不低于 60 分钟，所以 `0` 是「上一轮跑完就接上」，不是「立刻开始」 |
 | `iterateIntervalMin` | `0`（`0` = 用心跳自己的下限） | `10080`（七天） | 自迭代心跳之间的分钟数，下限语义与 `loopIntervalMin` 相同：不低于一轮最坏耗时、也不低于 60 分钟 |
-| `iterateTemplate` | 内置默认，即 `docs/iterate-template.md` | 最多 4000 字符 | 「自迭代」开关武装心跳时，存进 `RSI heartbeat` 调度任务的整段提示词。纯空白回退到内置默认。内置默认就是 `docs/iterate-template.md` 里的轮次提示词（POOL 优先选题、R1–R6、三重评审、四道刹车、禁区），`test/iterate-template.spec.ts` 保证文件与常量逐字节一致。在设置页「自迭代」分组的文本框里编辑、随档案保存；不带路由标记，编辑它不会改变门禁路由 |
-| `blockIntake` | `false` | `true` \| `false` | 是否挂上接单台：六个 `grok_*block*`/`grok_steer`/`grok_stop` 工具、判一个块交工的监工，以及接单台自己的那个心跳 `agent/pre-step` 观测。它是载入期开关（工具在载入时注册一次），因此不投影到设置页。关掉时一个块工具都不注册、接单台观测也不装，没要这个功能的档案保持原有工具面；决定心跳去留的窄监听不属于这个开关（每次载入都有），接单台也从不改变路由决策——它的观测把决策原样传下去 |
-| `legacyGate` | `false` | `true` \| `false` | 是否注册旧闸门。默认关闭：闸门整段不注册，一次载入里的 `agent/pre-step` 只剩窄心跳监听，而它是心跳唯一的裁决者。打开是显式选择：把旧闸门装回来，但只管用户消息的路由——它不决定任何心跳，因为窄监听装在最外层，被停下的心跳在闸门被调用之前就已经回了 `reject`。它是载入期开关（监听不能热插拔），因此不投影到设置页 |
+| `iterateTemplate` | 内置默认，即 `docs/iterate-template.md` | 最多 4000 字符 | 「自迭代」开关武装心跳时，存进 `RSI heartbeat` 调度任务的整段提示词。纯空白回退到内置默认。内置默认就是 `docs/iterate-template.md` 里的轮次提示词（POOL 优先选题、R1–R6、三重评审、四道刹车、禁区），`test/iterate-template.spec.ts` 保证文件与常量逐字节一致。在设置页「自迭代」分组的文本框里编辑、随档案保存；不带路由标记，编辑它不会改变一条投递被当成什么 |
+| `blockIntake` | `true` | `true` \| `false` | 是否挂上接单台：六个 `grok_*block*`/`grok_steer`/`grok_stop` 工具、判一个块交工的监工，以及接单台自己的那个心跳 `agent/pre-step` 观测。M3.3 起默认打开，什么都不写的档案也能拿到这些工具。它是载入期开关（工具在载入时注册一次），因此不投影到设置页。设为 `false` 时一个块工具都不注册、接单台观测也不装，只留那两个常驻工具；决定心跳去留的窄监听不属于这个开关（每次载入都有），接单台也从不改变路由决策——它的观测把决策原样传下去 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
 
-其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设，闸门恒开（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 开关已删除）。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
 
 **从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
 
@@ -260,9 +243,9 @@ DSH 启动后，直接提问即可：
 
 **输入框下面那个开关。** 轮数上限和间隔来自上面这几个存下来的键，花掉它们的开关在输入框下面那条 dock 里——槽位 `conversation.composer.dock`，id `grok-workflow-loop`。它挂载时用 `status` 读一次、之后不轮询，读取期间点不动；点击会为当前会话发 `open` 或 `close`，自己不另带数字：规则按存下来的 `loopIntervalMin`、`loopMaxRounds`、`loopFailStreak` 生成。被拒绝的点击不会翻面——它把上一次知道的状态留在页面上，并说明这次点击为什么没生效。这个开关是下面那条路由的调用方，不是第二套实现：同一条持久行、同一批服务方法。
 
-**它旁边的「自迭代」开关。** 第二个 dock 开关，id `grok-workflow-iterate`，POST 到 `/grok-workflow/iterate`，驱动第二个服务实例——它的槽位是 `RSI heartbeat` 这个保留标题，所以两个开关永远不会创建、读取或删除对方的行。它的 `open` 不带 prompt 也不带间隔：存进去的提示词就是档案里的 `iterateTemplate`（在设置页「自迭代」分组的文本框编辑；纯空白回退内置默认），间隔下限是 `iterateIntervalMin`。`RSI heartbeat` 的投递按普通调度消息放行——门禁的循环路由从不认领它——而且这一行刻意比插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
+**它旁边的「自迭代」开关。** 第二个 dock 开关，id `grok-workflow-iterate`，POST 到 `/grok-workflow/iterate`，驱动第二个服务实例——它的槽位是 `RSI heartbeat` 这个保留标题，所以两个开关永远不会创建、读取或删除对方的行。它的 `open` 不带 prompt 也不带间隔：存进去的提示词就是档案里的 `iterateTemplate`（在设置页「自迭代」分组的文本框编辑；纯空白回退内置默认），间隔下限是 `iterateIntervalMin`。`RSI heartbeat` 的投递是不带 Loop 标记的普通调度消息，所以窄监听不会动它——而且这一行刻意比插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
 
-**再接一个「workflow总开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是门控本来就读的那条，所以按钮和命令不会各说一套。挂载时读一次，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示部署默认值 `grokDefault`，默认值不在 UI 里重述，也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
+**再接一个「workflow总开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是接单台准入规则读的那条，所以按钮和命令不会各说一套。挂载时读一次，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示部署默认值 `grokDefault`，默认值不在 UI 里重述，也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
 
 打开一个循环是一次显式的浏览器请求：
 
@@ -273,7 +256,7 @@ POST /grok-workflow/loop
 
 只有这条路径能打开循环。面向模型的 `grok_loop` 工具只提供另外两个动作：`status` 读已存的循环，`close` 删掉它，`open` 会以 `loop/user-only` 被拒绝——代理可以报告或停掉循环，但不能替用户开一个。这条路由还站在宿主自己的连接闸门后面（Host/Origin 校验 + 浏览器认证），跨站或未认证的请求在到达服务前就被拒。没有装配 Schedule 服务的组合会返回 `loop/unavailable`（HTTP 503），插件其余部分照常工作。
 
-**心跳是什么。** 存下来的文案以 `[grok-workflow loop]` 开头——清理时按这个标记加标题 `Loop heartbeat` 认领自己的行——并要求这一轮接着做本会话没做完的事、不重做已完成的步骤、做完就报告并停下、以及连续失败到配置的轮数就停下报告而不是继续重试。投递到达时带的是 `source.kind = "schedule"`，所以工作流闸门「每条用户消息」的入口不会认领它：这一轮是由主模型处理的普通会话回合，也拿不到 `carryover` 的跨轮摘要——连续性靠的是仓库和本会话已有的内容。
+**心跳是什么。** 存下来的文案以 `[grok-workflow loop]` 开头——清理时按这个标记加标题 `Loop heartbeat` 认领自己的行——并要求这一轮接着做本会话没做完的事、不重做已完成的步骤、做完就报告并停下、以及连续失败到配置的轮数就停下报告而不是继续重试。投递到达时带的是 `source.kind = "schedule"` 与 Loop 标记，所以窄监听会在这一轮跑起来之前先审刹车；这一轮本身是由主模型处理的普通会话回合，也拿不到 `carryover` 的跨轮摘要——连续性靠的是仓库和本会话已有的内容。
 
 **什么时候停（breaker）。** 四样东西约束一个循环，其中只有一条是宿主强制的：
 
@@ -295,7 +278,7 @@ POST /grok-workflow/loop
 dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 ```
 
-停用或未安装时，工具与闸门都不会注册；普通 DSH 会话不受影响。
+停用或未安装时，工具与接单台都不会注册；普通 DSH 会话不受影响。
 
 ## 并行任务与写入路径
 
@@ -327,7 +310,7 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 ## 出问题时
 
 - **工具没出现：** 重启 profile，并确认它包含工作流引擎与子代理 provider。
-- **现在每个回答都像工作流：** 这是恒开闸门叠加 `grokDefault: on` 的效果；发 `/grok off` 只关掉那个会话的开关，或者让 `grokDefault` 保持 `off`（要求显式开启）。
+- **想把接单台的工具有关掉：** 把 `blockIntake` 设为 `false`。窄心跳监听两种情况下都在，它是心跳唯一的裁决者。
 - **消息被拒绝而不是被回答：** 原因会被打印（消息为空，或目标超过 32,000 字符）。没有执行任何工作，也不会自动重试。
 - **某个键在载入时被拒绝：** 错误信息会给出最接近的合法键。静默忽略是有意不提供的。
 - **DSH 版本不同：** 包声明的是 `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`，bundle 是否载入由这个区间决定。DSH 评估该区间时**包含预发布版本**（正因如此 `0.2.2-rc.3` 才装得上）：`0.2.x` 的预发布版被接受，`0.3.0` 及以后被拒绝——但 `0.3.0` 的**预发布**版仍满足 `<0.3.0`，因此仍会载入。行为在 `0.2.1-rc.2` 上验证；在 `0.2.2-rc.3` 上该 bundle 可安装、能激活（行不再是 `pending`）并对外提供设置命名空间。
@@ -351,7 +334,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` 依次运行 typecheck、lint、build 与**63 个文件 / 1154 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、闸门与交付路径、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、重复启动、递归、上下文边界、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+`npm run ci` 依次运行 typecheck、lint、build 与**98 个文件 / 1850 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、消息路径的放行、交付路径、接单台、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、递归、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
 
 ## 安全与兼容性
 
@@ -364,10 +347,7 @@ npm run ci
 
 ## 已知限制
 
-- 确认档的记忆只在插件进程内存里（10 分钟、用后即消）：重载或超时后，裸“简单 / 团队”会得到
-  “上一轮没有待回答的分流问题”的回答，需要把任务与选择写在一起（DECISIONS D-024）。
-- 迎宾语与最终回答同批到达，运行期间只有进度面板可见（`in-turn` 一轮一条插件消息）。
-- 直答档的措辞是模板，不含模型生成的内容；这是设计，不是降级。
+- 一次 `grok_workflow` 运行值不值得开，是模型的判断：插件不再对消息做分流，所以既没有东西逼着一句小问题走工作流，也没有东西阻止一个大目标被直接答掉。
 - **未在真实设置 GUI 中实测：** 自动生成页面的存在与运行时识别已有证据，但在活的 Web GUI 中点击操作、以及在该页面编辑 `roles` 数组，均为 NOT_RUN（设计台账中的 NR-1/NR-7/NR-8）。
 - **`writesPaths` 的规划器填充率尚无结论：** 唯一一次实测（目标明确要求声明）中规划器没有声明，因此没有发生串行化。目前只有调用方自己声明路径时才会自动获得缓解。
 - **真实 provider 的失败文案未穷尽实测**（NR-5/NR-6）：归类是白名单，未匹配的一律如实记为 `unknown`，不做猜测。

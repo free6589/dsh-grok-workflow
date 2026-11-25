@@ -13,7 +13,6 @@ import {
 } from '../src/carryover.js'
 import type { CarryoverRound } from '../src/carryover.js'
 import { resolveConfig } from '../src/config.js'
-import { composeObjective } from '../src/history.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { execution, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript, taskFromPrompt } from './helpers.js'
@@ -222,60 +221,7 @@ describe('the inheritance budget', () => {
   })
 })
 
-describe('the objective the gate composes carries the inherited work', () => {
-  it('attaches the digest under its own budget and keeps the request whole', () => {
-    const digest = buildInheritanceDigest([round({
-      tasks: [
-        { id: 'a', status: 'verified', title: 'Lexer', conclusion: 'tokenizes input' },
-        { id: 'b', status: 'failed', title: 'Parser' },
-      ],
-    })])
-    const composed = composeObjective('Conversation so far:\nUser: earlier', 'now do the rest', 4_000, digest)!
-    expect(composed).toContain(INHERITANCE_PREFIX)
-    expect(composed).toContain('retain (generation 1): a')
-    // Order is oldest → newest: inherited work, then history, then the request.
-    expect(composed.indexOf(INHERITANCE_PREFIX)).toBeLessThan(composed.indexOf('Conversation so far'))
-    expect(composed.indexOf('Conversation so far')).toBeLessThan(composed.indexOf('Current request:'))
-    expect(composed.endsWith('now do the rest')).toBe(true)
-    expect(composed.length).toBeLessThanOrEqual(4_000)
-  })
-
-  it('gives way with the oldest block first: history shrinks before an inherited line', () => {
-    const digest = buildInheritanceDigest([round({
-      tasks: [{ id: 'keepme', status: 'verified', title: 'Lexer', conclusion: 'tokenizes input' }],
-    })])
-    const history = 'Conversation so far (context only):\n' + Array.from({ length: 60 }, (_, index) => `User: line ${index} ${'z'.repeat(60)}`).join('\n')
-    const composed = composeObjective(history, 'finish it', 4_000, digest)!
-    expect(composed.length).toBeLessThanOrEqual(4_000)
-    // The inherited decision survives the squeeze; the transcript is the block cut.
-    expect(composed).toContain('keepme')
-    expect(composed).toContain('retain (generation 1): keepme')
-    expect(composed).toContain('…')
-    expect(composed.endsWith('finish it')).toBe(true)
-  })
-
-  it('never shortens the request to make room for inherited work', () => {
-    const digest = buildInheritanceDigest([round({
-      tasks: Array.from({ length: 40 }, (_, index) => ({
-        id: `n${String(index).padStart(2, '0')}`,
-        status: 'verified' as const,
-        title: `Task ${index}`,
-      })),
-    })])
-    const request = 'r'.repeat(3_500)
-    const composed = composeObjective('h'.repeat(1_000), request, 4_000, digest)!
-    // The request is the block that must arrive whole; the inherited block is what
-    // gives way, and it is trimmed from its old end, never cut mid-line.
-    expect(composed.endsWith(request)).toBe(true)
-    expect(composed.length).toBeLessThanOrEqual(4_000)
-    expect(composed).toContain(INHERITANCE_PREFIX)
-    expect(composed).toContain('n39 ')
-    expect(composed).not.toContain('n00 ')
-    for (const lineText of composed.split('\n')) {
-      expect(lineText.length).toBeLessThanOrEqual(4_000)
-    }
-  })
-
+describe('the inherited block reaches the prompts once, and the header cannot drift', () => {
   it('keeps the inherited header identical in the host digest and the generated script', () => {
     // Both sides ask "does the objective already carry this block?" — a drifted
     // prefix would make the planner print the same list twice.
@@ -331,10 +277,12 @@ describe('A1: a steering round carries the verified work instead of redoing it',
     const digest = buildInheritanceDigest([round({
       tasks: [{ id: 'a', status: 'verified', title: 'Lexer', conclusion: 'tokenizes input' }],
     })])
-    // The gate shape: the digest is inside the objective (composeObjective) *and*
-    // travels as an arg for the worker prompt. The planner reads the objective, so
-    // the arg must not be printed a second time there.
-    const objective = composeObjective('', 'Ship the parser', 32_000, digest)!
+    // Two carriers can meet: an objective that already carries the block (written out
+    // literally here — the plugin stopped composing it when `src/history.ts` went with
+    // the front desk, but a caller can still hand one in) and the `inheritance` arg the
+    // script prints for the worker. The planner reads the objective, so the arg must not
+    // be printed a second time there.
+    const objective = `${digest}\n\nCurrent request: Ship the parser`
     expect(objective).toContain(INHERITANCE_PREFIX)
     // No caller tasks: the planner runs and plans `a`, so both prompts exist.
     const request = buildWorkflowRequest(objective, undefined, config)
