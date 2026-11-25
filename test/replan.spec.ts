@@ -4,7 +4,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { resolveConfig } from '../src/config.js'
 import { REPLAN_LIMITS, mergeReplan, replanMergeSource } from '../src/replan.js'
-import type { ReplanState } from '../src/replan.js'
+import type { ReplanEdit, ReplanState } from '../src/replan.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import type { RunOutcome, WorkflowLogger } from '../src/run.js'
@@ -191,6 +191,35 @@ describe('merge API: what a boundary may change', () => {
     const request = { version: 2, edits: [{ action: 'add' as const, task: normalized('d') }] }
     expect(guest(state(), request)).toEqual(mergeReplan(state(), request))
   })
+
+  it('reads a task body written beside "action" (a live boundary wrote one there)', () => {
+    // The words are the live boundary child's own, copied out of the 2026-11-26 soak
+    // (`soak-pull-and-merge.txt`): it put id/title/objective beside `action` instead
+    // of under `task`, and the merge refused a demand it had understood.
+    const flat = {
+      action: 'add' as const,
+      id: 'task-4',
+      title: '报告 CHANGELOG 与 README 行数差值',
+      objective: '基于已统计的 README.md 与 CHANGELOG.md 行数，计算两者行数差值（CHANGELOG - README）并在最终报告中额外给出',
+      expectedOutput: '一行差值，带算式',
+      acceptanceCriteria: ['差值等于 CHANGELOG 行数减 README 行数'],
+      dependsOn: ['b'],
+    } as ReplanEdit & Record<string, unknown>
+    const outcome = mergeReplan(state(), { version: 2, edits: [flat] })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.addedTaskIds).toEqual(['task-4'])
+    expect(outcome.waves.map(wave => wave.map(item => item.id))).toEqual([['b'], ['c'], ['task-4']])
+    expect(outcome.waves[2]![0]!.title).toBe('报告 CHANGELOG 与 README 行数差值')
+    // Lifting is about the nesting level only: the dependency the same child made up
+    // ("changelog_count" is a name it invented, no task has that id) is still refused
+    // and named, because a silently dropped dependency is a task that runs too early.
+    const invented = { ...flat, dependsOn: ['changelog_count'] }
+    const refused = mergeReplan(state(), { version: 2, edits: [invented] })
+    expect(refused.ok).toBe(false)
+    if (refused.ok) return
+    expect(refused.reason).toMatch(/depends on unknown task changelog_count/)
+  })
 })
 
 describe('steering queue: bounded, consumed exactly once', () => {
@@ -325,6 +354,76 @@ describe('script: a demand merged at a wave boundary does not restart the round'
     expect(run.calls.filter(call => roleOf(call.label) === 'planner')).toHaveLength(1)
     expect(run.report.plan.version).toBe(1)
     expect(run.report.plan.replans).toEqual([])
+  })
+
+  /**
+   * The two cases below replay, word for word, the answer a live boundary child
+   * gave on 2026-11-26 (`.rsi/evidence/inbox-steering-2026-11-26/soak-pull-and-merge.txt`).
+   * It had read the queued demand correctly and argued it correctly; the merge still
+   * refused, because the task's own fields sat beside `action` instead of under
+   * `task` and two mandatory fields were never written at all. Those are two
+   * different faults and the plan answers them differently: the nesting is lifted,
+   * the missing content is refused with the field named.
+   */
+  const LIVE_BODY = {
+    id: 'task-4',
+    title: '报告 CHANGELOG 与 README 行数差值',
+    objective: '基于已统计的 README.md 与 CHANGELOG.md 行数，计算两者行数差值（CHANGELOG - README）并在最终报告中额外给出',
+  }
+  const LIVE_REASON = '新增差值报告需求依赖两文件的行数统计，将其作为依赖 changelog_count 的新收尾任务追加，不改动已沉淀任务。'
+
+  it('lifts a task body written beside "action" and runs the added task', async () => {
+    const run = await runWorkflowScript(
+      WORKFLOW_SCRIPT,
+      replanArgs(),
+      scripted(
+        { waves: [[planTask('a')], [planTask('b')], [planTask('c')]] },
+        [
+          {
+            action: 'apply',
+            reason: LIVE_REASON,
+            // The live shape: the body's fields live on the edit, not under `task`.
+            edits: [
+              { ...LIVE_BODY, action: 'add', expectedOutput: '一行差值，带算式', acceptanceCriteria: ['差值等于 CHANGELOG 行数减 README 行数'], dependsOn: ['c'] },
+            ],
+          },
+          { action: 'none', reason: 'nothing new' },
+        ],
+      ),
+    )
+    expect(run.report.plan.version).toBe(2)
+    expect(run.report.plan.replans?.[0]?.decision).toBe('applied')
+    expect(run.report.plan.replans?.[0]?.addedTaskIds).toEqual(['task-4'])
+    expect(run.report.plan.waves).toEqual([['a'], ['b'], ['c'], ['task-4']])
+    const workerIds = run.calls.filter(call => roleOf(call.label) === 'worker').map(call => taskFromPrompt(call.prompt).id)
+    expect(workerIds).toEqual(['a', 'b', 'c', 'task-4'])
+    expect(run.report.tasks.map(row => row.status)).toEqual(['verified', 'verified', 'verified', 'verified'])
+  })
+
+  it('refuses the same answer for the content it never wrote, not for where it wrote it', async () => {
+    const run = await runWorkflowScript(
+      WORKFLOW_SCRIPT,
+      replanArgs(),
+      scripted(
+        { waves: [[planTask('a')], [planTask('b')]] },
+        [
+          {
+            action: 'apply',
+            reason: LIVE_REASON,
+            edits: [{ ...LIVE_BODY, action: 'add', dependsOn: ['changelog_count'] }],
+          },
+        ],
+      ),
+    )
+    expect(run.report.plan.version).toBe(1)
+    const decision = run.report.plan.replans?.[0]
+    expect(decision?.decision).toBe('rejected')
+    // The nesting was tolerated (no "no body"), and the refusal names what is
+    // missing: a task with no expected output and no criterion cannot be verified.
+    expect(decision?.reason).not.toMatch(/no body/)
+    expect(decision?.reason).toMatch(/missing or unusable: expectedOutput, acceptanceCriteria/)
+    expect(run.report.status).toBe('completed')
+    expect(run.report.tasks.map(row => row.status)).toEqual(['verified', 'verified'])
   })
 })
 
