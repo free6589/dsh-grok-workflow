@@ -1,3 +1,39 @@
+## 2026-11-25 — `0.13.37` 已发布：两次门禁跑绿、标签与 GitHub Release 都在，live 档案升级按 `BLOCKED` 交给操作者
+
+- **From:** 记忆收口（`agent-165/memory-closeout`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：**发布轮，不是代码轮**。分支 `release/0.13.37`（worktree `.tmp/wt-release-0.13.37`）从 `main` 尖端 **`d34214b`** 开出，
+  先用真 `--no-ff` 把 `fix/switch-default-state`（尖端 `9d234c2`）折进来——合并提交 **`5c58afd`**，**零冲突**，合并树
+  `50d7eca3…` 与分支树逐字节相同——然后一个发布提交 **`34236f0`** `chore(release): prepare v0.13.37`（**8 文件 / +38 −20**，树 `71ffdb66…`）。
+  `src/` 与 `lib/` 只改了版本字面量那一对，没有一行逻辑。
+- **`main` 是快进前进的**：`git merge --ff-only release/0.13.37`，所以 `main` 尖端**就是**跑门禁的那个提交、也是标签剥出来的那个
+  （`git diff --stat release/0.13.37 main` 为空）；推送 `d34214b..34236f0  main -> main`。特性分支的 `--no-ff` 折入仍在历史里。
+- **门禁读数（两次，都 `EXIT=0`，`TMPDIR=$PWD/.tmp npm run ci` 在发布 worktree 里跑）**：
+  `5c58afd` 上 `98 files / 1849 tests`、`15 warnings / 0 errors`、`client bundle: 333611 bytes`、`lib/ at 5c58afd … (281 files, byte-identical)`、
+  `Duration 85.82s`；**`34236f0` 上（这一遍就是发布门禁）同上，`Duration 88.35s`**。六个文档守卫 `6 files / 80 tests` PASS。
+  逐行读数见 `VALIDATION.md` 同日条。
+- **远端（`CONFIRMED`，本轮用 `gh` 重读过）**：Release run **`45577666102`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45577666102 ；`main` 的 CI run **`45577662548`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45577662548 。
+  Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.37 ，`Grok Workflow for DSH v0.13.37`，
+  发布 `2026-11-25T08:37:20Z`，target `main`，非 draft、非 prerelease，唯一资产 **`dsh-grok-workflow-0.13.37.tgz` = 947407 字节**。
+  标签 `v0.13.37` = 附注对象 `235fa3e…` → `34236f0`；**没有移动任何已发布标签**（`v0.13.35` → `ffbb6b0`、`v0.13.36` → `26dc370`，`git ls-remote` 重读过）。
+- **live 档案升级没做，记 `BLOCKED`（不是失败），只有这两条理由**：
+  1. live 档案 `/home/fish/.dsh/profiles/web/cordis.patch.yml` 的 `grok-workflow` 行下**第 563 行仍是 `mode: triage`**（该文件没有 `legacyGate`），
+     `mode` 自 `0.13.35` 起就是被删的键——现在把 0.13.37 装上去，那一行会**拒绝激活**、工作流从界面消失。**先删这一行，再升级。**
+  2. 本会话文件策略是 `workspace-write`，`~/.dsh` 在工作区之外，从这里连写都不可能。
+  另：live 仍声明**浮动**依赖 `github:free6589/dsh-grok-workflow`（无标签），读回已装 **`0.13.35`**；`~/.dsh` 与 `~/.dsh/profiles`
+  前后尺寸 / mtime 同值，**未写、未重载、未重启**。
+- **环境陷阱（踩过，记住）**：新开的发布 worktree 没有 `node_modules`，第一次门禁在 `verify:lib` 里炸
+  （`Cannot find module …/verify-lib-*/node_modules/typescript/bin/tsc`），而 `typecheck` / `lint` 是靠 PATH 借父检出的
+  `node_modules/.bin` **悄悄过去的**。**任何发布 worktree 先自己 `npm ci --prefer-offline`，门禁才有意义。**
+- **下一个接手的人必须知道（一条，最要紧）**：开关与路由 / `/grok status` / 设置页**现在会显示不同的字，这是故意的**（`D-154`）——
+  开关报**这个会话自己的记录**（没记录就 `未开 · 还没设过`），路由与设置页报**有效值**。谁想「对齐」两边，先读 `D-154` 与
+  `test/mode-surface.spec.ts` 里那条 divergence 用例；对齐会把「界面说开着、工具说没开」那个矛盾放回来。
+- **收尾状态（按观察到的事实，不按口述）**：派单说两个 worktree 与两条本地分支都已清；**记下这一条时 `git worktree list` /
+  `git branch` 仍看到 `.tmp/wt-release-0.13.37`、`.tmp/wt-switch-default`、`release/0.13.37`、`fix/switch-default-state`**，
+  门禁日志也还在前者的 `.tmp/` 里。**清理留给下一位，别当成已完成。** 主检出唯一改动是与发布无关的 `.gitignore` 本地设计稿规则，
+  从未暂存。
+
 ## 2026-11-25 — 红二修完：没有记录的会话，开关不再显示「开」（`fix/switch-default-state`，`57b5723`）：路由与接单台准入一个字没动
 
 - **From:** 实现手（`agent-164/impl-switch-default`）· **To:** 操作者 / 下一个接手者

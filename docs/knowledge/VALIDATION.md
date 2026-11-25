@@ -1,3 +1,49 @@
+## `0.13.37` 发布收口：两次门禁、快进合流、标签、两条远端 run、Release 与资产；live 档案升级 `BLOCKED` — 2026-11-25 (`CONFIRMED`)
+
+发布轮，不是代码轮。发布分支 **`release/0.13.37`**（worktree `.tmp/wt-release-0.13.37`），从 `main` 尖端 **`d34214b`** 开出；
+合并提交 **`5c58afd`**（父 `d34214b` + `9d234c2`），发布提交 **`34236f0`**，标签 **`v0.13.37`**。
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被外部条件挡住的写 `BLOCKED`。
+**标注规则**：标 `包工头跑` 的行是发布执行方那边跑出来、本轮记录者**没有重跑**的读数（其中两条门禁读数是本轮从它留下的日志里逐行核对过的）；
+标 `本轮自查` 的行是本轮亲手跑的。**本轮没有执行任何测试套件**（按派单要求：只读日志与 git 对象）。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 发布提交与改动面（本轮自查） | `git show --stat 34236f0`；`git rev-parse 34236f0^{tree}`（主检出，`main`） | **`8 files changed, 38 insertions(+), 20 deletions(-)`**：`CHANGELOG.md` **+18**、`README.md` 5/5、`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、`package-lock.json` 2/2、`package.json` 1/1、`src/client/index.js` 2/2；头部 `34236f0 chore(release): prepare v0.13.37`。树 **`71ffdb665bc6196e8b91c6bf3f455ad24cff8ee5`**。**`CONFIRMED`** |
+| 合并提交与零冲突（本轮自查） | `git rev-list --parents -n1 5c58afd`；`git rev-parse 5c58afd^{tree} 9d234c2^{tree}`；`git diff --stat 9d234c2 5c58afd` | 父提交 **`d34214b` + `9d234c2`**（`fix/switch-default-state` 尖端）；合并树与分支树**同一个** **`50d7eca335b182d548b8a8bdab02d3ba10dd4e00`**；`git diff --stat` **空输出**。合并没往里加任何东西——特性分支严格领先 `main`，所以零冲突。**`CONFIRMED`** |
+| `main` 是快进，不是第二个合并提交（本轮自查） | `git rev-parse main`；`git diff --stat release/0.13.37 main`；`git ls-remote origin refs/heads/main` | `main` = **`34236f0c7e…`**（就是跑门禁、也是标签剥出来的那个提交）；`release/0.13.37` 与 `main` 的 diff **空**；远端 `refs/heads/main` = **`34236f0c7e…`**，推送已落地。推送原文 `d34214b..34236f0  main -> main`（包工头跑）。**`CONFIRMED`** |
+| 标签指向与已发布标签未被移动（本轮自查） | `git for-each-ref refs/tags/v0.13.37 --format='%(objecttype) %(objectname) %(*objectname)'`；`git show v0.13.37^{}:package.json`；`git rev-parse v0.13.35^{} v0.13.36^{}`；`git ls-remote --tags origin` | **`tag 235fa3e3ab2b1f1f7815ba16b905d53c60da8d3f 34236f0c7ebed22cc50f4b58ddaab10376275489`**——附注标签对象 `235fa3e`，剥出的正是 `34236f0`；`package.json` 读 **`"version": "0.13.37"`**。远端：`v0.13.35^{}` = **`ffbb6b0`**、`v0.13.36^{}` = **`26dc370`**、`v0.13.37^{}` = **`34236f0`**——**旧标签一个都没被移动**，新标签是 `* [new tag]`（包工头跑）。**`CONFIRMED`** |
+| 门禁 #1（包工头跑，日志本轮逐行核对） | `TMPDIR=$PWD/.tmp npm run ci`（发布 worktree，合并提交 `5c58afd` 这棵树；日志 `.tmp/ci-second.log`） | **EXIT=0**：`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`、`lib/ at 5c58afd is the build of src/ at 5c58afd (281 files, byte-identical)`、`Test Files 98 passed (98)` / **`Tests 1849 passed (1849)`**、**`Duration 85.82s`**。**`CONFIRMED`** |
+| 门禁 #2（包工头跑，**这一遍就是发布门禁**，日志本轮逐行核对） | `TMPDIR=$PWD/.tmp npm run ci`（发布 worktree，发布提交 `34236f0` 这棵树；日志 `.tmp/ci-release-34236f0.log`，日志头部读 `dsh-grok-workflow@0.13.37 ci`） | **EXIT=0**：`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`、`lib/ at 34236f0 is the build of src/ at 34236f0 (281 files, byte-identical)`、`Test Files 98 passed (98)` / **`Tests 1849 passed (1849)`**、**`Duration 88.35s (transform 1.91s, setup 0ms, import 7.44s, tests 69.46s, environment 11ms)`**。**`CONFIRMED`** |
+| 用例增量与体积的算术（本轮自查，本轮只读 git 对象） | `git ls-tree -r --name-only main -- test \| grep -c '\.spec\.ts$'`（`main` 与 `d34214b` 各一次）；`git show d34214b:test/client.spec.ts \| grep -c 'it('` 与 `test/mode-surface.spec.ts` 同法，两个提交各跑一次 | `d34214b` 与 `34236f0` 都是 **98 个 spec 文件**——一个没增、没删，改的是其中两个（`test/client.spec.ts`、`test/mode-surface.spec.ts`）。用例数 **1845 → 1849（+4）**，其中 `client.spec.ts` 的 `it(` **144 → 147**、`mode-surface.spec.ts` **24 → 25**（包工头跑的数；**我这边的粗数 `grep -c 'it('` 是 148 → 151，增量同为 +3，差的 4 是计数口径差**，绝对数以包工头口径为准）。`lib/client.js` **331626 → 333611** 字节（特性分支的 +1985），warnings 与基线同数仍 15。**`CONFIRMED`** |
+| 六个文档守卫（包工头跑，发布准备块） | `npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts`（发布提交的树上） | **PASS，`6 files / 80 tests`**：`update-entry 20`、`update-surface 29`、`docs-config-keys 14`、`docs-version 8`、`i18n-parity 6`、`docs-architecture-version 3`。基线就是 **80**（79 是 `0.13.36` 发布轮的过期口径）。**`CONFIRMED`** |
+| 远端 Release 工作流（本轮自查，`gh` 重读） | `gh run list --limit 3 --json databaseId,headSha,name,conclusion` | run **`45577666102`**、`name=Release`、`headSha=34236f0c7e…`、**`conclusion=success`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45577666102 。**`CONFIRMED`** |
+| 远端 `main` 的 CI（本轮自查，`gh` 重读） | 同上 | run **`45577662548`**、`name=CI`、`headSha=34236f0c7e…`、**`conclusion=success`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45577662548 。**`CONFIRMED`** |
+| GitHub Release 的发布面（本轮自查，`gh` 重读） | `gh release view v0.13.37 --json name,tagName,isDraft,isPrerelease,publishedAt,url,targetCommitish,assets` | `name=`**`Grok Workflow for DSH v0.13.37`**、`tagName=v0.13.37`、`targetCommitish=main`、`isDraft=false`、`isPrerelease=false`、`publishedAt=`**`2026-11-25T08:37:20Z`**、`url=https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.37`；**唯一资产** `dsh-grok-workflow-0.13.37.tgz`、`size=`**`947407`**、`state=uploaded`。**`CONFIRMED`** |
+| 发布正文与 `CHANGELOG.md` 的形状（本轮自查） | `git show --numstat --format= 34236f0 -- CHANGELOG.md`；`git show 34236f0:CHANGELOG.md` 取 `## [0.13.37]` 到 `## [0.13.36]` 之间 | `CHANGELOG.md` **+18 −0**——**零删除行**；`## [Unreleased]` 保留成**空标题**，`## [0.13.37] - 2026-11-25` 插在它下面、`## [0.13.36]` 之上，**这一段 30 行**，也就是 Release 正文。**`CONFIRMED`** |
+| 两个 README 的已发布标签清单是延伸不是替换（本轮自查） | `git show 34236f0:README.md` 的已发布清单 | 英文清单尾部是 `` `v0.13.35`, `v0.13.36` and `v0.13.37` ``（`v0.13.35`、`v0.13.36` 仍在，新项追加），安装固定点读 `#v0.13.37`。**`CONFIRMED`** |
+| live 档案的旧键（本轮自查，只读） | `sed -n '560,564p' ~/.dsh/profiles/web/cordis.patch.yml`；`grep -c legacyGate ~/.dsh/profiles/web/cordis.patch.yml` | `- id: grok-workflow`（`:560`）→ `name: dsh-grok-workflow`（`:561`）→ `config:`（`:562`）→ **`mode: triage`（`:563`）**；`legacyGate` **0 命中**。`mode` 自 `0.13.35` 起是被删的键。**`CONFIRMED`** |
+| live 的依赖形态与已装版本（本轮自查，只读） | `grep -n dsh-grok-workflow ~/.dsh/profiles/web/package.json ~/.dsh/profiles/web/pnpm-lock.yaml`；`node -e "require('…/node_modules/dsh-grok-workflow/package.json').version"` | 依赖是**浮动**的 `github:free6589/dsh-grok-workflow`（**无标签**），锁文件解析到 `…/tar.gz/84efda0…`，装着的版本读回 **`0.13.35`**。**`CONFIRMED`** |
+| live home 未写、未重载、未重启 | —— | 包工头在本次前后各量一次：`~/.dsh` size **1548** / mtime **1795362020**、`~/.dsh/profiles` size **226** / mtime **1795337986**，两次同值。**`CONFIRMED`（包工头读数）** |
+| live 档案升级（`AGENTS.md` §11） | —— | **`BLOCKED`（刻意未执行，两条理由都具体）**：**(a)** 第 563 行的 `mode: triage` 还在，装 0.13.37 上去会让 `grok-workflow` 那一行**拒绝激活**、工作流从界面消失——顺序必须是**操作者先删这一行，再升级**；**(b)** 本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，从这里写不进去。**这是等外部动作，不是升级失败。** |
+| 模型回合 / 真机 soak | —— | **`NOT_RUN`（本轮不需要）**：本轮除合并与版本字面量之外没有写任何行为——`src/` / `lib/` 的改动只有那一对版本字面量，功能行为的真机读数属于特性分支自己那一轮，见本文件 `fix/switch-default-state` 条与 `.rsi/evidence/switch-default-state-2026-11-25/`。 |
+| 收尾卫生（本轮自查） | `git worktree list`；`git branch`；`git status --short` | **与派单口述不符，照实记**：派单说两个 worktree 与两条本地分支都已清；写这一条时仍看到 `/…/.tmp/wt-release-0.13.37  34236f0 [release/0.13.37]`、`/…/.tmp/wt-switch-default  9d234c2 [fix/switch-default-state]`，两条本地分支也还在（门禁日志就在前者的 `.tmp/` 里，所以还读得到）。`git status --short` 只有 **` M .gitignore`**（与发布无关的本地设计稿忽略规则，从未暂存）。**清理留给下一位。`CONFIRMED`** |
+
+**这一轮动了什么：** 只有 `docs/knowledge/STATE.md`、`docs/knowledge/HANDOFF.md`、`docs/knowledge/VALIDATION.md` 三份记忆
+（连同本轮那条 `docs(release): record v0.13.37 …` 提交）。**没有碰** `src/`、`lib/`、`test/`、`package.json`、`package-lock.json`、
+`CHANGELOG.md`、`README*`、`.gitignore`；没有跑测试套件、没有建分支或 worktree、没有 push、没有打 tag。
+
+**Honest boundary（逐条）：**
+1. **两条门禁都不是本轮记录者执行的**：它们由发布执行方（包工头）在发布 worktree 里跑并报回读数；本轮做的是**读它留下的两份日志**
+   （`.tmp/ci-second.log` 的 `lib/ at 5c58afd`、`.tmp/ci-release-34236f0.log` 的 `lib/ at 34236f0`）逐行核对数字一致，
+   加上 `git show --stat`、`git rev-list --parents`、树比对、标签解析、`gh run list`、`gh release view`、`git ls-remote --tags`、
+   `git worktree list`、`git branch`、`git status --short`、以及只读地打开 live 档案与锁文件。**本轮没有自己跑 `npm run ci`。**
+2. **`it(` 的绝对数有 4 的口径差**：包工头报 `test/client.spec.ts` **144 → 147**，我这边 `grep -c 'it('` 数到 **148 → 151**；
+   **增量相同（+3）**，绝对数以包工头口径记录，差在哪没有查到底。全量例数 1845 → 1849 由两次门禁日志共同支持（+4）。
+3. **`.gitignore` 的改动不是四行**：`git diff --stat .gitignore` 读 **6 insertions**（含一行注释）。它从未被暂存，也不属于任何发布提交；
+   正文里不写行数，避免留一个错数。
+4. **live 档案的状态是这一轮真读出来的**（`mode: triage` 在第 563 行、无 `legacyGate`、浮动依赖、装 `0.13.35`），
+   所以 (a) 那条 `BLOCKED` 不含推断；`~/.dsh` 的两个尺寸 / mtime 是包工头的读数，本轮没有重跑那次测量。
+
 ## 设置页 429 开关补上控件：定向测试、门禁、构建体积、隔离真机读数 — 2026-11-25 (`CONFIRMED`)
 
 分支 **`fix/ratelimit-toggle`**（worktree `.tmp/wt-ratelimit-toggle`，基线 `main` 尖端 **`4def476`**），产品提交 **`534b867`**

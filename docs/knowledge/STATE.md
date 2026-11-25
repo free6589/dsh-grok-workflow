@@ -1,3 +1,59 @@
+Last updated: 2026-11-25 16:35 +08:00（**`0.13.37` 已经发出去了：两次本地门禁都 `EXIT=0`（`Test Files 98 passed (98)` / `Tests 1849 passed (1849)`、`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`），`main` 用 `--ff-only` 前进到发布提交 **`34236f0`**、附注标签 **`v0.13.37`** 剥出的正是它，远端 Release 工作流 run **`45577666102`** 与 `main` 上的 CI run **`45577662548`** 都是 success，GitHub Release 已发布、唯一资产 `dsh-grok-workflow-0.13.37.tgz` **947407 字节**；**唯一没做的是本机 live 档案升级**——档案第 563 行还留着被删掉的 `mode: triage`（没有 `legacyGate`），先删再升，否则 `grok-workflow` 那一行拒绝激活、工作流从界面消失，所以这一条记 **`BLOCKED`（等操作者动手），不是失败**；版本 `0.13.37`** —
+分支 **`release/0.13.37`**（worktree `.tmp/wt-release-0.13.37`），从 `main` 尖端 **`d34214b`** 开出。**合流提交 `5c58afd`**
+`merge: a session with no mode record no longer shows the switch as on`：真 `--no-ff` 合并，父提交 **`d34214b` + `9d234c2`**
+（`fix/switch-default-state` 尖端），**零冲突**——特性分支严格领先于 `main`。身份证明：合并树 **`50d7eca335b182d548b8a8bdab02d3ba10dd4e00`**
+等于 `fix/switch-default-state^{tree}`，且 `git diff --stat 9d234c2 5c58afd` 为空（本轮重跑过，空）。
+**发布提交 `34236f0`** `chore(release): prepare v0.13.37`——**8 文件 / +38 −20**：`CHANGELOG.md` +18、`README.md` 5/5、
+`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、`package-lock.json` 2/2、`package.json` 1/1、
+`src/client/index.js` 2/2；树 **`71ffdb665bc6196e8b91c6bf3f455ad24cff8ee5`**。**`src/` 与 `lib/` 的改动只有版本字面量那一对，没有一行逻辑。**
+**`main` 是 `git merge --ff-only release/0.13.37` 前进的，不是第二个合并提交**：所以 `main` 尖端**就是**跑门禁的那个提交、
+也就是标签剥出来的那个；`git diff --stat release/0.13.37 main` 为空。推送 `d34214b..34236f0  main -> main`（`origin/main` 现读为 `34236f0`）。
+**标签 `v0.13.37`** 是附注标签：标签对象 **`235fa3e3ab2b1f1f7815ba16b905d53c60da8d3f`** → 剥出提交 **`34236f0`**，
+`git show v0.13.37^{}:package.json` 读 `0.13.37`；推送 `* [new tag] v0.13.37 -> v0.13.37`。**没有 force-push，也没有移动任何已发布标签**：
+`v0.13.35` 仍剥到 `ffbb6b0`、`v0.13.36` 仍剥到 `26dc370`（`git ls-remote --tags origin`，本轮重读过）。
+**门禁两次，都是 `TMPDIR=$PWD/.tmp npm run ci` 在发布 worktree 里跑（`CONFIRMED`，日志 `.tmp/ci-second.log` 与 `.tmp/ci-release-34236f0.log`，
+相对该 worktree）**：`5c58afd` 上 `EXIT=0`、`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`、
+`lib/ at 5c58afd is the build of src/ at 5c58afd (281 files, byte-identical)`、`Test Files 98 passed (98)` / **`Tests 1849 passed (1849)`**、
+`Duration 85.82s`；`34236f0` 上（包工头自己跑的那一遍，**这一遍就是发布门禁**）同样 `EXIT=0`、`15 warnings / 0 errors`、`333611 bytes`、
+`lib/ at 34236f0 is the build of src/ at 34236f0 (281 files, byte-identical)`、`98 files / 1849 tests`、
+`Duration 88.35s (transform 1.91s, setup 0ms, import 7.44s, tests 69.46s, environment 11ms)`。
+**读者能只靠 git 自己算的算术**：`d34214b` 与 `34236f0` 各有 **98 个 spec 文件**（一个没增、没删，改的是其中两个）；
+`test/client.spec.ts` 的 `it(` **144 → 147**、`test/mode-surface.spec.ts` **24 → 25**，即 **+4 例**、**1845 → 1849**；
+`lib/client.js` **331626 → 333611** 字节（特性分支的 +1985）；warnings 与基线同数，仍 15。**六个文档守卫**（发布准备块跑）：
+`6 files / 80 tests` PASS（`update-entry 20`、`update-surface 29`、`docs-config-keys 14`、`docs-version 8`、`i18n-parity 6`、
+`docs-architecture-version 3`）。
+**用户拿到的四条（全部此前未发布）**：① 从没打过 `/grok` 的会话不再显示「开」——读 `Not on · not set yet` /「未开 · 还没设过」，
+点一下真把这个会话打开（`{"action":"set","enabled":true}`）；路由、`/grok status` 与设置页仍报有效值，**两边可以显示不同的字，
+这是故意的（`D-154`）**；② 限流（429）那个开关补上了设置页控件（`D-153`）；③ `/grok on` 说它真做的事；④ 设置页与两个 README
+说这颗开关真做的事。**随包带走的升级须知**：**升级前删掉 `<档案>/cordis.patch.yml` 里残留的 `mode:` 与 `legacyGate:` 两行**——
+任一行单独存在，插件那一行就拒绝激活，工作流随后从界面消失（设置与记录不丢）；须知中英双语，因为文件要求双语。
+**发布面（`CONFIRMED`，本轮用 `gh` 重读过）**：Release 工作流 run **`45577666102`**（标签 `v0.13.37`、head sha `34236f0`、结论 success）
+https://github.com/free6589/dsh-grok-workflow/actions/runs/45577666102 ；`main` 上的 CI run **`45577662548`**（head sha `34236f0`、结论 success）
+https://github.com/free6589/dsh-grok-workflow/actions/runs/45577662548 。GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.37 ，
+名字 `Grok Workflow for DSH v0.13.37`，发布 `2026-11-25T08:37:20Z`，target `main`，不是 draft、不是 prerelease，**唯一资产
+`dsh-grok-workflow-0.13.37.tgz` = 947407 字节**；正文就是 `## [0.13.37] - 2026-11-25` 那一节，**30 行**。
+**三条刻意偏差，照实记**：① **`main` 是快进、不是 `--no-ff` 合流**——于是 `main` 尖端与门禁提交、标签指向是同一个提交（上一轮 0.13.36
+也是标签落在发布提交上）；特性分支的 `--no-ff` 折入仍在历史里（`5c58afd`），所以「功能是怎么进来的」有账可查。② **环境陷阱（合流块发现，
+`CONFIRMED`）**：新开的发布 worktree 没有 `node_modules`，第一次门禁在 `verify:lib` 里炸
+（`Cannot find module …/verify-lib-*/node_modules/typescript/bin/tsc`），而 `typecheck` 与 `lint` 是靠 PATH 借了父检出的
+`node_modules/.bin` **悄悄过去**的；解法是给 worktree 自己一份 `npm ci --prefer-offline`，之后门禁的读数才算数。
+**以后任何发布 worktree，先自己装依赖，再谈门禁有没有意义。** ③ `CHANGELOG.md` 的 `## [Unreleased]` 保留成**空标题**，
+`## [0.13.37]` 插在 `## [0.13.36]` 之上、四条逐字搬过去（`CHANGELOG.md` 的 `+18 −0`，**零删除行**）；两个 README 的已发布标签清单是
+**延伸**（加上 `v0.13.37`），不是替换。
+**没做的，以及为什么（`BLOCKED`，不是失败）**：`AGENTS.md` §11 的 live 档案升级**没有执行**，两条独立的具体理由：
+**(a)** live 档案 `/home/fish/.dsh/profiles/web/cordis.patch.yml` 的 `grok-workflow` 那一行下仍写着 `mode: triage`（**第 563 行**，
+本轮自己读到；该文件**没有** `legacyGate` 行），而 `mode` 自 `0.13.35` 起就是被删的键——把 `0.13.37` 装上去会让那一行拒绝激活、
+工作流从 UI 消失。**顺序必须是操作者先删那一行，再升级。** **(b)** 本会话文件策略是 `workspace-write`，`~/.dsh` 在工作区之外，
+从这里连写都不可能。另：live 档案仍声明**浮动**依赖 `github:free6589/dsh-grok-workflow`（无标签），读回已装版本 **`0.13.35`**。
+**live home 未写、未重载、未重启**，前后尺寸与 mtime 同值（`~/.dsh` size 1548 / mtime 1795362020；`~/.dsh/profiles` size 226 /
+mtime 1795337986）。
+**收尾卫生（按观察到的事实写，不按口述）**：派单说两个 worktree（`.tmp/wt-release-0.13.37`、`.tmp/wt-switch-default`）已删、
+本地分支 `release/0.13.37` 与 `fix/switch-default-state` 已删；**本记录写下时 `git worktree list` 与 `git branch` 仍看到它们**
+（`CONFIRMED`），上面那些门禁日志也还在前者的 `.tmp/` 里可读——清理动作留给下一位，别把它记成已经做过。
+主检出剩下的唯一改动是与发布无关的 `.gitignore` 本地设计稿忽略规则，**从未被暂存**，也不在任何发布提交里。
+**一处顺序走样，照实记一句**：`fix/switch-default-state` 那条 16:10 的条目在**文件最底下**，它比上面 15:32 那条更新——
+这个文件的排序在那里出过一次序，**不改动、不搬动**，读者按时间找时自己留意。
+
 Last updated: 2026-11-25 15:32 +08:00（**设置页「谁来干」卡里那个 429 开关补上了控件：`switchOnRateLimit` 之前是 14 个声明字段里唯一「有文案、有 schema、就是不画」的一个，现在有一行 `FieldRow` + `Toggle` + 提示段，位置在 Guardian 之后、五条角色链之前；默认值仍是 `on`，行为一个字没改，没加任何文案键、没动 schema、没动版本号 `0.13.36`，未 push、未发版** —
 分支 **`fix/ratelimit-toggle`**，worktree `.tmp/wt-ratelimit-toggle`，基线 `main` 尖端 **`4def476`**。**代码与测试提交 `534b867`**
 `feat(settings): the 429 switch gets a control — the last declared field without one`（**3 文件 / +141 −2**：`lib/client.js` 21/1、
