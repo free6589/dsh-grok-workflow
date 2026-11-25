@@ -269,10 +269,37 @@
 5. **多块切分、会写多文件的块**（`NOT_RUN`）：本轮一单一块、只写一个文件。
 6. **心跳/自迭代那条线**（`NOT_RUN`）：`loopEnabled: true` 是档案里带着的，本轮没有投递过心跳。
 
-## 7. 红一的修复进程
+## 7. 红一已修，另开分支（`fix/grok-command-text`，未合流、未推送）
 
-另开分支 `fix/grok-command-text`（从 `main` 尖端 `6e9bc56` 开），只改话术与守卫它的测试/文档，
-不动记录形状、不动路由、不动接单台准入。跑完在这里补：提交号、红/绿读数、`npm run ci` 的 tail。
+分支 `fix/grok-command-text`（worktree `.agents/worktrees/fix/command-text`，基线 `main` 尖端 `6e9bc56`），
+两个提交：**`5c120b1`**「fix(command): say what `/grok on` really does」（9 文件 / +24 −15，含 `lib/command.js` 重建）与
+**`78c9091`**（只加证据文件）。**不是本分支的提交**，本分支只留证据与记忆。
+
+新话（用户 `/grok on` 之后看到的两句）：
+
+    Grok workflow ON — the model may commission reviewed blocks of work in this session.
+    Messages themselves are not turned into a workflow.
+
+`/grok off` 的答案没动（`Grok workflow OFF — normal chat.`），记录形状、路由、接单台准入规则都没有改。
+
+**验收（我自己复核过的，不是听它自报）**：
+
+- 红先绿后：`test/command.spec.ts` 先 7 例红（期望仍是旧话），改后 `27 passed (27)`；我自己在这个 worktree 里重跑
+  `npx vitest run test/command.spec.ts` → **`Test Files 1 passed (1)` / `Tests 27 passed (27)`**（13:28:32，2.55 s）。
+- 产物一致：`node scripts/verify-lib.mjs` 我自己跑 → **`lib/ at 78c9091 is the build of src/ at 78c9091
+  (281 files, byte-identical)`**、`client bundle: 329354 bytes → lib/client.js`。
+- 全量门禁（它跑的，我没有重跑）：`TMPDIR=$PWD/.tmp npm run ci` 在 `5c120b1` 与 `78c9091` 上都是 **EXIT=0**——
+  `98 files / 1839 tests`、`Found 15 warnings and 0 errors.`（15 条全是既有的、不在这次改的两个文件里）。
+- 它顺手把两个 README 里那句「`grokDefault: on` 认领每条用户消息」改成了实话（「`on` 只是一个没有记录的会话报出来的值，
+  是回退值，不是记录，本身不让接单台接活」）——**这句话正好把红二的矛盾写实了**，而准入规则一个字没动。
+- 它标了三条边界：没有真机/真模型 soak（一个字符串不值当，改用测试逐字钉住）；设置页与输入框开关上另有一句旧话
+  （「Send /grok for one serious run」）**故意没改**——那句话要先回答红二那个产品问题才能改得诚实；
+  两个 README 里「1850 tests across 98 files」是既有漂移（实际 1839），不在这次范围内。
+
+## 7.1 红二没有修，因为它要一个决定
+
+红二不是笔误也不是漏判，是两处各自讲得通的设计撞在一起（开关认部署默认、接单台只认会话记录）。
+修它要选甲或乙（§5），选哪个都改用户可见行为，得有决定号。本轮把它连同两条修法一起交上去，不替产品拍板。
 
 ## 8. 补跑：工作流引擎本身（真跑 `grok_workflow`，`CONFIRMED`）
 
