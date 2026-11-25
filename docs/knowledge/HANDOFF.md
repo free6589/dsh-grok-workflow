@@ -1,3 +1,79 @@
+## 2026-11-26 — `0.13.46` 已发布收口：一个发布提交（8 文件 / +47 −20、单父）、一份门禁 `GATE_EXIT=0`（`103 files / 1948 tests`）、`main` 尖端 `84f64c8`、附注标签、两个远端 run 与 Release 资产都在；这一版只有文档与证据、**没有行为变化**；**live 档案升级仍 `BLOCKED`**（live 里装的仍读 `0.13.39`）、**真机 soak `NOT_RUN`**
+
+- **From:** 包工头（`agent-197`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**发版轮 + 收口轮**，不写产品代码。`0.13.46` 已经出去（tag 推了、Release 建了、资产在）；
+  本轮只做三份记忆（`STATE` / 本文件 / `VALIDATION`）+ 一份证据索引
+  （`.rsi/evidence/release-0.13.46-2026-11-26/README.md`），然后提交推送、清掉发布 worktree。
+  **没有重跑门禁、没有跑任何 npm 脚本、没有碰 `src/` / `test/` / `lib/`**（`AGENTS.md` §12），
+  所以**这一轮没有红可记**——这一版没有行为改动可红；CHANGELOG 里写的那条行为（判腿被 401 拒掉之后
+  在同一条路由上再问一次）的红/绿在 `fix/judge-leg-soak` 那一轮，见本文件下方与
+  `.rsi/evidence/judge-leg-soak-2026-11-26/`。
+- **身份**：发布提交 **`84f64c8cd5868aeddf8d39e006456310c546c871`** `chore(release): prepare v0.13.46`，
+  父提交 **`3a0e859`**（**单父，发布提交不是合并**），**8 文件 / +47 −20**：
+  `CHANGELOG.md` +27 −0（只插入 `## [0.13.46] - 2026-11-26` 那一节，第 8 行是它的标题、上面第 6 行是空的
+  `## [Unreleased]`、下面第 35 行是 `## [0.13.45]`；新节正文 26 行、节内只有一个 `### Fixed / 修复` 子标题，
+  以 `**升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**` 收尾，更早的节一个字没动）、
+  `README.md` 5/5、`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、
+  `package-lock.json` 2/2、`package.json` 1/1、`src/client/index.js` 2/2；八文件骨架与 `v0.13.45` 那颗
+  `63793eb`（2/10/10/6/4/4/2/4）同形。`src/` 与 `lib/` 的唯一改动是 `PLUGIN_VERSION` / `UPDATE_LATEST`
+  那一对 `'0.13.45'` → `'0.13.46'`；`cmp src/client/index.js lib/client.js` 退出 **0**（同一个 blob
+  `93b7562` → `d2f330e`、各 **348559 字节**），`lib/` 没有第二个文件被动过。**附注标签 `v0.13.46`** 对象
+  **`a1f0f85d85dde0877801f9ac20db28a6163608f4`** → 剥出 `84f64c8`、消息 `Grok Workflow for DSH v0.13.46`、
+  `tagger` 时刻 **2026-11-26 06:01:30 +0800**（`1795644090 +0800`），标签上的 `package.json` 读 `0.13.46`。
+  **`main` = `origin/main` = 发布提交 = 标签剥出的提交 = `84f64c8`**（`git merge --ff-only 84f64c8`，
+  推送输出 `3a0e859..84f64c8  main -> main`，没有第二个合并提交），没有 force-push、没有移动任何已发布标签
+  （本轮重读 `v0.13.44` → `7cc4a901…`、`v0.13.45` → `63793eb93b…`，两条与开工前基线逐字一致）；
+  远端标签推送是 `* [new tag]  v0.13.46 -> v0.13.46`。
+- **用户看到的一件事**：两份 README 里那个过期的门禁数字换成了真跑出来的数——以前写 `98 files / 1850 tests`，
+  现在写 **`1948 deterministic tests across 103 files`** / **`103 个文件 / 1948 个确定性测试`**（各 +5 −5，
+  `README.md` 第 355 行、`README.zh-CN.md` 第 337 行），照着 README 估门禁规模的人不再少算五个文件、98 条测试。
+  另外这一版把 `0.13.44`「钥匙被拒就在同一条路由上再问一次」的**判腿**真机证据落进仓库
+  （`.rsi/evidence/judge-leg-soak-2026-11-26/`），那句承诺现在能对着跑出它的那次运行去核。
+  **插件行为没有变化**：`[Unreleased]` 本来就是空的；升级须知是「不用准备任何东西」。
+- **门禁读数（一份，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci`、worktree `.tmp/wt-release-0.13.46` 的干净树、
+  `HEAD = 84f64c8`、**`GATE_EXIT=0`**。转录 `.rsi/evidence/release-0.13.46-2026-11-26/gate-release-84f64c8.out`
+  （**388 行 / 23373 字节**、`sha256 96c5797419e4786edec252636f4b2050dbc60273224df03c448ccaf154a0bc1f`、
+  末行 `GATE_EXIT=0`，全文只出现这一次）。读数：第 2 / 6 / 10 行读作 `> dsh-grok-workflow@0.13.46 ci` /
+  `… typecheck` / `… lint`（**门禁树里 `package.json` 已经是 `0.13.46`**）、第 162 行
+  `Found 15 warnings and 0 errors.`、第 163 行 `Finished in 64ms on 184 files with 96 rules using 6 threads.`、
+  第 168 与第 178 行 `client bundle: 348559 bytes → lib/client.js`（同值）、第 169 行
+  `lib/ at 84f64c8 is the build of src/ at 84f64c8 (289 files, byte-identical)`、第 383 行
+  **`Test Files 103 passed (103)`**、第 384 行 **`Tests 1948 passed (1948)`**、第 386 行
+  `Duration 94.99s (transform 2.37s, setup 0ms, import 8.49s, tests 75.09s, environment 11ms)`。
+  `grep -c FAIL` = **0**；`grep -c 'failed'` = **3，三条都不是失败**：第 182 行用例标题里的 `read failed`、
+  第 307 行 checkpoint 夹具故意造的 `[smoke] status=failed …`（那行路径逐字带 `.tmp/wt-release-0.13.46/`，
+  正好说明门禁跑在发布 worktree 里）、第 381 行用例标题里的 `failed→blocked`。
+  门禁跑完那棵树仍干净（`git status --short` 空、`lib/` 没有改动残留）——这条是那一轮读到的，
+  worktree 清理之后无法再复核。
+- **用例算术**：spec 文件 **103**、用例 **1948**，与 `0.13.45` 发版门禁报的是同一个数，**没有动**——
+  这一版没有增删任何测试文件（`git diff --name-only v0.13.45 84f64c8 -- test` 输出为空、
+  `-- src` 只有 `src/client/index.js` 一个文件），它只是把 README 里印出来的那个数改成了真跑出来的数。
+- **远端读数（`gh run view` 重读）**：Release run **`45709634480`**（workflow `Release`、
+  `headBranch v0.13.46`、sha `84f64c8`、**success**、单 job `Validate and publish v0.13.46`、
+  `2026-11-25T22:01:43Z → 22:03:18Z` 约 1m35s，`gh run watch --exit-status` 退出 0）、`main` 的 CI run
+  **`45709629770`**（sha `84f64c8`、**success**）；GitHub Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.46 名字 `Grok Workflow for DSH v0.13.46`、
+  `publishedAt 2026-11-25T22:03:13Z`、非 draft / 非 prerelease、target `main`、正文 **27 行**、唯一资产
+  **`dsh-grok-workflow-0.13.46.tgz` = 989319 字节**、摘要
+  `sha256:a74e51855b8f0c89ab73d63d7ec8f630446ad6a2de1e2ad6228d0be5ac9635a9`（上一版 `0.13.45` 988089 → **+1230**）。
+- **`BLOCKED`（`AGENTS.md` §13 的 live 档案升级，就是下一件事）**：**没做成**——本会话文件策略 `workspace-write`、
+  `~/.dsh` 在工作区外，这一行写不进来，**没写、没重载、没重启**，3080 那个实例全程没碰。
+  只读读到的：live 档案里装的 `dsh-grok-workflow` 仍读 **`0.13.39`**，`~/.dsh` 的 mtime 是
+  `2026-11-25 23:14:14`；连「读一遍」这条路也走不通——`dsh --profile web plugin list` 返回
+  `EROFS: read-only file system, open '/home/fish/.dsh/profiles/web/cordis.yml'`（这个 CLI 连读都要打开那个文件写）。
+- **下一步那一件事**：由**有写权限的人**把 live 那条插件行钉到**确切的标签 `v0.13.46`**（绝不用浮动范围、
+  `latest` 或分支名），把装好的版本读回来确认；读不回 `0.13.46` 就回滚那一行——跑发布版时它必须读作 `0.13.46`。
+- **`NOT_RUN`（真机 soak）**：这一版没有可 soak 的行为变化——CHANGELOG 里那条行为是 `fix/judge-leg-soak`
+  那一轮在隔离档案里用真模型验过的（证据 `.rsi/evidence/judge-leg-soak-2026-11-26/`），证据这一版才落进仓库。
+- **`NOT_RUN`（任何 npm 脚本）**：记忆轮一条都没跑。门禁只跑过那一次，在打标签之前，就是上面那份转录。
+- **清理（推送成功后做，已做完）**：`git worktree remove .tmp/wt-release-0.13.46` 成功、
+  `git branch -d release/0.13.46`（`was 84f64c8`），`git worktree list` 现在只剩主检出
+  `/home/fish/projects_mine/dsh-grok-workflow 84f64c8 [main]`、`ls -d .tmp/wt-*` 找不到东西；
+  **远端分支一个不删、标签一个不删**。`.gitignore`(modified) 与 `.rsi/evidence/progress-now/`(未跟踪) 是别的会话的
+  遗留，没碰、没暂存、没提交。
+
+---
+
 ## 2026-11-26 — `fix/judge-leg-soak`：判腿被一次 401 拒掉之后整轮付多少代价，真机五条判据全中；两份 README 的门禁数字按实测改成 `103 / 1948`。**未合 `main`、未 push、未打 tag、未发版**，版本仍 `0.13.45`
 
 - **From:** 包工头（`agent-196`）· **To:** 下一个接手者 / 发版的那一轮
