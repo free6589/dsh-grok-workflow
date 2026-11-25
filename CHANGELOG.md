@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.37] - 2026-11-25
+
 ### Fixed / 修复
 
 - **A session that never ran `/grok` no longer shows the switch as on / 没打过 `/grok` 的新会话，开关不再显示「开」** —
@@ -16,6 +18,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   / 以前 `/grok on` 会回答「每条消息现在都跑完整的 plan→execute→verify 工作流」，而从 `0.13.35` 起没有任何东西会这么做。现在它用两句短话说实话：打开之后，这个会话里模型可以把工作拆成可复核的块来下单；消息本身不会被变成一次工作流。关闭时的回答、存下来的记录，以及接单台自己的准入规则都没有改。
 - **The settings page and both READMEs now say what the switch really does / 设置页与两个 README 现在说的是实话** — The first group on the settings page was titled "Master switch" with the field "Work hard by default", and the status line promised "the workflow tool is available" — none of which has been true since `0.13.35`. The group is now "Session default", the field "Default before /grok", and the status line says what a session with no `/grok` record reports, adding that opening a reviewed block still needs that session to run `/grok` itself. The `/grok on` receipt gained the same missing premise: the intake's tools only exist while the block intake is switched on. Both READMEs drop the deleted `auto`/`full` mode selector and describe the five groups the page really renders, including the one-line hints on the two budget fields and the upgrade card at the bottom.
   / 设置页第 1 组以前叫「总开关」，字段叫「默认下大力气」，状态行写着「工作流工具可用」——从 `0.13.35` 起这些都不再成立。现在这组叫「会话默认」，字段叫「没打 `/grok` 时的默认」，状态行说的是「还没打过 `/grok` 的会话报什么」，并补上那句缺了的前提：要在这个会话里开可复核的块，还得这个会话自己打一句 `/grok`。`/grok on` 的回执也补上了同一个前提：接单台的工具只在它打开时才存在。两个 README 删掉了早就删除的 `auto`/`full` 模式选择器，改成页面真正渲染的五组，包括两个预算字段各自的一行说明和最底下那张升级卡片。
+
+### Upgrade note / 升级须知
+
+- **Delete the leftover `mode:` and `legacyGate:` lines from your profile before you upgrade / 升级前先把档案里 `mode:` 与 `legacyGate:` 那两行都删掉** —
+  If your profile's patch file still carries a `mode:` line or a `legacyGate:` line under the `grok-workflow` entry, the plugin will refuse to
+  activate that row after the upgrade and the workflow simply disappears from the interface. Either line on its own is enough to do it, so
+  deleting only one of them still leaves the row refusing to activate. Nothing is lost — your settings and records are untouched — but you have
+  to restart with both lines gone for the plugin to come back. So: **before** upgrading, open `<your profile directory>/cordis.patch.yml`, find
+  the `grok-workflow` entry, delete the leftover `mode:` line **and** the leftover `legacyGate:` line beneath it, save, then upgrade. Both keys
+  were removed together with the old front desk, so a stored value is rejected as an unknown key. If neither line is present in your file, there
+  is nothing to do. We have not edited anybody's profile for you.
+  / 如果你的档案补丁文件里，`grok-workflow` 那一行下面还写着 `mode:` 或 `legacyGate:`，升级之后这一行会**拒绝激活**，症状就是工作流从界面上消失。
+  这两个键留下任何一个都会这样，只删掉其中一个，那一行仍然拒绝激活；什么都没丢——设置和记录都还在——但必须把两行都删掉再起，插件才会回来。
+  做法：**升级之前**打开 `<你的档案目录>/cordis.patch.yml`，找到 `grok-workflow` 那一行，把它下面写着 `mode:` 的那一行**整行删掉**，
+  再把写着 `legacyGate:` 的那一行也**整行删掉**，保存，然后升级。这两个键在 0.13.35 就随旧前台一起删了，存着值会被当未知键拒绝。
+  如果你的文件里这两行都没有，什么都不用做。我们**没有**替你改过任何档案。
 
 ## [0.13.36] - 2026-11-25
 
