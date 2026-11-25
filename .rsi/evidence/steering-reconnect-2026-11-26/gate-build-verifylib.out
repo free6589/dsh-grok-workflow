@@ -1,0 +1,12 @@
+# 2026-11-26T01:31:28+08:00 | HEAD a4753fe
+$ TMPDIR=$PWD/.tmp npm run build
+
+> dsh-grok-workflow@0.13.40 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 348559 bytes → lib/client.js
+---
+$ node scripts/verify-lib.mjs
+client bundle: 348559 bytes → lib/client.js
+lib/ at a4753fe is the build of src/ at a4753fe (285 files, byte-identical)
+EXIT=0

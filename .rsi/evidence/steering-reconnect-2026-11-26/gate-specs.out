@@ -1,0 +1,42 @@
+# 2026-11-26T01:31:03+08:00 | HEAD a4753fe
+$ TMPDIR=$PWD/.tmp npx vitest run test/replan.spec.ts test/block-tools.spec.ts test/lifecycle-disposal.spec.ts test/progress.spec.ts test/checkpoint-engine-wire.spec.ts test/plugin-lifecycle.spec.ts
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-steering
+
+ ✓ test/block-tools.spec.ts (23 tests) 5383ms
+     ✓ is idempotent: the same split started twice is the same block  348ms
+     ✓ counts a card answer only for a question asked after the preview, and only for what the user picked  373ms
+     ✓ returns the plan id, the split, the scope and the progress  374ms
+     ✓ vetoes a three-line handoff without spending a model call  307ms
+     ✓ passes a complete handoff through the judge and accepts the block  468ms
+     ✓ returns the same verdict for the same evidence instead of a second line  478ms
+     ✓ says so when the judge was skipped  408ms
+     ✓ judges by default when the row carries no switch at all  427ms
+     ✓ queues a demand for a workflow block that is really running  920ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 2355ms
+     ✓ records what it cancelled before it cancels it  597ms
+     ✓ says the process was shutting down when a signal arrived first  587ms
+(node:67) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run with no extra child calls from the resume scan
+[smoke] status=completed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-steering/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-0b3c390d-232a-42b0-8f99-dcabc468f6b7-0b6cf5a8.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-steering/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-5ae8b06e-4620-40d9-b226-58c4ea2114c0-0fe3aa94.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (6 tests) 1736ms
+     ✓ records a verified run with no extra child calls from the resume scan  330ms
+     ✓ lets an explicit caller carry-over outrank the leftover  409ms
+ ✓ test/plugin-lifecycle.spec.ts (19 tests) 1736ms
+(node:95) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 1044ms
+     ✓ records which summary draft the run shipped, and nothing when no draft passed  300ms
+ ✓ test/replan.spec.ts (21 tests) 624ms
+
+ Test Files  6 passed (6)
+      Tests  98 passed (98)
+   Start at  01:31:06
+   Duration  15.92s (transform 997ms, setup 0ms, import 2.13s, tests 12.88s, environment 1ms)
+
+EXIT=0

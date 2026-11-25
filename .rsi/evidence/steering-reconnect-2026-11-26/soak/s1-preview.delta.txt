@@ -1,0 +1,35 @@
+rok workflow ON — the model may commission reviewed blocks of work in this session, as long as the block intake is switched on. Messages themselves are not turned into a workflow.
+用 grok_open_block 的 preview 模式开一个块，只要预览、不要 start：标题「跑中插话接线验证」，objective「验证跑中插话能不能并进正在跑的计划」，deliverable「一次真机读数」，acceptance 只有一条「读到 plan.replans」，execution 填 workflow。
+01:19
+已完成
+已完成，用时 10秒
+
+预览已开，没有 start。
+
+预览 id bp-5d3f2b9e-ad02-4333-b196-35ea5dee56cb split_hash 28e5882f…16b0
+
+切出来 1 块：
+
+#	标题	执行	交付物	验收
+1	跑中插话接线验证	workflow	一次真机读数	读到 plan.replans
+
+两个提示（不影响预览，但真开工前值得补）：
+
+没声明 writesPaths —— 并行跑时可能和别人撞文件
+execution: workflow 但没给 owner —— 派单时不知道派给哪个子代理
+
+预览 10 分钟后过期（2026-11-26 01:29:27 +08:00）。要正式开工的话，把 owner / 写范围补上再说一声，我就用这对 id 起单。
+
+用量 58.6K tok
+01:19
+发消息或创建任务, / 调用指令, @ 文件或对话
+工作区内修改
+自动接着跑
+关
+自迭代
+关
+工作流开关
+开
+1 轮 2 步·94 tok/s
+58.6K tok·缓存命中 49%
+6%
