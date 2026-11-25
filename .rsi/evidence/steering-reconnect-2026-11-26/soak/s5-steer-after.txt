@@ -1,0 +1,165 @@
+DSH 本地构建
+0.2.2-rc.3-6b729fe
+会话
+生图
+新会话
+插件
+定时任务
+自动化任务
+网页版
+SDLC
+更多
+工作区
+默认工作区
+用 grok_open_block 的 preview 模式
+用 grok_open_block 的 preview 模式
+待办
+设置
+用 grok_open_block 的 preview 模式
+标准模式
+10 个子智能体
+1 个后台任务
+对话
+轨迹
+进度
+grok
+Grok workflow ON — the model may commission reviewed blocks of work in this session, as long as the block intake is switched on. Messages themselves are not turned into a workflow.
+用 grok_open_block 的 preview 模式开一个块，只要预览、不要 start：标题「跑中插话接线验证」，objective「验证跑中插话能不能并进正在跑的计划」，deliverable「一次真机读数」，acceptance 只有一条「读到 plan.replans」，execution 填 workflow。
+01:19
+已完成
+已完成，用时 10秒
+
+预览已开，没有 start。
+
+预览 id bp-5d3f2b9e-ad02-4333-b196-35ea5dee56cb split_hash 28e5882f…16b0
+
+切出来 1 块：
+
+#	标题	执行	交付物	验收
+1	跑中插话接线验证	workflow	一次真机读数	读到 plan.replans
+
+两个提示（不影响预览，但真开工前值得补）：
+
+没声明 writesPaths —— 并行跑时可能和别人撞文件
+execution: workflow 但没给 owner —— 派单时不知道派给哪个子代理
+
+预览 10 分钟后过期（2026-11-26 01:29:27 +08:00）。要正式开工的话，把 owner / 写范围补上再说一声，我就用这对 id 起单。
+
+用量 58.6K tok
+01:19
+确认。用上面的 preview_id 和 split_hash，以 start 模式把这个块开始。
+01:19
+已完成
+已完成，用时 2分43秒
+
+块已开，状态为 open，但还没有运行任何东西（waited_for_run: false）。
+
+block_id 0f135d39-918a-4873-9782-fc8474b8794d；这一块是 blk-1「跑中插话接线验证」，类型为 workflw，没有声明写文件，也没有依赖。
+状态 open（已记录切分，尚未认领）
+派单信封 派单 1 块：blk-1「跑中插话接线验证」workflow（不写文件，无依赖）。
+账本 .../soak-steer/home/taskboards/grok-workflow/blocks.jsonl
+
+过程中说明一下：第一次提交被拒了，原因是 approval.quote 必须是纯粹的点头词（确认、开工、yes…），不会被当成“包含确认的长句”。因此我把 quote 改成你消息里的「确认」二字才通过；切分和 hash 都没动。
+
+还差一步：这一块是 workflow 执行，但 preview 时没给 owner，真要发包时不知道该派给哪个子代理；写范围也是空的。要跑的话，建议先补上这两项，或直接告诉我派给谁，我再用 grok_accept_block 认领并起跑。
+
+用量 514K tok
+01:22
+现在用 grok_workflow 跑一个三波的小活：目标「在 .tmp/soak-steer-note.md 写三行」，分三步，第二步依赖第一步、第三步依赖第二步，每一步只写自己那一行，角色尽量用最便宜的。不要传 tasks 参数，让插件自己规划出三个有依赖的波。
+01:22
+已完成
+已完成，用时 5分20秒
+
+跑完了，结果是 FAILED —— 一行都没落到盘上。不是规划问题，是环境写不了。
+
+规划部分符合要求
+
+没传 tasks，让 planner 自己切，确实切出三条严格串行的波：
+
+波	任务	写什么	写得成吗
+1	s1_line1 创建文件 + 第一行 step1: init note	第 1 行	失败（2 次尝试都用尽）
+2	s2_line2 保留第一行、追加第二行	第 2 行	未启动（上游没验过，0 次尝试）
+3	s3_line3 保留前两行、追加第三行	第 3 行	未启动（同上）
+
+链条依赖是对的：s2 依赖 s1、s3 依赖 s2，每一步的验收都要求"前面的行不许被改"，写范围也各自限死在同一文件。
+
+角色也确实走的最便宜档：worker / verifier / supervisor 都是 agent2api/deepseek-v4.1-flash（worker 备胎 glm-5.3-flash），只有 planner 和 synthesizer 用了会话默认的 muse-spark-1.3-contributor。
+
+失败原因（我独立复核过，不是子代理瞎报）
+
+/home 整个挂载是只读的：
+
+代码块
+TARGET /home  SOURCE /dev/mapper/omarchy_root[/@home]  btrfs  ro,nosuid,nodev,noatime,...
+
+所以 printf > .tmp/soak-steer-note.md 直接 Read-only file system，宿主 write 工具在建临时目录时 EROFS，连 touch 一个探针文件都失败。子代理还试过 /tmp 是能写的，说明问题只在 /home 这个挂载，不是路径写错。两个 worker 尝试得到的是同一个结论，所以第二次重试注定白跑。
+
+现在文件状态我自己看了：.tmp/soak-steer-note.md → ABSENT，.tmp/ 里只有之前那批 human-scratch-r2*.md，没有残留半成品。
+
+想真跑成，二选一
+主机侧把 /home 恢复可写（sudo mount -o remount,rw /home，如果是 btrfs 报错触发的只读，还得先看 dmesg），然后我原样重跑一次；
+或者把交付物改到可写位置（比如 /tmp/soak-steer-note.md 或某个 rw 挂载的目录），我改一下 objective 里的路径再跑。
+
+要哪个说一声。另外上一轮那个块 0f135d39… 还停在 open，也没动过。
+
+用量 198K tok
+01:27
+顺便加一步：最后再写一行总结。用 grok_steer 把这个要求排进「跑中插话接线验证」那个块。
+01:27
+已完成
+已完成，用时 19秒
+
+没排进去，grok_steer 明确拒了：
+
+这一块现在没有在跑的 workflow，没有可投递的边界；等它跑起来再发，或者直接改要求。
+
+原因是这个块的状态就是 open —— 上一轮只做了「记录切分」，从没认领、也没有任何 workflow 拿它跑过。steering 队列是挂在正在跑的 run 上的，没有 run 就没有下一个波边界可以投递，所以"最后再加一步"没有地方落。刚才那个三波 workflow 也确实跑完了（而且是 FAILED），它的 run 也早结束了。
+
+而且就算排进去了，这一步照样写不出来：/home 还是 ro 挂载，第四行一样是 Read-only file system。
+
+要真落地，三条路：
+
+重开一单：走 grok_open_block preview → start，把切分改成四个有依赖的波（三行 + 一行总结），一次审清楚；
+先认领再跑：grok_accept_block 认领 0f135d39…，补上 owner，真起一个 workflow 跑起来，跑的过程中再用 grok_steer 把总结这步插进下一个波边界——这才是 steer 设计的使用姿势；
+先修环境：把 /home remount 成 rw，否则 1、2 都只能走到写文件那一步再失败。
+
+我建议 3 → 2 的顺序（先能写，再演示真机插话）。你定。
+
+用量 165K tok
+01:28
+现在再用 grok_steer 把「再加一步：写一行总结」排进「跑中插话接线验证」那个块。
+01:28
+已完成
+已完成，用时 19秒
+
+又调了一次，结果一模一样：这个块根本没在跑，steer 没有可投递的边界。我刚查了账本，挡住它的前提条件还在：
+
+代码块
+status: open          plan_id: null      tasks: []
+report.run_id: null   heartbeats: []     verdicts: []
+
+也就是说：这一块从记录进来那一刻起就没有被认领、没有 plan id、没有任何 run 在跑、一次心跳都没有。grok_steer 投递的是「下一个波边界」，边界来自活着的 run；没有 run，这句话无处可落。这跟重试、跟措辞都无关 —— 同样的调用只会拿回同样的 invalid。
+
+要让它真能排进去，得先制造出那个边界，顺序是：
+
+grok_accept_block 0f135d39… —— 认领，给它一个 plan id，这是"这一块有人管"的记录；
+起一个真正跑这一块的 workflow（这一块声明的是 execution: workflow 但没有 owner，所以派给谁现在是空的，得先定）；
+在它跑到某一波、即将进入下一波的时候，grok_steer 把「再加一步：写一行总结」推进 grok_replan_intents 那个边界 —— 那才是"跑中插话"真正被读取的时刻。
+
+现在卡在两件事上：owner 没定，而且 /home 还是只读（就算插进去了，写行那一步照样 EROFS）。
+
+要我接着做的话，给我一个子代理名当 owner，我就执行 1 → 2；或者你先把只读挂载解决掉，我一次把 1 → 3 走完。你选一个，我不替你猜。
+
+用量 114K tok
+01:29
+发消息或创建任务, / 调用指令, @ 文件或对话
+工作区内修改
+自动接着跑
+关
+自迭代
+关
+工作流开关
+开
+5 轮 26 步·128 tok/s
+1M tok·缓存命中 94%
+11%

@@ -1,0 +1,24 @@
+# The run's own progress rows, read out of the soak session log (zstd jsonl).
+# Source: <scratch DSH_HOME>/sessions/--home-fish-Documents-deepseek-harness-default-workspace--/session-711a9399-8739-4d26-a073-587c50d92c8c/session.v4.jsonl.zstd
+
+"type":"tool-workflow/run-start","seq":135,"time":1795627361120,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","name":"任务团队"}
+"type":"tool-workflow/guardian-start","seq":136,"time":1795627361121,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","armed":true,"budgetMs":7200000}
+"type":"tool-workflow/agent-start","seq":138,"time":1795627361639,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":1,"label":"规划（第1次）","phase":"规划","childId":"3d0d13f6-d069-4411-b08c-66fc422a6712"}
+"type":"tool-workflow/agent-end","seq":141,"time":1795627388550,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":1,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":143,"time":1795627388697,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":2,"label":"执行","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"a3ef0fc8-0fbe-4786-a46d-ebd031f4adf0"}
+"type":"tool-workflow/agent-end","seq":144,"time":1795627427610,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":2,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":146,"time":1795627427635,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":3,"label":"检查","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"276c1e1d-78e1-4e3b-a8bb-6a63d87e02c1"}
+"type":"tool-workflow/agent-end","seq":147,"time":1795627459549,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":3,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":149,"time":1795627459574,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":4,"label":"复核","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"16a0a49a-304b-499f-8fcb-b96b32adb134"}
+"type":"tool-workflow/agent-end","seq":150,"time":1795627488286,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":4,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":152,"time":1795627488308,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":5,"label":"执行（尝试 2）","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"21078a20-d870-4833-b8a3-7e5402f62b48"}
+"type":"tool-workflow/agent-end","seq":153,"time":1795627525416,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":5,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":155,"time":1795627525440,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":6,"label":"检查（尝试 2）","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"d8075fef-386a-44d9-bdc7-2087ad112cea"}
+"type":"tool-workflow/agent-end","seq":156,"time":1795627551257,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":6,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":158,"time":1795627551279,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":7,"label":"复核","phase":"任务 1 · 第一步：创建文件并写入第一行","childId":"2435228a-1be6-4264-8b42-f2f899bd9c0e"}
+"type":"tool-workflow/agent-end","seq":159,"time":1795627598613,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":7,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":161,"time":1795627598636,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":8,"label":"规划（第2次）","phase":"规划 · 波 1 边界","childId":"c9f6df7c-68e3-4636-b51a-330994e16dd7"}
+"type":"tool-workflow/agent-end","seq":162,"time":1795627610802,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":8,"outcome":"completed"}
+"type":"tool-workflow/agent-start","seq":164,"time":1795627610826,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":9,"label":"规划（第3次）","phase":"规划 · 波 2 边界","childId":"4ab67933-e804-4402-a778-e55e81b6c2d4"}
+"type":"tool-workflow/agent-end","seq":165,"time":1795627621307,"data":{"runId":"3c513728-7c0a-4027-ae18-d5a30f1aae63","seq":9,"outcome":"completed"}
+grep: write error: Broken pipe

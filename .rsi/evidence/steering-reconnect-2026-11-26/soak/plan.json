@@ -1,0 +1,19 @@
+[
+ {"type":"fresh","label":"fresh"},
+ {"type":"clicktext","label":"pick-workspace","text":"默认工作区","waitMs":2500},
+ {"type":"sleep","ms":1500},
+ {"type":"send","label":"s0-grok-on","timeoutMs":120000,"quietMs":6000,"shot":true,"text":"/grok on"},
+ {"type":"send","label":"s1-preview","timeoutMs":240000,"quietMs":8000,"shot":true,
+  "text":"用 grok_open_block 的 preview 模式开一个块，只要预览、不要 start：标题「跑中插话接线验证」，objective「验证跑中插话能不能并进正在跑的计划」，deliverable「一次真机读数」，acceptance 只有一条「读到 plan.replans」，execution 填 workflow。"},
+ {"type":"send","label":"s2-start","timeoutMs":240000,"quietMs":8000,"shot":true,
+  "text":"确认。用上面的 preview_id 和 split_hash，以 start 模式把这个块开始。"},
+ {"type":"send","label":"s3-run","timeoutMs":9000,"quietMs":1000,"shot":true,
+  "text":"现在用 grok_workflow 跑一个三波的小活：目标「在 .tmp/soak-steer-note.md 写三行」，分三步，第二步依赖第一步、第三步依赖第二步，每一步只写自己那一行，角色尽量用最便宜的。不要传 tasks 参数，让插件自己规划出三个有依赖的波。"},
+ {"type":"snapshot","label":"s3-running","shot":true},
+ {"type":"send","label":"s4-steer-midrun","optional":true,"timeoutMs":30000,"quietMs":3000,"shot":true,
+  "text":"顺便加一步：最后再写一行总结。用 grok_steer 把这个要求排进「跑中插话接线验证」那个块。"},
+ {"type":"settle","label":"s3-done","timeoutMs":1200000,"quietMs":25000,"shot":true},
+ {"type":"send","label":"s5-steer-after","timeoutMs":180000,"quietMs":10000,"shot":true,
+  "text":"现在再用 grok_steer 把「再加一步：写一行总结」排进「跑中插话接线验证」那个块。"},
+ {"type":"snapshot","label":"s6-final","shot":true}
+]

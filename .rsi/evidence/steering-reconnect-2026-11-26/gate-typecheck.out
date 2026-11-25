@@ -1,0 +1,3 @@
+# 2026-11-26T01:30:48+08:00 | worktree /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-steering | HEAD a4753fe
+$ npx tsc -p tsconfig.json --noEmit
+EXIT=0

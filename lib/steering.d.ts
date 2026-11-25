@@ -70,15 +70,37 @@ export declare class SteeringQueue {
     take(): SteeringPull;
 }
 /**
+ * Mint a run token without registering anything.
+ *
+ * The token is needed *before* the queue exists: `buildWorkflowRequest` budgets
+ * the boundary calls from it, while the registration must happen as late as
+ * possible in the run's setup (a run that never starts leaves no queue behind —
+ * see `runWorkflow`). Minting and registering are therefore two steps, and this
+ * is the first one.
+ * @returns a token unique within this process.
+ */
+export declare function mintSteeringToken(): string;
+/**
  * Register a run's steering channel.
  * @param sessionId - the session the run belongs to.
- * @param token - the run token (a fresh one when omitted, for tests).
+ * @param token - the run token; omitted means a fresh one (tests, callers that
+ *   do not need to know it in advance).
  * @returns the queue and the token the script must quote.
  */
 export declare function openSteering(sessionId: string, token?: string): {
     token: string;
     queue: SteeringQueue;
 };
+/**
+ * Close one run's channel; called from the run's `finally`.
+ *
+ * Only this token's entries are removed. A newer run in the same session that
+ * already took the channel over keeps it: the session mapping is dropped only
+ * when it still points at *this* token, so closing an older run cannot make a
+ * live run unsteerable.
+ * @param token - the token returned by {@link openSteering}.
+ */
+export declare function closeSteering(token: string): void;
 /** Close every channel (plugin unload). */
 export declare function closeAllSteering(): void;
 /**

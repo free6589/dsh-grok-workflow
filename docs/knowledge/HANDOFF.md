@@ -1,3 +1,46 @@
+## 2026-11-26 — `fix/steering-reconnect`：跑中插话的接线接回 `runWorkflow`（开队列 + 传令牌 + `finally` 关），真机上两道波边界真的叫了边界子并用新令牌调了拉取工具；**跑中并入本身仍没有活调用方（`D-161`）**，未合 `main`、未 push、未发版
+
+- **From:** 包工头（`agent-181`）· **To:** 下一个接手者 / 拍板的人
+- **这一轮是什么**：一支独立分支上的**接线修复**，不是新功能。0.13.35（M3.3）把旧前台整条链删掉时，
+  `src/gate.ts` 里那句 `openSteering()` 一起走了；队列（`src/steering.ts`）、拉取工具（`grok_replan_intents`）、
+  边界合并（`src/replan.ts`）三件都还在树上，却没有任何东西开队列——于是 `grok_steer` 永远回「这一块现在没有在跑的
+  workflow」。这一轮把这条调用链接回 `runWorkflow`。
+- **身份**：分支 **`fix/steering-reconnect`**，从 `main` 尖端 **`237cf2d`** 开出；产品提交 **`a4753fe`**
+  `fix(steering): a run opens its own live channel again`。改动面 **5 个 `src/` 文件 + 1 份 spec + 重建 `lib/` + `CHANGELOG`**：
+  - `src/steering.ts`：加回 `closeSteering(token)`（M3.3 当死代码删掉的那个，只删自己那一格）并新增
+    `mintSteeringToken()`（令牌要在队列之前铸，因为 `buildWorkflowRequest` 用它算边界的 agent 预算）；
+  - `src/run.ts`：新增 `RunWorkflowOptions.steering?: { sessionId }`，在引擎 `start` 之前的最后一步
+    `openSteering`，令牌传进 `buildWorkflowRequest`，`finally` 第一件事 `closeSteering`，并在关闭时只记「几条没并进去」；
+  - `src/index.ts`：工具面把「这次调用属于哪个会话」传进去（跑中要求按会话找队列）；
+  - `src/config.ts` / `src/types.ts`：三条过时注释订正（引用已删的 `src/channel.ts`、把「默认关」写成与
+    `DEFAULT_REPLAN = true` 相反、以及一段从 `iterateTemplate` 掉队的注释）；
+  - `test/replan.spec.ts`：**17 → 21**（三条接线 + 一条「老 run 关队列不会让新 run 变哑」）。
+- **块内门禁（`CONFIRMED`）**：`tsc` `EXIT=0`；`oxlint` `15 warnings / 0 errors / 182 files`；定向 6 份 spec
+  **`98 passed`**；`npm run build` `client bundle: 348559 bytes`；`verify:lib` 在 `a4753fe` 上
+  `285 files, byte-identical`。转录与红（退回 `main` 的 `src` 只跑新 spec → **`2 failed / 19 passed`**）都在
+  **`.rsi/evidence/steering-reconnect-2026-11-26/`**。**全量 `npm run ci` 没跑**（§12，留给发版提交）。
+- **真机（`CONFIRMED`，隔离档案 `steer` 复制自 live web 档案、端口 3399、live 3080 全程没碰）**：
+  装的是本轮 `npm pack` 的 tgz（`lib/steering.js` `sha256 a6c10bbc…0179` 与工作树逐字节相同、版本读回 `0.13.40`）；
+  一次真模型运行（3 波依赖计划）里进度行出现 **`规划（第2次）` `规划 · 波 1 边界`** 与
+  **`规划（第3次）` `规划 · 波 2 边界`**，两个边界子各自的 session 日志都记到
+  `grok_replan_intents`，令牌 **`steer-mwwe62zr-1`**（`mintSteeringToken()` 铸的形状）。运行结束后再 `grok_steer`
+  回「这一块现在没有在跑的 workflow」——队列随 run 关掉了。
+- **`FAILED` 的那次运行（照实记，原因在环境）**：子代理沙箱里 `/home` 是只读挂载（`btrfs ro`），
+  `printf > .tmp/soak-steer-note.md` 报 `Read-only file system`，任务 1 两次尝试用尽、任务 2/3 未启动。
+  计划、波次、依赖链、边界、汇总都按设计跑完。**这一轮的真机读数里没有一次 `completed` 的 run。**
+- **这一轮量到的边界（下一块的事）**：运行中发出的那条消息被 GUI **排队**（提示 `Cmd/Ctrl+Enter 插话发送全部排队消息`），
+  模型在这一轮**结束之后**才看到它；而 `grok_workflow` 是同步工具调用、子代理又被 `origin === 'subagent'` 守卫明令拒绝，
+  所以**今天没有任何角色能在跑中调用 `grok_steer`**。要真做跑中并入，二选一：
+  ① 把宿主侧的消息入口拿回来（M3.3 删掉的那半：消息到达时按会话入队，不占调用方的轮）；
+  ② 允许调度子代理跑 workflow，并把通道键到**根会话**（`Session.header.parentSession` 可以走上去）。
+  两条都要拍板，`D-161` 的 Consequences 里写着。
+- **给下一个人的三条**：① 合之前先想清楚上面那条边界——现在合并等于只把管道接回去，代价是每道波边界多一次
+  planner 路由调用（`CHANGELOG` 的 `[Unreleased]` 已如实写明）；② 这条分支**没有**发版、没有 bump 版本；
+  ③ 跑真机用 `.rsi/evidence/steering-reconnect-2026-11-26/soak/drive.mjs`（CDP 装置），
+  但**先确认 `<scratch>` 里有 `.credentials.yaml` 与 `bifrost.env`**，否则第一轮就会 `MISSING_CREDENTIAL`（这轮踩过）。
+
+---
+
 ## 2026-11-26 — `0.13.40` 已发布并收口：合流口径落地（「全部被拒」= 汇总节点转琥珀、理由在它展开的调用里）、发版门禁 `102 files / 1923 tests` 跑绿、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`（只能写工作区）**，**真机上没人见过那颗琥珀节点（`NOT_RUN`）**
 
 - **From:** 记忆收口（`memory-closeout`）· **To:** 包工头 / 下一个接手者
