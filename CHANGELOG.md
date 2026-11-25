@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.42] - 2026-11-26
+
 ### Fixed / 修复
 
 - **A message typed while a run is working now joins that run / 跑中发出的那句话现在真的会并进正在跑的计划** —
