@@ -39,7 +39,7 @@ import {
 import type { ArchiveEntry } from '../src/memory/archive.js'
 import { runArchiveCli } from '../src/memory/cli.js'
 import { childFinding, childResultText, createMemoryArchiver, roundArchiveSummary } from '../src/memory/recorder.js'
-import { createActiveState, runSingleCall, runWorkflow } from '../src/run.js'
+import { createActiveState, runWorkflow } from '../src/run.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness, type ChildAnswer, type ChildCall, type EngineHarness } from './engine-harness.js'
 
@@ -561,32 +561,6 @@ describe('a real run archives while it is running', () => {
     const round = readArchive({ dir }).find(item => item.kind === 'round')!
     expect(round.objective).toBe('Ship the verified result')
     expect(round).toMatchObject({ status: outcome.report.status })
-  })
-})
-
-describe('the front-desk tier is a round too', () => {
-  it('archives the one-call answer under its own run id before the call returns', async () => {
-    const engine = harness(() => ({ output: [{ type: 'text', text: '407 是 11 乘 37 的结果' }] }))
-    const outcome = await runSingleCall({
-      ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxTasks: 2}),
-      state: createActiveState(),
-      logger,
-      agent: { session: Session.create('sess-memory-front-desk' as never) } as never,
-      prompt: '11 乘 37 等于多少？',
-      label: 'Front desk',
-    })
-    expect(outcome).toEqual({ ok: true, text: '407 是 11 乘 37 的结果' })
-
-    const [stored] = readArchive({ dir })
-    expect(stored).toMatchObject({
-      kind: 'round',
-      status: 'completed',
-      objective: '11 乘 37 等于多少？',
-      summary: '407 是 11 乘 37 的结果',
-      sessionId: 'sess-memory-front-desk',
-    })
-    expect(stored!.id.startsWith('run:')).toBe(true)
   })
 })
 

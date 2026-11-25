@@ -1,3 +1,55 @@
+## M3.4 死代码收尾：删掉 0.13.35 遗留的一批零引用导出、改写 12 个够到它们的 spec、门禁通过（`fix/m3-dead-code`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/m3-dead-code`（worktree
+`.tmp/wt-m3-dead-code`，Node v26.8.1），基线 `main` 尖端 **`dde5b09`**，分支尖端 **`56f2feb`**。**全量门禁由 dispatcher 跑**；
+**记忆收口轮自己重跑了下面这几条**——同一批 12 个 spec（现在这棵树 **319** 例，`dde5b09` 的一次性解包 **338** 例）、
+`tsc -p tsconfig.json --noEmit`、`oxlint src test`，以及改完 `CHANGELOG.md` 之后的六个文档/更新守卫。
+**没有重跑 `npm run ci`，也没有跑 `npm run build`**（第二次并发的 `ci` 会抢 `TMPDIR`、`build` 会抢 `lib/` 产物）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、提交 | `git status --short --branch`；`git log --oneline -3`（worktree） | `## fix/m3-dead-code`，两条提交 **`d484229`** → **`56f2feb`**，基线 `dde5b09`。**`CONFIRMED`** |
+| 两条提交的面 | `git show --numstat --format="" d484229` / `56f2feb`；再按 `src/`、`lib/` 分组求和 | **`d484229`**：`src/` **13 文件 / +17 −691**、`lib/` **42 文件 / +48 −799**，合计 **55 文件 / +65 −1490**；**`56f2feb`**：**12 文件 / +71 −321**（全是 `test/`）。**`CONFIRMED`** |
+| 删除符号的零引用（删之前） | 对 33 个符号逐个 `grep -rn "\b<sym>\b" src/` | 33 个符号在 `src/` 里**全部 0 命中**——这是「删的是死代码」这条主张的唯一判据。**`CONFIRMED`** |
+| 逐文件行数（删前 → 删后） | `wc -l <file>` 与 `git show dde5b09:<file> \| wc -l` | `answer.ts` **222 → 58**、`run.ts` **2014 → 1692**、`mode.ts` **135 → 130**、`config.ts` **1334 → 1301**、`records.ts` **952 → 832**、`steering.ts` **169 → 159**、`intake.ts` **200 → 183**。**`CONFIRMED`** |
+| 十二个改写过的 spec（收口轮自己跑） | `TMPDIR=$PWD/.tmp npx vitest run test/final-answer-rewrite.spec.ts test/delivery-human-block.spec.ts test/delivery.spec.ts test/memory-archive.spec.ts test/mode.spec.ts test/command.spec.ts test/reliability.spec.ts test/docs-config-keys.spec.ts test/compact-step-pairing.spec.ts test/records-redaction.spec.ts test/intake.spec.ts test/client.spec.ts` | **EXIT=0**：`Test Files 12 passed (12)` / **`Tests 319 passed (319)`**，6.24 s。逐文件：`delivery-human-block` 46、`client` 132、`command` 27、`memory-archive` 20、`reliability` 19、`mode` 16、`delivery` 15、`docs-config-keys` 13、`final-answer-rewrite` 12、`intake` 9、`compact-step-pairing` 7、`records-redaction` 3。**0 skipped / 0 todo。`CONFIRMED`** |
+| 基线同一批文件（收口轮自己跑） | `git archive dde5b09 \| tar -x -C .tmp/m34-base`（一次性解包到 `.tmp/`，`node_modules` 软链自父 checkout）+ 同一批 12 个 spec | **EXIT=0**：`12 passed (12)` / **`338 passed (338)`**。逐文件：`delivery-human-block` 46、`client` 132、`command` 27、`memory-archive` **21**、`reliability` **20**、`mode` **18**、`delivery` **21**、`docs-config-keys` 13、`final-answer-rewrite` **15**、`intake` **14**、`compact-step-pairing` 7、`records-redaction` **4**。**`CONFIRMED`** |
+| 删掉的检查项数目 | 上两行相减：`338 − 319` | **19**，与 `56f2feb` 提交说明里的「Nineteen checks are gone」一致。**没有一份 spec 被整份删掉**，也没有一条被 `skip` 或标 `todo`。**`CONFIRMED`** |
+| 逐文件差额（基线 → 现在） | 上面两行的逐文件读数 | `delivery` 21→15（**−6**）、`intake` 14→9（**−5**）、`final-answer-rewrite` 15→12（**−3**）、`mode` 18→16（**−2**）、`memory-archive` 21→20 / `reliability` 20→19 / `records-redaction` 4→3（各 **−1**）；`delivery-human-block` 46、`client` 132、`command` 27、`docs-config-keys` 13、`compact-step-pairing` 7 **不变**。**`CONFIRMED`** |
+| 替换指向的是存活的生产路径 | `git show 56f2feb -- test/`；`grep -rn "deliverReport" src/delivery/index.ts`；`grep -rn "appendAssistantInStep" src/records.ts test/compact-step-pairing.spec.ts` | `deliverReport` 是 `src/delivery/index.ts:1301` 的活函数；`appendAssistantInStep` 是 `src/records.ts:729` 的活函数，spec 按被删包装器原来的实参调（`'档位：团队档'`, `{ provider: 'grok-workflow', model: 'workflow-receipt' }`, `silent`, `'instant receipt'`）。**`CONFIRMED`** |
+| typecheck（收口轮自己跑） | `npx tsc -p tsconfig.json --noEmit`（`src` + `test` 整棵树） | **EXIT=0**，无输出。**`CONFIRMED`** |
+| lint（收口轮自己跑） | `npx oxlint src test`（177 个文件 / 96 条规则 / 6 线程） | **`Found 15 warnings and 0 errors.`**——与 0.13.35 门禁记下的 15 条**完全相同**，本轮**没有新增一条警告**。**`CONFIRMED`** |
+| 门禁（全量，dispatcher 跑，`56f2feb` 的树） | `TMPDIR=$PWD/.tmp npm run ci` | **EXIT=0**：`Test Files 98 passed (98)`、**`Tests 1832 passed (1832)`**、`Duration 108.89s`、`Found 15 warnings and 0 errors.`、**`lib/ at 56f2feb is the build of src/ at 56f2feb (281 files, byte-identical)`**，同一条命令的输出里还有 **`client bundle: 321631 bytes`**。**`CONFIRMED`**（收口轮未重跑 `ci`；自己重跑的是同一批 12 个 spec、`tsc` 与 `oxlint`，读数一致） |
+| typecheck / lint（dispatcher 跑） | `npm run typecheck`；`npm run lint` | 两条都 **EXIT=0**（dispatcher 的记录，与上面收口轮自跑的读数相同）。**`CONFIRMED`** |
+| 门禁的基线算术 | 0.13.35 的门禁读数（**1851** 例）与本行 | **1851 − 19 = 1832**，与门禁的 `1832` 相等；spec 文件数 **98 → 98**（本轮一个文件都没删，所以文件数不动）。**`CONFIRMED`** |
+| `lib/` 文件集 | `git diff --name-status dde5b09 HEAD -- lib/`；`ls lib/*.js \| wc -l`；`find lib -type f \| wc -l` | 42 条**全是 `M`**（没有一条 `A`/`D`）；**71 个 `.js` / 281 文件**，与基线同数。**本轮删的都是同一文件里的导出、没有删模块，所以没有孤儿产物可扫。** **`CONFIRMED`** |
+| 两次连续构建的 `lib/` | —— | **`CONFIRMED`**（工人的读数：两次构建逐字节相同；收口轮**未重跑** `npm run build`，理由见本条开头） |
+| 构建体积 | 门禁输出里的 `client bundle` 行 | **321631 bytes**（基线 321645，**差 14 字节**＝`src/client/index.js` 里被删掉的那行注释文字）。**`CONFIRMED`**（收口轮未重跑构建） |
+| 六个守卫（收口轮自己跑，改完 `CHANGELOG.md` 之后） | `TMPDIR=$PWD/.tmp npx vitest run test/update-entry.spec.ts test/update-surface.spec.ts test/docs-config-keys.spec.ts test/docs-version.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts` | **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 79 passed (79)`**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）——`docs-version` 读 `CHANGELOG.md`，所以本轮新增的 `[Unreleased]` 条目也在被它核的范围里。**`CONFIRMED`** |
+| 六件守卫读哪些文件（收口轮逐件核过） | 对六个 spec 逐个 `grep readFileSync` | 读的是两个 README、`docs/LOCAL-TESTING.md`、`docs/ARCHITECTURE.md`、`package.json`、`CHANGELOG.md`、`src/client/index.js`——**没有一件读 `docs/knowledge/*`**。M3.3 那条记忆里「文档守卫 spec 仍然读这几份文件」与这次实测不符；旧条目照原文留着，以本行为准。**`CONFIRMED`** |
+| 复核时顺手发现的残余死代码 | `grep -oE "^export const FIXED_[A-Z_]+" src/config.ts` 后逐个统计 `config.ts` 之外的读者；全仓 grep | `FIXED_TRIAGE_CLASSIFIER` 在 `src/` 与 `test/` 里**零读者**（全仓只剩它自己那行定义）；`FIXED_TIMEOUT_MS` 与 `FIXED_ANSWER_STRATEGY` **只剩测试在读**；其余 `FIXED_*` 都有生产读者。本轮清单没写到这三处，按 `D-148` d **只报不删**。**`CONFIRMED`** |
+| 文档与代码的一处不一致（本轮发现） | `grep -rn "maxQueuedMessages" src/ test/ README.md README.zh-CN.md`；`git show 56f2feb -- test/docs-config-keys.spec.ts` | 键在 `REMOVED_CONFIG_KEYS`（`src/config.ts:471`）；两个 README 仍把 **`maxQueuedMessages=4`** 列在「其余一律固化在插件内部」那句里；那个 `4` 的出处 `FIXED_MAX_QUEUED_MESSAGES` 本轮删了，于是**这个数字在全仓再没有代码出处**（代码里唯一还写着 `maxQueuedMessages` 的是硬上限表里的 **`8`**，而那个成员**也没有读者**）。守卫里那一条事实已按 `D-148` b 丢掉、**没有拿 `4` 硬写**。**`CONFIRMED`** |
+| 真机 soak | —— | **`NOT_RUN`**：本轮不改行为、不发版，`AGENTS.md` §3 的 soak 门槛由「改行为」触发，这一轮不满足。 |
+| live profile 升级 | —— | **`NOT_RUN` / `BLOCKED`**：`~/.dsh` 一行未写、未重载、未重启；`~/.dsh/profiles/web/cordis.patch.yml:563` 那条 `mode: triage` **仍在**（`mode`/`legacyGate` 是移除键，先升级会让那一行拒绝激活）。 |
+| 发版 / push / tag / 版本号 / PR | —— | **`NOT_RUN`**：没有 `git push`、没有打 tag、没有改版本号（`package.json` 仍是 **`0.13.35`**）、没有创建 PR、没有 npm publish、没有合 `main`。 |
+
+**记忆侧这一轮动了什么：** `docs/knowledge/STATE.md`（顶部新条目）、`docs/knowledge/VALIDATION.md`（本条）、
+`docs/knowledge/HANDOFF.md`（顶部新条目）、`docs/knowledge/DECISIONS.md`（新增 **`D-148`**）、`CHANGELOG.md` 的 `[Unreleased]`
+下新增 `### Removed / 移除` 一条（中英双语）。
+**`src/`、`test/`、`lib/`、两个 README、`docs/ARCHITECTURE.md`、`package.json` 本轮一个字也没有写**——那些改动在
+`d484229` 与 `56f2feb` 里，是两位工人的，不是收口轮的。
+
+**Honest boundary（逐条）：**
+1. **门禁与构建不是收口轮跑的。** `npm run ci`、`npm run typecheck` / `npm run lint`、`npm run verify:lib` 与 `client bundle` 的字节数
+   都来自 dispatcher 的记录；收口轮自己重跑的是同一批 12 个 spec（两条树各一次）、`tsc --noEmit`、`oxlint src test` 与六个守卫，
+   读数与 dispatcher 一致。
+2. **`npm run build` 收口轮 `NOT_RUN`**：会写 `lib/` 并与 dispatcher 的构建抢产物；`client bundle: 321631 bytes` 因此是转述。
+3. **「两次连续构建逐字节相同」是工人的读数**，收口轮只核了「文件集未变、42 条全是 `M`」这一半。
+4. **19 条删除是行为面的事实，不是我挑的数**：两条树用同一批文件跑出 338 与 319，差额落在 7 个文件上（另 5 个一条没少）。
+5. **基线解包在 `.tmp/m34-base`，跑完即删**（`git` 不跟踪 `.tmp/`）；没有在仓库根、`docs/` 或 `src/` 留下任何探针文件。
+6. **`docs/knowledge` 现在不受任何测试守卫**（上面「六件守卫读哪些文件」那一行给了逐件读文件清单）。本轮改记忆因此不会让测试变红，
+   但这也意味着**记忆与代码不一致不会被机器抓住**——`maxQueuedMessages` 那处不一致就是这么留到今天的，靠人复核才看到。
+
 ## 0.13.35 发布：合流、三次门禁、版本口径纠错、标签、推送、远端两条 run（`CONFIRMED`）— 2026-11-25
 
 发布对象：M3.3（旧前台整条链删除 + 两个路由键移除 + `blockIntake` 默认打开）+ 设置页的 `Workflow` 项 + 角色改名，版本 **`0.13.35`**。

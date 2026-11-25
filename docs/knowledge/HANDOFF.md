@@ -1,3 +1,51 @@
+## 2026-11-25 — M3.4 死代码收尾完成（`fix/m3-dead-code`，未发版）：下一步是剩下三个常量与一个归档函数的去留，以及两个 README 里那个没有出处的数字
+
+- **From:** 记忆收口（`agent-152/memory-writer`）· **To:** 操作者 / 下一个接手者
+- **⚠️ live 档案那一行还在（这一轮没碰它）**：`~/.dsh/profiles/web/cordis.patch.yml` 第 **563** 行仍是 `mode: triage`。`mode` 与
+  `legacyGate` 从 0.13.35 起是**移除键**，带着它们升级会让 `grok-workflow` 那一行**拒绝激活**，症状就是「升级完了，工作流不见了」。
+  **升级任何档案的第一步，仍是操作者亲手删掉那一行**，然后才是装新包。本轮对 `~/.dsh` **一行未写、未重载、未重启**；
+  该档案现装的版本**上一轮读回是 `0.13.32`**（依赖写的是浮动的 `github:free6589/dsh-grok-workflow`，没有标签）；本轮没有重读，
+  所以这一条是转述，不是本轮的读数。
+- **这一支是什么**：分支 `fix/m3-dead-code`（worktree `.tmp/wt-m3-dead-code`），基线 `main` 尖端 **`dde5b09`**，两条提交、尖端
+  **`56f2feb`**：**`d484229`**（`refactor(m3.4): delete the dead exports the 0.13.35 sweep left behind`，`src/` 13 文件 / +17 −691，
+  加 `lib/` 重建 42 文件 / +48 −799）、**`56f2feb`**（`test(m3.4): rewrite the twelve specs that reached the deleted exports`，
+  12 文件 / +71 −321）。**未发版、未 push、未合 `main`、没有 PR**，`package.json` 仍是 `0.13.35`。
+- **已经证实的**：门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `56f2feb` 上 **EXIT=0**——`98 files` / **`1832 tests`**（0.13.35 是 1851，
+  **差额正好是删掉的 19 条检查项**）、`Found 15 warnings and 0 errors.`（与 0.13.35 那 15 条完全相同，没新增）、
+  `lib/ at 56f2feb is the build of src/ at 56f2feb (281 files, byte-identical)`、`client bundle: 321631 bytes`（基线 321645，差额是
+  被删掉的一行注释文字）。删掉的符号**删之前 `src/` 里调用点为零**（33 个符号逐符号 grep，全部 0 命中）。12 个改写过的 spec
+  现在合计 **319 例全过**；同一批文件在 `dde5b09` 的树上跑是 **338 例**，差 19。没有任何 spec 文件被整份删掉，没有一条被 skip。
+  逐行读数在 `STATE.md` 顶部与 `VALIDATION.md` 同日条；判据与备选在 `DECISIONS.md` 的 **`D-148`**。
+- **下一步（按顺序）**：
+  1. **`REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD` 与 `archiveRoundNow` 现在是树上看得到的最后一批零引用导出——先决定它们是
+     API 还是删掉。** 判断点不是「有没有人调」，而是「有没有人要读」：三个常量是给渲染那一侧读的一段协议文本，而
+     `archiveRoundNow` 是「没有事件流的调用方」那一个入口——插件是发出去的包，外部能不能 import 是产品问题，不是本仓库的
+     grep 能回答的。**顺带两处本轮清单没写到、复核时发现的**：`FIXED_TRIAGE_CLASSIFIER` 在 `src/` 与 `test/` 里一个读者都没有
+     （全仓只剩它自己那行定义）；`FIXED_TIMEOUT_MS` 与 `FIXED_ANSWER_STRATEGY` 只剩测试在读。按 `D-148` d 的口径本轮只报不删。
+  2. **两个 README 里有一个数字现在没有出处（本轮发现的文档与代码不一致）**：`maxQueuedMessages` 早在更早那轮就进了
+     `REMOVED_CONFIG_KEYS`（它是「已删的配置键」），而两个 README 的「其余一律固化在插件内部」那句里还列着
+     **`maxQueuedMessages=4`**。以前那个 `4` 有常量兜着，本轮常量跟着删了，于是**这个数字在全仓再没有代码出处**——顺手一查，
+     代码里唯一还写着它的地方是硬上限表里那个 **`8`**，而那个成员**也没有任何读者**。这是需要操作者拍板的一件小事：要么在代码里
+     把真实数值写出来（并有守卫钉住），要么把 README 那句话里的数字去掉。**本轮不擅自改 README**（不在写权限内，也不该在
+     死代码清理里顺手改用户文档）。
+  3. **`ask-user` 的 timed 模式（`F2`）仍是开着的产品问题**：上一轮记忆里就写着它是开着的，这轮照样没有结论，留给下一轮拍板。
+- **三件会踩的事**：
+  1. **`lib/` 是提交产物**：本轮删的都是「同一个文件里的导出」，没有删模块，所以 `lib/` **文件集一个没变**（71 个 `.js` / 281 文件，
+     `git diff --name-status` 42 条全是 `M`，没有 `A`/`D`）——**这次没有孤儿产物可扫**。以后真删模块时，仍旧要重建并扫孤儿
+     （注意 `lib/captain-memory.*` 是活模块的产物，拿 `captain*` 数孤儿会数错）。
+  2. **`src/answer.ts` 现在只有 58 行，其中三个导出没有读者**：四个导出里只有 `RELAY_SOURCE_KIND` 被 `carryover.ts` 与 `run.ts`
+     用着。谁要是给那三个常量接上调用方，就得同时想清楚**它们背后的契约已经没有任何测试钉着了**（本轮删掉的那批覆盖里，
+     relay 前言契约、折叠账本信封都在其中）——接上之前先把断言写出来，别让「现在有调用方了」冒充「现在被验证了」。
+  3. **六份记忆文档不再被任何守卫读取**：`docs-version` / `docs-config-keys` / `docs-architecture-version` / `i18n-parity` /
+     `update-entry` / `update-surface` 这六件读的是两个 README、`docs/LOCAL-TESTING.md`、`docs/ARCHITECTURE.md`、
+     `package.json`、`CHANGELOG.md` 与 `src/client/index.js`——**没有一件读 `docs/knowledge/*`**（本轮逐件核过读文件清单）。
+     所以改记忆本身不会再让测试变红；但**发版前那六件该跑还是要跑**，尤其改了 `CHANGELOG.md` 的那一轮（`docs-version` 读它）。
+     M3.3 自己那条记忆里写「文档守卫 spec 仍然读这几份文件」，与这次实测不符——**旧条目照原文留着**（记忆是当时为真的记录），
+     以本条为准。
+- **一条要如实说的话**：本轮**没有真机 soak**（不改行为、不发版，`AGENTS.md` §3 的 soak 门槛由「改行为」触发，这轮不满足）；
+  没有升级 live 档案、没有重启实例、没有碰 3080 端口那个正在跑的 Web 界面。真实范围就是「删掉零调用点的导出 + 把量它们的
+  测试改成量存活的同形路径」，**用户能感觉到的变化是零**。
+
 ## 2026-11-25 — 0.13.35 已发布（旧前台删除 + 接单台默认开 + 设置页 Workflow 项）：下一步是 live 档案删一行再升级、以及死代码收尾
 
 - **From:** 记忆收口（`agent-150/memory-writer`）· **To:** 操作者 / 下一个接手者

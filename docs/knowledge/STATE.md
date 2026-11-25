@@ -1,3 +1,60 @@
+Last updated: 2026-11-25 10:55 +08:00（**M3.4 死代码收尾：把 0.13.35 遗留的一批零引用导出删掉，并改写 12 个够到它们的 spec；门禁通过，`CONFIRMED`；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
+分支 **`fix/m3-dead-code`**，worktree `.tmp/wt-m3-dead-code`，基线 `main` 尖端 **`dde5b09`**，两条提交：**`d484229`**
+（`refactor(m3.4): delete the dead exports the 0.13.35 sweep left behind`，`src/` **13 文件 / +17 −691**，加 `lib/` 重建
+**42 文件 / +48 −799**，合计 **55 文件 / +65 −1490**）、**`56f2feb`**（`test(m3.4): rewrite the twelve specs that reached the
+deleted exports`，**12 文件 / +71 −321**）。这是 **`D-143`** 明确推迟的那一刀——那条决定说「删掉的模块」与「因它失去调用者的模块」
+是两次删除；第二次现在做完了，判据与被否掉的替代见 **`D-148`**。）
+**删了什么（逐文件 `wc -l` 实测，括号里是 `git show --numstat` 的 +/−）**：`src/answer.ts` **222 → 58**（+4 −168）——`relayText`、
+`reportEnterText`、`RelayOptions`，以及私有的 `REWRITE_PREAMBLE`/`FAILURE_PREAMBLE`/`DIAGNOSTICS_RULE`/`SUCCESS_DIAGNOSTICS_PREAMBLE`/
+`FAILURE_DIAGNOSTICS_PREAMBLE`/`foldedLedger`；`src/run.ts` **2014 → 1692**（+1 −323，净 −322）——`runSingleCall`、`SingleCallOptions`、
+`SingleCallOutcome`、`singleCallScript`、`TRIAGE_RUN_LABEL`，以及 `archiveRoundNow` 那个 import 名字；`src/mode.ts` **135 → 130**（−5）——
+`isModeEnabled`；`src/config.ts` **1334 → 1301**（+3 −36）——`ConfigReader.lastGood()` 连同它的闭包缓存、`FIXED_INSTANT_RECEIPT`、
+`FIXED_MAX_QUEUED_MESSAGES`、`FIXED_TRIAGE_ASK`、`FIXED_TRIAGE_FOLLOWUP_AS_FAST`、`FIXED_GATE_ON`、`SWITCHABLE_CLASSES`；
+`src/records.ts` **952 → 832**（+1 −121）——`alreadyRouted`、`appendInstantReceipt`、`deliveryKey`、`recordDelivery`，外加级联走的
+`readDeliveries`、`isDeliveryRecord`、`DELIVERY_RECORD`、`DeliveryPhase`、`DeliveryRecord` 与 `PluginRecordMap` 增强里
+`plugin:grok-workflow/delivery` 那个成员；`src/steering.ts` **169 → 159**（+1 −12）——`closeSteering`；`src/intake.ts`
+**200 → 183**（−17）——`inspectPrompt`。**删之前这些符号在 `src/` 里调用点为零**——本轮逐符号 grep 复核，**33 个符号全部 0 命中**。
+**枚举之外的两处，都是后果不是扩大范围**：① `createConfigReader` 的 `logger` 参数跟着 `lastGood()` 走了（它唯一的消费者就是
+`lastGood` 的兜底告警），唯一调用点 `src/index.ts:62` 一起改，现在读作 `createConfigReader(rawConfig as Record<string, unknown>)`；
+② 六处点名已删符号的注释改写为描述存活代码（`src/memory/recorder.ts`、`src/progress-tab.ts`、`src/client/index.js`、
+`src/supervisor/verdict.ts`、`src/delivery/index.ts`、`src/answer.ts`）——改法是**只摘掉符号名**，散文里「前台那一档」的描述还在：
+`archiveRoundNow` 的文档注释现在写「The front-desk tier is one `agent()` call in its own run」，而它自己仍然没有调用者。
+**测试面（12 文件 / +71 −321）**：**19 条检查项删除**，每条都是因为量的那个机制没了；**没有整份删掉任何 spec 文件，没有一条被
+`skip` 或标 `todo`**。基线算术是把同一批 12 个文件在 `dde5b09` 的树上再跑一遍：**338 → 319，差 19**。逐文件（基线 → 现在）：
+`delivery` 21→15（−6）、`intake` 14→9（−5）、`final-answer-rewrite` 15→12（−3）、`mode` 18→16（−2）、`memory-archive` 21→20、
+`reliability` 20→19、`records-redaction` 4→3（各 −1）；`delivery-human-block` 46、`client` 132、`command` 27、`docs-config-keys` 13、
+`compact-step-pairing` 7 不变。12 个文件现在合计 **319 例**。
+**替换用的是存活的生产路径，不是测试里重造的仿制品（`D-148` a）**：relay 标记切片 → `deliverReport(report).text`（诊断关掉时
+逐字节相同的那个块，断言一字未改）；`isModeEnabled` → `readModeRecord(s)?.enabled`；`appendInstantReceipt` →
+`appendAssistantInStep` 按那个包装器原来的实参调；`inspectPrompt` → 存活的 `refuseOversizePrompt` / `refuseEmptyPrompt`；
+`SWITCHABLE_CLASSES` 的比较删掉，「bundle 不导出可切换类」保留。`docs-config-keys.spec.ts` 丢掉的那一条是 `maxQueuedMessages`
+这个事实，**没有拿 `4` 硬写上去**（`D-148` b）。
+**丢掉的那部分覆盖，如实记**：relay 前言契约（默认改写、失败逐字、禁机器词）、折叠账本的信封与跨轮往返、「in-turn 与 relay
+一种措辞」、即时回执自己那一轮归档、last-good 快照、投递记录脱敏、准入五行矩阵、mode 兜底值。`parseReportRound` 仍有活覆盖
+（`carryover.spec.ts`、`report-audit.spec.ts`）。
+**门禁（dispatcher 亲自在 `56f2feb` 这棵树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：
+`Test Files 98 passed (98)` / `Tests 1832 passed (1832)` / `Duration 108.89s`、`Found 15 warnings and 0 errors.`（177 个文件，与
+0.13.35 门禁记的那 15 条**完全相同**，本轮没有新增一条）、`verify:lib` →
+**`lib/ at 56f2feb is the build of src/ at 56f2feb (281 files, byte-identical)`**，同一条命令的输出里还有
+**`client bundle: 321631 bytes`**（基线 321645，差额就是 `src/client/index.js` 里被删掉的那行注释文字）。基线算术对得上：
+0.13.35 的门禁是 **1851** 例，**1851 − 19 = 1832**；spec 文件数仍是 **98**（本轮没有删文件，所以文件数不动）。
+`lib/` 重建后 **71 个 `.js` / 281 文件**，**文件集与基线逐个相同**（`git diff --name-status dde5b09 HEAD -- lib/` 42 条**全是 `M`**，
+没有一条 `A`/`D`），两次连续构建逐字节相同。
+**死代码本体现在还剩什么（都是报出来、没有顺手删的，`D-148` d）**：① `REPORT_BEGIN`/`REPORT_END`/`LEDGER_GUARD`（`src/answer.ts`）——
+仍然导出、`src/` 内零引用；`answer.ts` 现在只剩 **58 行**，四个导出里只有 `RELAY_SOURCE_KIND` 有读者（`carryover.ts` 与 `run.ts`
+各一处），其余三个就是这三个常量；② `archiveRoundNow`（`src/memory/recorder.ts:674`）——唯一的调用者正是本轮删掉的 `runSingleCall`；
+③ 仍有读者的 `FIXED_*` 常量（`FIXED_SWITCH_ON`、`FIXED_SHOW_DIAGNOSTICS`、`FIXED_UNLOAD_DRAIN_*`、`FIXED_MAX_ACTIVE_RUNS` 等，
+喂 `script.ts`、`run.ts`、`checkpoint/schema.ts` 与配置签名行），它们不是死代码。**复核时顺手发现的两类残余，本轮清单没写到**：
+`FIXED_TIMEOUT_MS` 与 `FIXED_ANSWER_STRATEGY` 只剩测试在读，`FIXED_TRIAGE_CLASSIFIER` 在 `src/` 与 `test/` 里**一个读者都没有**
+（全仓只剩它自己那行定义）；按 `D-148` d 的口径不扩大范围，留给下一轮。
+**上一轮那份清单已经清空**：M3.3 条目末尾那段「按设计稿仍留在树上的死代码（下一轮候选，本轮不删，`D-143`）」——`relayText` /
+`reportEnterText` / `runSingleCall` 三件套 / `isModeEnabled` / `ConfigReader.lastGood()` / 五个 `FIXED_*` / `records.ts` 四函数 /
+`closeSteering` / `inspectPrompt` / `SWITCHABLE_CLASSES`——**本轮全部清掉**。那段原文不回改（一条记忆是「写下时为真」的记录），
+只在这里交叉引用。
+**没做的 / 如实记（`NOT_RUN`）**：本轮**没有真机 soak**（不改行为、不发版，`AGENTS.md` §3 的触发条件不满足）；没有升级 live 档案
+（`~/.dsh` 一行未写、未重载、未重启，`~/.dsh/profiles/web/cordis.patch.yml:563` 那条 `mode: triage` **仍在**）；没有 push、没有打
+tag、没有改版本号（`package.json` 仍是 `0.13.35`）；没有创建 PR。
+
 Last updated: 2026-11-25 10:20 +08:00（**0.13.35 已发布**：`release/0.13.35` 从 `main` 尖端 `fe07507` 开出，合 `feat/m3-delete-gate` 成 merge `fb2ae22`，发版提交 `61d8f4a`，合回 `main` 成 `ffbb6b0`；三次门禁全部 EXIT=0，标签与 Release 已推；live 升级故意留一手，须由操作者先删一行）
 **发布**：`release/0.13.35` 从 `main` 尖端 **`fe07507`** 开出；合 `feat/m3-delete-gate`（`54670f9`）成 merge **`fb2ae22`**；发版提交
 **`61d8f4a`**「chore(release): prepare v0.13.35」（**9 文件 / +59 −57**）；合 `main` 成 **`ffbb6b0`**——`git diff --stat release/0.13.35 main`

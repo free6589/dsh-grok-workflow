@@ -5,6 +5,19 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Removed / 移除
+
+- **Dead code, not features: the last unused exports left by the 0.13.35 deletion are gone / 删掉的是死代码，不是功能：0.13.35 那次删除留下的最后一批没人用的导出已经清掉** —
+  Nothing you can do produces a different result. The text renderer that relayed a report into the turn, and the front desk's
+  single-call path, lost their last callers when the old front desk was deleted in 0.13.35; this version removes them, together with
+  the private constants and record types only they read, and rewrites the twelve test files that still reached for them. Nineteen
+  checks went with them, each one measuring a mechanism that no longer exists; everything else in those files is unchanged and still
+  runs. No configuration key, tool, message wording or settings-page field moves, and nothing installs or upgrades differently.
+  / 你能做的事，没有一件结果会变。把报告转述进这一轮的那段文字渲染，和旧前台那条单次调用路径，在 0.13.35 删掉旧前台时就失去了最后
+  一个调用者；这一版把它们删掉，连同只有它们在读的私有常量与记录类型，并把仍然够到它们的十二个测试文件改写过来。十九条检查项随之
+  删除，每一条量的都是一个已经不存在的机制；这些文件里其余的用例一字未改，照旧在跑。配置键、工具、消息措辞、设置页上的字段一个都没动，
+  安装与升级的步骤也没有任何不同。
+
 ## [0.13.35] - 2026-11-25
 
 ### Added / 新增

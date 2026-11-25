@@ -59,7 +59,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // One reader, re-validated per admission (DD-9 1-2): a settings edit applies to
   // the next message, and a run that already started keeps the snapshot it was
   // given, so its limits cannot move under it.
-  const reader = createConfigReader(rawConfig as Record<string, unknown>, logger)
+  const reader = createConfigReader(rawConfig as Record<string, unknown>)
   // t47: every effective-configuration change is announced once. The t46 round could
   // not tell a settings save from a profile-patch edit — and could not read the
   // deadline the run actually used — because both lived only in memory.

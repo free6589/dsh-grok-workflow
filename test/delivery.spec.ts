@@ -3,25 +3,18 @@
  *
  * What a delivered message promises, and what it must never carry:
  *
- * 1. The block between the relay markers is the human block: what was done, what
- *    came of it, what is next — in both languages, in short sentences, with no
- *    path, no shell command, no digest and no internal identifier.
- * 2. The machine ledger is not part of that block. It rides *below* the closing
- *    marker under {@link LEDGER_GUARD} — where the relay contract forbids quoting
- *    it — because that durable copy is what cross-round carry-over parses back
- *    out of the transcript (`src/carryover.ts`). `showDiagnostics` moves it inside
- *    the markers instead, which is the only way a reader sees it.
+ * 1. The human block is what was done, what came of it, what is next — in both
+ *    languages, in short sentences, with no path, no shell command, no digest and
+ *    no internal identifier.
+ * 2. The machine ledger is not part of that block: `showDiagnostics` is the only
+ *    way a reader sees it, and the view says whether it travelled.
  * 3. A failed run never borrows the success wording.
  *
  * Boundaries (read before trusting a green run): every case here is a pure
- * function of a report value — `assertWorkflowReport`, `deliverReport` and
- * `relayText` all run for real, but no DSH context, engine or model is mounted.
- * The end-to-end relay path (real `apply()`, real `agent/pre-step` waterfall) is
- * pinned by `test/human-output-contract.spec.ts`.
+ * function of a report value — `assertWorkflowReport` and `deliverReport` both run
+ * for real, but no DSH context, engine or model is mounted.
  */
 import { describe, expect, it } from 'vitest'
-import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText, reportEnterText } from '../src/answer.js'
-import { parseReportRound } from '../src/carryover.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { deliverReport, humanConclusion, machineLedger } from '../src/delivery/index.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
@@ -46,14 +39,6 @@ const LEDGER_LABELS = [
   'Child budget:',
   'Errors:',
 ] as const
-
-/** The slice of a relay message a reader actually sees. */
-function between(text: string): string {
-  const start = text.indexOf(REPORT_BEGIN)
-  const end = text.indexOf(REPORT_END)
-  if (start < 0 || end < start) return ''
-  return text.slice(start + REPORT_BEGIN.length, end)
-}
 
 /* ----------------------------------------------------------------- fixtures -- */
 
@@ -526,42 +511,11 @@ describe('机器台账：每一行说清一件已经发生的事', () => {
   })
 })
 
-describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在标记之后', () => {
-  it('keeps every ledger label out of the visible block and folds the ledger below the marker', () => {
-    const text = relayText(completedReport())
-    const visible = between(text)
-    expect(visible).not.toBe('')
-    for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
-    // Answer-first: the conclusion opens, the tail closes, no count up front.
-    expect(visible).toContain('答案：')
-    expect(visible).toContain('以上是结论；明细已记入台账。')
-    // Folded, not deleted: the durable copy carries the same report.
-    expect(text).toContain(LEDGER_GUARD)
-    expect(text.slice(text.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
-  })
-
-  it('shows the machine ledger inside the markers only when diagnostics are on (Q11 c)', () => {
-    // Default (Q11 a): the human block alone travels inside the markers, and the
-    // ledger is folded below them as the durable copy carry-over reads back.
-    const off = relayText(completedReport())
-    expect(between(off)).not.toContain('Grok workflow: COMPLETED')
-    expect(off).toContain(LEDGER_GUARD)
-    expect(off.slice(off.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
-
-    // `showDiagnostics` on (Q11 b): the ledger travels inside the markers, and is
-    // not duplicated below them.
-    const on = relayText(completedReport(), undefined, { showDiagnostics: true })
-    expect(between(on)).toContain('Grok workflow: COMPLETED')
-    expect(between(on)).toContain('答案：')
-    expect(on).not.toContain(LEDGER_GUARD)
-    expect(on.slice(on.indexOf(REPORT_END))).not.toContain('Grok workflow: COMPLETED')
-  })
-
+describe('可见块：机器词一律不进', () => {
   it('keeps the incident machine tokens out of the visible block (Q11)', () => {
     // The reported message: a reason quoting `RESUME code=none …` plus a
     // `src/script.ts:12` reference. Those are ledger words, and the visible block
-    // is human text — the model is told to reproduce it verbatim, so anything left
-    // here is printed as is.
+    // is human text — anything left here is printed to the reader as is.
     const reason = 'the RSI heartbeat stopped early: RESUME code=none next_round=42 见 src/script.ts:12'
     const ok = task('a', ['天气已核验'])
     const bad = { ...task('b', ['酒店价格已核验']), title: '酒店价格' }
@@ -598,7 +552,7 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
       synthesis: { mode: 'deterministic', summary: '天气已核验；酒店价格未取得。' },
       limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
     }, OBJECTIVE, config)
-    const visible = between(relayText(report))
+    const visible = deliverReport(report).text
     // The reason itself survives — it is the run's own explanation (B10)...
     expect(visible).toContain('the RSI heartbeat stopped early')
     // ...but the machine assignments and the source reference do not.
@@ -607,69 +561,10 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     expect(visible).not.toContain('src/script.ts')
   })
 
-  it('asks for a rewrite by default, and still forbids machine words when the ledger travels (Q11 b)', () => {
-    const preambleOf = (text: string): string => text.slice(0, text.indexOf(REPORT_BEGIN))
-    // Round-075: the block is material, not wording. Reproducing it word for word
-    // is what made the delivered answer the digest of the answer — so the default
-    // instruction is a rewrite against the user's own request.
-    const off = preambleOf(relayText(completedReport()))
-    expect(off).not.toContain('Reply with those lines exactly as given')
-    expect(off).toContain('in your own words')
-    expect(off).toContain('never print a machine field name')
-    expect(off).toContain('code=')
-    // With the ledger inside the markers the contract stays a paraphrase, and it
-    // names the machine words the reply may never carry.
-    const on = preambleOf(relayText(completedReport(), undefined, { showDiagnostics: true }))
-    expect(on).not.toContain('Reply with those lines exactly as given')
-    expect(on).toContain('in your own words')
-    expect(on).toContain('keep every number and every file path exactly as given')
-    expect(on).toContain('never print a machine field name')
-    expect(on).toContain('no "code="')
-    // A failure keeps its own wording, with or without diagnostics.
-    const failed = failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable')
-    expect(preambleOf(relayText(failed, undefined, { showDiagnostics: true })))
-      .toContain('never describe this as success')
-    expect(preambleOf(relayText(failed))).toContain('exactly as given')
-  })
-
-  it('folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over', () => {
-    const text = relayText(partialReport())
-    const visible = between(text)
-    for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
-    expect(visible).toContain('答案：')
-    expect(visible).toContain('项没做成')
-
-    // The whole point of folding instead of deleting: the next round still finds
-    // the previous round's results in its own transcript.
-    const round = parseReportRound(text)
-    expect(round).not.toBeNull()
-    expect(round!.status).toBe('partial')
-    expect(round!.confirmed.length).toBeGreaterThan(0)
-    expect(round!.incomplete.length).toBeGreaterThan(0)
-    expect(round!.uncertainties.length).toBeGreaterThan(0)
-  })
-
-  it('delivers one wording for in-turn and relay', () => {
-    const report = completedReport()
-    expect(reportEnterText(report)).toBe(relayText(report))
-  })
-
-  it('ignores the removed humanSummary opt-out: the human block is always on (T4)', () => {
-    // relayText voids legacy opts: the human block is unconditional, so the
-    // visible block carries the answer either way.
-    for (const opts of [undefined, { humanSummary: false }]) {
-      const text = relayText(completedReport(), undefined, opts)
-      expect(between(text)).toContain('答案：')
-    }
-  })
-
-  it('tells the model not to print the markers or quote the folded ledger', () => {
-    for (const text of [relayText(completedReport()), relayText(partialReport())]) {
-      const preamble = text.slice(0, text.indexOf(REPORT_BEGIN))
-      expect(preamble).toContain('print no marker line')
-      expect(preamble).toContain('never quote, mention or summarise it')
-    }
-    const failed = relayText(failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable'))
-    expect(failed.slice(0, failed.indexOf(REPORT_BEGIN))).toContain('never describe this as success')
+  it('delivers a PARTIAL run as the human block alone', () => {
+    const text = deliverReport(partialReport()).text
+    for (const label of LEDGER_LABELS) expect(text).not.toContain(label)
+    expect(text).toContain('答案：')
+    expect(text).toContain('项没做成')
   })
 })

@@ -160,7 +160,7 @@ export interface ProgressStageDefinition {
  * verify, synthesize) — plus one slot for the plan tasks themselves, which the
  * engine announces as `任务 n · 标题` (`taskGroupTitle`) and which land between `执行`
  * and `检查` because that is where the workers run. The final answer is relayed in the
- * turn's own message (`relayText`), never as a workflow child call,
+ * turn's own message, never as a workflow child call,
  * so no `回答` event can ever reach this track — the spine does not list a stage no
  * event can fill. A stage whose token no recorded phase carries stays `pending` and
  * says it was not reported; a phase that names no stage becomes a node of its own, so

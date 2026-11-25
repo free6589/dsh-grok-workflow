@@ -41,9 +41,8 @@ export declare const SUPERVISOR_FAILED = "\u76D1\u5DE5\u8C03\u7528\u5931\u8D25";
 /**
  * The guest script: one `agent()` call, one object back.
  *
- * Written as a string because the engine runs it in its own realm; the shape mirrors
- * `src/run.ts`'s `singleCallScript` (a string answer and a structured answer are both
- * accepted so the host reads one field either way).
+ * Written as a string because the engine runs it in its own realm; a string answer and
+ * a structured answer are both accepted so the host reads one field either way.
  * @param prompt - the whole prompt handed to the child.
  * @param route - optional provider/model override.
  * @returns the script body.

@@ -1307,8 +1307,7 @@ export function deliverReport(report: WorkflowReport, opts: DeliveryOptions = {}
   // deliver the answer, so a refused chain drops in the unavailable marker here
   // instead of escaping as a thrown delivery (round 46: a silently absent ledger
   // read as a healthy run).
-  // `src/answer.ts` `foldedLedger` makes the same call on the
-  // relay path; this is the layer a direct caller of `deliverReport` sees.
+  // This is the layer a direct caller of `deliverReport` sees.
   let ledger: string | undefined
   if (diagnostics) {
     try {

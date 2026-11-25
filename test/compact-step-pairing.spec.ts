@@ -24,7 +24,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { TokenMeter } from '@deepseek-ai/dsh-token-meter'
-import { appendInstantReceipt, appendUnloadNotice } from '../src/records.js'
+import { appendAssistantInStep, appendUnloadNotice } from '../src/records.js'
 
 /* ------------------------------------------------------------------ harness -- */
 
@@ -96,7 +96,7 @@ describe('the plugin never writes an assistant row without an open step', () => 
 
     // Red on the pre-fix source: this returned true and appended the unpaired row,
     // which made the measurement below throw instead of returning a number.
-    expect(appendInstantReceipt(session, '档位：团队档', silent)).toBe(false)
+    expect(appendAssistantInStep(session, '档位：团队档', { provider: 'grok-workflow', model: 'workflow-receipt' }, silent, 'instant receipt')).toBe(false)
 
     expect(session.ownEvents().filter(event => event.type === 'assistant/message')).toEqual([])
     // The whole point: `/compact` measures this session and gets a number.
@@ -108,7 +108,7 @@ describe('the plugin never writes an assistant row without an open step', () => 
     const session = atPreStep('sess-receipt-in-step')
     session.append('step/start', { turn: 1, step: 0 })
 
-    expect(appendInstantReceipt(session, '档位：团队档', silent)).toBe(true)
+    expect(appendAssistantInStep(session, '档位：团队档', { provider: 'grok-workflow', model: 'workflow-receipt' }, silent, 'instant receipt')).toBe(true)
 
     const rows = session.ownEvents().filter(event => event.type === 'assistant/message')
     expect(rows).toHaveLength(1)

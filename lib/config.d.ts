@@ -266,25 +266,18 @@ export declare const FIXED_MAX_ACTIVE_RUNS_TOTAL = 8;
 /** Fixed carry-over/history budget (rounds, chars). */
 export declare const FIXED_HISTORY_TURNS = 20;
 export declare const FIXED_HISTORY_CHARS = 20000;
-/** Fixed per-agent queue bound. */
-export declare const FIXED_MAX_QUEUED_MESSAGES = 4;
 /** Fixed ledger row bound. */
 export declare const FIXED_RECORD_LIMIT = 256;
 /** Front desk is always `rules` + follow-up shortcut on; receipt always posted. */
-export declare const FIXED_TRIAGE_FOLLOWUP_AS_FAST = true;
-export declare const FIXED_INSTANT_RECEIPT = true;
 export declare const FIXED_HUMAN_SUMMARY = true;
 export declare const FIXED_SHOW_DIAGNOSTICS = false;
 /** Only `in-turn` survives: `relay`/`append` lose the answer on a one-shot app (D-050). */
 export declare const FIXED_ANSWER_STRATEGY: "in-turn";
 export declare const FIXED_TRIAGE_CLASSIFIER: "rules";
-export declare const FIXED_TRIAGE_ASK = true;
 export declare const FIXED_RECORD_RUNS = true;
 export declare const FIXED_SHOW_PROGRESS = true;
 /** Empty means the built-in switching policy. */
 export declare const FIXED_SWITCH_ON: Array<'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'>;
-/** The old front desk was always on: no preset or required switch could turn it off. */
-export declare const FIXED_GATE_ON = true;
 /**
  * Bounded grace window an unload gives the child calls already in flight.
  *
@@ -622,8 +615,6 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
  */
 /** One config route as written: an object, or a bare model id shorthand. */
 export type RouteInput = ModelRoute | string;
-/** Failure classes a user may name in `switchOn`. */
-export declare const SWITCHABLE_CLASSES: readonly ["rate-limit", "server-error", "connection", "timeout", "model-unavailable", "format-error", "agent-start-failed"];
 /**
  * Reject unknown keys instead of letting the loader and the schema drop them.
  *
@@ -725,8 +716,6 @@ export interface ConfigReader {
      * @throws If the current values are invalid (the message names the field).
      */
     read(): ResolvedConfig;
-    /** The last configuration that validated, for work that already started. */
-    lastGood(): ResolvedConfig;
 }
 /**
  * Build the reader used by the tool and the plugin's own surfaces.
@@ -734,11 +723,10 @@ export interface ConfigReader {
  * A settings edit invalidates nothing by itself: the next `read()` validates the
  * new values, so a broken edit refuses the next message with its exact reason
  * instead of half-applying, and a run that already started keeps the snapshot it
- * was given (`lastGood()`), which is what "live" has to mean for a run whose
- * limits must not move under it.
+ * was given, which is what "live" has to mean for a run whose limits must not
+ * move under it.
  * @param raw - live configuration object (holders included).
- * @param logger - optional logger for the fallback warning.
- * @returns A reader with a validated snapshot cache.
+ * @returns A reader that validates on every `read()`.
  */
 /** One-line summary of a resolved config, for the load-time and per-edit log line.
  *
@@ -749,7 +737,5 @@ export interface ConfigReader {
  * changes, and the deadline travels into the run's report as well.
  */
 export declare function describeResolvedConfig(config: ResolvedConfig): string;
-export declare function createConfigReader(raw: GrokWorkflowConfig | Record<string, unknown> | undefined, logger?: {
-    warn(message: string): void;
-}): ConfigReader;
+export declare function createConfigReader(raw: GrokWorkflowConfig | Record<string, unknown> | undefined): ConfigReader;
 //# sourceMappingURL=config.d.ts.map
