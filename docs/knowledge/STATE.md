@@ -1,3 +1,46 @@
+Last updated: 2026-11-25 10:20 +08:00（**0.13.35 已发布**：`release/0.13.35` 从 `main` 尖端 `fe07507` 开出，合 `feat/m3-delete-gate` 成 merge `fb2ae22`，发版提交 `61d8f4a`，合回 `main` 成 `ffbb6b0`；三次门禁全部 EXIT=0，标签与 Release 已推；live 升级故意留一手，须由操作者先删一行）
+**发布**：`release/0.13.35` 从 `main` 尖端 **`fe07507`** 开出；合 `feat/m3-delete-gate`（`54670f9`）成 merge **`fb2ae22`**；发版提交
+**`61d8f4a`**「chore(release): prepare v0.13.35」（**9 文件 / +59 −57**）；合 `main` 成 **`ffbb6b0`**——`git diff --stat release/0.13.35 main`
+为空，即 main 的树与被门禁的那棵树**逐字节相同**。
+**冲突**：`git merge-tree --write-tree main feat/m3-delete-gate` 实测只有**四个冲突**，全是记忆文档（`DECISIONS.md` / `HANDOFF.md` /
+`STATE.md` / `VALIDATION.md`），解法是两侧内容**原样拼接**、不做 `--ours/--theirs`；`CHANGELOG.md`、`docs/ARCHITECTURE.md`、
+`test/block-tools.spec.ts` 是自动合并、逐行核过——改名没被回退，`execution: "foreman"` 这个账本值仍在。合并后 `lib/` 与 `src/`
+已经自洽，`npm run build` 没有产生任何 `lib/` 差异，没有为产物 amend。
+**门禁（三次读数，全部 `EXIT=0`）**：① **`fb2ae22`**（merge 树）`TMPDIR=$PWD/.tmp npm run ci`：vitest **`98 files / 1851 tests PASS`**、
+oxlint **`Found 15 warnings and 0 errors.`**、`verify:lib` → **`lib/ at fb2ae22 is the build of src/ at fb2ae22 (281 files, byte-identical)`**；
+② **`61d8f4a`**（发版树，发版侧跑的同一命令）：同样 **98 / 1851**、15 warnings / 0 errors、
+`lib/ at 61d8f4a is the build of src/ at 61d8f4a (281 files, byte-identical)`；
+③ **包工头自己独立跑的第三次**（同一命令、同一棵 `61d8f4a` 树）：`FOREMAN_CI_EXIT=0`、98 files / 1851 tests、
+`Found 15 warnings and 0 errors.`、`lib/ at 61d8f4a is the build of src/ at 61d8f4a (281 files, byte-identical)`，日志 `.tmp/ci-foreman.log`。
+基线算术：`main`（`fe07507`）是 **112 个 spec 文件**，`feat` 删了 14 个、没加新的，**112−14=98** 与读数相等；测试数从上一版
+（`0.13.34` 的 2128、`a926cd6` 的 2130）落到 **1851**，差额来自那 14 个文件连同它们的用例一起被删。
+**文档守卫**：`00720ad` 上跑全套六件 = **6 文件 / 79 测试 PASS**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、
+`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）；把版本口径改对之后在 `61d8f4a` 上重跑其中四件 =
+**4 文件 / 30 测试 PASS**。
+**发版前抓到一个真实的谎**（细节在 `VALIDATION.md` 同日条，这里一句话）：`feat` 分支把六处用户可见文档写成「`0.13.34`（M3.3）起
+消息前面什么都不放」，但 `v0.13.34` 的树里 `src/gate.ts`、`src/mode.ts`、`src/triage.ts`、`src/captain.ts`、`src/channel.ts`、
+`src/history.ts` **都还在**（`git ls-tree --name-only v0.13.34 src/` 实测），M3.3 是 `0.13.35` 才发。发版提交里改成 `0.13.35`
+（`README.md` 三处、`README.zh-CN.md` 三处、`docs/ARCHITECTURE.md:331` 的 `Status (since **0.13.35**)`）。
+**标签与推送**：注解标签 `v0.13.35` → 标签对象 `bedf8ba2…` → 剥皮 **`ffbb6b0`**；`git show v0.13.35^{}:package.json` 读到 `0.13.35`。
+推送无 force：`fe07507..ffbb6b0  main -> main`、`* [new tag] v0.13.35 -> v0.13.35`。
+**远端 run**：CI **`45530571233` success**（main，headSha `ffbb6b0`，创建 2026-11-25T02:06:32Z → 更新 02:07:43Z）、
+Release **`45530586853` success**（tag `v0.13.35`，headSha `ffbb6b0`，02:06:40Z → 02:08:12Z）。
+**GitHub Release**：`Grok Workflow for DSH v0.13.35`（https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.35），
+资产 **`dsh-grok-workflow-0.13.35.tgz`（948278 B）**，sha256 `b5a4d96b3c6e887cd0348cc67e03668b1c77e18f8fe914ce6415559a36c95eb5`，
+非 draft、非 prerelease；发布正文就是 `CHANGELOG.md` 里 `## [0.13.35]` 那一段（88 行），含「升级前先删 `mode:` / `legacyGate:`」
+两语言各一处。`v0.13.34` 的标签与 Release 一个字节没动（剥皮仍是 `d01da81`）。
+**用户能感觉到的变化**：旧前台连同它背后的分流/队长/通道/历史四个模块整个删掉，普通消息不再被转述；`legacyGate` 与 `mode` 成了
+移除键，补丁还带着就会让那一行**拒绝激活**；接单台 `blockIntake` 默认 `true`，六个块工具默认载入就注册；设置页同时成为宿主
+设置面板左列的「Workflow」一项；「包工头」改叫「调度」。配置面 **19 键**、设置页 **16 字段**。
+**没做的 / 需要操作者动手的（`BLOCKED`，必须写清）**：`AGENTS.md` §11 的「发版后把 live profile 升到新标签」这一轮**故意没做**，
+理由是做了会把插件弄坏：live 档案 `/home/fish/.dsh/profiles/web/cordis.patch.yml` 第 **563** 行仍写着 `mode: triage`（这一行这个
+档案里没有 `legacyGate`），而 `mode` 在 0.13.35 里是移除键——先升级会让 `grok-workflow` 那一行**拒绝激活**，症状就是「工作流
+不见了」。正确顺序是操作者先删那一行，再升级。同一份档案的依赖写的是**浮动**的 `github:free6589/dsh-grok-workflow`（没有标签），
+现装的版本读回是 **`0.13.32`**；这一轮对 `~/.dsh` **一行未写**、未重载、未重启。
+**一条刻意偏离既有口径的决定**：撞号时 `feat` 的 `D-141`–`D-145` 保留原号，把 `main` 上那条「角色改名」从 `D-141` 改成
+**`D-146`**，与 `D-134`「最早合入的那一支留号」相反；理由是被证据文件钉住的号不能动（`docs/knowledge/evidence/m3-3-2026-11-25/README.md`
+逐字引用 `D-141`–`D-144`，而本仓明写证据改字即伪造）。这条偏离本身记成 **`D-147`**（见 `DECISIONS.md`）。
+
 Last updated: 2026-11-25 08:55 +08:00（**角色改名「包工头」→「调度」：只动面向用户的字，合 `main`、未发版** —
 分支 **`fix/rename-foreman`**（worktree `.tmp/wt-rename-foreman`），基线 `main` 尖端 **`061693e`**；版本仍 **`0.13.34`**）
 **做了什么**：操作员拍板把那个角色改叫「调度」——把一块活拆给子代理、收结果、自己不写代码的那一个。改的是**用户会看到的字**：

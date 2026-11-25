@@ -1,3 +1,33 @@
+## 2026-11-25 — 0.13.35 已发布（旧前台删除 + 接单台默认开 + 设置页 Workflow 项）：下一步是 live 档案删一行再升级、以及死代码收尾
+
+- **From:** 记忆收口（`agent-150/memory-writer`）· **To:** 操作者 / 下一个接手者
+- **⚠️ 升级前必须先删那一行（最重要的一条，再说一遍）**：`mode` 与 `legacyGate` 在 0.13.35 里都是**移除键**——任何 `cordis.patch.yml`
+  的 `grok-workflow` 条目里还带着它们，插件就会**拒绝激活**，表现就是「升级完了，工作流不见了」。**升级任何档案的第一步，必须是
+  操作者亲手删掉 `grok-workflow` 那一行的 `mode:` / `legacyGate:`**，然后才是装新包。本机 live 档案
+  `~/.dsh/profiles/web/cordis.patch.yml` 第 **563** 行还写着 `mode: triage`（这一行里没有 `legacyGate`），正因如此，**live 档案这一轮
+  故意没有升级**，仍停在该档案依赖解析出来的读回版本 **`0.13.32`**（依赖写的是浮动的 `github:free6589/dsh-grok-workflow`，没有标签）。
+- **0.13.35 已经发完**：`release/0.13.35` 从 `main` 尖端 `fe07507` 开出，合 `feat/m3-delete-gate`（`54670f9`）成 merge `fb2ae22`，
+  发版提交 `61d8f4a`（9 文件 / +59 −57），合 `main` 成 `ffbb6b0`（与门禁树逐字节相同）；**三次门禁全部 EXIT=0**（98 files / 1851 tests、
+  `Found 15 warnings and 0 errors.`、`verify:lib` 281 文件 byte-identical，第三次由包工头独立跑）；标签 `v0.13.35`（剥皮 `ffbb6b0`）与
+  推送、远端 CI `45530571233` 与 Release `45530586853` 两条 success、GitHub Release 资产 `dsh-grok-workflow-0.13.35.tgz`（948278 B）
+  全部落定。发版前还抓到一条真实的谎并纠掉：六处用户可见文档写「`0.13.34` 起」，而 `v0.13.34` 的树里六个旧前台模块都还在，
+  发版提交里改成 `0.13.35`。逐行读数见 `STATE.md` 顶部与 `VALIDATION.md` 同日条。
+- **下一步（按顺序）**：
+  1. **先删行、再升级**：操作者从 live 档案 `~/.dsh/profiles/web/cordis.patch.yml` 的 `grok-workflow` 条目里删掉那一行 `mode: triage`
+     （第 563 行），把依赖从浮动改**钉到 `v0.13.35`**（或文件 pin 到发版产物），再升级；升级后验证版本读回 `0.13.35`，**读不回来就把
+     那一行回滚到原值**并报失败。顺序反了，插件会拒绝激活。
+  2. **死代码收尾（M3.3 分支故意没带走的）**：`relayText` / `reportEnterText`（`answer.ts`）、`runSingleCall` 三件套（`run.ts`）、
+     `isModeEnabled`、`ConfigReader.lastGood()`、五个 `FIXED_*` 常量、`records.ts` 四个函数、`closeSteering`、`inspectPrompt`、
+     `SWITCHABLE_CLASSES`。`D-143` 写清了为什么没把它并进那次删除（一次删除不拆成两次评审）；现在删除已经发版，可以单独开一支清。
+  3. **`ask-user` 的 timed 模式（`F2`）仍是开着的产品问题**：这轮没有结论，留给下一轮拍板。
+  4. **分支清理：已经发生（收口只读确认，不是收口删的）**——`feat/m3-delete-gate`（worktree `.tmp/wt-m3-delete-gate`）与
+     `release/0.13.35` 在收口开工时**还在**（10:09 前后的 `git branch -a` / `git worktree list` 读数），收口过程中被删掉了：收口末尾
+     同一对命令不再列出这两个分支，`git worktree list` 只剩主工作树、`.git/worktrees/` 已空。删除动作不是本收口轮做的（本轮只删了
+     自己 `.tmp/` 下的草稿文件），`AGENTS.md` §5 的 24 小时期限已经落地；`54670f9` 与 `fb2ae22` 仍在历史里可达。
+- **记忆侧这一轮动了什么**：`DECISIONS.md` 新增 **`D-147`**（撞号时**被证据钉住的那一侧留号**，`D-134` 的「先合先留号」在这里让位
+  一次）；`D-146` 的标题上补了那句重编括注（合流时由 `D-141` 重编为 `D-146`）。`STATE.md` / `VALIDATION.md` 各加一条 0.13.35 的
+  收口；`src/`、`test/`、`lib/`、`CHANGELOG.md`、两个 `README` 与 `docs/ARCHITECTURE.md` 本轮**一个字也没有写**。
+
 ## 2026-11-25 — M3.3 验收通过（`feat/m3-delete-gate`）：旧前台整条链已删、设置页进了宿主设置面板，下一步是发版说明与死代码收尾
 
 - **From:** 记忆收口（`agent-146/memory-writer`）· **To:** 接发版或 M3.4 的人

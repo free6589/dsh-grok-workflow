@@ -1,3 +1,27 @@
+## 0.13.35 发布：合流、三次门禁、版本口径纠错、标签、推送、远端两条 run（`CONFIRMED`）— 2026-11-25
+
+发布对象：M3.3（旧前台整条链删除 + 两个路由键移除 + `blockIntake` 默认打开）+ 设置页的 `Workflow` 项 + 角色改名，版本 **`0.13.35`**。
+`release/0.13.35` 从 `main` 尖端 **`fe07507`** 开出，合 `feat/m3-delete-gate`（`54670f9`）成 merge **`fb2ae22`**，发版提交 **`61d8f4a`**
+（9 文件 / +59 −57），合 `main` 成 **`ffbb6b0`**（`git diff --stat release/0.13.35 main` 为空）。下面每行都写清命令与结果；
+没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 门禁 ①（merge 树） | `TMPDIR=$PWD/.tmp npm run ci`（`fb2ae22` 的树） | **EXIT=0**：vitest **`98 files / 1851 tests PASS`**、oxlint **`Found 15 warnings and 0 errors.`**、`verify:lib` → **`lib/ at fb2ae22 is the build of src/ at fb2ae22 (281 files, byte-identical)`** |
+| 门禁 ②（发版树，发版侧跑同一命令） | `TMPDIR=$PWD/.tmp npm run ci`（`61d8f4a` 的树） | **EXIT=0**：同样 **98 files / 1851 tests**、`Found 15 warnings and 0 errors.`、**`lib/ at 61d8f4a is the build of src/ at 61d8f4a (281 files, byte-identical)`** |
+| 门禁 ③（包工头独立跑的第三次） | `TMPDIR=$PWD/.tmp npm run ci`（同一命令、同一棵 `61d8f4a` 树） | **`FOREMAN_CI_EXIT=0`**：`98 files / 1851 tests`、`Found 15 warnings and 0 errors.`、`lib/ at 61d8f4a is the build of src/ at 61d8f4a (281 files, byte-identical)`；日志 `.tmp/ci-foreman.log` |
+| 基线算术（对得上读数） | `main`（`fe07507`）的 spec 文件数；`feat` 删除数 | **112 − 14 = 98**，与门禁的 98 个文件相等；测试数从上一版（`0.13.34` 的 2128、`a926cd6` 的 2130）落到 **1851**，差额就是那 14 个文件连同它们的用例一起被删 |
+| 冲突面 | `git merge-tree --write-tree main feat/m3-delete-gate` | **4 个冲突文件，全是记忆文档**：`DECISIONS.md` / `HANDOFF.md` / `STATE.md` / `VALIDATION.md`；解法是两侧内容**原样拼接**、不做 `--ours/--theirs`。`CHANGELOG.md`、`docs/ARCHITECTURE.md`、`test/block-tools.spec.ts` 是自动合并、**逐行核过**（改名没被回退，`execution: "foreman"` 这个账本值仍在）。合并后 `lib/` 与 `src/` 自洽，`npm run build` 没有产生任何 `lib/` 差异，没有为产物 amend。**`CONFIRMED`** |
+| **抓到的那条文档谎** | `git ls-tree --name-only v0.13.34 src/ \| grep -E "gate\|mode\|triage\|captain\|channel\|history"` | 六个文件在 **`v0.13.34` 的树里全部还在**（`gate` / `mode` / `triage` / `captain` / `channel` / `history`）——于是 `feat` 分支写下并复述的六处用户可见句子（「`0.13.34`（M3.3）起消息前面什么都不放」）**是假的**，M3.3 是 `0.13.35` 才发。修正落在发版提交 `61d8f4a`（**7 行 / 3 文件**：`README.md` 三处、`README.zh-CN.md` 三处、`docs/ARCHITECTURE.md:331` 的 `Status (since **0.13.35**)`），修正后的树重新过门禁（上面 ②③）与四个文档守卫。**`CONFIRMED`** |
+| 发版前置条件本地回放（打 tag 前） | 读 `package.json` 的版本；数 `CHANGELOG.md` 里 `## [0.13.35]` 段的行数；数 `[Unreleased]` 段下的条目 | `package.json` = **`0.13.35`**；`## [0.13.35]` 段 **88 行 ≥ 4**；`[Unreleased]` **0 条**。三条全部满足才打标签。**`CONFIRMED`** |
+| 标签与推送 | 注解标签 `v0.13.35`；`git show v0.13.35^{}:package.json`；push 输出 | 标签对象 `bedf8ba2…` → 剥皮 **`ffbb6b0`**；`package.json` 读到 `0.13.35`；推送**无 force**：`fe07507..ffbb6b0  main -> main`、`* [new tag] v0.13.35 -> v0.13.35`。**`CONFIRMED`** |
+| 远端两条 run | GitHub Actions 的两条 run | CI **`45530571233` success**（main，headSha `ffbb6b0`，创建 2026-11-25T02:06:32Z → 更新 02:07:43Z）；Release **`45530586853` success**（tag `v0.13.35`，headSha `ffbb6b0`，02:06:40Z → 02:08:12Z）。**`CONFIRMED`** |
+| 发布资产 | GitHub Release `Grok Workflow for DSH v0.13.35`（https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.35） | 资产 **`dsh-grok-workflow-0.13.35.tgz`（948278 B）**，sha256 `b5a4d96b3c6e887cd0348cc67e03668b1c77e18f8fe914ce6415559a36c95eb5`；非 draft、非 prerelease；发布正文就是 `CHANGELOG.md` 的 `## [0.13.35]` 段（88 行），含「升级前先删 `mode:` / `legacyGate:`」两语言各一处。**`v0.13.34` 的标签与 Release 一个字节没动**（剥皮仍是 `d01da81`）。**`CONFIRMED`** |
+| 文档守卫（合流前全套六件） | `TMPDIR=$PWD/.tmp npx vitest run test/update-entry.spec.ts test/update-surface.spec.ts test/docs-config-keys.spec.ts test/docs-version.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts`（`00720ad` 的树） | **EXIT=0**：**6 文件 / 79 测试 PASS**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）。**`CONFIRMED`** |
+| 文档守卫（改对版本口径后重跑四件） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-config-keys.spec.ts test/docs-version.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts`（`61d8f4a` 的树） | **EXIT=0**：**4 文件 / 30 测试 PASS**。**`CONFIRMED`** |
+| 真机 soak 打**已发布**的那棵树 | —— | **`NOT_RUN`**：本轮没有对 `v0.13.35` 指向的构建重跑任何一条 soak——M3.3 在 **`468e30f`** 上的四条 soak 仍是这条分支的证据，tag 上一条都没有重跑 |
+| live profile 升级 | —— | **`NOT_RUN` / `BLOCKED`**：live 档案第 563 行还带着 `mode: triage`，先升级会让 `grok-workflow` 行拒绝激活；本轮对 `~/.dsh` 一行未写、未重载、未重启（理由见 `STATE.md` 顶部那条 `BLOCKED`） |
+
 ## 角色改名「包工头」→「调度」（`fix/rename-foreman`）— 2026-11-25 (`CONFIRMED`)
 
 纯文字改动：面向用户的称呼、记忆文档与 `AGENTS.md` §10 的层名。分支 `fix/rename-foreman`（worktree `.tmp/wt-rename-foreman`），
