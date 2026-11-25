@@ -1,0 +1,70 @@
+{
+  "prompt": "用 grok_workflow 工具跑一个工作流：写 notes.md 三行安装步骤，再写 test.txt 一行 hello",
+  "sentAt": 1795621890438,
+  "states": [
+    {
+      "name": "waiting",
+      "at": 1795621900226,
+      "rel": 9.79,
+      "hooks": {
+        "viewTab": [
+          "对话",
+          "轨迹",
+          "进度",
+          "普通生图",
+          "素材库",
+          "无限画布",
+          "电商模式预览",
+          "图片转 PPT"
+        ],
+        "progress": 1,
+        "node": 3,
+        "doing": 1,
+        "ord": 0,
+        "toggle": 1,
+        "calls": 0,
+        "left": 1,
+        "wires": 2,
+        "guardian": 1,
+        "flow": 1,
+        "dock": 1,
+        "chip": "进行中",
+        "leftText": "还剩 1 步 / 共 3 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n进行中\n起点\n执行\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 3 步"
+    },
+    {
+      "name": "running",
+      "at": 1795621900360,
+      "rel": 9.92,
+      "hooks": {
+        "viewTab": [
+          "对话",
+          "轨迹",
+          "进度",
+          "普通生图",
+          "素材库",
+          "无限画布",
+          "电商模式预览",
+          "图片转 PPT"
+        ],
+        "progress": 1,
+        "node": 3,
+        "doing": 1,
+        "ord": 0,
+        "toggle": 1,
+        "calls": 0,
+        "left": 1,
+        "wires": 2,
+        "guardian": 1,
+        "flow": 1,
+        "dock": 1,
+        "chip": "进行中",
+        "leftText": "还剩 1 步 / 共 3 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n进行中\n起点\n执行\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 3 步"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}

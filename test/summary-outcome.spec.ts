@@ -8,7 +8,7 @@ import {
   PROGRESS_SUMMARY_REJECTED_REASON_CHARS,
   createWorkflowProgressRecorder,
 } from '../src/records.js'
-import { deriveProgressStory, foldProgressRuns } from '../src/progress-tab.js'
+import { deriveProgressFlow, foldProgressRuns } from '../src/progress-tab.js'
 import type { ProgressEventRecord } from '../src/progress-tab.js'
 import { assertWorkflowReport, shippedSummaryDraft, summaryGateOutcome } from '../src/report.js'
 import { buildWorkflowRequest } from '../src/script.js'
@@ -267,7 +267,7 @@ function rec(type: string, data: Record<string, unknown>, seq: number, time?: nu
   return { type, data, seq, ...time === undefined ? {} : { time } }
 }
 
-describe('the fold and the story read the rejected outcome', () => {
+describe('the fold and the flow read the rejected outcome', () => {
   const rejectedStream = (payload: Record<string, unknown>, seq = 6): ProgressEventRecord[] => [
     rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1, 1_000),
     rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
@@ -279,12 +279,19 @@ describe('the fold and the story read the rejected outcome', () => {
   it('carries the verdict onto the run and into the story', () => {
     const [run] = foldProgressRuns(rejectedStream({ drafts: 3, stage: 'check', reason: 'cites "x"' }))
     expect(run!.summaryRejected).toEqual({ drafts: 3, stage: 'check', reason: 'cites "x"' })
-    // A rejected run names no shipped draft: the mark never lands, and the card has
-    // something else to say.
+    // A rejected run names no shipped draft: the mark never lands, and the summary leg
+    // says it instead. This case pinned `deriveProgressStory(run).final` before the
+    // flowchart; it pins the same fact on the flow — the summary node turned amber, and
+    // it is the only node that carries the verdict.
     expect(run!.summaryFinalDraft).toBeUndefined()
     expect(run!.members.map((row) => row.label)).toEqual(['汇总·第1稿'])
-    const story = deriveProgressStory(run!)
-    expect(story.final).toEqual({ kind: 'rejected', drafts: 3, stage: 'check', reason: 'cites "x"' })
+    const flow = deriveProgressFlow(run!)
+    expect(flow.final).toBeUndefined()
+    const summary = flow.nodes.filter((node) => node.kind === 'summarize')
+    expect(summary).toHaveLength(1)
+    expect(summary[0]!.state).toBe('failed')
+    expect(summary[0]!.rejected).toEqual({ drafts: 3, stage: 'check', reason: 'cites "x"' })
+    expect(flow.nodes.filter((node) => node.rejected !== undefined)).toHaveLength(1)
   })
 
   it('takes the first valid claim and refuses half-facts', () => {
@@ -299,19 +306,27 @@ describe('the fold and the story read the rejected outcome', () => {
     ]) {
       const [run] = foldProgressRuns(rejectedStream(payload))
       expect(run!.summaryRejected, JSON.stringify(payload)).toBeUndefined()
-      expect(deriveProgressStory(run!).final).toBeUndefined()
+      // The same fact as the deleted `deriveProgressStory(...).final`: a half-claim leaves
+      // the page with nothing to say, so no node carries a verdict and none turns amber.
+      const flow = deriveProgressFlow(run!)
+      expect(flow.nodes.some((node) => node.rejected !== undefined), JSON.stringify(payload)).toBe(false)
+      expect(flow.nodes.filter((node) => node.kind === 'summarize').map((node) => node.state)).toEqual(['done'])
     }
   })
 
   it('prefers a shipped draft when a stream somehow carries both facts', () => {
-    // The recorder never writes both. A hand-written stream could, and the card must
-    // not deny a draft the run really shipped.
+    // The recorder never writes both. A hand-written stream could, and the page must
+    // not deny a draft the run really shipped: the draft wins, and the verdict colours
+    // nothing. The deleted story model said this with `final.kind === 'shipped'`; the
+    // flow says it with `final` plus a summary node that stayed green.
     const [run] = foldProgressRuns([
       ...rejectedStream({ drafts: 3, stage: 'check', reason: 'cites "x"' }, 6),
       rec('tool-workflow/summary-final', { runId: 'r', draft: 1 }, 8),
     ])
-    const story = deriveProgressStory(run!)
-    expect(story.final).toMatchObject({ kind: 'shipped', draft: 1 })
+    const flow = deriveProgressFlow(run!)
+    expect(flow.final).toMatchObject({ draft: 1 })
+    expect(flow.nodes.some((node) => node.rejected !== undefined)).toBe(false)
+    expect(flow.nodes.filter((node) => node.kind === 'summarize').map((node) => node.state)).toEqual(['done'])
   })
 
   it('leaves a run with neither fact saying nothing at all', () => {
@@ -320,6 +335,8 @@ describe('the fold and the story read the rejected outcome', () => {
       rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
     ])
     expect(run!.summaryRejected).toBeUndefined()
-    expect(deriveProgressStory(run!).final).toBeUndefined()
+    const flow = deriveProgressFlow(run!)
+    expect(flow.final).toBeUndefined()
+    expect(flow.nodes.some((node) => node.rejected !== undefined)).toBe(false)
   })
 })

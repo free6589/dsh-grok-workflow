@@ -1,0 +1,13 @@
+# cmd A: npm run typecheck   (whole tree)
+# cmd B: npx tsc -p .tmp/tsconfig.scope.json   (src/** + test/progress-tab.spec.ts only)
+# head: 57dcf0410c62454b0ad62e1ca6b195c6e1da213d (feat/progress-flowchart)
+# at: 2026-11-25T23:07:36+08:00
+# note: the tree is shared with another builder, who was mid-edit in test/client.spec.ts 23:06:14-23:07:06; the whole-tree run below is the settled state.
+
+== cmd A ==
+
+> dsh-grok-workflow@0.13.39 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+== cmd B ==

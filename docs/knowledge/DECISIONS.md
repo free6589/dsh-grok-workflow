@@ -4419,6 +4419,7 @@ spine 为空，pre-fix 形状会进脊柱。
   `test/client.spec.ts`、`test/report.spec.ts` 的改写；门禁 `.rsi/evidence/synth-outcome-2026-11-25/gate-5388f22.out`
   `EXIT=0`、`102 files / 1903 tests`；真机通过态读数在同一个目录，**退回态是 `NOT_RUN`**）
 - **Date:** 2026-11-25
+- **现状（合流后补记，2026-11-26）：** 上面第 5 条那个**三态卡片**在同一个发布（`release/0.13.40`）的流程图改造里退场——交卷卡不再是页面上的一块，但「每一稿都被退回」这个事实仍然可见：它落在流程图「汇总」那颗节点的琥珀状态里，退回了几稿与最后卡在哪道门（连同运行自己那句理由）写在点开该节点后的调用行里，不另开卡片（见 `D-159`、`DESIGN-progress-tab.md` §22.5）。**标记文法、读回、事件与折叠这四件事一个字没变**，变的只是它们的界面出口。
 - **Context:** 闸门（draft → check → 独立 verify）只把**通过**的结论写进报告：分层策略在全部被退回时写
   `check=fail verify=pass drafts=N` 却不带理由，plain `model` 策略连标记都不写，只剩 `synthesis.error` 的一段散文。
   于是「这一轮没交卷」在进度页上只有一个读法——那句 `progress.final.missing`——读者看不出**是一次都没写出来**
@@ -4459,8 +4460,95 @@ spine 为空，pre-fix 形状会进脊柱。
   - **退回时不动卡片，只让 chip 变「未通过」。** 否决：chip 说的是运行状态，不是汇总结论；一个 0/2 的运行与一个
     「活都做完了、只是稿子没过」的运行会显示成同一件事。
 - **Consequences:**
-  - `docs/knowledge/DESIGN-progress-tab.md` 追加 §21（标记文法、读回表、事件载荷、折叠字段、故事联合、三态卡片与钩子、
+  - `docs/knowledge/DESIGN-progress-tab.md` 追加 §22（标记文法、读回表、事件载荷、折叠字段、折叠后的判别式、节点出口与钩子、
     两条文案、通过优先的不变量、仍然 `NOT_RUN` 的两条）。
   - 报告台账行的退回后缀读**解析值**而不是被 `oneLine(...,240)` 截过的字符串，否则理由掉进截断里就只剩「退回」。
   - `synthesis.review` 仍是 schema 里的无上限 `string()`，长标记不会让报告非法（已用一条断言钉住 tail 保留）。
   - 未验的边界留在证据里：`check=pass verify=fail` 的写入端没有活引擎读数（解析/渲染有）；真机没跑过退回态。
+
+## D-159 · 进度页改回可视化流程图：一步一节点、按腿的「第几次」分组、两端是结构节点、折行处不画线（2026-11-25，未发版）
+
+- **编号说明：** 合流到 `release/0.13.40` 时本条由 `D-158` 重排为 `D-159`——`main` 侧先落地的汇总结论那条（三态卡片）占用了 `D-158`；下一条同样后移一位。
+- **Status:** `CONFIRMED`（源码 `src/progress-tab.ts` 的 `deriveProgressFlow`、`src/client/index.js` 的镜像与渲染、
+  六个 spec 的 256 条用例、门禁转录 `.rsi/evidence/progress-flowchart-2026-11-25/gate-*.out`；真机读数见
+  `VALIDATION.md` 同一节）
+- **Date:** 2026-11-25
+- **Decision:**
+  1. **节点 = 一条腿的一次访问**，固定七种：`start / plan / execute / check / review / summarize / end`。
+     两端是结构节点——`start` 恒 `done`（这一轮已经开始了），`end` 随 `stopReason`（未结束 `pending`、
+     `completed` `done`、`cancelled` `cancelled`、其余 `failed`）。中段五条腿**只按调用自己的 `label`** 认
+     （`规划/planner/plan`、`执行/worker/execute`、`检查/核验/check/verifier/verify`、`复核/review/supervisor/reviewer`、
+     `汇总/summarize/synthesizer`，`check` 先于 `review` 判），不看 `phase`——`phase` 是任务标题。
+  2. **同一腿连排怎么分组**：这一行 label 没有数字、或数字等于已开那颗节点的 `ordinal` → 并进前一颗；否则按
+     label 里的**第一个整数**开新的一颗。于是「两个任务各跑一次执行」是一颗节点挂两行，「规划（第1次）/（第2次）」
+     是两颗，「汇总·第1稿/第2稿/第3稿」是三颗。角标：`汇总` 每颗都写「第 N 稿」，其余腿只有 `ordinal > 1` 才写
+     「第 N 次」——一次就是常态，不给常态加字。
+  3. **认不出腿的行不许丢**：挂到前一个节点；前面没有中段节点时挂 `start`。这会让「两端 `members` 恒为空」这条
+     形式美感在一种情况下不成立——宁可多一颗按钮，也不丢一条已声明的调用。Guardian 那行不进图（它有自己的监控）。
+  4. **状态色就是四种观感**：`done` 绿、`doing` 蓝（当前高亮）、`pending` 灰虚线、`failed`/`blocked`/`cancelled` 琥珀；
+     仍然没有红、没有字面色值。中段状态直接用既有 `nodeState(members, ended)`。
+  5. **`at` 的唯一口径**：最早一条未结算调用所在的节点 → 否则未结束取 `end` → 否则第一颗 `failed`/`blocked` →
+     否则 `total`；一条中段节点都没有且未结束时是 1。`remaining = total - at`，`total` **含两端**（所以跑完时
+     写「还剩 0 步」）。
+  6. **连线是量的，不是猜的**：同一行左右相邻画横线，上下相邻画竖线，**折到下一行的那一对不画**——
+     画了就是主张一条读者看不见的路。测量相同则不重渲。
+  7. **故事模型整块删除**：`deriveProgressStory` 与 `ProgressStory` / `ProgressStoryStep` / `ProgressStoryLogRow` /
+     `ProgressStoryDock` 一起删（页面是它们唯一的读者，删前全仓 grep 零引用）；行的那一半留下来给节点用
+     （`rowState` / `storyRoleOf` 因此转成导出，行为一字未改）。
+- **Alternatives rejected:**
+  - **按「计划任务」当节点**（§19 的步骤口径）：那样执行/检查/复核是挂在任务行上的胶囊，一条腿走两遍只能靠
+    行文字表达，图上读不出「这一步现在在哪」。
+  - **一颗节点挂所有同腿调用**（不按第几次分组）：会把「规划两次」「汇总三稿」压成一颗节点，角色的第几次只在
+    行里，图上等于把重规划与多稿藏起来。
+  - **CSS 伪元素画线**（最省事）：折行后第一颗节点会带着一个指向没有来源的箭头；`overflow-x: auto` 被既有断言
+    禁止，横向滚动不是选项。
+  - **重试成功就把第一颗的琥珀清掉**：那颗节点上那一次真的没过；抹掉它等于把「重试过」这件事藏起来（见 D-160 末条）。
+- **Evidence:**
+  - 门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 **`e998a00`** 的干净树上（包工头跑）：`EXIT=0`、`Found 15 warnings and 0 errors.`、
+    `client bundle: 340995 bytes → lib/client.js`、
+    `lib/ at e998a00 is the build of src/ at e998a00 (285 files, byte-identical)`、
+    `Test Files 101 passed (101)` / **`Tests 1897 passed (1897)`**、`Duration 101.14s`。
+    **这一遍的 `verify:lib` 才有意义**：工作树脏着跑的那一遍比对的是 `HEAD` 的 src 与 lib（即基线自己），是空的证明。
+  - 基线（`main` 尖端 `57dcf04`，本轮在独立 worktree `.tmp/wt-baseline` 上跑的全套）：`EXIT=0`、
+    `lib/ at 57dcf04 is the build of src/ at 57dcf04 (285 files, byte-identical)`、
+    `client bundle: 347526 bytes`、`101 files / 1884 tests`、`Duration 112.96s`。
+    所以本分支 **spec 文件数不变（一换一）/ +13 条用例 / bundle −6531 字节**。
+  - 逐文件（两棵树各量一遍，不是抄总数）：`client.spec.ts` **139 → 146**、`progress-tab.spec.ts` **57 → 69**、
+    `progress-layout.spec.ts` **20 → 删除**、`progress-flow.spec.ts` **新增 15**、
+    `progress-hint-absent.spec.ts` **8 → 7**、`progress-connector.spec.ts` **11 → 11**、
+    `i18n-parity.spec.ts` **8 → 8**；`7 + 12 − 5 − 1 = +13`。
+  - 先红后绿：实现侧红跑 `51 failed / 136 passed`（把 `HEAD` 的浏览器包放回去、用最终版五份 spec 跑），
+    取数侧红跑 `18 failed / 51 passed`（源回退到 `57dcf04`）；两份转录都在证据目录里。
+  - 立/破互证：`cross-check.mjs` 把 10 组 fixture 同时喂给 `lib/progress-tab.js` 与浏览器镜像，
+    比较 `state/at/total/remaining/final` 与每个节点的 `key·kind·ordinal·state·seq`，输出 `ALL SAME`。
+
+## D-160 · 四区版退场：零说明文字、Guardian 留在页面上但不占一列、定稿卡由角色词代言（2026-11-25，未发版）
+
+- **编号说明：** 合流时由 `D-159` 重排为 `D-160`（`D-158` 已被汇总结论占用，见 `D-159` 的说明）。
+- **Status:** `CONFIRMED`（`test/progress-connector.spec.ts` 的退场守卫：40 个退役类名 + 28 个退役钩子；
+  `test/progress-hint-absent.spec.ts` 的零说明文字族；`test/i18n-parity.spec.ts` 的键集与 `REDESIGN_COPY` 表）
+- **Date:** 2026-11-25
+- **Decision:**
+  1. **页面上没有一句说明文字。** 留下的字只有：运行名、五态胶囊、七个腿词、角标、展开行里的时刻/角色/任务名/状态词/
+     「打开子会话」、Guardian 那块既有词、计数行、dock 按钮与 filled 行。删除的 19 个键（`progress.now.*`、
+     `progress.steps.aria`、`progress.flag.*`、`progress.rest`、`progress.plan.title`、`progress.log.title`、
+     `progress.log.more/less`、`progress.final.title/missing`、`progress.dock.hintStart/hintAccept/quiet`）
+     在两本字典与 `REDESIGN_COPY` 表里一起消失。
+  2. **Guardian 留在页面上，但它不是一个节点、也不再占一列**：监控说的是「这次运行还活着没有」，不是「做到哪一步」，
+     塞进流程图会把两种事实混成一种。它保持 §20 的四块瓦片与全部钩子，位置在流程图下面、计数行上面。
+  3. **「交卷」卡退场**，哪一稿是定稿改由那一行的角色词说（`汇总·第2稿（定稿）`）；同一张卡上「每一稿都被退回」那块琥珀也一并退场，那个事实改由「汇总」节点的琥珀状态与它展开的调用行承载（见 `D-158` 的现状补记与 `D-159`）；`progress.final.mark` 因此
+     **留在字典里但没有读者**——删键是为了不留死词，但这一颗是「稿名后缀」的唯一来源，留着比删掉更不容易被下一个人
+     误当成新键再加一遍，故保留并在此写清它没有读者。
+  4. **节点的状态词只进无障碍名字、不上画面**：`progress.plan.waiting/running/done/failed/cancelled` 继续用，
+     但只出现在节点的 `aria-label` 里（腿词 + 角标 + 状态词）；画面上的状态由颜色与虚线表达。这样「零说明文字」
+     与「色盲读者也读得出状态」两件事不冲突。
+  5. **保住的**：运行名 + 五态胶囊、Guardian、dock 的两颗按钮（`progress.dock.fill` 的「只填框不代发」机制一字未改）、
+     行胶囊、链段 chip（class 改名 `gw-progress-call-chain`，身份仍在 `data-gw-progress-task-chain` 钩子上，
+     因为 `gw-progress-task` 这个子串是退役指纹）。
+  6. **重试成功仍留一颗琥珀**（承 D-159）：那颗节点上那一次真的没过。
+- **Alternatives rejected:**
+  - **把 Guardian 做成图上的一个节点**（例如执行旁边一颗）：会读成「监控也是这一步的一部分」，而它不是。
+  - **整块删掉 Guardian 面板**：操作者要退场的是四区布局，不是监控能力；删掉等于顺手拿走一个他没说要拿的东西。
+  - **把状态词印在节点上**（更直白）：那就等于给每颗节点加一个要读的词，与「零说明文字」和「一眼看出」都相反。
+- **Evidence:** 见 D-159 的 Evidence 段（同一遍门禁、同一批 spec）与 `test/progress-connector.spec.ts` 的三道独立检查
+  （渲染树逐元素、源码带边界的整属性名匹配、样式表按规则选择器解析）。

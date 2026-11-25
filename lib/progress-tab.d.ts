@@ -73,7 +73,7 @@ export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-
  *
  * The sibling of {@link PROGRESS_SUMMARY_FINAL_EVENT_TYPE} and never its alternative: a
  * run either handed one draft in or handed none, so a stream carrying both is not ours
- * (the fold still has to read one, see {@link deriveProgressStory}). A tab that has never
+ * (the fold still has to read one, see {@link deriveProgressFlow}). A tab that has never
  * heard of this event renders a rejected run exactly as it did before — as a run with no
  * final draft — because the event only ever adds a reading of a gap it already saw.
  */
@@ -479,106 +479,115 @@ export declare function orderTaskCards<T extends ProgressTaskCardDraft>(cards: r
  * @returns the track model.
  */
 export declare function deriveTrack(run: ProgressRunFacts, options?: DeriveOptions): ProgressTrackModel;
-/** The five words a run can be described by on the one-page story (the header chip). */
+/** The five words a run can be described by on the one-page flow (the header chip). */
 export type ProgressStoryState = 'waiting' | 'running' | 'done' | 'failed' | 'cancelled';
-/** Which action the story's dock offers: start it, accept it, or leave the reader alone. */
-export type ProgressStoryDock = 'start' | 'accept' | 'quiet';
-/** One step of the story's track: a plan task, or one declared call. */
-export interface ProgressStoryStep {
-    /** Track node key it speaks for (`phase:任务 1 · 标题`), or `seq:<n>` for a call step. */
-    key: string;
-    /** Plan-task position (`progressTaskNumber`); absent when the step is a declared call. */
-    number?: number;
-    /** Plan-task phase header verbatim; a call step carries its role word. */
-    title: string;
-    state: ProgressState;
-    /** The task's Execute-Check-Review chain; empty for a call step. */
-    chain: ProgressChainSlot[];
-    members: ProgressMemberFact[];
-}
-/** One line of the story's history: a declared call, as the stream settled it. */
-export interface ProgressStoryLogRow {
-    seq: number;
-    /** Session time of the call's `agent-start`, when the stream carried one. */
-    at?: number;
-    /** The role the line is spoken as: the label without its attempt suffix or shipped mark. */
-    role: string;
-    /** Exact phase header (the plan-task title), or the empty string when it named none. */
-    title: string;
-    state: ProgressState;
-    /** Set on the one row `summary-final` names: the draft that actually shipped. */
-    shipped?: true;
-}
 /**
- * One page of the story, in the three screens the redesign settles on.
+ * The leg a node of the flow stands for.
  *
- * Everything here is derived from the run facts the fold already produced: no plan, no
- * percentage, no estimate, and no reading of what the run "probably" did. `steps` is the
- * track (one segment per step), `log` is the history under it, and `now` / `attempt` /
- * `rest` are the three sentences above them.
+ * The two ends are structure — the run opened, the run closed. The five in between are the
+ * calls that wrote the plan, did the work, checked it, reviewed it, or wrote the answer
+ * down.
  */
-export interface ProgressStory {
-    state: ProgressStoryState;
-    steps: ProgressStoryStep[];
-    /** 1-based current step; `0` when the run declared nothing to step through. */
-    at: number;
-    total: number;
-    /** The headline: the current step's title, or the two states that have no title. */
-    now: {
-        titleKey?: 'planning' | 'done';
-        title: string;
-        role?: string;
-    };
-    /** Present only while the current step carries a failure nothing later replaced. */
-    attempt?: {
-        n: number;
-        retrying: boolean;
-    };
-    /** The titles of the steps after the current one, consecutive repeats collapsed. */
-    rest: string[];
-    log: ProgressStoryLogRow[];
-    /**
-     * What the run handed in: the shipped draft, or the all-rejected verdict.
-     *
-     * Absent is its own fact — "nothing was recorded" — and it is not the same as a
-     * rejection: a run whose gate never judged a draft says exactly as little as one whose
-     * recorder never wrote a word.
-     */
-    final?: ProgressStoryFinal;
-    dock: ProgressStoryDock;
-}
-/** The two ways a run ends its summary: one draft shipped, or every draft rejected. */
-export type ProgressStoryFinal = {
-    kind: 'shipped';
-    draft: number;
-    label: string;
-    row?: ProgressStoryLogRow;
-} | {
-    kind: 'rejected';
+export type ProgressFlowKind = 'start' | 'plan' | 'execute' | 'check' | 'review' | 'summarize' | 'end';
+/**
+ * The gate's all-rejected verdict: how many drafts went in, where the last one stopped, why.
+ *
+ * It is the same reading `ProgressRunFacts.summaryRejected` records; the flow keeps it on the
+ * summary leg's node because that leg is what the verdict is about, and the node's opened
+ * call list is where a reader looks for that leg's calls.
+ */
+export interface ProgressFlowRejected {
+    /** How many drafts the gate turned back; at least 1. */
     drafts: number;
+    /** The gate the last draft failed: the check, or the review after it. */
     stage: 'check' | 'verify';
+    /** The gate's own words, verbatim. */
     reason: string;
-};
+}
+/** One node of the flow: one leg of the run, with the calls that spoke for it. */
+export interface ProgressFlowNode {
+    /** Stable identity: `flow:start` / `flow:end` / `flow:<position>:<kind>:<ordinal>`. */
+    key: string;
+    kind: ProgressFlowKind;
+    /** Which visit of this leg this is, counting from 1; both ends are 0. */
+    ordinal: number;
+    /** Aggregate state (see {@link nodeState}); the start is always `done`, the end follows the run. */
+    state: ProgressState;
+    /** The calls this node speaks for, in `seq` order; both ends carry none of their own. */
+    members: ProgressMemberFact[];
+    /**
+     * Set on the summary leg when every draft was rejected — nothing shipped.
+     *
+     * The verdict rides here instead of in a card of its own: the page keeps one drawing, and
+     * the words are only read once the node is opened. A node carrying it is always `failed`
+     * and never `done`, and it is the only node this field can appear on.
+     */
+    rejected?: ProgressFlowRejected;
+}
+/** One run as a flow: every node, the one being worked on, and how far that leaves it. */
+export interface ProgressFlow {
+    /** The whole run's word (`waiting` / `running` / `done` / `failed` / `cancelled`), as the chip says it. */
+    state: ProgressStoryState;
+    nodes: ProgressFlowNode[];
+    /** 1-based index of the node being worked on, in `nodes`; never below 1. */
+    at: number;
+    /** `nodes.length`. */
+    total: number;
+    /** `total - at`. */
+    remaining: number;
+    /** The row `summary-final` named — the draft that shipped: its number and its `seq`. */
+    final?: {
+        draft: number;
+        seq: number;
+    };
+}
 /**
- * Derive the one-page story for one run (the pure half of the redesign, §19.2).
+ * The state of one declared call: the row-level half of {@link nodeState}.
  *
- * Three screens out of the same facts the track already reads:
+ * A row is the smallest thing the stream settles, so its own state is its outcome and
+ * nothing else — an unsettled row is `doing` (`正在看`), and an outcome that is neither a
+ * completion, a cancellation nor a failure stays `blocked` rather than being renamed.
  *
- * - **waiting** — the run is open and no call was declared; the page says it is planning,
- *   and the track is empty because there is nothing to step through yet;
- * - **running / failed / cancelled** — one step per declared thing, the current step
- *   chosen by `doing` → `failed` → first unfinished → the last step;
- * - **done** — every declared row passed, so the headline stops naming a step.
- *
- * A step is a **plan task** when the run declared any (`任务 n · 标题`, not the guardian
- * card): those are the units a reader waits for. A run that planned nothing (a triage or
- * single-call run) steps through its declared calls instead, so the track's length is
- * always what the stream announced and never a plan nobody wrote down.
- *
- * @param run - folded run facts.
- * @returns the story model.
+ * The flow's nodes carry these rows and their opened list shows one per call, so the row
+ * keeps saying its own word even where the node above it aggregates several.
+ * @param member - one folded row.
+ * @returns the row's own state.
  */
-export declare function deriveProgressStory(run: ProgressRunFacts): ProgressStory;
+export declare function rowState(member: ProgressMemberFact): ProgressState;
+/**
+ * The role a row is spoken as: `执行（尝试 2）` → `执行`, `汇总·第2稿（定稿）` → `汇总·第2稿`.
+ * @param member - one folded row.
+ * @returns the role word, without the retry suffix or the shipped mark.
+ */
+export declare function storyRoleOf(member: ProgressMemberFact): string;
+/**
+ * Derive the flow one run draws: the two ends, one node per leg, and the one being worked on.
+ *
+ * Everything comes off the run facts the fold already produced — no plan, no estimate, and
+ * no reading of what the run "probably" did. A leg is read off a row's **label**, never its
+ * phase (a phase names the task), and the grouping has four rules:
+ *
+ * 1. a leg that ran again under its own number (`规划（第2次）`, `汇总·第2稿`,
+ *    `执行（尝试 2）`) is a node of its own, so two visits stay two steps;
+ * 2. a leg that ran again with no number of its own (two workers of one wave) folds into
+ *    the node beside it, so one step is one leg however many calls it took;
+ * 3. a row whose label names no leg is kept on the step before it — on the start when no
+ *    step has opened yet — because a declared call is a fact, not a gap;
+ * 4. the guardian call is not a leg: its own monitor speaks for it.
+ *
+ * The current node (`at`) is the one a reader is waiting on: the node holding the earliest
+ * unsettled call, else the end of a run that is still open, else the first step that is
+ * failed or blocked, else the end. Before the run declares any step it is the start.
+ *
+ * The summary is the one leg a run can end without shipping anything: `summary-final` names
+ * the draft that shipped, and `summary-rejected` says the gate turned every draft back. Only
+ * the second one, and only when no draft shipped, leaves a mark on the drawing — the summary
+ * node turns `failed` and carries the verdict for its opened call list (see
+ * {@link ProgressFlowNode.rejected}).
+ * @param run - folded run facts.
+ * @returns the flow model.
+ */
+export declare function deriveProgressFlow(run: ProgressRunFacts): ProgressFlow;
 /**
  * Parse a coordination block out of a stage's text.
  *

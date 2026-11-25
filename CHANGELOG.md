@@ -7,15 +7,34 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Changed / 变更
 
-- **The 交卷 card says why nothing was handed in / 交卷卡片会说清「为什么没交卷」** —
-  When every summary draft is rejected, the progress page's 「交卷」 card now names how many drafts were turned back and
-  what the last failure was, in the run's own words, instead of only showing the generic "this run handed in no draft".
-  A run that did hand a draft in looks exactly as it did before, and a run that recorded neither still shows the same gap
-  sentence — the new block is the third state, not a replacement. The rejection is also recorded as its own progress
-  event, so the page can say it at all. See D-158.
-  / 汇总的每一稿都被退回时，进度页的「交卷」卡片现在会写明退回了几稿、最后一次卡在哪（用运行自己那句话），
-  而不是只给一句「这一轮没有交卷稿」；交过稿的运行与以前完全一样，什么都没记录时仍是原来那句——
-  新的一块是第三种状态，不是替换品。这条结论也作为独立的进度事件记录下来，页面才说得出这句话。见 D-158。
+- **The progress page is one flow chart: every step a node, where it got to lit, what is left counted / 进度页就是一张流程图：每一步一个节点，走到哪一盏亮着，还剩几步写在一行里** —
+  The page used to ask a reader to assemble the run out of four neighbouring answers — a 「现在」 headline, an equal-segment bar, a
+  step list, a history — with the guardian in a second column. It is one figure now. From 起点 to 终点 each leg the run actually
+  recorded is a node (规划 / 执行 / 检查 / 复核 / 汇总), a leg it visited twice keeps one node per visit and says which visit it was,
+  the steps already passed are green, the one being worked on is lit, the ones still ahead are grey and dashed, and a leg that broke
+  is amber. Each node carries its own calls underneath, closed until you press it, one line each: the moment, the gate, what came
+  back, and the way into that child session. The line under the figure is the whole count — 还剩 N 步 / 共 M 步 — and there is no
+  explanatory sentence anywhere on the page. Under 720 px the figure stacks into one column. What went away with the four zones: the
+  「现在」 headline, the segment bar, the amber bar, 「后面还有」, the step list, the 「经过」 log and its fold, the 「交卷」 card, the
+  two columns, and the two hint lines under the dock. What stayed, word for word: the run name with its five-state chip, the
+  guardian panel, and the dock's two buttons that only fill the box. See D-159 and D-160. **Upgrade note: nothing to prepare — no
+  key, schema, default or stored record changed.**
+  / 这一页以前要读者从四个相邻的答案里自己拼出这次运行——「现在」主标题、一条等分分段条、一份步骤清单、一段「经过」——Guardian 还另占一列。
+  现在只有一张图：从「起点」到「终点」，这次运行真的记录过的每一条腿都是一个节点（规划 / 执行 / 检查 / 复核 / 汇总），去过的腿每去一次各占一个
+  节点并写明是第几次，已经过的是绿的，正在做的那颗亮着，还没到的灰着、虚线，断过的腿是琥珀色。每个节点下面挂它自己的那些调用，按一下才展开，
+  一行一条：时刻、哪道门、回来的结果、进那个子会话的入口。图下面那一行就是全部计数——「还剩 N 步 / 共 M 步」——页面上没有任何一句说明文字。
+  720 像素以下，图竖起来排成一列。跟着四区一起退场的：「现在」主标题、分段条、琥珀条、「后面还有」、步骤清单、「经过」及其折叠、「交卷」卡、
+  两栏、dock 下面那两句提示。一字未动保住的：运行名与五态胶囊、Guardian 那一块、dock 上只填框不代发的两颗按钮。见 D-159 与 D-160。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
+- **The summary node says why nothing was handed in / 「汇总」节点会说清「为什么没交卷」** —
+  When every summary draft is rejected, the 「汇总」 node on the flow chart turns amber, and how many drafts were turned back and which
+  gate the last one failed at are written in the calls that node opens — one line each, in the run's own words. A run that did hand a
+  draft in looks exactly as it did before, and the page still carries no new always-on explanatory sentence. The rejection is also
+  recorded as its own progress event, which is what lets the page say it at all. See D-158.
+  / 汇总的每一稿都被退回时，流程图上的「汇总」节点转琥珀，退回了几稿、最后卡在哪道门，都写在点开该节点后展开的调用行里——一行一条，
+  用运行自己那句话；交过稿的运行看起来与以前完全一样，页面上也仍然没有新的常显说明文字。这条结论同时作为独立的进度事件记录下来，
+  页面才说得出这句话。见 D-158。
 
 - **The progress page holds its shape while you read it: the guardian beside the page, a task's own calls under its row, a long history folded / 进度页读起来不再变形：Guardian 挪到页面右侧、任务行下面就是它自己的调用、太长的「经过」先收起来** —
   Three layout changes, and nothing else: no new number, and the only new words are the three labels the two new controls

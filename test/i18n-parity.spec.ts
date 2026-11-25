@@ -58,11 +58,16 @@ function asymmetric(left: Dict, right: Dict): { leftOnly: string[], rightOnly: s
 }
 
 /**
- * The one-page redesign's copy contract (`DESIGN-progress-tab.md` §19.3), key by key.
+ * The flowchart's copy contract (`.tmp/flowchart-contract.md` §5), key by key.
  *
  * The values are asserted verbatim, not just for presence: a key that exists with the
  * wrong words is the same defect as a missing one — the page would say something nobody
  * agreed to, in the language the operator reads.
+ *
+ * The page's visible vocabulary is small on purpose: seven leg words, two badges, one count
+ * line, one reader label for the flow, the five-state chip, the dock's words and the row
+ * words. `progress.plan.*` survives as the *spoken* state word on a node (`aria-label`), so
+ * it is still pinned here even though the page never prints it.
  */
 const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string]> = [
   ['progress.chip.waiting', '等你点头', 'Waiting for you'],
@@ -70,25 +75,26 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.chip.done', '已完成', 'Done'],
   ['progress.chip.failed', '未通过', 'Not passed'],
   ['progress.chip.cancelled', '已取消', 'Cancelled'],
-  ['progress.now.label', '现在', 'Now'],
-  ['progress.now.planning', '正在拆活', 'Planning'],
-  ['progress.now.done', '做好了', 'Done'],
-  ['progress.now.suffix', '正在看', 'is checking'],
-  ['progress.now.allPassed', '{total} 步全过', 'All {total} steps passed'],
-  ['progress.now.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
-  ['progress.steps.aria', '进度：第 {at} 步，共 {total} 步', 'Progress: step {at} of {total}'],
-  ['progress.flag.retrying', '第 {n} 遍没过，正在重看', 'Attempt {n} failed, rechecking'],
-  ['progress.flag.failed', '第 {n} 遍没过', 'Attempt {n} failed'],
-  ['progress.rest', '后面还有：{list}', 'Still to come: {list}'],
-  ['progress.plan.title', '要干的 {count} 件事', '{count} things to do'],
+  // The seven leg words, the two badges, the count line and the flow's reader label.
+  ['progress.flow.start', '起点', 'Start'],
+  ['progress.flow.plan', '规划', 'Plan'],
+  ['progress.flow.execute', '执行', 'Execute'],
+  ['progress.flow.check', '检查', 'Check'],
+  ['progress.flow.review', '复核', 'Review'],
+  ['progress.flow.summarize', '汇总', 'Summarize'],
+  ['progress.flow.end', '终点', 'End'],
+  ['progress.flow.visit', '第 {n} 次', 'Visit {n}'],
+  ['progress.flow.draft', '第 {n} 稿', 'Draft {n}'],
+  ['progress.flow.left', '还剩 {left} 步 / 共 {total} 步', '{left} steps left / {total} total'],
+  ['progress.flow.aria', '进度流程图', 'Run flow'],
+  // The state words a node speaks and never prints (`aria-label`).
   ['progress.plan.waiting', '等着', 'Waiting'],
   ['progress.plan.running', '在做', 'Doing'],
   ['progress.plan.done', '过了', 'Passed'],
   ['progress.plan.failed', '没过', 'Not passed'],
   ['progress.plan.cancelled', '没做', 'Cancelled'],
-  // The layout detail's own three keys: the row control's name, and the fold's two words.
+  // The row control's name, and the seven words a call line can end on.
   ['progress.task.detail', '详情', 'Detail'],
-  ['progress.log.title', '经过', 'History'],
   ['progress.log.done', '做完', 'Did it'],
   ['progress.log.passed', '过了', 'Passed'],
   ['progress.log.reviewed', '通过', 'Approved'],
@@ -96,19 +102,14 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.log.failed', '没过', 'Not passed'],
   ['progress.log.shipped', '交卷', 'Shipped'],
   ['progress.log.cancelled', '取消', 'Cancelled'],
-  ['progress.log.more', '展开全部', 'Show all'],
-  ['progress.log.less', '收起', 'Collapse'],
-  ['progress.final.title', '交卷', 'Handed in'],
   ['progress.final.mark', '（定稿）', '(final)'],
-  ['progress.final.missing', '这一轮没有交卷稿', 'This run handed in no draft'],
-  // The all-rejected card: how many drafts were turned back, and the last failure.
+  // The all-rejected verdict, printed in the summary node's opened calls: how many drafts
+  // were turned back, which gate the last one stopped at, and the gate's own words.
   ['progress.final.rejected', '第 {n} 稿全被退回', 'Every draft was rejected: {n}'],
+  ['progress.final.rejectedStage', '卡在{stage}', 'Held at {stage}'],
   ['progress.final.rejectedReason', '最后不过：{reason}', 'Last failure: {reason}'],
   ['progress.dock.start', '开工', 'Start'],
   ['progress.dock.accept', '收下这版', 'Accept this version'],
-  ['progress.dock.hintStart', '要改就说一声，我重拆', "Say what to change and I'll re-plan"],
-  ['progress.dock.hintAccept', '不满意就说，我重做', "Say what's off and I'll redo it"],
-  ['progress.dock.quiet', '不用你说话，好了叫你', "Nothing needed from you; I'll call you"],
   ['progress.dock.fill', '确认', 'yes'],
   ['progress.dock.filled', '已填进输入框，按发送', 'Filled the box; press send'],
 ]
@@ -122,6 +123,26 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
  * of them, and the prefix check below catches a clever rename that the list would miss.
  */
 const REDESIGN_DELETED: readonly string[] = [
+  // the four-zone page's own copy (2026-11-25, replaced by the flowchart)
+  'progress.now.label',
+  'progress.now.planning',
+  'progress.now.done',
+  'progress.now.suffix',
+  'progress.now.allPassed',
+  'progress.now.step',
+  'progress.steps.aria',
+  'progress.flag.retrying',
+  'progress.flag.failed',
+  'progress.rest',
+  'progress.plan.title',
+  'progress.log.title',
+  'progress.log.more',
+  'progress.log.less',
+  'progress.final.title',
+  'progress.final.missing',
+  'progress.dock.hintStart',
+  'progress.dock.hintAccept',
+  'progress.dock.quiet',
   'progress.title',
   'progress.aria',
   'progress.percent',

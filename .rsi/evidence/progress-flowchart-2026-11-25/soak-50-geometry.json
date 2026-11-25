@@ -1,0 +1,618 @@
+{
+  "geometry": [
+    {
+      "width": 1500,
+      "scrollWidth": 1500,
+      "clientWidth": 1500,
+      "innerWidth": 1500,
+      "nodesPerRow": [
+        7
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start",
+            "flow:0:execute:1",
+            "flow:1:check:1",
+            "flow:2:review:1",
+            "flow:3:summarize:1",
+            "flow:4:summarize:2",
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 284,
+          "y": 138,
+          "w": 73,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 369,
+          "y": 138,
+          "w": 453,
+          "h": 120,
+          "state": "done"
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 834,
+          "y": 138,
+          "w": 91,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 937,
+          "y": 138,
+          "w": 91,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 1040,
+          "y": 138,
+          "w": 125,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:4:summarize:2",
+          "x": 1177,
+          "y": 138,
+          "w": 125,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:end",
+          "x": 1315,
+          "y": 138,
+          "w": 73,
+          "h": 31,
+          "state": "done"
+        }
+      ],
+      "pathCount": 4,
+      "paths": [
+        {
+          "d": "M645 16 L657 16",
+          "x": 925,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M748 16 L760 16",
+          "x": 1028,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M885 16 L897 16",
+          "x": 1165,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M1023 16 L1035 16",
+          "x": 1303,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        }
+      ],
+      "flowBox": {
+        "x": 280,
+        "y": 138,
+        "w": 1213,
+        "h": 120
+      },
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "row",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 900,
+      "scrollWidth": 900,
+      "clientWidth": 900,
+      "innerWidth": 900,
+      "nodesPerRow": [
+        4,
+        3
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start",
+            "flow:0:execute:1",
+            "flow:1:check:1",
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 268,
+          "keys": [
+            "flow:3:summarize:1",
+            "flow:4:summarize:2",
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 60,
+          "y": 138,
+          "w": 73,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 145,
+          "y": 138,
+          "w": 453,
+          "h": 120,
+          "state": "done"
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 610,
+          "y": 138,
+          "w": 91,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 713,
+          "y": 138,
+          "w": 91,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 60,
+          "y": 268,
+          "w": 125,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:4:summarize:2",
+          "x": 197,
+          "y": 268,
+          "w": 125,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:end",
+          "x": 335,
+          "y": 268,
+          "w": 73,
+          "h": 31,
+          "state": "done"
+        }
+      ],
+      "pathCount": 3,
+      "paths": [
+        {
+          "d": "M645 16 L657 16",
+          "x": 701,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M129 146 L141 146",
+          "x": 185,
+          "y": 284,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M267 146 L279 146",
+          "x": 323,
+          "y": 284,
+          "w": 12,
+          "h": 0
+        }
+      ],
+      "flowBox": {
+        "x": 56,
+        "y": 138,
+        "w": 837,
+        "h": 161
+      },
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "row",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 700,
+      "scrollWidth": 700,
+      "clientWidth": 700,
+      "innerWidth": 700,
+      "nodesPerRow": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start"
+          ]
+        },
+        {
+          "y": 179,
+          "keys": [
+            "flow:0:execute:1"
+          ]
+        },
+        {
+          "y": 309,
+          "keys": [
+            "flow:1:check:1"
+          ]
+        },
+        {
+          "y": 350,
+          "keys": [
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 391,
+          "keys": [
+            "flow:3:summarize:1"
+          ]
+        },
+        {
+          "y": 432,
+          "keys": [
+            "flow:4:summarize:2"
+          ]
+        },
+        {
+          "y": 473,
+          "keys": [
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 4,
+          "y": 138,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 4,
+          "y": 179,
+          "w": 685,
+          "h": 120,
+          "state": "done"
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 4,
+          "y": 309,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 4,
+          "y": 350,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 4,
+          "y": 391,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:4:summarize:2",
+          "x": 4,
+          "y": 432,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:end",
+          "x": 4,
+          "y": 473,
+          "w": 685,
+          "h": 31,
+          "state": "done"
+        }
+      ],
+      "pathCount": 6,
+      "paths": [
+        {
+          "d": "M347 31 L347 41",
+          "x": 347,
+          "y": 169,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 161 L347 171",
+          "x": 347,
+          "y": 299,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 202 L347 212",
+          "x": 347,
+          "y": 340,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 243 L347 253",
+          "x": 347,
+          "y": 381,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 284 L347 294",
+          "x": 347,
+          "y": 422,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 325 L347 335",
+          "x": 347,
+          "y": 463,
+          "w": 0,
+          "h": 10
+        }
+      ],
+      "flowBox": {
+        "x": 0,
+        "y": 138,
+        "w": 693,
+        "h": 366
+      },
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "column",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 480,
+      "scrollWidth": 480,
+      "clientWidth": 480,
+      "innerWidth": 480,
+      "nodesPerRow": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start"
+          ]
+        },
+        {
+          "y": 179,
+          "keys": [
+            "flow:0:execute:1"
+          ]
+        },
+        {
+          "y": 365,
+          "keys": [
+            "flow:1:check:1"
+          ]
+        },
+        {
+          "y": 406,
+          "keys": [
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 447,
+          "keys": [
+            "flow:3:summarize:1"
+          ]
+        },
+        {
+          "y": 488,
+          "keys": [
+            "flow:4:summarize:2"
+          ]
+        },
+        {
+          "y": 529,
+          "keys": [
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 4,
+          "y": 138,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 4,
+          "y": 179,
+          "w": 465,
+          "h": 176,
+          "state": "done"
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 4,
+          "y": 365,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 4,
+          "y": 406,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 4,
+          "y": 447,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:4:summarize:2",
+          "x": 4,
+          "y": 488,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        },
+        {
+          "key": "flow:end",
+          "x": 4,
+          "y": 529,
+          "w": 465,
+          "h": 31,
+          "state": "done"
+        }
+      ],
+      "pathCount": 6,
+      "paths": [
+        {
+          "d": "M237 31 L237 41",
+          "x": 237,
+          "y": 169,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 217 L237 227",
+          "x": 237,
+          "y": 355,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 258 L237 268",
+          "x": 237,
+          "y": 396,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 299 L237 309",
+          "x": 237,
+          "y": 437,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 340 L237 350",
+          "x": 237,
+          "y": 478,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 381 L237 391",
+          "x": 237,
+          "y": 519,
+          "w": 0,
+          "h": 10
+        }
+      ],
+      "flowBox": {
+        "x": 0,
+        "y": 138,
+        "w": 473,
+        "h": 422
+      },
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "column",
+        "gridTemplateColumns": "none"
+      }
+    }
+  ],
+  "opened": {
+    "ariaExpanded": "true",
+    "calls": 1,
+    "nodeKey": "flow:0:execute:1",
+    "rows": [
+      {
+        "seq": "1",
+        "state": "done",
+        "text": "23:48 执行 任务 1 · 写 notes.md 三行安装步骤 做完 打开子会话"
+      },
+      {
+        "seq": "2",
+        "state": "done",
+        "text": "23:48 执行 任务 2 · 写 test.txt 一行 hello 做完 打开子会话"
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}
