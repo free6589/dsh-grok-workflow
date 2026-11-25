@@ -1366,6 +1366,10 @@ window.__ModuleLoader__.load({
      * has no fallback, so the row is a single provider/model pair and a blank
      * model reads as "off" (adjudication disabled, timeouts fail straight to
      * the task's bounded retry).
+     *
+     * `data-field` mirrors the FieldRow contract: this is a declared field whose
+     * control is not a FieldRow, and the page-wide "every declared field has a
+     * row" guard in test/client.spec.ts reads that attribute to see it.
      */
     function GuardianModelRow(props) {
       const { route, disabled, catalog, t, onChangeRoute } = props
@@ -1399,7 +1403,7 @@ window.__ModuleLoader__.load({
         },
         h('option', { key: '', value: '' }, t('roles.modelPlaceholder')),
         models.map((name) => h('option', { key: name, value: name }, name)))
-      return h('div', { style: styles.roleCard, 'data-gw-guardian': true },
+      return h('div', { style: styles.roleCard, 'data-gw-guardian': true, 'data-field': 'guardianModel' },
         h('div', { style: styles.roleHead },
           h('span', { style: styles.roleIndex }, '·'),
           h('strong', null, t('field.guardianModel'))),
@@ -1886,6 +1890,22 @@ window.__ModuleLoader__.load({
               disabled, catalog, t,
               onChangeRoute: (next) => onChange('guardianModel', { provider: '', model: '', ...next }),
             }),
+            // The 429 switch (Sec.3-2): the last declared field without a control.
+            // The state word reuses the page's existing On/Off pair (`option.replan.on`
+            // / `option.replan.off`, plain "开/关" in both languages): the page ships
+            // one On/Off string per language already, and adding
+            // `option.switchOnRateLimit.*` would duplicate two strings per language,
+            // which this round forbids (no new copy keys).
+            h(FieldRow, {
+              key: 'switchOnRateLimit', fieldKey: 'switchOnRateLimit',
+              title: t('field.switchOnRateLimit'),
+              control: h(Toggle, {
+                on: draft.switchOnRateLimit === true, disabled,
+                onFlip: (next) => onChange('switchOnRateLimit', next),
+                label: t(draft.switchOnRateLimit === true ? 'option.replan.on' : 'option.replan.off'),
+              }),
+            }),
+            h('p', { style: styles.hint, 'data-gw-ratelimit-hint': true }, t('field.switchOnRateLimit.hint')),
             ROLES.map((role) => h(RoleChain, {
               key: role, role, chain: draft.roles[role] || [], disabled, catalog, t, badRows,
               onChange: (next) => setChain(role, next),

@@ -1162,6 +1162,105 @@ describe('client settings page: reading, failure and retry', () => {
     }
   })
 
+  it('renders the 429 switch with its label, state word and hint in both languages', () => {
+    // The residue this covers: `switchOnRateLimit` had a label and a hint in both
+    // dictionaries and was the one declared field with no control drawn for it.
+    // Everything below is compared against the dictionary, never against a literal.
+    for (const [locale, dict] of [['zh', zhDict], ['en', bundle.GROK_WORKFLOW_DICT['en']!]] as const) {
+      const { component, props } = mounted(faceFor(READY))
+      const tree = renderPage(component, {
+        ...props,
+        t: (key: string, params?: Record<string, unknown>) => translate(locale, key, params),
+      }).run()
+      const row = walk(tree).find(element => element.props['data-field'] === 'switchOnRateLimit')
+      expect(row, `${locale} row`).toBeDefined()
+      expect(texts(row!).join('\n'), `${locale} label`).toContain(dict['field.switchOnRateLimit']!)
+      // The switch is inside that row, and its state word is the page's On/Off pair
+      // (no `option.switchOnRateLimit.*` key exists, by design).
+      const toggle = walk(row!).find(element => element.props['role'] === 'switch')
+      expect(toggle, `${locale} switch`).toBeDefined()
+      expect(texts(row!).join('\n'), `${locale} state word`).toContain(dict['option.replan.on']!)
+      const hint = walk(tree).find(element => element.props['data-gw-ratelimit-hint'] === true)
+      expect(hint, `${locale} hint`).toBeDefined()
+      expect(texts(hint!).join(''), `${locale} hint text`).toBe(dict['field.switchOnRateLimit.hint']!)
+    }
+  })
+
+  it('draws a control for every declared field, in both languages', () => {
+    // The guard this residue needed: a field count cannot see a field that is declared
+    // and never drawn. This walks the bundle's own field table and demands a row, and
+    // its label, for every key in it — so the next field added without a control fails
+    // here instead of shipping as dead copy.
+    const keys = bundle.GROK_WORKFLOW_FIELDS.map(field => field.key)
+    expect(keys).toHaveLength(14)
+    for (const [locale, dict] of [['zh', zhDict], ['en', bundle.GROK_WORKFLOW_DICT['en']!]] as const) {
+      const { component, props } = mounted(faceFor(READY))
+      const tree = renderPage(component, {
+        ...props,
+        t: (key: string, params?: Record<string, unknown>) => translate(locale, key, params),
+      }).run()
+      // One row per declared field: `data-field` sits on the row wrapper and, for the
+      // plain inputs, on the control inside it too, so compare the set of keys.
+      const drawn = new Set(walk(tree)
+        .map(element => element.props['data-field'])
+        .filter((value): value is string => typeof value === 'string'))
+      const rendered = texts(tree).join('\n')
+      for (const key of keys) {
+        expect(drawn.has(key), `${locale} ${key} has no row`).toBe(true)
+        expect(rendered, `${locale} ${key} label`).toContain(dict[`field.${key}`]!)
+      }
+    }
+  })
+
+  it('saves the 429 switch as exactly one set op through the face', async () => {
+    const mutations: Array<{ ops: unknown[], revision: unknown }> = []
+    const { component, props } = mounted(faceFor({
+      status: 'ready',
+      view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 3, value: { roles: {}} }] },
+      error: null,
+    }), mutations)
+    const view = renderPage(component, props)
+    const toggle = (tree: unknown): Element => {
+      const row = walk(tree).find(element => element.props['data-field'] === 'switchOnRateLimit')
+      expect(row).toBeDefined()
+      const button = walk(row!).find(element => element.props['role'] === 'switch')
+      expect(button).toBeDefined()
+      return button!
+    }
+    let tree = view.run()
+    // The default is on, so the state word says so and one press turns it off.
+    expect(toggle(tree).props['aria-checked']).toBe(true)
+    await view.click(toggle(tree))
+    tree = view.run()
+    expect(toggle(tree).props['aria-checked']).toBe(false)
+    expect(texts(walk(tree).find(element => element.props['data-field'] === 'switchOnRateLimit')!).join('\n'))
+      .toContain(zhDict['option.replan.off']!)
+
+    await view.click(walk(tree).find(element => element.props['data-action'] === 'save')!)
+    expect(mutations).toHaveLength(1)
+    const written = (mutations[0]!.ops as Array<{ op: string, path: string[], value: unknown }>)
+      .filter(op => op.path[0] === 'switchOnRateLimit')
+    expect(written).toEqual([{ op: 'set', path: ['switchOnRateLimit'], value: false }])
+  })
+
+  it('reflects the stored 429 value instead of a fixed state', () => {
+    // A control that always renders "on" would pass a shape check; only the stored
+    // value may decide `aria-checked`.
+    for (const stored of [true, false]) {
+      const { component, props } = mounted(faceFor({
+        status: 'ready',
+        view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 5, value: { roles: {}, switchOnRateLimit: stored } }] },
+        error: null,
+      }))
+      const tree = renderPage(component, props).run()
+      const row = walk(tree).find(element => element.props['data-field'] === 'switchOnRateLimit')
+      expect(row, `stored ${stored}`).toBeDefined()
+      const button = walk(row!).find(element => element.props['role'] === 'switch')
+      expect(button, `stored ${stored}`).toBeDefined()
+      expect(button!.props['aria-checked'], `stored ${stored}`).toBe(stored)
+    }
+  })
+
   it('says what 0 means on the rows whose minimum is 0, in both languages', () => {
     // `timeoutMs` and `loopIntervalMin` both default to 0, and 0 is not "off" on either
     // one. The page carries no hint row (T5), so the unit suffix is the only place the
