@@ -2718,10 +2718,12 @@ window.__ModuleLoader__.load({
 
     /**
      * The numbered summary-draft names, this half's copy of `src/naming.ts`
-     * (`synthesisDraft` + `SYNTHESIS_FINAL_MARK`).
+     * (`synthesisDraft` + `SYNTHESIS_FINAL_MARK`), kept word for word.
      *
-     * The host serves this file verbatim, so it cannot import the typed table; the
-     * strings are asserted against `synthesisDraftLabel` in `test/client.spec.ts`.
+     * The host serves this file verbatim, so it cannot import the typed table. The mark is
+     * pinned by the bilingual table in `test/i18n-parity.spec.ts` and the rendered name by
+     * the final card's own assertion — neither compares back to `src/naming.ts`, so a change
+     * to the naming table has to be carried across by hand.
      */
     const PROGRESS_SUMMARY_DRAFTS = {
       zh: { draft: '汇总·第{n}稿', final: '（定稿）' },
