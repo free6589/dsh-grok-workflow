@@ -3,33 +3,29 @@
  *
  * The reported defect: the delivered answer was a 200-character telegraphic
  * narrative, and the reader got only its first sentence, sandwiched between
- * `答案：`/`下一步：`/`交付物：` style labels — the relay told the main model to
- * reproduce the material word for word, so the material *was* the answer, and the
- * material was a ledger digest.
+ * `答案：`/`下一步：`/`交付物：` style labels — the material *was* the answer, and
+ * the material was a ledger digest.
  *
- * What this file pins:
+ * What this file pins, on the block the delivery layer composes:
  *
- * 1. The default relay **rewrites**: the preamble asks for the user's own question
- *    to be answered in the model's own words, names where the deliverable is and
- *    how to open it, and forbids machine field names — while the material between
- *    the markers carries the whole summary, the deliverable paths and the caveats.
- * 2. The lead is the whole summary (bounded), not its first sentence, and a
+ * 1. The block carries the whole summary, the deliverable paths and the caveats,
+ *    and the lead is the whole summary (bounded), not its first sentence; a
  *    completed run names its deliverables instead of skipping the achievement row.
- * 3. One language by default: the block follows the request's language instead of
+ * 2. One language by default: the block follows the request's language instead of
  *    mirroring every answer in Chinese and English.
- * 4. The synthesizer may write 结果 / 怎么用 / 注意, and it **rewrites** the
+ * 3. The synthesizer may write 结果 / 怎么用 / 注意, and it **rewrites** the
  *    report's caveats instead of the appendix pasting them verbatim — the section
  *    it must keep is the caveat section, not the original sentence.
  *
  * Boundaries (read before trusting a green run): pure functions of a report value
  * plus the scripted `agent` for the synthesis half. The report validator, the
- * delivery composer, the relay text and the workflow script all run for real; no
- * engine, no model, no clock, no network.
+ * delivery composer and the workflow script all run for real; no engine, no model,
+ * no clock, no network.
  */
 import { describe, expect, it } from 'vitest'
-import { REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
 import { resolveConfig, FIXED_MAX_RETRIES } from '../src/config.js'
-import { assertWorkflowReport, failureReport } from '../src/report.js'
+import { deliverReport } from '../src/delivery/index.js'
+import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, task, verification } from './fixtures.js'
@@ -58,19 +54,6 @@ const U3 = '品类归并沿用了旧口径，新品类暂时并入其他。'
 const U4 = '周报里的同比基数取自去年同期报表，未经二次核对。'
 const U5 = '第五条的细节只应出现在台账里。'
 const U6 = '第六条的细节只应出现在台账里。'
-
-/** The slice of a relay message a reader actually sees. */
-function between(text: string): string {
-  const start = text.indexOf(REPORT_BEGIN)
-  const end = text.indexOf(REPORT_END)
-  if (start < 0 || end < start) return ''
-  return text.slice(start + REPORT_BEGIN.length, end)
-}
-
-/** The instruction the main model reads above the markers. */
-function preambleOf(text: string): string {
-  return text.slice(0, text.indexOf(REPORT_BEGIN))
-}
 
 /** A legal COMPLETED report carrying the paragraph summary and one deliverable. */
 function paragraphReport(uncertainties: { taskId: string, text: string }[] = []): WorkflowReport {
@@ -104,50 +87,14 @@ function paragraphReport(uncertainties: { taskId: string, text: string }[] = [])
   }, OBJECTIVE, config)
 }
 
-describe('默认 relay 改写，而不是逐字复述', () => {
-  it('asks for the user\'s question to be answered in the model\'s own words', () => {
-    const preamble = preambleOf(relayText(paragraphReport()))
-    // The old contract: reproduce the material line for line. That is what turned
-    // a ledger-shaped block into the answer.
-    expect(preamble).not.toContain('Reply with those lines exactly as given')
-    expect(preamble).toContain('in your own words')
-    // The two facts a reader needs and the block cannot state by itself: the
-    // deliverable's location and how to open it.
-    expect(preamble).toContain('where the deliverable is')
-    expect(preamble).toContain('how to open it')
-  })
-
-  it('forbids machine field names and ledger labels in the reply', () => {
-    const preamble = preambleOf(relayText(paragraphReport()))
-    expect(preamble).toContain('never print a machine field name')
-    // The labels are named so the model can avoid them, never with the colon the
-    // block itself uses — a preamble that carried `答案：` would be read back out of
-    // the relay text by every reader (and by the gate's own checks) as content.
-    for (const label of ['答案', '下一步', '交付物', 'Grok workflow', 'code=', 'Model routes']) {
-      expect(preamble).toContain(label)
-    }
-    expect(preamble).not.toContain('答案：')
-    expect(preamble).not.toContain('Grok workflow:')
-    // The folded ledger stays off-limits, and no tool may be called.
-    expect(preamble).toContain('never quote, mention or summarise it')
-    expect(preamble).toContain('do not call any tool')
-  })
-
-  it('still refuses to dress a failure as an answer, and keeps its wording verbatim', () => {
-    const failed = preambleOf(relayText(failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable')))
-    expect(failed).toContain('exactly as given')
-    expect(failed).toContain('never describe this as success')
-  })
-})
-
-describe('标记线内放的是原料：整段 summary、交付物路径、caveat', () => {
+describe('人话块里放的是原料：整段 summary、交付物路径、caveat', () => {
   it('carries the whole summary, not its first sentence', () => {
-    const visible = between(relayText(paragraphReport()))
+    const visible = deliverReport(paragraphReport()).text
     for (const sentence of [S1, S2, S3, S4]) expect(visible).toContain(sentence)
   })
 
   it('names the deliverable path and keeps it out of the machine-detail strip', () => {
-    const visible = between(relayText(paragraphReport()))
+    const visible = deliverReport(paragraphReport()).text
     expect(visible).toContain('交付物：')
     expect(visible).toContain(DELIVERABLE)
     // The exception is the deliverable only: another path the report quotes is
@@ -156,7 +103,7 @@ describe('标记线内放的是原料：整段 summary、交付物路径、cavea
   })
 
   it('lists what was achieved on a completed run instead of skipping it', () => {
-    const visible = between(relayText(paragraphReport()))
+    const visible = deliverReport(paragraphReport()).text
     expect(visible).toContain('做成了：')
     // The row names the work the way the report does (the task title), not by id.
     expect(visible).toContain('Task a')
@@ -170,7 +117,7 @@ describe('标记线内放的是原料：整段 summary、交付物路径、cavea
       ...paragraphReport(),
       synthesis: { mode: 'model', summary: `结果：${S1}\n怎么用：${S4}\n注意：${U1}` },
     }, OBJECTIVE, config)
-    const visible = between(relayText(headed))
+    const visible = deliverReport(headed).text
     expect(visible).not.toContain('答案：结果：')
     expect(visible).toContain(S1)
     expect(visible).toContain(S4)
@@ -186,7 +133,7 @@ describe('标记线内放的是原料：整段 summary、交付物路径、cavea
       ...paragraphReport(),
       synthesis: { mode: 'model', summary: `结果：${S1}\n怎么用：打开 ${DELIVERABLE} 就能看。` },
     }, OBJECTIVE, config)
-    const visible = between(relayText(named))
+    const visible = deliverReport(named).text
     expect(visible).toContain(DELIVERABLE)
     expect(visible).not.toContain('weekly-report. md')
     // Named once by the answer and once by the deliverable row.
@@ -198,15 +145,15 @@ describe('标记线内放的是原料：整段 summary、交付物路径、cavea
       ...paragraphReport(),
       synthesis: { mode: 'model', summary: `结果：${S1}\n说明：具体判定见 src/script.ts 那一段。` },
     }, OBJECTIVE, config)
-    const visible = between(relayText(leaked))
+    const visible = deliverReport(leaked).text
     expect(visible).not.toContain('src/script.ts')
     expect(visible).toContain(S1)
   })
 
   it('keeps four caveats and drops the rest', () => {
-    const visible = between(relayText(paragraphReport(
+    const visible = deliverReport(paragraphReport(
       [U1, U2, U3, U4, U5, U6].map(text => ({ taskId: 'a', text })),
-    )))
+    )).text
     expect(visible).toContain('需要你知道的')
     for (const kept of [U1, U2, U3, U4]) expect(visible).toContain(kept.slice(0, 12))
     for (const dropped of [U5, U6]) expect(visible).not.toContain(dropped)
@@ -215,14 +162,14 @@ describe('标记线内放的是原料：整段 summary、交付物路径、cavea
 
 describe('默认一种语言，跟随用户请求的语言', () => {
   it('does not mirror a Chinese answer into English', () => {
-    const visible = between(relayText(paragraphReport()))
+    const visible = deliverReport(paragraphReport()).text
     expect(visible).toContain('答案：')
     expect(visible).not.toContain('Answer:')
     expect(visible).not.toContain('That is the conclusion')
   })
 
   it('answers an English request in English only', () => {
-    const visible = between(relayText(paragraphReport(), undefined, { lang: 'en' }))
+    const visible = deliverReport(paragraphReport(), { lang: 'en' }).text
     expect(visible).toContain('Answer:')
     expect(visible).not.toContain('答案：')
     expect(visible).not.toContain('以上是结论')
@@ -230,10 +177,10 @@ describe('默认一种语言，跟随用户请求的语言', () => {
 
   it('keeps the ledger out of the visible block whatever the language', () => {
     for (const lang of ['zh', 'en'] as const) {
-      const text = relayText(paragraphReport(), undefined, { lang })
-      expect(between(text)).not.toContain('Grok workflow:')
-      expect(between(text)).not.toContain('Confirmed evidence:')
-      expect(between(text)).not.toContain('Model routes:')
+      const text = deliverReport(paragraphReport(), { lang }).text
+      expect(text).not.toContain('Grok workflow:')
+      expect(text).not.toContain('Confirmed evidence:')
+      expect(text).not.toContain('Model routes:')
     }
   })
 })

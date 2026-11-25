@@ -19,7 +19,6 @@
  *   that simply removed the guard would fail the second half of this file.
  */
 import { describe, expect, it } from 'vitest'
-import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
 import { deliverReport, humanConclusion, LEDGER_UNAVAILABLE, machineLedger, pairCaps, statusTail } from '../src/delivery/index.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { TASK_LIMITS } from '../src/input.js'
@@ -716,14 +715,6 @@ describe('round 39: a chain value that is not a route label is refused by path',
     expect(view.human.startsWith('Answer:')).toBe(true)
     expect(view.text).toContain(view.human)
     expect(view.text).toContain('unavailable')
-    // The relay path folds the same marker below the closing marker, so the
-    // durable copy never reads as a healthy run either.
-    // One language now (round-075), so the English block is asked for explicitly.
-    const relayed = relayText(dirty, undefined, { lang: 'en' })
-    expect(relayed).toContain(LEDGER_GUARD)
-    expect(relayed).toContain('unavailable')
-    const visible = relayed.slice(relayed.indexOf(REPORT_BEGIN), relayed.indexOf(REPORT_END))
-    expect(visible).toContain('That is the conclusion')
   })
 })
 

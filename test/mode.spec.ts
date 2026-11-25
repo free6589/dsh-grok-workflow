@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Session, appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
-import { MODE_RECORD, isModeEnabled, isModeRecord, readModeRecord, setMode } from '../src/mode.js'
+import { MODE_RECORD, isModeRecord, readModeRecord, setMode } from '../src/mode.js'
 import type { ModeRecord, SetModeResult } from '../src/mode.js'
 
 function modeRecord(enabled: boolean, turn = 1, setBy = 'command:/grok'): ModeRecord {
@@ -103,24 +103,6 @@ describe('workflowMode', () => {
     const session = Session.create('sess-mode-shape' as never)
     setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' })
     expect(readModeRecord(session)?.workflowMode).toBe('full')
-  })
-})
-
-describe('isModeEnabled', () => {
-  it('returns the fallback when nothing is recorded', () => {
-    const session = Session.create('sess-mode-fallback' as never)
-    expect(isModeEnabled(session, true)).toBe(true)
-    expect(isModeEnabled(session)).toBe(false)
-    expect(isModeEnabled(undefined, true)).toBe(true)
-  })
-
-  it('returns the recorded value once one exists', () => {
-    const on = Session.create('sess-mode-on' as never)
-    setMode(on, modeRecord(true, 1, 'command:/grok'))
-    expect(isModeEnabled(on, false)).toBe(true)
-    const off = Session.create('sess-mode-off' as never)
-    setMode(off, modeRecord(false, 1, 'config:default'))
-    expect(isModeEnabled(off, true)).toBe(false)
   })
 })
 

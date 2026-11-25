@@ -5,9 +5,8 @@
  * Coverage is deliberately end-to-end on the intake layer, offline and
  * deterministic:
  *
- *   1. the boundary matrix — a prompt at the budget is admitted, one character
- *      over is refused, with the measured count and the number of parts it would
- *      take to send it through;
+ *   1. the size boundary — a prompt over the budget is refused with the measured
+ *      count and the number of parts it would take to send it through;
  *   2. the refusal texts — both shipped languages, always, so a refusal can never
  *      read as silence;
  *   3. template assembly — `assembleTaskPrompt` renders the documented template
@@ -19,7 +18,6 @@ import { describe, expect, it } from 'vitest'
 import {
   assembleTaskPrompt,
   INTAKE_LIMITS,
-  inspectPrompt,
   isPromptShapedArgument,
   refuseDiscardedCommandPrompt,
   refuseEmptyPrompt,
@@ -36,16 +34,9 @@ function expectBilingual(text: string): void {
   expect(english).toBe(true)
 }
 
-describe('intake boundary matrix', () => {
-  it.each([1, 4_000, 4_001, 31_999, 32_000])(
-    'admits a %i-character prompt (under or at the budget)',
-    (chars) => {
-      expect(inspectPrompt('x'.repeat(chars))).toBeUndefined()
-    },
-  )
-
+describe('intake size boundary', () => {
   it('refuses a 32 001-character prompt with the measured count and the limit', () => {
-    const refusal = inspectPrompt('x'.repeat(INTAKE_LIMITS.promptChars + 1))!
+    const refusal = refuseOversizePrompt(INTAKE_LIMITS.promptChars + 1)
     expect(refusal.code).toBe('oversize')
     expect(refusal.chars).toBe(INTAKE_LIMITS.promptChars + 1)
     expect(refusal.limit).toBe(INTAKE_LIMITS.promptChars)
@@ -61,11 +52,10 @@ describe('intake boundary matrix', () => {
   })
 
   it('refuses an empty prompt', () => {
-    const refusal = inspectPrompt('   \n ')!
+    const refusal = refuseEmptyPrompt()
     expect(refusal.code).toBe('empty')
     expect(refusal.chars).toBe(0)
     expectBilingual(refusal.text)
-    expect(refusal.text).toBe(refuseEmptyPrompt().text)
   })
 
   it('reports the number of parts for a prompt twice the budget', () => {

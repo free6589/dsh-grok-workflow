@@ -409,14 +409,12 @@ describe('reliability: live configuration and diagnostics', () => {
     expect(snapshotConfig(raw as never)).toMatchObject({ maxConcurrency: 12, maxTasks: 2 })
   })
 
-  it('keeps the last good snapshot when a live edit breaks validation', () => {
+  it('re-reads and re-validates on every call, so a broken live edit is refused', () => {
     let bad = false
     const reader = createConfigReader({ roles: { get: () => ({ worker: bad ? [{ model: '' }] : [{ model: 'm1' }] }) } } as never)
     expect(reader.read().roles.planner).toEqual([])
     bad = true
     expect(() => reader.read()).toThrow(/non-empty model id/)
-    // Delivery work that already started keeps a usable snapshot.
-    expect(reader.lastGood().roles.worker).toEqual([{ model: 'm1' }])
   })
 
   it('states the settings surface in the diagnostics line, or says there is none', () => {
@@ -476,18 +474,6 @@ describe('reliability: wiring the live configuration and the category vocabulary
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('run did not start') })
     const args = ctx.engine.startCalls[0]!.args as { roles: { worker: { model: string }[] } }
     expect(args.roles.worker[0]!.model).toBe('wb/cn:deepseek-v4.1-flash')
-  })
-
-  it('falls back to the last good snapshot, not the load-time config (F1)', async () => {
-    // Sequence that kills the M3 mutation: a valid edit takes effect, then an
-    // invalid edit arrives. Delivery must keep the last *valid* value, because
-    // falling back to load-time values would silently undo a live edit.
-    // T4: the queue bound is fixed (FIXED_MAX_QUEUED_MESSAGES), so the live
-    // side of this contract moved to holders the user can still edit
-    // (roles here); maxQueuedMessages holders no longer validate.
-    const reader = createConfigReader({ roles: { get: () => ({ worker: [{ model: 'm1' }] }) } } as never)
-    expect(reader.read().roles.worker).toEqual([{ model: 'm1' }])
-    expect(reader.lastGood().roles.worker).toEqual([{ model: 'm1' }])
   })
 
   it('parses the cancelled category and still rejects an invented one (F3)', () => {
