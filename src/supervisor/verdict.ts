@@ -70,9 +70,8 @@ const ANSWER_SCHEMA = {
 /**
  * The guest script: one `agent()` call, one object back.
  *
- * Written as a string because the engine runs it in its own realm; the shape mirrors
- * `src/run.ts`'s `singleCallScript` (a string answer and a structured answer are both
- * accepted so the host reads one field either way).
+ * Written as a string because the engine runs it in its own realm; a string answer and
+ * a structured answer are both accepted so the host reads one field either way.
  * @param prompt - the whole prompt handed to the child.
  * @param route - optional provider/model override.
  * @returns the script body.

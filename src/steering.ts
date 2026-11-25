@@ -127,17 +127,6 @@ export function openSteering(
   return { token, queue }
 }
 
-/**
- * Close a run's channel.
- * @param token - the token returned by {@link openSteering}.
- */
-export function closeSteering(token: string): void {
-  queues.delete(token)
-  for (const [sessionId, queue] of bySession) {
-    if (queue.token === token) bySession.delete(sessionId)
-  }
-}
-
 /** Close every channel (plugin unload). */
 export function closeAllSteering(): void {
   queues.clear()

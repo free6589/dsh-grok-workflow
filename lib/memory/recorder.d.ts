@@ -180,7 +180,7 @@ export declare function roundArchiveEvidence(report: WorkflowReport | undefined)
 /**
  * Archive one settled round on the spot, for callers that own no event stream.
  *
- * The front-desk tier (`runSingleCall`) is one `agent()` call in its own run: it has
+ * The front-desk tier is one `agent()` call in its own run: it has
  * a result but no planner/verifier fan-out, so there is nothing to watch and the
  * round verdict is the whole record. Passing it through this helper keeps the rule
  * identical to the full path — the entry is written before the caller returns, not

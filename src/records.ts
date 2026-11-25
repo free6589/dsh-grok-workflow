@@ -10,35 +10,11 @@
 
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
-import { appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
+import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { redactError, redactSecrets } from './redact.js'
 import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowLogger } from './run.js'
 import type { FinalStatus, RouteTrailEntry, RoleName, SynthesisMode } from './types.js'
-
-/** Record type owned by this plugin. */
-export const DELIVERY_RECORD = 'plugin:grok-workflow/delivery'
-
-/** Phases a delivery passes through. */
-export type DeliveryPhase = 'started' | 'delivered' | 'failed'
-
-/** Payload stored for one gate delivery. */
-export interface DeliveryRecord {
-  /** Record schema version owned by this plugin. */
-  v: 1
-  /** Deterministic delivery key; also the de-duplication identity. */
-  key: string
-  /** Agent whose message batch was routed. */
-  agentId: string
-  /** Clamped message ids of the claimed batch, in claim order. */
-  messageIds: string[]
-  phase: DeliveryPhase
-  /** Turn that owned the claimed batch. */
-  turn: number
-  /** Explicit outcome label for diagnostics (status or failure cause). */
-  outcome: string
-}
 
 /**
  * Record type owned by this plugin: a turn terminal the transcript could not carry.
@@ -265,82 +241,10 @@ declare module '@deepseek-ai/dsh-session' {
   interface PluginRecordMap {
     /** The model-route ledger written after a workflow run. */
     'plugin:grok-workflow/routing': RoutingRecord
-    'plugin:grok-workflow/delivery': DeliveryRecord
     /** One observation of this plugin being unloaded (t45, P0-1). */
     'plugin:grok-workflow/dispose': DisposeRecord
     /** A turn terminal the transcript could not carry (no open step). */
     'plugin:grok-workflow/terminal': TerminalRecord
-  }
-}
-
-/**
- * Deterministic identity for one claimed batch.
- *
- * The key is derived from the agent and the exact claimed message ids, so a
- * replay of the same delivery (resume, fork, duplicate followup) recomputes the
- * same key without keeping any process-local state.
- */
-export function deliveryKey(agentId: string, messages: readonly Pick<UserMessage, 'id'>[]): string {
-  const ids = messages.map(message => String(message.id)).sort()
-  return `grok-workflow:${agentId}:${ids.join(',')}`
-}
-
-/** True when the payload is a record this build can trust. */
-function isDeliveryRecord(value: unknown): value is DeliveryRecord {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Partial<DeliveryRecord>
-  return record.v === 1
-    && typeof record.key === 'string'
-    && typeof record.agentId === 'string'
-    && Array.isArray(record.messageIds)
-    && record.messageIds.every(id => typeof id === 'string')
-    && (record.phase === 'started' || record.phase === 'delivered' || record.phase === 'failed')
-    && typeof record.turn === 'number'
-    && typeof record.outcome === 'string'
-}
-
-/** Every delivery record this plugin committed to the session, oldest first. */
-export function readDeliveries(session: Session | undefined): DeliveryRecord[] {
-  if (session === undefined || typeof session.ownEvents !== 'function') return []
-  const records: DeliveryRecord[] = []
-  for (const event of session.ownEvents()) {
-    const record = pluginRecordOf(event)
-    if (record === undefined || record.type !== DELIVERY_RECORD) continue
-    const data = (record as { data?: unknown }).data
-    if (isDeliveryRecord(data)) records.push(data)
-  }
-  return records
-}
-
-/**
- * True when the batch was already routed by this plugin.
- *
- * `started` and `delivered` count: a run was launched for these exact messages,
- * so routing them again would start a second workflow for one user message.
- * `failed` does not count — a refusal that never launched a run (busy queue,
- * oversized message) must not become a permanent block on that message.
- */
-export function alreadyRouted(session: Session | undefined, key: string): boolean {
-  return readDeliveries(session).some(record => record.key === key && (record.phase === 'started' || record.phase === 'delivered'))
-}
-
-/**
- * Append one delivery record.
- *
- * A record is durable plugin state, not a correctness dependency for the current
- * turn: when the session refuses the write we warn and continue, and the run
- * still happens (the gate never answers by itself).
- */
-export function recordDelivery(
-  session: Session | undefined,
-  record: DeliveryRecord,
-  logger: WorkflowLogger,
-): void {
-  if (session === undefined || typeof session.append !== 'function') return
-  try {
-    appendPluginRecord(session, DELIVERY_RECORD, record)
-  } catch (error) {
-    logger.warn(`delivery record not persisted (${record.key}): ${redactError(error)}`)
   }
 }
 
@@ -878,30 +782,6 @@ export function recordTerminal(
     logger.warn(`terminal record not persisted: ${redactError(error)}`)
     return false
   }
-}
-
-/**
- * Append an instant team-tier receipt so the run never looks blank while in flight.
- *
- * The gate composes this row in `agent/pre-step`, which is dispatched *before* the
- * step begins, so in practice no step is open and the row is refused. The receipt
- * is kept as a call site (rather than deleted) because the step pairing — not the
- * wording — is what decides it: a runtime that dispatches the gate inside an open
- * step still gets the live row, and the progress panel is where a live row belongs
- * on a runtime that does not (pooled as follow-up work).
- */
-export function appendInstantReceipt(
-  session: Session | undefined,
-  text: string,
-  logger: WorkflowLogger,
-): boolean {
-  return appendAssistantInStep(
-    session,
-    text,
-    { provider: 'grok-workflow', model: 'workflow-receipt' },
-    logger,
-    'instant receipt',
-  )
 }
 
 /**

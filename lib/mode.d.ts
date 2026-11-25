@@ -49,8 +49,6 @@ export declare function isModeRecord(value: unknown): value is ModeRecord;
  * clobbering the last valid one.
  */
 export declare function readModeRecord(session: Session | undefined): ModeRecord | undefined;
-/** Whether grok mode is on, falling back when no record was written yet. */
-export declare function isModeEnabled(session: Session | undefined, fallback?: boolean): boolean;
 /** Outcome of one toggle write; `ok` is only ever reported for a readable record. */
 export interface SetModeResult {
     /** True when {@link readModeRecord} shows exactly the record that was asked for. */

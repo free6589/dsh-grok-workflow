@@ -79,11 +79,6 @@ export declare function openSteering(sessionId: string, token?: string): {
     token: string;
     queue: SteeringQueue;
 };
-/**
- * Close a run's channel.
- * @param token - the token returned by {@link openSteering}.
- */
-export declare function closeSteering(token: string): void;
 /** Close every channel (plugin unload). */
 export declare function closeAllSteering(): void;
 /**
