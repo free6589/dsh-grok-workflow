@@ -1,3 +1,43 @@
+## 2026-11-26 — `fix/judge-leg-soak`：判腿被一次 401 拒掉之后整轮付多少代价，真机五条判据全中；两份 README 的门禁数字按实测改成 `103 / 1948`。**未合 `main`、未 push、未打 tag、未发版**，版本仍 `0.13.45`
+
+- **From:** 包工头（`agent-196`）· **To:** 下一个接手者 / 发版的那一轮
+- **这一轮是什么**：**不改产品代码**。两件事——① 把 `D-164`（`0.13.44` 发出的「钥匙被拒就在同一条路由上再问一次」）
+  **判腿那一半**的真机读数补上（上一轮 `auth-retry-2026-11-26` 只跑了规划腿，判腿只有单测）；
+  ② 把两份 README 里过期的门禁数字（`1850 / 98`）改成这一轮实测的 **`1948 deterministic tests across 103 files`**
+  / **`103 个文件 / 1948 个确定性测试`**（各 +1 −1，全仓只这两处带这两个数）。
+- **分支身份**：`fix/judge-leg-soak`，从 `main` 尖端 **`c7975cc`** 开出，worktree `.tmp/wt-judge-leg`。
+  `src/` / `test/` / `lib/` / `package.json` / `CHANGELOG` **一个字没动**（这两个数字不是用户可见的行为变化，`[Unreleased]` 保持空）。
+- **用户看到的一件事**：**这一轮不改用户能看到的行为**。改的是文档里那两个数字：现在写的是「1948 条 / 103 个文件」，
+  和 `0.13.45` 发版门禁读的一样。
+- **门禁（`CONFIRMED`，只跑了这一截）**：`TMPDIR=$PWD/.tmp npx vitest run`、worktree 干净树、`HEAD = c7975cc`、
+  **`Test Files 103 passed (103)` / `Tests 1948 passed (1948)`**、`Duration 101.60s`、`VITEST_EXIT=0`
+  （`.rsi/evidence/judge-leg-soak-2026-11-26/gate-full-suite.out`，214 行 / 15235 字节、
+  `sha256 a4bd7ba0017f8b90666d8763dbadc8480801dcb0dc0a7086e0156fdfdc6fd83f`）。
+  **全量 `npm run ci` `NOT_RUN`**（§12）；typecheck / lint / build / `verify:lib` 也 `NOT_RUN`（没有代码改动，
+  `lib/` 没重建，装进 soak 的那份 `lib/` 与工作树逐字节同哈希）。
+- **真机（`CONFIRMED`，隔离档案、真模型、live 3080 全程没碰）**：克隆 live web（`parity 5/5`）→ 五角色钉
+  `bifrost-responses`、**只有判腿**指到拒一次的小代理 `127.0.0.1:18190` → 装本轮 `npm pack` 的 `0.13.45`
+  （`lib/script.js` `233d327e…2e22` 逐字节相同、版本读回 `0.13.45`）→ 端口 3517 + headless Chromium 发一句话。
+  **绿跑 `bcd45b43`**（`161324 ms`）：判腿第一条腿吃到 **401**（`code AUTH`、小代理 `seq 1 -> 401 injected`）→
+  同一次尝试的**第二条判腿回到同一条路由**并 `completed`（`seq 2 -> 200`）→ 干活腿**只跑一次**（`attempts 1`）→
+  整轮 **`COMPLETED`**、2/2 verified → 路由台账**只有一行** `verifier / chainIndex 0 / failed / model-unavailable`，
+  **没有 `chainIndex > 0` 的行**（那条路由没进死路表）。五条判据全中。
+- **一处必须记住的口径（`CONFIRMED`）**：字面量 `judge re-fired` 只挂在**技术审计尾**上，而审计尾只随
+  **非 `completed`** 的报告附出（`src/index.ts:282`、`src/report.ts:1424`、`src/report-audit.ts:134`）。
+  所以绿跑读不到它——绿跑的等价记录是「同一次尝试里两条判腿」。本轮**另外跑了一跑红的**
+  （`PROBE_ALWAYS=1` 每次都拒，运行 `d7c1017c`，整轮 `FAILED`）把它打成字面量：两次尝试各一行
+  `Attempt N — route … — judge re-fired — not passed`；那一跑的台账 4 行**全部 `chainIndex 0`**，
+  是「同一条路由被反复问、从没换路」的第二份读数。**注意**：审计尾 `Attempt N — route …` 写的是**这次尝试的主路由**
+  （干活那条腿的 `bifrost-responses`），裁判走哪条要看同一份审计尾的 `Calls` 段。
+- **红也照实留**：这次 soak 的**第一次尝试是装置故障**（小代理的模型条目漏了 `reasoningEfforts`，判腿在
+  provider 层就死，`UNSUPPORTED_REASONING_EFFORT`，一个 HTTP 都没发出），那一轮 `7f6292d1` `failed` 并作废；
+  补上同一份表后重跑。见证据目录 `soak/first-attempt-rig-fault.txt`。
+- **这一轮没做的**：合 `main` / push / tag / 发版 / live 档案升级 —— **都没做**（派单没要求）。
+  判腿「被拒 → 换第二条路由再问」的真机、以及判腿在**超时/掉线/5xx**族的同路重问 —— **`NOT_RUN`**（真机只造了 401）。
+- **红线**：`~/.dsh` 与 `profiles` 系列 mtime 全在本会话（05:27 起）之前，写探测 `Read-only file system`，
+  live 3080 前后都是 401；密钥只做布尔判断、没读值；scratch（`.tmp/soak`）用完整棵删除。
+  证据：`.rsi/evidence/judge-leg-soak-2026-11-26/`（`README.md` 是索引，`rig/` 是可重放的五件套）。
+
 ## 2026-11-26 — `0.13.45` 已发布并收口：一个发布提交（8 文件 / +22 −20、单父）、一份门禁 `GATE_EXIT=0`（`103 files / 1948 tests`）、`main` 尖端 `63793eb`、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**（live 里装的仍读 `0.13.39`）、**真机 soak `NOT_RUN`**
 
 - **From:** 包工头（`agent-194`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

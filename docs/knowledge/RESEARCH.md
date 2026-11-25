@@ -1825,3 +1825,23 @@ boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`）
 真机读数（`.rsi/evidence/auth-retry-2026-11-26/soak/routes-switches.txt`）：`plugin:grok-workflow/routing` 的
 `switches` 只收**失败**行（成功首问不入账，`src/records.ts`），所以「同路重问成功了」要看子会话的
 `request/context.provider/model` 两次相同，而不是看 `switches` 里有没有第二行。
+
+### 判腿那一半的真机读数（2026-11-26，`CONFIRMED`）
+
+`.rsi/evidence/judge-leg-soak-2026-11-26/`：判腿独占一个「第一次 401、之后透传」的小代理，其余四条腿直连。
+三条读源码时容易弄错的记录事实：
+
+- **字面量 `judge re-fired` 只出现在技术审计尾里**（`src/report-audit.ts:134` 的 `head.push('judge re-fired')`），
+  而审计尾由 `src/report.ts:1424` 只在 `opts.auditTrail === true` 时附上，`src/index.ts:282` 只在
+  `report.status !== 'completed'` 时才传这个开关。**所以一次绿跑永远读不到这五个字**——绿跑的等价记录是
+  「同一次尝试里同一个 phase 出现**两条判腿**」，不是字符串。要字符串就把判腿逼成必失败（那一跑整轮 `FAILED`，
+  审计尾两次尝试各一行 `Attempt N — route … — judge re-fired — not passed`）。
+- **审计尾 `Attempt N — route …` 那一行写的是这次尝试的主路由，不是裁判的路由**：重打发生时 `attemptRoute`
+  已经由干活那条腿填过（`src/script.ts` 里 `if (attemptRoute === '') attemptRoute = …` 全部是「第一次才填」），
+  所以绿跑那行读 `bifrost-responses/…`，而裁判实际走 `authprobe/…`。裁判走哪条要看同一份审计尾的 `Calls` 段。
+- **重问失败会让台账多一行，但 `chainIndex` 仍是 0**：`plugin:grok-workflow/routing` 的 `switches` 收所有**失败**行
+  （成功首问不入账），所以「被拒 4 次」的原文是 4 行、`chainIndex` 全 `0` —— 再问一次是**同一条路由上的又一次失败**，
+  不是换路由，也永远不进死路表。**死路在台账里没有字段可读**（`RoutingRecord` 只有 `routing` / `synthesis` / `switches`，
+  `src/records.ts`）：判据只能是「没有 `chainIndex > 0` 的行」+「子会话 `request/context` 两次同路由」+「整轮跑完」。
+- **checkpoint 不带 `judgeRetried`**：`attempts` 是**尝试**计数，判腿重打**不涨**它（绿跑两行都读 `verified (1 attempt)`）。
+  想从记录里区分「重试」与「重打」，只能数子腿。

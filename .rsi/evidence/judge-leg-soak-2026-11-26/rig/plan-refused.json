@@ -1,0 +1,13 @@
+[
+  { "type": "fresh", "label": "t0-fresh" },
+  { "type": "baseline", "label": "t1-baseline" },
+  {
+    "type": "send",
+    "label": "t2-refused",
+    "text": "用 grok_workflow 跑一个小活，只做一步：objective 是「算出 7 乘 6」，不要传 tasks 参数，让插件自己规划。",
+    "timeoutMs": 900000,
+    "quietMs": 25000,
+    "shot": true
+  },
+  { "type": "settle", "label": "t3-settled", "timeoutMs": 180000, "quietMs": 20000, "shot": false }
+]
