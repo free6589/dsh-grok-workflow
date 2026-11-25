@@ -1,3 +1,51 @@
+## `fix/auth-retry`：钥匙被拒给一次同路重发——块内门禁 `TSC_EXIT=0` / `15 warnings / 0 errors` / 定向 `9 files · 165 tests`，红 `3 failed / 18 passed`，真机一次运行 `COMPLETED` 且同一条路由被再问一次 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`D-120` 当年故意留的那一条——钥匙被拒既不进死路表、也不走任何重发走廊——在本轮改掉一半：
+**仍然不进死路表**，但判腿与规划腿都会在**同一条路由上再问一次**（`D-164`）。改动面：`src/script.ts`（新谓词
+`refusalDeath`、`judgeLegTransportDeath` 改读它、规划腿 C 走廊加同路重问、三处注释）、`src/child-outcomes.ts`（注释一句）、
+`test/planner-resubmit.spec.ts` 10 → 12、`test/judge-leg-retry.spec.ts` 8 → 9、`test/dead-routes.spec.ts`（注释）、
+重建 `lib/`（`lib/script.js` 与 `lib/child-outcomes.*`；`client bundle: 348559 bytes` 未变）。
+
+**命令与环境（全部在 worktree `.agents/worktrees/fix-auth-retry`、干净树上，`CONFIRMED`）**：
+
+| 命令 | 结果 | 转录 |
+| --- | --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | `TSC_EXIT=0`（无输出） | `.rsi/evidence/auth-retry-2026-11-26/gate-typecheck.out` |
+| `npx oxlint src test` | `Found 15 warnings and 0 errors.` / `184 files` / `LINT_EXIT=0` | `…/gate-lint.out` |
+| `TMPDIR=$PWD/.tmp npx vitest run test/planner-resubmit.spec.ts test/judge-leg-retry.spec.ts test/dead-routes.spec.ts test/null-collapse.spec.ts test/verifier-resubmit.spec.ts test/failure-paths.spec.ts test/routing.spec.ts test/child-evidence.spec.ts test/waves.spec.ts` | `Test Files 9 passed (9)` / `Tests 165 passed (165)` / `SPECS_EXIT=0` | `…/gate-specs.out` |
+| `npm run build` | `client bundle: 348559 bytes → lib/client.js` | 同上（构建读数） |
+| `node scripts/verify-lib.mjs`（产品提交之后） | `lib/ at <commit> is the build of src/ at <commit> (…, byte-identical)` / `EXIT=0` | `…/gate-verifylib-commit.out` |
+| 全量 `TMPDIR=$PWD/.tmp npm run ci` | **`NOT_RUN`**（`AGENTS.md` §12，留给发版提交；远端 CI 每次 push 都跑 Node 22 + 24） | — |
+
+**红（先看它能红，`CONFIRMED`）**：`git stash push -- src` 把 `src/` 退回 `main`、只留三份 spec →
+**`Test Files 2 failed (2)` / `Tests 3 failed | 18 passed (21)`**、`RED_EXIT=1`：
+`re-asks the route that refused…`、`spends the repeat once, on the route that refused last…`、
+`re-fires a judge whose route refused the key…`。恢复后同样两遍 `21 passed`。
+
+**真机（`CONFIRMED`，隔离档案、真模型、一次运行、判据全中）**：`scripts/clone-profile.mjs` 从 live web 克隆
+`authretry-clone`（`parity 5/5 equal after redaction`），只改 soak 需要的：删 `mode: triage`、
+`agent-default-model` 与五个角色 + `guardianModel` 钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、
+**新增规划腿独占的 provider `authprobe`** 指向 `127.0.0.1:18190`（第一次 `POST /openai/v1/responses` 回 401、其余透传到
+真网关 18088 的小代理）。装本轮 tgz（`sha256 13607a3c…25756`；`lib/script.js` `ada7a58f…97b0a`、`lib/index.js`
+`201f6788…28b7d6`、`lib/client.js` `95f0e410…cb60` 与工作树逐字节相同；`dsh plugin list` 读回 `0.13.43`）。
+实例 `--port 3455`（live 3080 全程没碰），headless Chromium（CDP 9333）+ 上一轮那份 `drive.mjs` 按真人视角发一句话。
+运行 `818754a2-115b-409a-96a2-e1dbf93a3283`：`switches` 第一行 `role planner / chainIndex 0 / attempt 1 /
+outcome failed / failureClass model-unavailable`（理由逐字带 `401 Unauthorized: virtual key is required`）；
+两个规划子会话 `seq 1 failed` → `seq 2 completed`，两边 `request/context` 都是
+`authprobe/opencode-go/muse-spark-1.3-contributor`；小代理 `seq 1 → 401 injected`、`seq 2/3/4 → 200`；
+报告 `COMPLETED` / `Plan: planner; 2 task(s); 2 verified`；checkpoint 里 `plan.source = planner`、两个 task 都 `verified`；
+**没有任何子代理提示词带 `RESUBMISSION`**（所以是 C 走廊同路重问，不是 B 走廊同次重交）。
+证据目录 `.rsi/evidence/auth-retry-2026-11-26/`（`soak/{proxy.log,routes-switches.txt,planner-pair.txt,planner-routes.txt,report.txt,root-session.jsonl,checkpoint-excerpt.txt,s2-done.txt,s2-done.png}`）。
+
+**一处刻意没做**：判腿那条走廊的**真机**没单独跑（同一个谓词，单测 9 条覆盖）；真机只跑了规划腿这一条，
+因为「同路重问」这条判据在单路由链上才是干净的。
+
+**红线（`CONFIRMED`）**：`~/.dsh` mtime `2026-11-25 23:14:14`、`~/.dsh/profiles` `2026-11-22 16:59:46`、
+`~/.dsh/profiles/web` 与 `cordis.patch.yml`（21611 字节）`2026-11-25 23:04:40` —— 全在本会话（03:47 起）之前；
+写探测 `: > ~/.dsh/.auth-retry-probe` → `Read-only file system`；live 实例 `100.111.111.88:3080` 前后都 401。
+密钥只做布尔存在性判断；scratch 的访问令牌只落在 `.tmp/soak/token.txt`（0600，随 scratch 删除），证据目录里的
+启动行已把 token 打码。scratch `.tmp/soak`（283 MB）用完整棵删除。
+
 ## `0.13.43` 发版收口：两次门禁（抬版本前的 `532d4cf` 与发布树 `549a579`）都是 `GATE_EXIT=0`（`103 files / 1944 tests`），发布提交里提交的 `lib/` 就是它自己 `src/` 的构建；附注标签、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有任何代码改动**。`0.13.43` 已经出去（tag 推了、Release 建了、资产在），

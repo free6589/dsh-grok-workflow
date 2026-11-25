@@ -1,0 +1,11 @@
+## live home, read-only by policy (not written by this session)
+/home/fish/.dsh size=1568 mtime=2026-11-25 23:14:14.025606767 +0800
+/home/fish/.dsh/profiles size=226 mtime=2026-11-22 16:59:46.687805286 +0800
+/home/fish/.dsh/profiles/web size=196 mtime=2026-11-25 23:04:40.915802661 +0800
+/home/fish/.dsh/profiles/web/cordis.patch.yml size=21611 mtime=2026-11-25 23:04:40.804802112 +0800
+
+## write probe
+bash: line 1: /home/fish/.dsh/.auth-retry-probe: Read-only file system
+
+## live instance
+live 3080 -> 401

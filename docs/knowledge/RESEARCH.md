@@ -1798,3 +1798,30 @@ boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`）
 于是「三种编辑各写各的形状」只能用 `oneOf` 表达（`src/script.ts` 的 `REPLAN_EDIT_SCHEMAS`），「最多 16 条编辑」只能在脚本与
 合并器里校验，不能在 schema 里写。读回验证：把本轮的 `REPLAN_SCHEMA` 交给真的 `assertObjectJsonSchema` 得
 `SCHEMA_SUBSET_OK; oneOf branches = 3`（探针在 `.rsi/evidence/replan-shape-2026-11-26/`）。
+
+## 2026-11-26 · 一条路由「拒服务」与「线程死了」在脚本里是两条判据，但共用两条判腿走廊（`CONFIRMED`，读源码 + 真机）
+
+脚本里关于一次子调用的失败有**三张表**，它们回答三个不同的问题，别再合并：
+
+| 表 / 谓词 | 位置 | 回答的问题 | 含哪些 |
+| --- | --- | --- | --- |
+| `CHILD_DEATH_FAMILIES` | `src/script.ts`（宿主镜像 `CHILD_DEATH_FAMILIES` 在 `src/child-outcomes.ts`） | 宿主**允不允许**把这个死因写进 `CHILD_DEATH:` 标记送到脚本 | timeout / connection / server-error / rate-limit / **model-unavailable** |
+| `ROUTE_HEALTH_FAMILIES` | `src/script.ts` | 这次失败算不算**关于这条路由**的证据（该不该排到后面、两次后进死路表） | timeout / connection / server-error / rate-limit（**不含 model-unavailable**） |
+| `refusalDeath(failure)`（D-164 新增） | `src/script.ts` | 这次调用**有没有被服务**（判腿该不该在同一次尝试里再问一次、规划腿该不该同路重问一次） | `class === 'model-unavailable'` 且 `setup !== true` |
+
+三者的关系：`refusalDeath` 与 `routeHealthFamily !== ''` 是**并列**的两种「没有答案」，`judgeLegTransportDeath`
+现在读 `routeHealthFamily(...) !== '' || refusalDeath(failure)`；规划腿 C 走廊先看 `planDeath`（运输类，可按链换路），
+再用 `else if (refusalDeath(...))` 走**同路重问一次**（`repeatAvoid` = 除最后一条已付路由外全部避开）。
+
+读源码时容易踩的两处：
+
+- **`model-unavailable` 是一个桶**：`classifyFailureText` 把「这个模型不存在」和「钥匙/权限被拒」都归到它，
+  所以按分类判定会把「模型没配」也重问一次。理由文本不能替代分类：宿主记录 `code: 'AUTH'` 而没有 diagnostic 时，
+  `childStopPhrase` 只写「the child run ended abnormally」，句子里没有 `401`。
+- **判腿与规划腿的「最多几次」由常量钉住**：`PLANNER_LEG_CALLS = 3`（首问 / 形状重交 / 死因重打）与
+  `routeBudgetFor` 的 `2 * worker + 3 * (verifier + supervisor)`（首问 / 死因重打 / 形状重交）已经把重问算进去了，
+  本轮不需要抬上限——这也是一条回归信号：真正的重问次数不会超过这两个常量。
+
+真机读数（`.rsi/evidence/auth-retry-2026-11-26/soak/routes-switches.txt`）：`plugin:grok-workflow/routing` 的
+`switches` 只收**失败**行（成功首问不入账，`src/records.ts`），所以「同路重问成功了」要看子会话的
+`request/context.provider/model` 两次相同，而不是看 `switches` 里有没有第二行。
