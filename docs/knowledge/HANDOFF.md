@@ -1,3 +1,49 @@
+## 2026-11-25 — `0.13.36` 已发布并跑绿；下一个接手的先看这条：**升级前必须把档案里 `mode:` 与 `legacyGate:` 两行都删掉**，本机 live 档案还没升（`BLOCKED`，等操作者）
+
+- **From:** 记忆收口（`agent-155/release-memory`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：`main` 上的发布提交 **`26dc370`** `chore(release): prepare v0.13.36`（**8 文件 / +35 −30**），标签 **`v0.13.36`**
+  （附注标签对象 `0ff357b` → 剥出 `26dc370`）。**`0.13.36` 已经发布**，不是「准备发」。
+- **发出去的是什么（`CONFIRMED`）**：`package.json` + `package-lock.json` 的版本；`src/client/index.js` 的 `PLUGIN_VERSION` / `UPDATE_LATEST` 两行
+  与 `lib/client.js` 里同样两行的重建；`README.md` / `README.zh-CN.md` 的声明版本、两处安装固定点、正文里那个反引号版本、已发布标签清单
+  （末尾补上 `v0.13.35` 与 `v0.13.36`）；`docs/LOCAL-TESTING.md` 三个 tarball 名统一成 `dsh-grok-workflow-0.13.36.tgz`；`CHANGELOG.md` 开新段。
+  **`src/` 与 `lib/` 的改动只有版本字面量，没有逻辑改动。**
+- **`CHANGELOG.md` 的形状**：`## [Unreleased]` 留成空标题，新段 `## [0.13.36] - 2026-11-25` 压在原有四个小节之上；`### Upgrade note / 升级须知`
+  **重写成点名两个键**：残留 `mode:` **或** 残留 `legacyGate:`，**任一个单独存在**都会让 `grok-workflow` 那一行拒绝激活、工作流从界面消失，
+  所以升级前**两行都要删**；设置与记录不丢；我们**没有**改过任何人的档案。
+- **已经证实（`CONFIRMED`）**：
+  1. **合并早就在了**：`main` 尖端此前是 `2f71a95`（八条分支提曲折进来），与 `origin/main` 同点，主检出树与分支尖端 `bf337b4` 逐字节相同
+     （`git diff --stat bf337b4 main` 为空）。这一轮只是在它上面加了一个版本提交。
+  2. **本地门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**，`98 files` / **`1839 tests`**、`Duration 97.12s`、**`Found 15 warnings and 0 errors.`**、
+     `client bundle: 329354 bytes → lib/client.js`。
+  3. **`verify:lib` 两次读数都对**：门禁里那次打印 `lib/ at 2f71a95 …`，因为它是**按提交**验的、那次验的是升版前的提交；提交后重跑
+     `node scripts/verify-lib.mjs` → **`lib/ at 26dc370 is the build of src/ at 26dc370 (281 files, byte-identical)`**。别把前一行当缺陷。
+  4. **推送**：`2f71a95..26dc370  main -> main`、`* [new tag]  v0.13.36`；没有 force-push，没有移动任何已发布标签。
+  5. **远端**：Release run **`45547073752`** success（head sha `26dc370`）、`main` 的 CI run **`45547060845`** success；
+     Release 已发布，唯一资产 `dsh-grok-workflow-0.13.36.tgz` = **943206 字节**。
+- **操作者必须自己做的（`BLOCKED`，我们刻意没做）**：
+  1. 打开 live 档案的 `<档案目录>/cordis.patch.yml`，找到 `grok-workflow` 那一行，把它下面写着 `mode:` 的那一行**整行删掉**，
+     再把写着 `legacyGate:` 的那一行也**整行删掉**，保存。
+  2. 然后才把插件升到**固定标签** `v0.13.36`（不要用浮动范围、`latest` 或分支名），装完读回的版本必须就是 `0.13.36`。
+  3. 为什么必须按这个顺序：`AGENTS.md` §11 的自动升级这一轮**没有执行**——档案里留着任一个旧键，装上去那一行就拒绝激活、工作流从界面消失。
+     `~/.dsh` **一行未读、一字未写**，运行中的实例没有重启。**这是等操作者动手，不是失败。**
+- **下一步（按顺序）**：
+  1. **操作者删两行 → 升级到 `v0.13.36` → 读回版本**（上面那三步）。
+  2. **下一轮可做：`HARD_LIMITS.maxQueuedMessages`（`src/config.ts:10` = 8）这个零读者常量的去留。** 键早在 `REMOVED_CONFIG_KEYS` 里，
+     clamp 永不发生；删它要连带核 `HARD_LIMITS` 的其他读者与 `test/config.spec.ts` 的守卫，是一次代码改动。
+  3. **冷加载多读一次 `status` 那条残留**要不要抠：抠就得让路由的答案形状多一个字段，属于另一次决定。
+- **分支与 worktree 的现状（`CONFIRMED`，`git worktree list` / `git branch` 现查）**：**只有一个工作树**，就是主检出
+  `/home/fish/projects_mine/dsh-grok-workflow`，检出在 `26dc370 [main]`。`fix/switch-refresh` 与 `fix/composer-label` 的工作树**和分支都已经清掉**。
+  本地还留着四个分支，**都不是工作树、本轮没动**：`backup/wip-2026-11-24-live-steering`、`backup/wip-2026-11-24-team-dispatch-v1`、
+  `backup/wip-2026-11-24-progress-task-number-first`、`feat/audit-layer`（它的远端已经没了）。
+- **残留三条（照抄，不重新论证）**：① 冷加载会多读一次 `status`（不是轮询，状态收敛正确）；② `HARD_LIMITS.maxQueuedMessages = 8` 零读者；
+  ③ `docs/knowledge` 仍不受任何测试守卫。
+- **三件会踩的事**：
+  1. **别把门禁里那句 `lib/ at 2f71a95 …` 当成产物过期**：`verify:lib` 按提交验、不看工作树；要看当前提交是否一致，提交后再单独跑一次。
+  2. **升级顺序不能反**：先删 `mode:` 与 `legacyGate:` 两行，再装 0.13.36。反过来做，界面上的工作流会消失（数据不丢，但看起来像坏了）。
+  3. **工作树里 `.gitignore` 那条改动与本轮无关**：四行本地设计稿忽略规则，早前会话加的，发布提交里没暂存，之后也别顺手带上。
+- **一条要如实说的话**：这一轮的发布提交**只改版本字面量与文档**，运行行为零变化，所以没有为它重跑真机 soak；最近一次真机读数是 0.13.35 那一轮
+  （打字 `/grok on|off` 后开关 +0.5 秒自己刷新）。全量门禁由包工头跑，读数如上。
+
 ## 2026-11-25 — 这一支装了两批：开关刷新修复 + 四个死导出删除，附带队列数字订正与升级须知（`fix/switch-refresh`，未发版）
 
 - **From:** 记忆收口（`agent-154/switch-refresh-worker`）· **To:** 操作者 / 下一个接手者

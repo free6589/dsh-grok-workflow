@@ -1,3 +1,29 @@
+Last updated: 2026-11-25 12:33 +08:00（**`0.13.36` 已经发出去了：本地门禁跑绿（`Test Files 98 passed (98)` / `Tests 1839 passed (1839)` / `Found 15 warnings and 0 errors.`），`main` 与标签 `v0.13.36` 都推上去了，远端 Release 跑绿（run **`45547073752`**）、`main` 上的 CI 也绿（run **`45547060845`**），GitHub Release 已发布、唯一资产 `dsh-grok-workflow-0.13.36.tgz` **943206 字节**；**唯一没做的是本机 live 档案的自动升级**——档案里可能还留着 `mode:` 或 `legacyGate:` 两行，先删再升，否则那一行拒绝激活、工作流从界面消失，所以这一条记 **`BLOCKED`（等操作者动手），不是失败**；版本 `0.13.36`** —
+分支 **`main`**，发布提交 **`26dc370`** `chore(release): prepare v0.13.36`（**8 文件 / +35 −30**），标签 **`v0.13.36`** 是附注标签，标签对象 **`0ff357b`**、剥出的提交正是 **`26dc370`**。
+**发的是哪些字**：`package.json` 与 `package-lock.json` 的版本、`src/client/index.js` 里 `PLUGIN_VERSION` 与 `UPDATE_LATEST` 两行、`lib/client.js` 里同样那两行的重建、两个 README 的声明版本 / 两处安装固定点 / 正文里那个反引号版本 / 已发布标签清单（英文尾部是 `v0.13.34`, `v0.13.35` 与 `v0.13.36`；中文尾部是 `v0.13.34`、`v0.13.35`、`v0.13.36`）、`docs/LOCAL-TESTING.md` 三个 tarball 名（全部都是 `dsh-grok-workflow-0.13.36.tgz`）、以及 `CHANGELOG.md`。**`src/` 与 `lib/` 的改动只有那两行版本字面量，没有一行逻辑。**
+**`CHANGELOG.md` 的形状（`CONFIRMED`，翻过文件）**：`## [Unreleased]` 保留成一个**空标题**，新段 `## [0.13.36] - 2026-11-25` 压在原有四个小节之上；其中 `### Upgrade note / 升级须知` **重写成点名两个键**——档案里残留一行 `mode:` **或** 残留一行 `legacyGate:`，**任一个单独存在**都会让 `grok-workflow` 那一行拒绝激活、症状是工作流从界面上消失，所以升级前**两行都要删**；设置与记录不丢；结尾写明「两行都没有就什么都不用做」与「我们**没有**替你改过任何档案」。
+**合并不是这一轮做的**：`main` 尖端此前就已经是 **`2f71a95`**（`merge: refresh mounted switch after command writes record`，把 `8b32e5e` / `ded1df6` / `266006b` / `144a9a1` / `3366248` / `07b91d3` / `c5f40b7` / `bf337b4` 八条折进来），且与 `origin/main` 同点；主检出树与分支尖端 `bf337b4` 逐字节相同（`git diff --stat bf337b4 main` 为空）。**这一轮只是在它上面打了一个版本提交。**
+**本地门禁（包工头在升版后的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`Test Files 98 passed (98)` / **`Tests 1839 passed (1839)`**、
+`Duration 97.12s (transform 2.37s, setup 0ms, import 7.78s, tests 78.51s, environment 10ms)`、**`Found 15 warnings and 0 errors.`**（与基线同数）、
+`client bundle: 329354 bytes → lib/client.js`（与 0.13.35 那一轮同数——本轮只改版本字面量，体积不变是对的）。
+**`verify:lib` 的两次读数如实记（这不是缺陷）**：它是**按提交**验的，不看工作树；所以门禁那一次打印的是 `lib/ at 2f71a95 …`——那一次验的是升版**之前**的提交。
+提交之后包工头又单独跑了一次 `node scripts/verify-lib.mjs` → **`lib/ at 26dc370 is the build of src/ at 26dc370 (281 files, byte-identical)`**。**两条读数都记下来，因为它们测的是两个不同的提交。**
+**推送（`CONFIRMED`）**：`git push origin main` → `2f71a95..26dc370  main -> main`；`git push origin v0.13.36` → `* [new tag]`。**没有 force-push，没有移动任何已发布的标签。**
+**远端（`gh`，`CONFIRMED`；这一轮我自己又用 `gh run list` 与 `gh release view` 重读过一遍）**：Release 工作流 run **`45547073752`**，标签 `v0.13.36`、head sha `26dc370`、conclusion **success**
+（https://github.com/free6589/dsh-grok-workflow/actions/runs/45547073752 ）；`main` 上的 CI run **`45547060845`**、head sha 同为 `26dc370`、conclusion **success**
+（https://github.com/free6589/dsh-grok-workflow/actions/runs/45547060845 ）。
+**GitHub Release（`CONFIRMED`）**：https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.36 ，名字 `Grok Workflow for DSH v0.13.36`，
+target `main`，发布时间 `2026-11-25T04:30:10Z`，唯一资产 `dsh-grok-workflow-0.13.36.tgz` = **943206 字节**（`sha256:cac9aa40…`）。
+**没做的，以及为什么（`BLOCKED`，不是失败）**：`AGENTS.md` §11 要求的 **live 档案自动升级没有执行**。理由具体：live 档案里**可能仍然留着**被删掉的 `mode:` / `legacyGate:` 两行，
+把 0.13.36 装上去会让插件那一行**拒绝激活**、工作流直接从界面消失——那比不升级更糟。**顺序必须是操作者先删那两行，再升到固定标签。**
+`~/.dsh` **一行未读、一字未写**，运行中的实例也没有重启。**这条记在操作者身上**：删两行 → 再升级。
+**残留（照抄上一轮，不重新论证）**：① 冷加载会**多读一次** `status`（多一个几十字节的 POST，状态收敛正确，不是轮询）；② `HARD_LIMITS.maxQueuedMessages = 8`
+（`src/config.ts:10`）仍是**零读者**常量，下一轮决定去留；③ `docs/knowledge` **仍不受任何测试守卫**，改记忆不会让测试变红。
+**工作树里那条无关改动**：`.gitignore` 有四行本地设计稿忽略规则（早前会话加的），发布提交里**没有**被暂存，本轮也不碰它。
+**这一轮我自己跑过的守卫（`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts
+test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` → **EXIT=0，`6 files / 79 tests` PASS**。下面那条 12:16 的旧记录原样留在历史里，
+它写着「未发版」是对的——那时确实还没发。
+
 Last updated: 2026-11-25 12:16 +08:00（**这一支现在同时装了四件事：① 打字 `/grok off` 后已挂载的开关自己刷新（真机验过）；② 删掉四个零引用导出、并按拍板先给协议词汇补了载体；③ 两个 README 里那个没有出处的队列数字订正成写现状；④ `CHANGELOG.md` 补了旧键 `mode:` 的升级须知。运行行为零变化（除①之外），门禁由包工头跑，未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
 分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**。**完整提交清单（八条，最后一条是本轮文档提交）**：
 `8b32e5e` `fix(client): refresh the mounted workflow switch after a command writes the record`（3 文件：`lib/client.js` 143/0、

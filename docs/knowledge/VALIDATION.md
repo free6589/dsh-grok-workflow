@@ -1,3 +1,45 @@
+## `0.13.36` 发布收口：门禁、推送、远端跑绿、Release 已发布；live 档案升级 `BLOCKED` — 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境或前置条件挡住的写 `BLOCKED`。**发布轮，不是代码轮**：
+`main` 上的发布提交 **`26dc370`** `chore(release): prepare v0.13.36`（**8 文件 / +35 −30**），标签 **`v0.13.36`**（附注标签对象 `0ff357b` → `26dc370`）。
+`src/` 与 `lib/` 的改动**只有 `PLUGIN_VERSION` / `UPDATE_LATEST` 那两行版本字面量**，没有逻辑改动。主检出，Node v26.8.1。
+**标注规则**：标 `包工头跑` 的行是发布执行方在主检出上跑出来、本轮记录者没有重跑的读数；标 `本轮自查` 的行是这一轮记录者亲手跑的。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 发布提交与改动面（本轮自查） | `git show --stat 26dc370`；`git log --oneline -3`（主检出，`main`） | **`8 files changed, 35 insertions(+), 30 deletions(-)`**：`CHANGELOG.md` 25/—、`README.md` 10、`README.zh-CN.md` 10、`docs/LOCAL-TESTING.md` 6、`lib/client.js` 4、`package-lock.json` 4、`package.json` 2、`src/client/index.js` 4。头部是 `26dc370 chore(release): prepare v0.13.36` → `2f71a95 merge: refresh mounted switch after command writes record`。**`CONFIRMED`** |
+| 标签指向（本轮自查） | `git rev-parse v0.13.36`；`git for-each-ref refs/tags/v0.13.36 --format='%(objecttype) %(objectname) %(*objectname)'` | **`tag 0ff357bcac653fc3a91ca1f7fb269335be6c2ea5 26dc370e270150ddb3facf8653677a645038f87a`**——附注标签对象 `0ff357b`，剥出的提交正是 `26dc370`。**`CONFIRMED`** |
+| 版本号没被这一轮改（本轮自查） | `node -e "console.log(require('./package.json').version)"` | **`0.13.36`**——本轮只写记忆，**没有**再动版本。**`CONFIRMED`** |
+| 合并早已在位（包工头跑） | `git diff --stat bf337b4 main`（发布前） | **空输出**——主检出树与分支尖端 `bf337b4` 逐字节相同；`main` 尖端当时是 `2f71a95`，与 `origin/main` 同点。八条分支提交（`8b32e5e` / `ded1df6` / `266006b` / `144a9a1` / `3366248` / `07b91d3` / `c5f40b7` / `bf337b4`）已在其中。**`CONFIRMED`** |
+| 本地门禁（包工头跑，升版后的树上） | `TMPDIR=$PWD/.tmp npm run ci` | **EXIT=0**。`Test Files 98 passed (98)` / **`Tests 1839 passed (1839)`**；`Duration 97.12s (transform 2.37s, setup 0ms, import 7.78s, tests 78.51s, environment 10ms)`；**`Found 15 warnings and 0 errors.`**；`client bundle: 329354 bytes → lib/client.js`（与 0.13.35 同数，因为只改版本字面量）。**`CONFIRMED`** |
+| `verify:lib` 在门禁里的读数（包工头跑，如实记） | 同上一次 `npm run ci` 的 `verify:lib` 阶段 | 打印 **`lib/ at 2f71a95 …`**。**这不是缺陷**：`scripts/verify-lib.mjs` 按**提交**验、不看工作树，那一次验的是升版**之前**的提交 `2f71a95`。**`CONFIRMED`（作为一条读数，不是一次失败）** |
+| `verify:lib` 提交后重跑（包工头跑） | `node scripts/verify-lib.mjs`（`26dc370` 已落盘之后） | **`lib/ at 26dc370 is the build of src/ at 26dc370 (281 files, byte-identical)`**。与上一行合起来才说明「发布提交里的 `lib/` 就是同一提交 `src/` 的产物」。**`CONFIRMED`** |
+| 推送 `main`（包工头跑） | `git push origin main` | **`2f71a95..26dc370  main -> main`**。没有 force-push。**`CONFIRMED`** |
+| 推送标签（包工头跑） | `git push origin v0.13.36` | **`* [new tag]  v0.13.36`**——新建标签，**没有移动或覆盖任何已发布标签**。**`CONFIRMED`** |
+| 远端 Release 工作流（本轮自查，`gh` 重读） | `gh run list --limit 4 --json databaseId,headSha,name,conclusion,event` | run **`45547073752`**、`name=Release`、`headSha=26dc370e27…`、**`conclusion=success`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45547073752 。**`CONFIRMED`** |
+| 远端 `main` CI（本轮自查，`gh` 重读） | 同上 | run **`45547060845`**、`name=CI`、`headSha=26dc370e27…`、**`conclusion=success`**。https://github.com/free6589/dsh-grok-workflow/actions/runs/45547060845 。**`CONFIRMED`** |
+| GitHub Release 的发布面（本轮自查） | `gh release view v0.13.36 --json name,tagName,isDraft,publishedAt,url,assets,targetCommitish` | `name=`**`Grok Workflow for DSH v0.13.36`**、`tagName=v0.13.36`、`targetCommitish=main`、`isDraft=false`、`publishedAt=`**`2026-11-25T04:30:10Z`**、`url=https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.36`；**唯一资产** `dsh-grok-workflow-0.13.36.tgz`、`size=`**`943206`**、`state=uploaded`、`sha256:cac9aa40…`。**`CONFIRMED`** |
+| 已发布标签清单补齐（本轮自查） | `git show 26dc370 -- README.md README.zh-CN.md`；`grep -n "0\.13\.3[456]" README.md README.zh-CN.md` | 英文清单末尾由 `` `v0.13.34`, `v0.13.35` and `v0.13.36` ``收尾，中文由 `` `v0.13.34`、`v0.13.35`、`v0.13.36`。 `` 收尾；两处安装固定点与声明版本都读 `0.13.36` / `#v0.13.36`。**`CONFIRMED`** |
+| 本地测试 tarball 名（本轮自查） | `grep -n "0\.13\.3" docs/LOCAL-TESTING.md` | 三处（`:77`、`:163`、`:164`）全部是 **`dsh-grok-workflow-0.13.36.tgz`**，无旧版本残留。**`CONFIRMED`** |
+| 六个文档守卫（**本轮自查，本轮亲手跑**） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` | **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 79 passed (79)`**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3），`Duration 1.36s`。与基线 6 文件 / 79 例同数。**`CONFIRMED`** |
+| worktree 现状（本轮自查） | `git worktree list`；`git branch` | **只有主检出**：`/home/fish/projects_mine/dsh-grok-workflow  26dc370 [main]`。`fix/switch-refresh` 与 `fix/composer-label` 的工作树**和分支都已不在**。剩下的四个本地分支都不是工作树、本轮未动：`backup/wip-2026-11-24-live-steering`、`backup/wip-2026-11-24-team-dispatch-v1`、`backup/wip-2026-11-24-progress-task-number-first`、`feat/audit-layer`（远端已删）。**`CONFIRMED`** |
+| 工作树状态（本轮自查） | `git status --short` | 只有 **` M .gitignore`**——四行本地设计稿忽略规则，早前会话加的，发布提交里**没有**被暂存，本轮也没碰。加上本轮三份 `docs/knowledge/` 记忆改动。**无测试残留（无 `*.log` / `*.tgz` / `*.bak` / `*.orig` / harness 截图）。`CONFIRMED`** |
+| live 档案自动升级（`AGENTS.md` §11） | —— | **`BLOCKED`（刻意未执行，等操作者）**：live 档案里可能仍留着被删掉的 `mode:` / `legacyGate:` 两行，装 0.13.36 上去会让 `grok-workflow` 那一行**拒绝激活**、工作流从界面消失。正确顺序是**操作者先删这两行，再升级到固定标签 `v0.13.36`**。`~/.dsh` **一行未读、一字未写**，运行实例未重启。**这是等外部动作，不是失败。** |
+| 模型回合 / 真机 soak | —— | **`NOT_RUN`（本轮不需要）**：发布提交只改版本字面量与文档，运行行为零变化，所以没有为它重跑真机；最近一次真机读数是 0.13.35 那一轮（打字 `/grok on\|off` 后开关 +0.5 秒自刷新，隔离克隆、端口 3321）。 |
+| `docs/knowledge` 的守卫 | —— | **`NOT_RUN`（不存在）**：改记忆仍然不会让任何测试变红——这是延续下来的残留，不是本轮引入的。 |
+
+**这一轮动了什么：** 只有 `docs/knowledge/STATE.md`、`docs/knowledge/HANDOFF.md`、`docs/knowledge/VALIDATION.md` 三份记忆
+（连同本轮那条 `docs(memory): close out 0.13.36 …` 提交）。**没有碰** `src/`、`lib/`、`test/`、`package.json`、`package-lock.json`、
+`CHANGELOG.md`、`README*`、`.gitignore`；没有建分支、没有建 worktree、没有 push、没有重发版本。
+
+**Honest boundary（逐条）：**
+1. **门禁、推送、`verify:lib` 提交后那次重跑不是这一轮记录者执行的**：它们由发布执行方（包工头）在主检出上跑并报回读数，本条按 `CONFIRMED` 记录，
+   但来源是那一方；这一轮记录者亲手跑的是六个文档守卫（79 例）、`git show --stat 26dc370`、标签解析、`gh run list`、`gh release view`、`git worktree list`、`git status --short`、版本读回。
+2. **`lib/ at 2f71a95 …` 那条读数是真读数，不是过期产物**：`verify:lib` 按提交验，门禁跑在升版提交落盘之前；提交后单独重跑得 `26dc370` 全一致。两条都留在表里。
+3. **live 档案的旧键状态是推断、不是读出来的**：本轮**没有**读 `~/.dsh`，所以「档案里可能还留着 `mode:` / `legacyGate:`」是 `HYPOTHESIS`（基于上一轮记忆），
+   而「留着就会导致那一行拒绝激活」是 `CHANGELOG.md` 里已写明的机制。因此自动升级记为 `BLOCKED`，而不是「升级失败」。
+4. **没有为 0.13.36 重跑真机**：发布提交不含逻辑改动，真机读数沿用 0.13.35 那一轮；这不是遗漏，是刻意。
+
 ## 删掉四个零引用导出（先补协议载体）、订正队列上限的写法、补旧键升级须知（`fix/switch-refresh`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/switch-refresh`（worktree
