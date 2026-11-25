@@ -367,6 +367,8 @@ window.__ModuleLoader__.load({
       'progress.plan.done': 'Passed',
       'progress.plan.failed': 'Not passed',
       'progress.plan.cancelled': 'Cancelled',
+      // The one control a task row carries: it opens the row's own lines, never a panel.
+      'progress.task.detail': 'Detail',
       'progress.log.title': 'History',
       'progress.log.done': 'Did it',
       'progress.log.passed': 'Passed',
@@ -375,6 +377,9 @@ window.__ModuleLoader__.load({
       'progress.log.failed': 'Not passed',
       'progress.log.shipped': 'Shipped',
       'progress.log.cancelled': 'Cancelled',
+      // The history's height cap: one word each way, no sentence about the fold.
+      'progress.log.more': 'Show all',
+      'progress.log.less': 'Collapse',
       // The shipped draft, and the one button the page offers (it fills the box, never sends).
       'progress.final.title': 'Handed in',
       'progress.final.mark': '(final)',
@@ -601,6 +606,8 @@ window.__ModuleLoader__.load({
       'progress.plan.done': '过了',
       'progress.plan.failed': '没过',
       'progress.plan.cancelled': '没做',
+      // 任务行唯一的那颗控件：展开这一行自己的日志，不是弹出面板。
+      'progress.task.detail': '详情',
       'progress.log.title': '经过',
       'progress.log.done': '做完',
       'progress.log.passed': '过了',
@@ -609,6 +616,9 @@ window.__ModuleLoader__.load({
       'progress.log.failed': '没过',
       'progress.log.shipped': '交卷',
       'progress.log.cancelled': '取消',
+      // 「经过」的高度上限：两个词，各管一个方向，不解释折叠本身。
+      'progress.log.more': '展开全部',
+      'progress.log.less': '收起',
       // 交卷稿，以及页面上唯一那颗按钮（只填框，不代发）。
       'progress.final.title': '交卷',
       'progress.final.mark': '（定稿）',
@@ -2846,6 +2856,15 @@ window.__ModuleLoader__.load({
       review: 'progress.log.reviewed',
     }
 
+    /**
+     * How many history lines stand open before the list folds.
+     *
+     * Six lines is one screen of the page's own type; beyond it the list keeps its height
+     * and scrolls, so the dock below it stays where the reader last saw it. The number is
+     * a cap on drawing, not a fact about the run: no line is dropped, none is summarized.
+     */
+    const PROGRESS_LOG_FOLD_AT = 6
+
     /** One empty track, shared so a session with no run keeps one snapshot identity. */
     const EMPTY_PROGRESS_SNAPSHOT = { runs: [], activeRun: undefined }
 
@@ -3494,6 +3513,27 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * One declared call, as the page's own history line.
+     *
+     * The history and a task row's opened detail read the same declaration, so both take
+     * their line from here: a second mapping would let the detail describe a call
+     * differently from the log it expands.
+     * @param member - one declared call of the run.
+     * @param shipped - the row `summary-final` named, when the stream named one.
+     * @returns the story's log row for that call.
+     */
+    function progressStoryLogRow(member, shipped) {
+      return {
+        seq: member.seq,
+        ...member.startedAt === undefined ? {} : { at: member.startedAt },
+        role: progressStoryRole(member),
+        title: member.phase === undefined ? '' : member.phase,
+        state: progressRowState(member),
+        ...member === shipped ? { shipped: true } : {},
+      }
+    }
+
+    /**
      * The row `summary-final` names, read back off the rows the fold already marked.
      *
      * The fold writes the mark onto the row that landed (the highest `order` of that draft
@@ -3628,14 +3668,7 @@ window.__ModuleLoader__.load({
       const shipped = run.summaryFinalDraft === undefined ? undefined : progressShippedRow(run.members, run.summaryFinalDraft)
       const log = [...run.members]
         .sort((left, right) => left.seq - right.seq)
-        .map((member) => ({
-          seq: member.seq,
-          ...member.startedAt === undefined ? {} : { at: member.startedAt },
-          role: progressStoryRole(member),
-          title: member.phase === undefined ? '' : member.phase,
-          state: progressRowState(member),
-          ...member === shipped ? { shipped: true } : {},
-        }))
+        .map((member) => progressStoryLogRow(member, shipped))
       const shippedLine = shipped === undefined ? undefined : log.find((row) => row.seq === shipped.seq)
       const final = run.summaryFinalDraft === undefined || shippedLine === undefined
         ? undefined
@@ -3815,14 +3848,31 @@ window.__ModuleLoader__.load({
       // never inside a segment: the segment is a proportion, the bar is a sentence.
       '.gw-progress-flag { align-self: flex-start; margin: 10px 4px 0; padding: 4px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-state-warn-primary); font-size: 12px; font-weight: 600; }',
       '.gw-progress-rest { margin: 10px 4px 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
+      // ── the body: the page on the left, the guardian's blocks on the right ────────
+      // The wrapper exists only when a guardian started: without one the three sections
+      // are the page's own flow and there is no empty column beside them.
+      '.gw-progress-columns { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }',
+      '.gw-progress-main { display: flex; flex-direction: column; min-width: 0; }',
+      '.gw-progress-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }',
       // ── sections: the step list and the history share one heading shape ───────────
       '.gw-progress-section { margin-top: 16px; }',
       '.gw-progress-h2 { margin: 0 4px 6px; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--dsw-alias-label-secondary, inherit); }',
+      // A heading with one control beside it: the fold sits at the far end of its own line.
+      '.gw-progress-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 4px 6px; }',
+      '.gw-progress-section-head .gw-progress-h2 { margin: 0; }',
+      '.gw-progress-log-toggle { flex: none; height: 22px; padding: 0 9px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; background: transparent; color: var(--dsw-alias-label-secondary, inherit); font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }',
+      '.gw-progress-log-toggle:hover { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-plan-toggle:focus-visible, .gw-progress-log-toggle:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }',
       '.gw-progress-plan { display: flex; flex-direction: column; margin: 0; padding: 0 4px; list-style: none; }',
-      '.gw-progress-plan-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       '.gw-progress-plan-row:last-child { border-bottom: 0; }',
-      '.gw-progress-plan-n { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
-      '.gw-progress-plan-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }',
+      // The row's own control: number and title in one button, the state word outside it.
+      '.gw-progress-plan-toggle { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }',
+      // A chevron drawn in CSS, so the row's text stays exactly the words it already had.
+      '.gw-progress-plan-toggle::after { content: ""; flex: none; width: 6px; height: 6px; margin-inline-start: auto; margin-inline-end: 2px; border-right: 1.5px solid var(--dsw-alias-label-secondary, inherit); border-bottom: 1.5px solid var(--dsw-alias-label-secondary, inherit); transform: rotate(45deg); }',
+      '.gw-progress-plan-row[data-open="true"] .gw-progress-plan-toggle::after { transform: rotate(-135deg); }',
+      '.gw-progress-plan-n { flex: none; width: 18px; font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
+      '.gw-progress-plan-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }',
       '.gw-progress-plan-name { font-size: 13px; overflow-wrap: anywhere; }',
       '.gw-progress-plan-roles { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); }',
       '.gw-progress-plan-word { flex: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; }',
@@ -3830,8 +3880,17 @@ window.__ModuleLoader__.load({
       '.gw-progress-plan-row[data-state="doing"] .gw-progress-plan-word { color: var(--dsw-alias-state-business-primary); }',
       '.gw-progress-plan-row[data-state="failed"] .gw-progress-plan-word { color: var(--dsw-alias-state-warn-primary); }',
       '.gw-progress-plan-row[data-state="blocked"] .gw-progress-plan-word { color: var(--dsw-alias-state-warn-primary); }',
+      // An opened row's lines hang under it, across both columns of the row's own grid.
+      '.gw-progress-plan-detail { grid-column: 1 / -1; display: flex; flex-direction: column; margin: 4px 0 8px; padding: 8px 8px 4px; border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 6%, transparent); }',
+      '.gw-progress-plan-detail .gw-progress-log-row { grid-template-columns: 46px minmax(0, 1fr) auto auto; padding: 6px 4px; }',
+      // The slot one detail line reached: the chain's word, in a capsule of its own.
+      '.gw-progress-plan-detail [data-gw-progress-task-chain] { flex: none; padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; white-space: nowrap; }',
       // ── the history: one line per declared call ──────────────────────────────────
       '.gw-progress-log { display: flex; flex-direction: column; margin: 0; padding: 0 4px; list-style: none; }',
+      // The cap is a fold, not a scroller: nothing scrolls sideways, and the unfolded list
+      // shows every line the run declared.
+      '.gw-progress-log[data-expanded="false"] { max-height: 264px; overflow-y: auto; }',
+      '.gw-progress-log[data-expanded="true"] { max-height: none; overflow-y: visible; }',
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       '.gw-progress-log-row:last-child { border-bottom: 0; }',
       '.gw-progress-log-time { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
@@ -3868,14 +3927,19 @@ window.__ModuleLoader__.load({
       '.gw-progress-guardian { box-sizing: border-box; min-width: 0; margin-top: 16px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian[data-state="active"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, transparent); }',
       '.gw-progress-guardian[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 38%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); }',
-      '.gw-progress-guardian-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; }',
-      '.gw-progress-guardian-title { font-size: 12px; font-weight: 650; }',
-      '.gw-progress-guardian-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px; font-size: 11px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent); color: var(--dsw-alias-state-business-primary); }',
-      '.gw-progress-guardian[data-state="finished"] .gw-progress-guardian-status { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent); color: var(--dsw-alias-state-success-primary); }',
-      '.gw-progress-guardian[data-state="cancelled"] .gw-progress-guardian-status { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 9%, transparent); color: var(--dsw-alias-state-warn-primary); }',
-      '.gw-progress-guardian-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-top: 8px; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; font-variant-numeric: tabular-nums; }',
-      '.gw-progress-guardian-empty { margin: 9px 0 0; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; }',
-      '.gw-progress-guardian-list { display: grid; gap: 6px; margin: 9px 0 0; padding: 0; list-style: none; }',
+      // The lane reads as blocks, not as a head plus a list: two tiles a row, and the
+      // findings (or the sentence that there are none) across the whole width.
+      '.gw-progress-guardian-blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }',
+      '.gw-progress-guardian-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 6px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 6%, transparent); }',
+      '.gw-progress-guardian-block[data-gw-progress-guardian-block="findings"] { grid-column: 1 / -1; padding: 0; border-color: transparent; background: transparent; }',
+      '.gw-progress-guardian-block-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
+      '.gw-progress-guardian-block-value { font-size: 12px; font-weight: 650; color: var(--dsw-alias-label-primary, inherit); overflow-wrap: anywhere; }',
+      // The state word keeps the colour it always had, on the tile that now holds it.
+      '.gw-progress-guardian[data-state="active"] [data-gw-progress-guardian-block="status"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-guardian[data-state="finished"] [data-gw-progress-guardian-block="status"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-guardian[data-state="cancelled"] [data-gw-progress-guardian-block="status"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-warn-primary); }',
+      '.gw-progress-guardian-empty { margin: 0; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; }',
+      '.gw-progress-guardian-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }',
       '.gw-progress-guardian-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; padding: 6px 8px; border-inline-start: 3px solid var(--dsw-alias-state-warn-primary, currentColor); border-radius: 7px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); font-size: 11px; }',
       '.gw-progress-guardian-list li[data-action="rescue"] { border-inline-start-color: var(--dsw-alias-state-success-primary, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian-finding-label { font-weight: 600; }',
@@ -3887,6 +3951,11 @@ window.__ModuleLoader__.load({
       // "running", so a reader who asked for less motion loses nothing.
       '@media (prefers-reduced-motion: reduce) {',
       '  .gw-progress-step[data-state="doing"]::after, .gw-progress-chip[data-state="running"] .gw-progress-chip-dot, .gw-progress-quiet-dot { animation: none; }',
+      '}',
+      // Below 720px the page is one column: the guardian's blocks stack under the step list
+      // and the history, which is the order the DOM already gives them.
+      '@media (max-width: 720px) {',
+      '  .gw-progress-columns { grid-template-columns: minmax(0, 1fr); }',
       '}',
       // Under 480px the page stacks: the headline keeps the width, the plan and the log
       // rows drop their number column, and the dock keeps one full-width button. Nothing
@@ -4018,6 +4087,11 @@ window.__ModuleLoader__.load({
      * The title keeps the `data-gw-progress-task-name` hook the plan-task cards used, so an
      * external reader that already looks for a plan task's name finds it here instead of
      * losing the row with the card.
+     *
+     * Each row is also the page's one new control: number and title sit in a button that
+     * opens the row's own declared lines under it. The state word stays outside the button,
+     * so the row says the same words it said before — the button adds a way to look, not a
+     * word to read.
      */
     function ProgressPlan(story, props) {
       const t = props.t
@@ -4027,19 +4101,99 @@ window.__ModuleLoader__.load({
         h('ol', { className: 'gw-progress-plan', 'data-gw-progress-plan': true },
           story.steps.map((step, index) => {
             const roles = progressChainWords(step.chain, t)
+            const open = props.openTasks[step.key] === true
+            // The id the button names and the panel it names are the same pair, in the same
+            // order as the step: a stable name per row, never per render.
+            const detailId = `gw-progress-task-detail-${index}`
             return h('li', {
               key: step.key,
               className: 'gw-progress-plan-row',
               'data-gw-progress-plan-row': step.key,
               'data-state': step.state,
+              'data-open': open ? 'true' : 'false',
             },
-            h('span', { className: 'gw-progress-plan-n', 'data-gw-progress-plan-n': true }, String(index + 1)),
-            h('span', { className: 'gw-progress-plan-body' },
+            h('button', {
+              key: 'toggle',
+              type: 'button',
+              className: 'gw-progress-plan-toggle',
+              'data-gw-progress-plan-toggle': true,
+              'aria-expanded': open,
+              'aria-controls': detailId,
+              title: t('progress.task.detail'),
+              onClick: () => props.toggleTask(step.key),
+            },
+            h('span', { key: 'n', className: 'gw-progress-plan-n', 'data-gw-progress-plan-n': true }, String(index + 1)),
+            h('span', { key: 'body', className: 'gw-progress-plan-body' },
               h('span', { className: 'gw-progress-plan-name', 'data-gw-progress-task-name': true }, step.title),
-              roles === '' ? null : h('span', { className: 'gw-progress-plan-roles', 'data-gw-progress-plan-roles': true }, roles)),
+              roles === '' ? null : h('span', { className: 'gw-progress-plan-roles', 'data-gw-progress-plan-roles': true }, roles))),
             h('span', { className: 'gw-progress-plan-word', 'data-gw-progress-plan-word': true },
-              t(PROGRESS_PLAN_KEY[step.state] === undefined ? 'progress.plan.waiting' : PROGRESS_PLAN_KEY[step.state])))
+              t(PROGRESS_PLAN_KEY[step.state] === undefined ? 'progress.plan.waiting' : PROGRESS_PLAN_KEY[step.state])),
+            open
+              ? h('div', {
+                key: 'detail',
+                className: 'gw-progress-plan-detail',
+                id: detailId,
+                'data-gw-progress-task-detail': step.key,
+              }, [...step.members]
+                .sort((left, right) => left.seq - right.seq)
+                .map((member) => ProgressLogRow(progressStoryLogRow(member), props, {
+                  key: `detail:${member.seq}`,
+                  childId: member.childId,
+                  chain: true,
+                  pill: true,
+                })))
+              : null)
           })))
+    }
+
+    /**
+     * One history line, and the same line inside an opened task row.
+     *
+     * The history and the detail read one declaration, so they draw one row: a second
+     * renderer would let the detail describe a call differently from the log it expands.
+     * The history passes no options — its lines are the page's own record and carry no
+     * capsule — and its text is therefore exactly what it was before the rows could open.
+     * @param row - one story log row.
+     * @param props - translator, the open gate and the open callback.
+     * @param options - `chain` adds the chain slot the role reached, `pill` adds the capsule
+     *   (only when the shell can open that child), `childId` names the child, `key` the
+     *   React key.
+     * @returns the row element.
+     */
+    function ProgressLogRow(row, props, options) {
+      const t = props.t
+      const line = [h('span', { key: 'role', className: 'gw-progress-log-role', 'data-gw-progress-log-role': true }, row.role)]
+      // The task name is the second half of the same sentence ("执行 · 收尾"); when the
+      // phase and the role are the same word — a run with no plan tasks logs
+      // `规划 规划` — printing it twice says nothing and widens the row.
+      if (row.title !== '' && row.title !== row.role) {
+        line.push(h('span', { key: 'name', className: 'gw-progress-log-name', 'data-gw-progress-log-name': true }, row.title))
+      }
+      if (options.chain === true) {
+        const slot = progressChainForLabel(typeof row.role === 'string' ? row.role : '')
+        if (slot !== undefined) {
+          line.push(h('span', {
+            key: 'chain',
+            className: 'gw-progress-plan-chain',
+            'data-gw-progress-task-chain': true,
+          }, t(PROGRESS_CHAIN_LABEL_KEY[slot.key])))
+        }
+      }
+      const cells = [
+        h('span', { key: 'time', className: 'gw-progress-log-time', 'data-gw-progress-log-time': true },
+          typeof row.at === 'number' ? progressClockText(row.at) : ''),
+        h('span', { key: 'line', className: 'gw-progress-log-line', 'data-gw-progress-log-line': true }, line),
+        h('span', { key: 'word', className: 'gw-progress-log-word', 'data-gw-progress-log-word': true }, progressLogWord(row, t)),
+      ]
+      if (options.pill === true && props.canOpen(options.childId) === true) {
+        cells.push(h('span', { key: 'pill', className: 'gw-progress-log-pill' }, ProgressOpenPill(options.childId, props)))
+      }
+      return h('li', {
+        key: options.key === undefined ? row.seq : options.key,
+        className: 'gw-progress-log-row',
+        'data-gw-progress-log-row': row.seq,
+        'data-state': row.state,
+      }, cells)
     }
 
     /**
@@ -4047,30 +4201,34 @@ window.__ModuleLoader__.load({
      *
      * The clock is the call's own `agent-start` time and is omitted — not zeroed — when the
      * stream carried none, because "8:00" would be a claim about a moment nobody recorded.
+     *
+     * A history longer than one screen keeps its height and offers one word that unfolds
+     * it: the dock below stays where the reader last saw it, and no line is dropped.
      */
     function ProgressLog(story, props) {
       const t = props.t
       if (story.log.length === 0) return null
+      const foldable = story.log.length > PROGRESS_LOG_FOLD_AT
+      const expanded = props.logOpen === true
       return h('section', { className: 'gw-progress-section', 'data-gw-progress-log-section': true },
-        h('h4', { className: 'gw-progress-h2', 'data-gw-progress-log-title': true }, t('progress.log.title')),
-        h('ol', { className: 'gw-progress-log', 'data-gw-progress-log': true },
-          story.log.map((row) => h('li', {
-            key: row.seq,
-            className: 'gw-progress-log-row',
-            'data-gw-progress-log-row': row.seq,
-            'data-state': row.state,
-          },
-          h('span', { className: 'gw-progress-log-time', 'data-gw-progress-log-time': true },
-            typeof row.at === 'number' ? progressClockText(row.at) : ''),
-          h('span', { className: 'gw-progress-log-line', 'data-gw-progress-log-line': true },
-            h('span', { className: 'gw-progress-log-role', 'data-gw-progress-log-role': true }, row.role),
-            // The task name is the second half of the same sentence ("执行 · 收尾"); when the
-            // phase and the role are the same word — a run with no plan tasks logs
-            // `规划 规划` — printing it twice says nothing and widens the row.
-            row.title === '' || row.title === row.role
-              ? null
-              : h('span', { className: 'gw-progress-log-name', 'data-gw-progress-log-name': true }, row.title)),
-          h('span', { className: 'gw-progress-log-word', 'data-gw-progress-log-word': true }, progressLogWord(row, t))))))
+        h('div', { className: 'gw-progress-section-head' },
+          h('h4', { className: 'gw-progress-h2', 'data-gw-progress-log-title': true }, t('progress.log.title')),
+          foldable
+            ? h('button', {
+              type: 'button',
+              className: 'gw-progress-log-toggle',
+              'data-gw-progress-log-toggle': true,
+              'aria-expanded': expanded,
+              'aria-controls': 'gw-progress-log-list',
+              onClick: () => props.toggleLog(),
+            }, t(expanded ? 'progress.log.less' : 'progress.log.more'))
+            : null),
+        h('ol', {
+          className: 'gw-progress-log',
+          'data-gw-progress-log': true,
+          id: 'gw-progress-log-list',
+          'data-expanded': expanded ? 'true' : 'false',
+        }, story.log.map((row) => ProgressLogRow(row, props, {}))))
     }
 
     /**
@@ -4099,6 +4257,11 @@ window.__ModuleLoader__.load({
     /**
      * The Guardian side lane reports liveness interventions only. It does not
      * infer task quality or retry state from a timeout/rescue finding.
+     *
+     * The lane is a block grid rather than a head plus a list: the state word, the budget
+     * and the number of interventions each get their own tile, and the findings take the
+     * full width under them. It carries no copy of its own — every word here is a
+     * `progress.guardian.*` key the lane already shipped.
      */
     function ProgressGuardianPanel(guardian, t) {
       if (guardian === undefined || guardian === null || guardian.started !== true) return null
@@ -4115,32 +4278,38 @@ window.__ModuleLoader__.load({
             : 'progress.guardian.finished'
       const budgetMs = Number(guardian.budgetMs)
       const seconds = Number.isFinite(budgetMs) && budgetMs > 0 ? Math.round(budgetMs / 1000) : 0
+      const block = (name, children) => h('div', {
+        key: name,
+        className: 'gw-progress-guardian-block',
+        'data-gw-progress-guardian-block': name,
+      }, children)
       return h('aside', {
         className: 'gw-progress-guardian',
         'data-gw-progress-guardian': true,
         'data-state': state,
         'aria-label': t('progress.guardian.title'),
       },
-      h('div', { className: 'gw-progress-guardian-head' },
-        h('strong', { className: 'gw-progress-guardian-title' }, t('progress.guardian.title')),
-        h('span', { className: 'gw-progress-guardian-status', role: 'status' }, t(statusKey))),
-      h('div', { className: 'gw-progress-guardian-meta' },
-        h('span', null, t('progress.guardian.budget', { seconds })),
-        h('span', null, t('progress.guardian.count', { count: findings.length }))),
-      findings.length === 0
-        ? h('p', { className: 'gw-progress-guardian-empty' }, t('progress.guardian.empty'))
-        : h('ul', { className: 'gw-progress-guardian-list', 'aria-label': t('progress.guardian.count', { count: findings.length }) },
-          findings.slice(-4).map((finding, index) => {
-            const actionKey = finding.action === 'rescue' ? 'progress.guardian.rescue' : finding.action === 'observe' ? 'progress.guardian.observe' : 'progress.guardian.cancel'
-            const label = typeof finding.label === 'string' && finding.label !== '' ? finding.label : '#' + finding.seq
-            return h('li', {
-              key: 'guardian:' + finding.seq + ':' + (finding.atMs === undefined ? index : finding.atMs),
-              'data-action': finding.action === 'rescue' ? 'rescue' : finding.action === 'observe' ? 'observe' : 'cancel-run',
-              title: typeof finding.reason === 'string' ? finding.reason : undefined,
-            },
-            h('span', { className: 'gw-progress-guardian-finding-label' }, label),
-            h('span', { className: 'gw-progress-guardian-finding-action' }, t(actionKey)))
-          })))
+      h('div', { className: 'gw-progress-guardian-blocks', 'data-gw-progress-guardian-blocks': true },
+        block('status', [
+          h('span', { key: 'label', className: 'gw-progress-guardian-block-label' }, t('progress.guardian.title')),
+          h('span', { key: 'value', className: 'gw-progress-guardian-block-value', role: 'status' }, t(statusKey)),
+        ]),
+        block('budget', h('span', { className: 'gw-progress-guardian-block-value' }, t('progress.guardian.budget', { seconds }))),
+        block('count', h('span', { className: 'gw-progress-guardian-block-value' }, t('progress.guardian.count', { count: findings.length }))),
+        block('findings', findings.length === 0
+          ? h('p', { className: 'gw-progress-guardian-empty' }, t('progress.guardian.empty'))
+          : h('ul', { className: 'gw-progress-guardian-list', 'aria-label': t('progress.guardian.count', { count: findings.length }) },
+            findings.slice(-4).map((finding, index) => {
+              const actionKey = finding.action === 'rescue' ? 'progress.guardian.rescue' : finding.action === 'observe' ? 'progress.guardian.observe' : 'progress.guardian.cancel'
+              const label = typeof finding.label === 'string' && finding.label !== '' ? finding.label : '#' + finding.seq
+              return h('li', {
+                key: 'guardian:' + finding.seq + ':' + (finding.atMs === undefined ? index : finding.atMs),
+                'data-action': finding.action === 'rescue' ? 'rescue' : finding.action === 'observe' ? 'observe' : 'cancel-run',
+                title: typeof finding.reason === 'string' ? finding.reason : undefined,
+              },
+              h('span', { className: 'gw-progress-guardian-finding-label' }, label),
+              h('span', { className: 'gw-progress-guardian-finding-action' }, t(actionKey)))
+            })))))
     }
 
 
@@ -4173,9 +4342,26 @@ window.__ModuleLoader__.load({
       const story = useMemo(() => (run === undefined ? undefined : deriveProgressStory(run)), [run])
       // The one stateful thing on the page: whether *this* render already filled the box.
       const [filled, setFilled] = useState(false)
+      // Which task rows have their own lines showing, by step key, and whether the history
+      // is unfolded. Both start closed: the page a reader lands on is the page it was.
+      const [openTasks, setOpenTasks] = useState({})
+      const [logOpen, setLogOpen] = useState(false)
       const canOpen = typeof props.canOpen === 'function' ? props.canOpen : () => false
       const openChild = (childId) => { if (typeof props.openChild === 'function') props.openChild(childId) }
-      const shared = { t, canOpen, openChild }
+      const shared = {
+        t,
+        canOpen,
+        openChild,
+        openTasks,
+        logOpen,
+        toggleTask: (key) => setOpenTasks((value) => {
+          const next = { ...value }
+          if (next[key] === true) delete next[key]
+          else next[key] = true
+          return next
+        }),
+        toggleLog: () => setLogOpen((value) => value !== true),
+      }
       // The dock's button is the only thing the `conversation` service is needed for: with
       // no way to write the box, the page says it needs nothing from the reader instead of
       // rendering a button that would do nothing (§19.4).
@@ -4266,6 +4452,19 @@ window.__ModuleLoader__.load({
           h('span', { className: 'gw-progress-quiet-dot', 'aria-hidden': 'true' }),
           t('progress.dock.quiet'))
         : null)
+      // The three sections are the page's body. They share a column with the Guardian's
+      // blocks only when a guardian started: no guardian, no wrapper, no empty column.
+      const sections = story === undefined
+        ? null
+        : [ProgressPlan(story, shared), ProgressLog(story, shared), ProgressFinal(story, run, shared)]
+      const guardianPanel = story === undefined ? null : ProgressGuardianPanel(run.guardian, t)
+      const body = sections === null
+        ? null
+        : guardianPanel === null
+          ? sections
+          : h('div', { className: 'gw-progress-columns', 'data-gw-progress-columns': true },
+            h('div', { className: 'gw-progress-main', 'data-gw-progress-main': true }, ...sections),
+            h('aside', { className: 'gw-progress-side', 'data-gw-progress-side': true }, guardianPanel))
       return h('section', {
         className: 'gw-progress',
         'data-gw-progress': true,
@@ -4281,10 +4480,7 @@ window.__ModuleLoader__.load({
           track,
           flag,
           rest,
-          ProgressPlan(story, shared),
-          ProgressLog(story, shared),
-          ProgressFinal(story, run, shared),
-          ProgressGuardianPanel(run.guardian, t),
+          body,
           dock,
         ])
     }

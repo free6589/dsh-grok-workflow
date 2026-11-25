@@ -2829,9 +2829,14 @@ describe('client progress tab: the button fills the box instead of sending', () 
     const view = renderWith(injectedProps(servicesOf(record)), run)
     const tree = walk(view.run())
     const controls = tree.filter((element) => element.props['onClick'] !== undefined)
-    // Exactly two controls, in reading order: the capsule that opens the shipped row and
-    // the dock's one button.
-    expect(controls.map((element) => element.props['data-gw-progress-dock-fill'] === true ? 'dock' : 'open')).toEqual(['open', 'dock'])
+    // Four kinds of control, and nothing else: the task row that opens its own lines, the
+    // capsule that opens the shipped row, and the dock's one button. (This history is two
+    // lines long, so the fold's toggle deliberately does not exist here.)
+    expect(controls.map((element) =>
+      element.props['data-gw-progress-dock-fill'] === true ? 'dock'
+        : element.props['data-gw-progress-plan-toggle'] === true ? 'row'
+          : element.props['data-gw-progress-log-toggle'] === true ? 'fold'
+            : 'open')).toEqual(['row', 'open', 'dock'])
     // Everything else — the header, the segments, the plan rows, the log rows, the card —
     // is a static mark: no handler, no tab stop.
     for (const element of tree) {
@@ -2912,6 +2917,371 @@ describe('client progress tab: Guardian monitor side lane', () => {
   it('renders no guardian card at all when the session recorded none', () => {
     const tree = treeOf(undefined)
     expect(walk(tree).some((element) => element.props['data-gw-progress-guardian'] === true)).toBe(false)
+  })
+})
+
+
+/**
+ * The layout detail: the Guardian beside the page, a task row that opens, a history that
+ * folds.
+ *
+ * Three contracts are pinned here, and each is one a reader would otherwise have to trust.
+ * The two-column body exists **only** when the stream recorded a started guardian — a run
+ * without one keeps exactly the page that shipped before, with no wrapper and no empty
+ * column. A task row opens into the *same* lines the history draws, so the detail cannot
+ * drift into a second, incompatible row shape. And a long history is capped instead of
+ * pushing the dock off the page.
+ */
+describe('client progress tab: the two-column body, open task rows and the folded history', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const t = translator('zh')
+
+  /** Local wall-clock base, built from local parts so the clocks are machine-independent. */
+  const BASE = new Date(2026, 10, 25, 8, 2).getTime()
+
+  /** One recorded event, in the shape the fold reads. */
+  function rec(type: string, data: Record<string, unknown>, seq: number, time?: number) {
+    return { type, data, seq, ...time === undefined ? {} : { time } }
+  }
+
+  type Call = readonly [number, string, string, (string | undefined)?]
+
+  /** The folded run of one recorded stream. */
+  function runOf(calls: readonly Call[], options: { stopReason?: string } = {}): ProgressRun {
+    const records: Array<Record<string, unknown>> = [
+      rec('tool-workflow/run-start', { runId: 'r-layout', name: '任务团队 · 布局' }, 1, BASE - 60_000),
+    ]
+    let at = 2
+    for (const [seq, label, phase, outcome] of calls) {
+      records.push(rec('tool-workflow/agent-start', { runId: 'r-layout', seq, label, phase, childId: `child-${seq}` }, at, BASE + seq * 60_000))
+      at += 1
+      if (outcome === undefined) continue
+      records.push(rec('tool-workflow/agent-end', { runId: 'r-layout', seq, outcome }, at, BASE + seq * 60_000 + 500))
+      at += 1
+    }
+    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-layout', stopReason: options.stopReason }, at))
+    const runs = progress.fold(records)
+    expect(runs, 'the fixture must fold into one run').toHaveLength(1)
+    return runs[0]!
+  }
+
+  /** The log time of one row, as the page spells it. */
+  function clockOf(seq: number): string {
+    const date = new Date(BASE + seq * 60_000)
+    return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+
+  type Guardian = NonNullable<ProgressRun['guardian']>
+
+  /** A guardian that started, armed, and rescued one child. */
+  const GUARDIAN: Guardian = {
+    started: true,
+    armed: true,
+    budgetMs: 300_000,
+    ended: false,
+    cancelled: false,
+    findings: [{ seq: 3, label: '执行 3', signal: 'timeout', action: 'rescue', reason: 'workflow guardian rescued child with guidance', atMs: 2_000 }],
+  }
+
+  /** The same run with a guardian recorded on it. */
+  function withGuardian(run: ProgressRun, guardian: Guardian = GUARDIAN): ProgressRun {
+    return { ...run, guardian }
+  }
+
+  /** Two planned tasks, one of them through both gates. */
+  const twoTasks: readonly Call[] = [
+    [1, '规划助手', '规划', 'completed'],
+    [2, '执行', '任务 1 · 修复登录', 'completed'],
+    [3, '检查', '任务 1 · 修复登录', 'completed'],
+    [4, '执行', '任务 2 · 写文档', 'completed'],
+  ]
+
+  /**
+   * One task, three rows: its worker, its verifier and the summary draft that shares its
+   * phase. The third row's role names no chain slot, which is the case the detail has to
+   * leave the chip off for.
+   */
+  const mixedRoles: readonly Call[] = [
+    [1, '规划助手', '规划', 'completed'],
+    [2, '执行', '任务 1 · 修复登录', 'completed'],
+    [3, '检查', '任务 1 · 修复登录', 'completed'],
+    [4, '汇总·第1稿', '任务 1 · 修复登录', 'completed'],
+  ]
+
+  /** Eight declared calls: one more than the fold leaves standing open. */
+  const eightLines: readonly Call[] = [
+    [1, '执行', '任务 1 · 读代码', 'completed'],
+    [2, '检查', '任务 1 · 读代码', 'completed'],
+    [3, '执行', '任务 2 · 写代码', 'completed'],
+    [4, '检查', '任务 2 · 写代码', 'completed'],
+    [5, '执行', '任务 3 · 补测试', 'completed'],
+    [6, '检查', '任务 3 · 补测试', 'completed'],
+    [7, '执行', '任务 4 · 收尾', 'completed'],
+    [8, '检查', '任务 4 · 收尾', 'completed'],
+  ]
+
+  /** Render the tab for one run without the hook cells (a single pass). */
+  function pageOf(run: ProgressRun | undefined, extra: Record<string, unknown> = {}): unknown {
+    const snapshot = run === undefined ? { runs: [], activeRun: undefined } : { runs: [run], activeRun: run }
+    return progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select(snapshot),
+      ...extra,
+    })
+  }
+
+  /** Render the tab with the real hook cells, so a click is a real second render. */
+  function mount(run: ProgressRun, extra: Record<string, unknown> = {}) {
+    const snapshot = { runs: [run], activeRun: run }
+    return renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select(snapshot),
+      ...extra,
+    })
+  }
+
+  /** Every element carrying one data hook, in document order. */
+  function elementsOf(tree: unknown, name: string): Element[] {
+    return walk(tree).filter((element) => Object.prototype.hasOwnProperty.call(element.props, name))
+  }
+
+  /** The first element carrying one data hook, or a failure that names the hook. */
+  function elementOf(tree: unknown, name: string): Element {
+    const found = elementsOf(tree, name)[0]
+    expect(found, `no element carries ${name}`).toBeDefined()
+    return found!
+  }
+
+  /** One row's visible words, joined for a single comparison. */
+  function wordsOf(row: Element): string {
+    return texts(row).join(' ')
+  }
+
+  /** Click the element carrying one hook. */
+  function click(element: Element): void {
+    const onClick = element.props['onClick']
+    expect(onClick, 'the element is not a control').toBeTypeOf('function')
+    ;(onClick as () => void)()
+  }
+
+  it('puts the guardian in a right column only when a guardian started', () => {
+    const page = pageOf(withGuardian(runOf(twoTasks)))
+    const columns = elementOf(page, 'data-gw-progress-columns')
+    expect(columns.props['className']).toBe('gw-progress-columns')
+    expect(columns.type).toBe('div')
+    // The body is [main, side]: the reading order is already the stacking order under 720px.
+    expect((columns.children as Element[]).map((child) =>
+      child.props['data-gw-progress-main'] === true ? 'main' : child.props['data-gw-progress-side'] === true ? 'side' : 'stray'))
+      .toEqual(['main', 'side'])
+
+    const main = elementOf(page, 'data-gw-progress-main')
+    expect(main.props['className']).toBe('gw-progress-main')
+    // The three sections the page reads in order, and not the guardian.
+    expect((main.children as Element[]).map((child) =>
+      child.props['data-gw-progress-plan-section'] === true ? 'plan'
+        : child.props['data-gw-progress-log-section'] === true ? 'log'
+          : child.props['data-gw-progress-final-section'] === true ? 'final' : 'stray'))
+      .toEqual(['plan', 'log', 'final'])
+    expect(elementsOf(main, 'data-gw-progress-guardian')).toHaveLength(0)
+
+    const side = elementOf(page, 'data-gw-progress-side')
+    // The panel keeps its own `aside` identity, its state and its reader label.
+    const panel = elementsOf(side, 'data-gw-progress-guardian')
+    expect(panel).toHaveLength(1)
+    expect(panel[0]!.props['data-state']).toBe('active')
+    expect(panel[0]!.props['aria-label']).toBe('Guardian 监控')
+
+    // The header, the step bar, the amber bar and the rest line stay above the grid, and the
+    // dock stays below it at full width.
+    for (const above of ['data-gw-progress-bar', 'data-gw-progress-now', 'data-gw-progress-steps']) {
+      expect(elementsOf(columns, above), above).toHaveLength(0)
+    }
+    expect(elementsOf(columns, 'data-gw-progress-dock')).toHaveLength(0)
+    expect(elementsOf(page, 'data-gw-progress-dock')).toHaveLength(1)
+  })
+
+  it('keeps a run without a guardian as the plain page: no wrapper, no empty column', () => {
+    const page = pageOf(runOf(twoTasks))
+    expect(elementsOf(page, 'data-gw-progress-columns')).toHaveLength(0)
+    expect(elementsOf(page, 'data-gw-progress-main')).toHaveLength(0)
+    expect(elementsOf(page, 'data-gw-progress-side')).toHaveLength(0)
+    expect(elementsOf(page, 'data-gw-progress-plan-section')).toHaveLength(1)
+    expect(elementsOf(page, 'data-gw-progress-log-section')).toHaveLength(1)
+    expect(elementsOf(page, 'data-gw-progress-final-section')).toHaveLength(1)
+    // A guardian that never started is not a column either.
+    const never = pageOf(withGuardian(runOf(twoTasks), { ...GUARDIAN, started: false }))
+    expect(elementsOf(never, 'data-gw-progress-columns')).toHaveLength(0)
+  })
+
+  it('draws the guardian as blocks: three tiles and a full-width findings block', () => {
+    const page = pageOf(withGuardian(runOf(twoTasks)))
+    const blocks = elementOf(page, 'data-gw-progress-guardian-blocks')
+    expect(blocks.props['className']).toBe('gw-progress-guardian-blocks')
+    const tiles = elementsOf(page, 'data-gw-progress-guardian-block')
+    expect(tiles.map((tile) => tile.props['data-gw-progress-guardian-block'])).toEqual(['status', 'budget', 'count', 'findings'])
+    for (const tile of tiles) expect(tile.props['className']).toBe('gw-progress-guardian-block')
+
+    // The status tile: the card's own title as its label, the state word as its value.
+    expect(texts(tiles[0]!)).toEqual(['Guardian 监控', '监控中'])
+    // The state word is still the live region it was, and the key choice is unchanged.
+    const state = walk(tiles[0]!).find((element) => element.props['role'] === 'status')
+    expect(state, 'the state word must stay a live region').toBeDefined()
+    expect(texts(state!)).toEqual(['监控中'])
+    // The two counts carry their own sentence, verbatim.
+    expect(texts(tiles[1]!)).toEqual(['子任务存活判断预算 · 300 秒'])
+    expect(texts(tiles[2]!)).toEqual(['1 条处置记录'])
+    // The findings block keeps the list it always drew: one `li` per recorded action.
+    expect(texts(tiles[3]!)).toEqual(['执行 3', '已排队发送恢复指引'])
+    expect(walk(tiles[3]!).filter((element) => element.props['data-action'] !== undefined)
+      .map((element) => element.props['data-action'])).toEqual(['rescue'])
+
+    // No finding recorded: the same four tiles, with the empty sentence in the last one.
+    const quiet = pageOf(withGuardian(runOf(twoTasks), { ...GUARDIAN, findings: [] }))
+    const quietTiles = elementsOf(quiet, 'data-gw-progress-guardian-block')
+    expect(quietTiles).toHaveLength(4)
+    expect(texts(quietTiles[3]!)).toEqual(['暂无处置记录'])
+
+    // The grid and the full-width findings block are the stylesheet's job.
+    expect(progress.css).toMatch(/\.gw-progress-guardian-blocks \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    expect(progress.css).toMatch(/\.gw-progress-guardian-block\[data-gw-progress-guardian-block="findings"\] \{[^}]*grid-column: 1 \/ -1/)
+    // Tile surfaces are token colours, like every other surface on the page.
+    expect(progress.css).toMatch(/\.gw-progress-guardian-block \{[^}]*border: 1px solid var\(--dsw-alias-border-l2/)
+    expect(progress.css).toMatch(/\.gw-progress-guardian-block \{[^}]*color-mix\(in srgb, var\(--dsw-alias-state-idle-primary\)/)
+    expect(progress.css).toMatch(/\.gw-progress-guardian-block \{[^}]*border-radius: 10px/)
+    expect(progress.css).toMatch(/\.gw-progress-guardian-block \{[^}]*min-width: 0/)
+  })
+
+  it('opens one task row into its own lines, and closes it again', () => {
+    const view = mount(runOf(twoTasks), { canOpen: (childId: string) => childId === 'child-2' })
+    const closed = view.run()
+    expect(elementsOf(closed, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['false', 'false'])
+    expect(elementsOf(closed, 'data-gw-progress-task-detail')).toHaveLength(0)
+
+    const toggles = elementsOf(closed, 'data-gw-progress-plan-toggle')
+    expect(toggles).toHaveLength(2)
+    const first = toggles[0]!
+    expect(first.type).toBe('button')
+    expect(first.props['type']).toBe('button')
+    expect(first.props['aria-expanded']).toBe(false)
+    expect(first.props['aria-controls']).toBe('gw-progress-task-detail-0')
+    expect(first.props['title']).toBe('详情')
+    // The row's visible text is today's: number, title, gates — the state word stays outside.
+    expect(wordsOf(first)).toBe('1 任务 1 · 修复登录 执行 → 检查')
+    expect(elementsOf(elementsOf(closed, 'data-gw-progress-plan-row')[0]!, 'data-gw-progress-plan-word')).toHaveLength(1)
+    // The toggles carry no glyph of their own: the affordance is the CSS `::after` chevron.
+    expect(texts(first).join('')).not.toMatch(/[▸▾►▼›⌄+−]/u)
+
+    // A click opens exactly that row.
+    click(first)
+    const opened = view.run()
+    expect(elementsOf(opened, 'data-gw-progress-plan-row')[0]!.props['data-open']).toBe('true')
+    expect(elementsOf(opened, 'data-gw-progress-plan-toggle')[0]!.props['aria-expanded']).toBe(true)
+    const detail = elementOf(opened, 'data-gw-progress-task-detail')
+    expect(detail.props['data-gw-progress-task-detail']).toBe('phase:任务 1 · 修复登录')
+    expect(detail.props['id']).toBe('gw-progress-task-detail-0')
+    expect(detail.props['className']).toBe('gw-progress-plan-detail')
+
+    // One line per member of that step, in `seq` order, drawn by the history's own renderer:
+    // clock, role + task, the chain slot, the state word, and the capsule when it opens.
+    const lines = elementsOf(detail, 'data-gw-progress-log-row')
+    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3])
+    expect(lines.map((line) => line.props['data-state'])).toEqual(['done', 'done'])
+    expect(lines.map(wordsOf)).toEqual([
+      `${clockOf(2)} 执行 任务 1 · 修复登录 执行 做完 打开子会话`,
+      `${clockOf(3)} 检查 任务 1 · 修复登录 检查 过了`,
+    ])
+    // The chain chip names the slot the row's role reached, with the chain's own word.
+    const chips = elementsOf(detail, 'data-gw-progress-task-chain')
+    expect(chips.map((chip) => chip.props['className'])).toEqual(['gw-progress-plan-chain', 'gw-progress-plan-chain'])
+    expect(chips.map((chip) => texts(chip).join(''))).toEqual(['执行', '检查'])
+    // The capsule is the page's own, and only an openable child gets one.
+    const pill = elementsOf(lines[0]!, 'data-gw-progress-open')
+    expect(pill).toHaveLength(1)
+    expect(pill[0]!.props['data-gw-progress-open']).toBe('child-2')
+    expect(pill[0]!.props['type']).toBe('button')
+    expect(elementsOf(lines[1]!, 'data-gw-progress-open')).toHaveLength(0)
+
+    // A second row opens on its own, and the first one stays open: the rows are independent.
+    click(elementsOf(opened, 'data-gw-progress-plan-toggle')[1]!)
+    const both = view.run()
+    expect(elementsOf(both, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['true', 'true'])
+    expect(elementsOf(both, 'data-gw-progress-task-detail').map((node) => node.props['data-gw-progress-task-detail']))
+      .toEqual(['phase:任务 1 · 修复登录', 'phase:任务 2 · 写文档'])
+    expect(elementsOf(both, 'data-gw-progress-task-detail').map((node) => node.props['id']))
+      .toEqual(['gw-progress-task-detail-0', 'gw-progress-task-detail-1'])
+
+    // Clicking the first again closes it and leaves the second alone.
+    click(elementsOf(both, 'data-gw-progress-plan-toggle')[0]!)
+    const one = view.run()
+    expect(elementsOf(one, 'data-gw-progress-plan-row').map((row) => row.props['data-open'])).toEqual(['false', 'true'])
+    expect(elementsOf(one, 'data-gw-progress-task-detail').map((node) => node.props['data-gw-progress-task-detail']))
+      .toEqual(['phase:任务 2 · 写文档'])
+  })
+
+  it('leaves the chain chip off a line whose role names no slot', () => {
+    const view = mount(runOf(mixedRoles))
+    click(elementOf(view.run(), 'data-gw-progress-plan-toggle'))
+    const detail = elementOf(view.run(), 'data-gw-progress-task-detail')
+    const lines = elementsOf(detail, 'data-gw-progress-log-row')
+    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3, 4])
+    // The summary row shares the task's phase but speaks the 汇总 role: no slot, no chip,
+    // and the row is still there — the detail drops no declared line.
+    expect(elementsOf(detail, 'data-gw-progress-task-chain')).toHaveLength(2)
+    expect(texts(lines[2]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 任务 1 · 修复登录 做完`)
+  })
+
+  it('folds a history longer than six lines behind one toggle', () => {
+    const run = runOf(eightLines)
+    const view = mount(run)
+    const closed = view.run()
+    const list = elementOf(closed, 'data-gw-progress-log')
+    expect(list.props['id']).toBe('gw-progress-log-list')
+    expect(list.props['data-expanded']).toBe('false')
+
+    const toggle = elementOf(closed, 'data-gw-progress-log-toggle')
+    expect(toggle.type).toBe('button')
+    expect(toggle.props['type']).toBe('button')
+    expect(toggle.props['aria-expanded']).toBe(false)
+    expect(toggle.props['aria-controls']).toBe('gw-progress-log-list')
+    expect(texts(toggle).join('')).toBe('展开全部')
+    // The toggle sits in the history section, beside the heading it belongs to.
+    expect(elementsOf(elementOf(closed, 'data-gw-progress-log-section'), 'data-gw-progress-log-title')).toHaveLength(1)
+
+    click(toggle)
+    const opened = view.run()
+    expect(elementOf(opened, 'data-gw-progress-log').props['data-expanded']).toBe('true')
+    const unfolded = elementOf(opened, 'data-gw-progress-log-toggle')
+    expect(unfolded.props['aria-expanded']).toBe(true)
+    expect(texts(unfolded).join('')).toBe('收起')
+    // All eight lines are still drawn: the fold caps the height, it deletes nothing.
+    expect(elementsOf(opened, 'data-gw-progress-log-row')).toHaveLength(run.members.length)
+
+    // A short history keeps no toggle at all, and still says which side of the fold it is on.
+    const short = pageOf(runOf(twoTasks))
+    expect(elementsOf(short, 'data-gw-progress-log-toggle')).toHaveLength(0)
+    expect(elementOf(short, 'data-gw-progress-log').props['data-expanded']).toBe('false')
+  })
+
+  it('carries the grid, the stacking rule and the height cap in the stylesheet', () => {
+    expect(progress.css).toMatch(/\.gw-progress-columns \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) 240px;[^}]*gap: 16px;[^}]*align-items: start;/)
+    expect(progress.css).toMatch(/\.gw-progress-main \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*min-width: 0;/)
+    expect(progress.css).toMatch(/\.gw-progress-side \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*gap: 10px;[^}]*min-width: 0;/)
+    // Under 720px the side column stacks under the main one: one column, DOM order decides.
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
+    expect(narrow, 'the 720px stacking rule is gone').not.toBe('')
+    expect(narrow).toMatch(/\.gw-progress-columns \{[^}]*grid-template-columns: minmax\(0, 1fr\);/)
+    // The cap is a fold, not a scroller in both directions.
+    expect(progress.css).toMatch(/\.gw-progress-log\[data-expanded="false"\] \{[^}]*max-height: 264px;[^}]*overflow-y: auto;/)
+    expect(progress.css).toMatch(/\.gw-progress-log\[data-expanded="true"\] \{[^}]*max-height: none;[^}]*overflow-y: visible;/)
+    expect(progress.css).not.toContain('overflow-x: auto')
+    // …and every rule is still scoped to the tab and free of literal colours.
+    const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
+    for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+    expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    expect(progress.css).not.toMatch(/\brgba?\(/)
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
   })
 })
 
