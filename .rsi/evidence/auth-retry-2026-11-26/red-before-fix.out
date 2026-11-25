@@ -1,0 +1,94 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-auth-retry
+
+(node:86) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/planner-resubmit.spec.ts (12 tests | 2 failed) 3269ms
+     ✓ recovers a plan that arrived with no structured result, without the fallback 88ms
+     ✓ names the shape gate in the resubmit when the plan the child wrote is unusable 23ms
+     ✓ falls back once the resubmit is spent, and spends it only once 22ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1008ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1020ms
+     ✓ re-asks a route that refused, because a refusal costs one call and is often transient 22ms
+     ✓ keeps a 429 on its route when the switch says so, and does not re-fire it 22ms
+     × re-asks the route that refused, and keeps the plan it gets back 26ms
+     × spends the repeat once, on the route that refused last, and still never kills it 26ms
+     ✓ counts three planning walks, because the rescue calls are real children 0ms
+     ✓ pays two boundary calls for every replan, because a boundary can ask twice 0ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1008ms
+ ❯ test/judge-leg-retry.spec.ts (9 tests | 1 failed) 104ms
+     ✓ re-fires once inside the same attempt and keeps the execution result 67ms
+     ✓ treats the child-budget death (timeout family) as the same transport failure 3ms
+     × re-fires a judge whose route refused the key, and never marks that route dead 10ms
+     ✓ records the transport failure when the re-fire dies again, and the retry policy runs 5ms
+     ✓ re-fires the supervision call once and still verifies the task 5ms
+     ✓ does not re-fire a judge that answered with a failing verdict 4ms
+     ✓ leaves a format death to corridor B: two calls per attempt, no re-fire 4ms
+     ✓ does not re-fire a setup fault, which repeats by definition 3ms
+     ✓ sizes the per-attempt block as 2 * worker + 3 * (verifier + supervisor) 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/judge-leg-retry.spec.ts > verifier leg: a transport death re-fires the judge, not the worker > re-fires a judge whose route refused the key, and never marks that route dead
+AssertionError: expected [ Object{ attempt: 1, …(6) }, …(1) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/judge-leg-retry.spec.ts:137:43
+    135|     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles:…
+    136|     expect(run.report.status).toBe('completed')
+    137|     expect(run.report.tasks[0]?.attempts).toHaveLength(1)
+       |                                           ^
+    138|     expect(run.report.tasks[0]?.attempts[0]?.judgeRetried).toBe(true)
+    139|     expect(workerCalls).toBe(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/planner-resubmit.spec.ts > planner rescue: one same-route repeat when the key is refused > re-asks the route that refused, and keeps the plan it gets back
+AssertionError: expected 'fallback' to be 'planner' // Object.is equality
+
+Expected: "planner"
+Received: "fallback"
+
+ ❯ test/planner-resubmit.spec.ts:266:36
+    264|
+    265|     expect(run.stopReason).toBe('completed')
+    266|     expect(run.report.plan.source).toBe('planner')
+       |                                    ^
+    267|     expect(run.report.status).toBe('completed')
+    268|     const calls = plannerCalls(run.children)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/planner-resubmit.spec.ts > planner rescue: one same-route repeat when the key is refused > spends the repeat once, on the route that refused last, and still never kills it
+AssertionError: expected [ 'p1', 'p2' ] to deeply equal [ 'p1', 'p2', 'p2' ]
+
+- Expected
++ Received
+
+  [
+    "p1",
+    "p2",
+-   "p2",
+  ]
+
+ ❯ test/planner-resubmit.spec.ts:293:64
+    291|     // First ask walks both routes; the repeat is aimed at the one tha…
+    292|     // last, so it costs one child and never a second walk.
+    293|     expect(plannerCalls(run.children).map(call => call.model)).toEqual…
+       |                                                                ^
+    294|     // Two consecutive refusals and still no dead route: a second fail…
+    295|     // supply what a key needs, so the route is not written down as de…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 18 passed (21)
+   Start at  03:56:40
+   Duration  4.67s (transform 828ms, setup 0ms, import 1.05s, tests 3.37s, environment 0ms)
+

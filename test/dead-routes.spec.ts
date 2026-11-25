@@ -21,8 +21,9 @@ import { roleOf, runWorkflowScript, settledWithin, taskFromPrompt, type ScriptAg
  * already shown it cannot answer. The table is deliberately narrow — only the
  * four families where "try this again" is a reasonable thing to think about
  * count, and a credential refusal is not one of them: that death does reach the
- * script (it must stop resubmitting it), but the next call would be refused
- * identically, so the fix is a key, not a route.
+ * script (it re-asks that same route once, D-164), but a second failure cannot
+ * supply what a key needs, so the route is never written down as dead — the fix
+ * is a key, not another route.
  */
 
 const OBJECTIVE = 'Ship the verified result'
@@ -570,8 +571,8 @@ describe('dead routes: the host side of the channel it opens', () => {
   it('forwards five families — every class the script may act on, key refusals included', () => {
     // This table answers one question only: may the host put this death in front of
     // the script? It is *not* the bookkeeping gate — a refused key belongs here
-    // (the script must stop resubmitting and move on) and nowhere near the
-    // dead-route table (the next call would be refused identically).
+    // (the script re-asks that same route once, D-164) and nowhere near the
+    // dead-route table (a second failure cannot supply what a key needs).
     expect(CHILD_DEATH_FAMILIES).toEqual(['timeout', 'connection', 'server-error', 'rate-limit', 'model-unavailable'])
     expect(childDeathRejection({ stopReason: 'error', diagnostic: '503 service unavailable' }))
       .toBe(`${CHILD_DEATH_MARKER} server-error: the child run ended abnormally (503 service unavailable)`)

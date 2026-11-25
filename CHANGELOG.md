@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A refused key is asked once more on the same route before the run pays for it / 钥匙被拒时，运行会先在同一条路由上再问一次** —
+  A provider that answers 401/403 — a refused key, an expired virtual key, a gateway that mints its own upstream credential — used to end the
+  call for good: the judging leg recorded "no judgement" and the whole attempt was retried, which re-ran the worker for a verdict nobody made,
+  and the planning leg degraded to the fallback split, which can never report the objective as completed. The refusal is often about one
+  request rather than the route, so a refused call is now repeated once, on that same route, before anything more expensive is spent: the two
+  judging legs re-ask the judge inside the same attempt, and the planning leg re-asks the plan once, aimed at the route that refused and never
+  a walk down the chain (at most one extra child call). The route itself is still never written down as dead — a second failure cannot supply
+  what a key needs — so the dead-route table keeps counting only timeouts, dropped connections, 5xx and the 429 the operator's switch keeps on
+  its route. What the user sees: a run whose gateway refuses the first call with a key error finishes instead of falling back or re-running
+  work it had already done. **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 供应商回 401/403（钥匙被拒、虚拟密钥过期、网关自己换上游凭据）以前会把这通调用彻底结束：判腿记成「没有判」，于是整轮重试、连干活的那条腿
+  也重跑一遍，只为拿一个谁都没做过的判决；规划腿则退到兜底切分，而兜底计划永远报不出「已完成」。拒往往只针对这一次请求、不是这条路，
+  所以被拒的调用现在会在同一条路由上先重发一次，再谈别的开销：两条判腿在同一次尝试里把裁判再问一遍，规划腿把计划再问一次
+  （对准拒的那条路由，绝不顺着链再走一遍，最多一次额外的子调用）。这条路本身仍然不会被记成「死路」——第二次失败也变不出一把钥匙，
+  所以死路表仍然只数超时、掉线、5xx 和操作员开关留在原路由上的 429。用户看到的：网关第一次用钥匙错误拒掉调用的那种运行，会照常跑完，
+  而不是退到兜底或把已经干完的活重跑一遍。**升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.43] - 2026-11-26
 
 ### Fixed / 修复

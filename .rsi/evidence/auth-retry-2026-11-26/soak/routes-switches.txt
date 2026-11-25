@@ -1,0 +1,5 @@
+# plugin:grok-workflow/routing → switches (one row per route attempt)
+{"role": "planner", "chainIndex": 0, "route": "authprobe/opencode-go/muse-spark-1.3-contributor", "attempt": 1, "outcome": "failed", "failureClass": "model-unavailable"}
+
+# the first planner row, verbatim
+{"role": "planner", "chainIndex": 0, "route": "authprobe/opencode-go/muse-spark-1.3-contributor", "attempt": 1, "outcome": "failed", "failureClass": "model-unavailable", "reason": "planner call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type\""}

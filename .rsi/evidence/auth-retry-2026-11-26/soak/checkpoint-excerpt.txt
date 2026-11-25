@@ -1,0 +1,10 @@
+# excerpt of the run's checkpoint (scratch store, deleted with the soak)
+# file: checkpoints/grok-workflow/checkpoint-818754a2-115b-409a-96a2-e1dbf93a3283-b3aef6e8.json
+# read with: json.load(...) then the `plan` / `run` / `stages` / `tasks` keys
+/plan = {"source": "planner", "taskCount": 2, "tasks": [{"id": "mult_12x12", "title": "Compute 12 multiplied by 12", "writesPaths": null}, {"id": "add_1", "title": "Add 1 to the step-1 product", "writesPaths": null}]}
+/run/status = "completed"
+/stages[0]/status = "completed"
+/stages[1]/status = "completed"
+/stages[2]/status = "completed"
+/tasks[0]/status = "verified"
+/tasks[1]/status = "verified"

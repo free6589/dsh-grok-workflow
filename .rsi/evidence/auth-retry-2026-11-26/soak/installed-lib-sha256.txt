@@ -1,0 +1,13 @@
+## the package the scratch instance ran (file: tgz, pinned 0.13.43)
+  "version": "0.13.43",
+
+## hashes: worktree lib vs installed lib
+ada7a58f206d77270f452d14281bb1e0f1eb8e13fd57cce51e1fdb6e6b8e7b0a  lib/script.js
+ada7a58f206d77270f452d14281bb1e0f1eb8e13fd57cce51e1fdb6e6b8e7b0a  .tmp/soak/dsh-home/profiles/authretry-clone/node_modules/dsh-grok-workflow/lib/script.js
+201f67888878219f08d6383f610b1d5bf13112736e6788d3af05b0354528b7d6  lib/index.js
+201f67888878219f08d6383f610b1d5bf13112736e6788d3af05b0354528b7d6  .tmp/soak/dsh-home/profiles/authretry-clone/node_modules/dsh-grok-workflow/lib/index.js
+95f0e4106a0e7108c788eb8d1b3d58f4843819ce65b7e84da431dab6f7e0cb60  lib/client.js
+95f0e4106a0e7108c788eb8d1b3d58f4843819ce65b7e84da431dab6f7e0cb60  .tmp/soak/dsh-home/profiles/authretry-clone/node_modules/dsh-grok-workflow/lib/client.js
+
+## tgz
+13607a3c9b3bc7e2aa3a0e9708e6d5a07f132c984f9fa1b261c0d33487125756  .tmp/soak/dsh-grok-workflow-0.13.43.tgz

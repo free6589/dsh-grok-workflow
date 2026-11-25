@@ -1,0 +1,5 @@
+# the scratch instance announced itself once; the access token is redacted here
+# (it lived only in .tmp/soak/token.txt, 0600, deleted with the scratch home)
+# stderr in this run carried unrelated MCP tracebacks (their state dirs are outside
+# the workspace); those lines are dropped — they are not this change's evidence.
+dsh web: http://127.0.0.1:3455/?token=<redacted>
