@@ -1,0 +1,8 @@
+# console summary of the clone step (verbatim)
+#   node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak/dsh-home --name judgeleg-clone --force
+clone-profile: ok — /home/fish/projects_mine/dsh-grok-workflow/.tmp/soak/dsh-home/profiles/judgeleg-clone
+  files 7734 -> 7734 (88511836 bytes)
+  links 5 (relinked 2, already dangling in the source 1)
+  parity 5/5 equal after redaction
+  dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+  credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)

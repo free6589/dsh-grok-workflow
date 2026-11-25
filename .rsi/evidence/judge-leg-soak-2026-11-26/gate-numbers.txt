@@ -1,0 +1,9 @@
+# command: TMPDIR=$PWD/.tmp npx vitest run   (worktree .tmp/wt-judge-leg, HEAD = c7975cc, tree = main)
+# the README's two numbers come from these two lines
+ Test Files  103 passed (103)
+      Tests  1948 passed (1948)
+   Duration  101.60s (transform 3.39s, setup 0ms, import 11.14s, tests 76.52s, environment 12ms)
+VITEST_EXIT=0
+
+# spec files on disk
+103

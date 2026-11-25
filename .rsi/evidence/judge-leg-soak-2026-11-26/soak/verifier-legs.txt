@@ -1,0 +1,9 @@
+# the judging legs only (verifier 检查 / supervisor 复核)
+
+检查             任务 1 · 第一步只算12乘12乘法                authprobe  ERROR
+  refusal, verbatim: authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.","type":"authentication_error"}
+  code: AUTH
+检查             任务 1 · 第一步只算12乘12乘法                authprobe  completed
+复核             任务 1 · 第一步只算12乘12乘法                bifrost-responses  completed
+检查             任务 2 · 第二步只在第一步结果上加1               authprobe  completed
+复核             任务 2 · 第二步只在第一步结果上加1               bifrost-responses  completed

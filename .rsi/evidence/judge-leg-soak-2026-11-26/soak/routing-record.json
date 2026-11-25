@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "objective": "算出 12 乘 12，再在它的基础上加 1，分两步，第二步依赖第一步，第一步只算乘法、第二步只算加法",
+  "routing": {
+    "planner": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "worker": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "verifier": [
+      "authprobe/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "supervisor": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "synthesizer": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ]
+  },
+  "synthesis": "model",
+  "switches": [
+    {
+      "role": "verifier",
+      "chainIndex": 0,
+      "route": "authprobe/opencode-go/muse-spark-1.3-contributor",
+      "attempt": 1,
+      "outcome": "failed",
+      "failureClass": "model-unavailable",
+      "reason": "verifier call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type"
+    }
+  ]
+}

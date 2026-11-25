@@ -1,0 +1,10 @@
+# .tmp/soak/dsh-home/checkpoints/grok-workflow/checkpoint-d7c1017c-f8cf-4d04-bc84-3631db0431fc-29c75d6a.json
+
+/run/status = "failed"
+/time/durationMs = 93328
+/plan/source = "planner"
+/plan/taskCount = 1
+/plan/tasks = [{"id":"calc_7x6","title":"计算 7 乘 6"}]
+/stages = ["completed","completed","completed"]
+/tasks = [{"id":"calc_7x6","status":"failed","attempts":2}]
+# the checkpoint carries no per-attempt judgeRetried flag (see README §4)

@@ -1,0 +1,12 @@
+# every workflow child leg of this run, in order
+
+seq  1 规划（第1次）        规划                                 579f59e5-1b81-4423-a312-698cc61e97e1  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
+seq  2 执行             任务 1 · 计算 7 乘 6                    d5f4a257-062c-4259-8c7e-064291b58d1f  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
+seq  3 检查             任务 1 · 计算 7 乘 6                    5ab7dddb-a5e9-48d6-80da-96c276f45028  route authprobe/opencode-go/muse-spark-1.3-contributor  end error: authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.","type":"authentication_error"}
+seq  4 检查             任务 1 · 计算 7 乘 6                    d946a0f0-e400-4726-8b7a-3e516a1a66be  route authprobe/opencode-go/muse-spark-1.3-contributor  end error: authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.","type":"authentication_error"}
+seq  5 复核             任务 1 · 计算 7 乘 6                    b879cc65-148b-4f18-98ff-6247627594f0  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
+seq  6 执行（尝试 2）       任务 1 · 计算 7 乘 6                    ad55b15a-b31e-429e-8fb6-7749445fbb25  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
+seq  7 检查（尝试 2）       任务 1 · 计算 7 乘 6                    bc6108e2-e221-4028-ac42-99452b3c1b88  route authprobe/opencode-go/muse-spark-1.3-contributor  end error: authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.","type":"authentication_error"}
+seq  8 检查（尝试 2）       任务 1 · 计算 7 乘 6                    a7cb44e4-f2e2-4660-b49d-5aa562b2947a  route authprobe/opencode-go/muse-spark-1.3-contributor  end error: authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.","type":"authentication_error"}
+seq  9 复核             任务 1 · 计算 7 乘 6                    68d944de-0dc9-4269-b820-804901ab02dd  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
+seq 10 汇总·第1稿         汇总                                 1d728796-f5a3-410c-9e5d-f3590065871d  route bifrost-responses/opencode-go/muse-spark-1.3-contributor  end completed
