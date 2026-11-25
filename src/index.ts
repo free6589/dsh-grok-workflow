@@ -9,7 +9,6 @@ import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
 import { installHeartbeatBrakes } from './block/brakes.js'
 import { registerBlockTools } from './block/tools.js'
-import { installGate } from './gate.js'
 import { installHeartbeatListen } from './heartbeat-listen.js'
 import { createLoopBrakes } from './loop-brakes.js'
 import { ITERATE_TASK_TITLE, createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
@@ -299,8 +298,8 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       }
       const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, live.maxTasks)
       // Cross-round carry-over (v0.5): a tool call is also a new round inside the
-      // session, so it gets the same bounded digest of the earlier rounds that the
-      // gate hands to a message-driven run. Empty when the session has none.
+      // session, so it gets the same bounded digest of the earlier rounds that a
+      // message-driven run gets. Empty when the session has none.
       const carryover = carryoverForSession(agent.session, carryoverBounds({ historyTurns: FIXED_HISTORY_TURNS, historyChars: FIXED_HISTORY_CHARS }))
       const outcome = await runWorkflow({
         ctx,
@@ -392,8 +391,8 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // The composer's master switch rides the same durable mode record `/grok`
   // writes: a browser click has no commanding agent, so it gets one exact route
   // (`POST /grok-workflow/mode`) instead of a second store. `status` reports the
-  // live `grokDefault` fallback, which is exactly what the gate applies when no
-  // record exists — the default is stated once, never copied into the button.
+  // live `grokDefault` fallback, which is what a session with no record reads — the
+  // default is stated once, never copied into the button.
   installModeRoute({
     ctx: ctx as unknown as ModeHostContext,
     fallback: () => {
@@ -401,7 +400,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         return readConfig().grokDefault === 'on'
       } catch {
         // A broken live edit must not make "is the workflow on?" unanswerable:
-        // the load-time snapshot is the same fallback the gate uses.
+        // the load-time snapshot is the same fallback a session with no record reads.
         return config.grokDefault === 'on'
       }
     },
@@ -419,7 +418,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // leave a profile with the intake off and no owner of a beat at all: a stopped loop
   // would keep running with nobody left to stop it. It goes in first so it is the
   // outermost `agent/pre-step` listener: it answers `reject` without calling `next()`,
-  // so a beat it stops never reaches the front desk or the intake's own observer.
+  // so a beat it stops never reaches the intake's own observer.
   installHeartbeatListen({
     ctx,
     logger,
@@ -435,15 +434,15 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
 
   // Block intake (接单台子): a load-time switch, read from the load-time snapshot
   // because every half is a registration — the six tools and the observer — and a
-  // registration cannot appear without a reload. Off registers **nothing from the
-  // intake**: no tool name and no observer, which is what makes "off is the pre-feature
-  // tree minus nothing" a testable claim instead of a promise (`test/block-flag.spec.ts`).
+  // registration cannot appear without a reload. It is on by default; off registers
+  // **nothing from the intake**: no tool name and no observer, which is what makes
+  // "off is the intake-free tree" a testable claim instead of a promise
+  // (`test/block-flag.spec.ts`).
   //
-  // Listener counts on `agent/pre-step`, by registration: the narrow heartbeat listener
-  // always (1); the intake's own observer when `blockIntake` is on (2); the old front
-  // desk when `legacyGate` is explicitly on (3). So the default load — both switches
-  // off — carries exactly one listener, and the front desk is never one of them unless
-  // a profile asked for it.
+  // Listener counts on `agent/pre-step`, by registration: the narrow heartbeat
+  // listener always (1); the intake's own observer when `blockIntake` is on (2). So
+  // a default load carries two listeners and an intake-off load carries one, and
+  // nothing else in this plugin registers one.
   if (config.blockIntake === true) {
     // The intake's own observer records which blocks a beat found open. It writes its
     // own file (`heartbeats.jsonl`) and the narrow listener writes
@@ -451,20 +450,5 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     // each and "how many beats arrived" stays answerable.
     installHeartbeatBrakes({ ctx, logger, enabled: true })
     registerBlockTools({ ctx, logger, readConfig, state })
-  }
-
-  // The old front desk (T4's `installGate`) is opt-in since M3.2: it registers only when
-  // a profile asks for it, and then it decides ordinary user messages only. It never
-  // decides a heartbeat — `classifyPreStep` passes a beat through as `non-user-source`,
-  // and the narrow listener, being outermost, has already answered it.
-  if (config.legacyGate === true) {
-    installGate({
-      ctx,
-      config,
-      state,
-      logger,
-      readConfig,
-      lastGoodConfig: () => reader.lastGood(),
-    })
   }
 }

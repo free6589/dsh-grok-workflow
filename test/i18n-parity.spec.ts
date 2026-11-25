@@ -119,14 +119,28 @@ describe('client i18n: both locales carry every key the UI asks for', () => {
   })
 
   it('resolves the keys built by concatenation and the tables that hold them', () => {
-    const indirect = new Set<string>()
-    for (const match of SOURCE.matchAll(/\b(?:detailKey|titleKey|labelKey|unitKey)\s*:\s*'([A-Za-z0-9_.]+)'/g)) {
-      if (match[1] !== undefined) indirect.add(match[1])
+    // Two shapes are assembled at render time and are therefore invisible to the
+    // literal scan above: the number-unit suffixes in `NUMBER_UNITS`, and the status
+    // line's `${key}.detail`. (The mode cards that used to supply the rest were
+    // deleted with the front desk in M3.3, so the guard below names the real
+    // survivors instead of counting literals that no longer exist.)
+    const unitsStart = SOURCE.indexOf('const NUMBER_UNITS = {')
+    expect(unitsStart, 'the unit table must still be readable').toBeGreaterThan(-1)
+    const unitsBlock = SOURCE.slice(unitsStart, SOURCE.indexOf('}', unitsStart))
+    const unitKeys = [...unitsBlock.matchAll(/'([A-Za-z0-9_.]+)'/g)].map((match) => match[1]!)
+    expect(unitKeys.length, 'every number row carries a unit key').toBeGreaterThanOrEqual(6)
+    for (const key of unitKeys) expect(key.startsWith('unit.'), key).toBe(true)
+
+    // The status line builds `${key}.detail` from `status.on` / `status.off`.
+    expect(SOURCE).toContain('`${key}.detail`')
+    const statusKeys = ['status.on', 'status.off'].map((key) => `${key}.detail`)
+
+    // Both sets are read by `t(...)`, so a typo there renders as the raw key: assert
+    // them in both dictionaries instead of trusting the source.
+    for (const key of [...unitKeys, ...statusKeys]) {
+      expect(key in bundle.dict.zh, `zh ${key}`).toBe(true)
+      expect(key in bundle.dict.en, `en ${key}`).toBe(true)
     }
-    // `t(option.detailKey)` and `t(unitKey)` read these; a typo there is invisible to the
-    // literal check above.
-    expect(indirect.size).toBeGreaterThanOrEqual(6)
-    expect([...indirect].filter((key) => !(key in bundle.dict.zh) || !(key in bundle.dict.en))).toEqual([])
 
     // The settings fields the page labels through `t(`field.${key}`)`.
     const fieldKeys = [...SOURCE.matchAll(/'field\.([A-Za-z0-9]+)'\s*:/g)].map((match) => match[1]!)

@@ -147,37 +147,6 @@ export async function settledWithin<T>(promise: Promise<T>, ms: number, what: st
 }
 
 /**
- * Wait for a state a background round only produces once it has landed, on the probe's clock.
- *
- * The sibling of {@link settledWithin} for the cases that admit work behind the answer.
- * Such a round has two halves, and the second one is the one these cases need: the run
- * settles, and then the gate's own round ends — it delivers the report and closes the
- * session's steering channel in the same `finally` (`src/gate.ts`, `runChannelRound`).
- * Nothing on the public surface resolves at that instant, so a case that asserts after
- * merely *starting* a round reads a session that is still steering: its next message is
- * folded into the live run (`已收到，并入了正在跑的这一轮…`) instead of being routed by the
- * front desk, and a report it is waiting for has not been delivered yet.
- *
- * The wait is a re-read of the state the case is about to assert on, kept on a timer this
- * call owns: the loop holds a ref'd timer for its whole life (the same reason
- * `settledWithin` exists — the worker must not sleep through the settle), and a round that
- * never lands fails the case with this named condition inside the probe's own budget,
- * instead of as the runner's 30 s kill or as a receipt that reads like a product bug.
- *
- * @param condition - predicate over the state the case asserts on next.
- * @param ms - the probe's own budget for the landing.
- * @param what - what is being awaited, for the failure message.
- */
-export async function landedWithin(condition: () => boolean, ms: number, what: string): Promise<void> {
-  const deadline = Date.now() + ms
-  for (;;) {
-    if (condition()) return
-    if (Date.now() >= deadline) throw new Error(`${what} did not land within ${ms} ms`)
-    await new Promise(resolve => setTimeout(resolve, 20))
-  }
-}
-
-/**
  * The fixture task id a member belongs to.
  *
  * Fixture titles are `Task <id>` (`test/fixtures.ts`), and the group header carries

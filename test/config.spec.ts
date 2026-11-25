@@ -3,7 +3,7 @@ import {
   CONFIG_KEYS,
   CONFIG_VERSION,
   Config,
-  DEFAULT_LEGACY_GATE,
+  DEFAULT_BLOCK_INTAKE,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_REPLAN,
   DEFAULT_TIMEOUT_MS,
@@ -117,18 +117,19 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as removed (R-06), with the migration named', () => {
-    // The surface keeps exactly 21 keys (nine plus childTimeoutMs, the mid-run
+    // The surface keeps exactly 19 keys (nine plus childTimeoutMs, the mid-run
     // replan switch, the four repeat-run keys, the two self-iteration keys, the
-    // Q8 guardianModel single route, the block-intake switch and the old front
-    // desk's own switch); the other 23 are removed now.
+    // Q8 guardianModel single route and the block-intake switch); the other 25
+    // are removed now, including the two M3.3 deleted the front desk's routing
+    // with (`mode`, `legacyGate`).
     expect(CONFIG_KEYS).toEqual([
-      'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
+      'toolName', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
-      'iterateIntervalMin', 'iterateTemplate', 'blockIntake', 'legacyGate',
+      'iterateIntervalMin', 'iterateTemplate', 'blockIntake',
       'configVersion',
     ])
-    expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(25)
     for (const key of REMOVED_CONFIG_KEYS) {
       expect(() => resolveConfig({ [key]: 1 } as never))
         .toThrow(new RegExp(`removed configuration key "${key}"`))
@@ -239,7 +240,6 @@ describe('configuration surface', () => {
       maxConcurrency: DEFAULT_MAX_CONCURRENCY,
       maxTasks: 10,
       synthesis: 'layered',
-      mode: 'triage',
       grokDefault: 'off',
       replan: true,
       switchOnRateLimit: true,
@@ -251,22 +251,23 @@ describe('configuration surface', () => {
     })
   })
 
-  it('defaults the old front desk off, and keeps the key as an explicit opt-in', () => {
-    // M3.2: the front desk is not registered unless a profile asks for it. The key
-    // survives as that opt-in, so omitting it and writing `false` are the same shape and
-    // `true` is the only value that registers a listener.
-    expect(DEFAULT_LEGACY_GATE).toBe(false)
-    expect(resolveConfig({} as never).legacyGate).toBe(false)
-    expect(resolveConfig({ legacyGate: true } as never).legacyGate).toBe(true)
-    expect(snapshotConfig(Config({}))).toMatchObject({ legacyGate: false })
-    // Fail closed, like every other switch: a string that reads as truthy would silently
-    // register a listener the profile never asked for.
-    expect(() => resolveConfig({ legacyGate: 'on' } as never)).toThrow(/legacyGate must be true or false/)
-    // The key is part of the accepted surface, and the effective-configuration line still
-    // states it either way.
-    expect(CONFIG_KEYS).toContain('legacyGate')
-    expect(describeResolvedConfig(resolveConfig({}))).toContain('legacyGate=off')
-    expect(describeResolvedConfig(resolveConfig({ legacyGate: true } as never))).toContain('legacyGate=on')
+  it('defaults the intake on, and names the two deleted switches as removed (M3.3)', () => {
+    // M3.3 deleted the front desk and the routing mode it read, so `mode` and
+    // `legacyGate` are removed keys: a patch that still carries one learns why the row
+    // stopped loading instead of being ignored. `blockIntake` survives and now defaults
+    // to on — a load that says nothing registers the intake.
+    expect(DEFAULT_BLOCK_INTAKE).toBe(true)
+    expect(resolveConfig({} as never).blockIntake).toBe(true)
+    expect(snapshotConfig(Config({}))).toMatchObject({ blockIntake: true })
+    for (const key of ['mode', 'legacyGate']) {
+      expect(REMOVED_CONFIG_KEYS).toContain(key)
+      expect(CONFIG_KEYS).not.toContain(key)
+      expect(() => resolveConfig({ [key]: true } as never))
+        .toThrow(new RegExp(`removed configuration key "${key}"`))
+    }
+    // The effective-configuration line still states the intake either way.
+    expect(describeResolvedConfig(resolveConfig({}))).toContain('blockIntake=on')
+    expect(describeResolvedConfig(resolveConfig({ blockIntake: false } as never))).toContain('blockIntake=off')
   })
 
   it('validates the four repeat-run keys and defaults a loop off and bounded', () => {
@@ -552,15 +553,15 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 17 volatile keys (toolName/configVersion are structural);
-    // replan is the switch in the "自动接着干" group, switchOnRateLimit the 429
-    // checkbox (Sec.3-2) in the role group.
+    // The page is the 16 volatile keys (toolName/configVersion are structural and
+    // blockIntake is load-time only); replan is the switch in the "自动接着干" group,
+    // switchOnRateLimit the 429 checkbox (Sec.3-2) in the role group.
     expect(projected).toEqual([
       'childTimeoutMs', 'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
-      'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'replan',
+      'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'replan',
       'roles', 'switchOnRateLimit', 'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(17)
+    expect(projected).toHaveLength(16)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -580,9 +581,10 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 17 volatile keys reach the generated page,
-    // 19 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`17 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 16 volatile keys reach the generated page,
+    // 19 are accepted (toolName/configVersion are plain, not volatile, and
+    // blockIntake is read at load time only).
+    expect(surface.text).toContain(`16 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {
@@ -767,7 +769,6 @@ describe('t47: the effective configuration is nameable', () => {
   it('names the deadline and every role chain, with "inherit" for an unset role', () => {
     const described = describeResolvedConfig(resolveConfig({}))
     expect(described).toContain('timeoutMs=0')
-    expect(described).toContain('gate=on')
     expect(described).toContain('roles=planner:inherit worker:inherit verifier:inherit synthesizer:inherit supervisor:inherit')
   })
 

@@ -1,17 +1,19 @@
 /**
  * Boundary matrix for the workflow objective limit.
  *
- * Four lengths — 4 000, 4 001, 32 000 admitted, 32 001 refused — on the three
- * paths a request can take:
+ * Four lengths — 4 000, 4 001, 32 000 admitted, 32 001 refused — on the two paths
+ * a request can take since M3.3 deleted the message gate:
  *
- *   1. `gate`     — the mandatory entry gate (`agent/pre-step`) that classifies
- *                   and refuses a message before any run starts.
- *   2. `tool`     — the workflow tool's direct call path. No gate is in front of
- *                   it and the declared tool schema has no `maxLength`, so
- *                   `execute()` itself is the only guard.
- *   3. `fallback` — the plan the generated workflow script builds when the
+ *   1. `tool`     — the workflow tool's direct call path. Nothing is in front of it
+ *                   and the declared tool schema has no `maxLength`, so `execute()`
+ *                   itself is the only guard.
+ *   2. `fallback` — the plan the generated workflow script builds when the
  *                   planner fails, reached through the same direct tool call so
  *                   the objective has already passed entry validation.
+ *
+ * The third path this file used to cover — `agent/pre-step` refusing an over-long
+ * message — no longer exists: no listener refuses a user message any more, and
+ * `test/block-flag-baseline.spec.ts` pins the pass-through that replaced it.
  *
  * Every row is deterministic and offline: the workflow engine is faked, the
  * real generated script runs in a VM with scripted child answers, and no model
@@ -19,10 +21,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
-import { Session } from '@deepseek-ai/dsh-session'
 import { resolveConfig } from '../src/config.js'
 import { apply } from '../src/index.js'
 import { parseMemberLabel } from '../src/naming.js'
@@ -140,7 +139,13 @@ class FakeContext {
   readonly workflowEngine = this.engine
   readonly logger = () => ({ warn: (message: string) => { this.warnings.push(message) } })
 
-  on(event: string, handler: Handler): () => void {
+  /**
+   * Bound, like cordis's own `on`.
+   *
+   * `src/block/brakes.ts` reads `ctx.on` into a local and calls it, so a method that
+   * relied on its receiver would throw there; the real context binds its methods.
+   */
+  readonly on = (event: string, handler: Handler): (() => void) => {
     this.handlers.set(event, handler)
     return () => { this.handlers.delete(event) }
   }
@@ -168,28 +173,6 @@ class FakeContext {
   }
 }
 
-/* -------------------------------------------------------------------- agent -- */
-
-class FakeAgent {
-  readonly session: unknown
-  readonly followups: UserMessage[] = []
-  readonly followup = vi.fn((message: UserMessage) => { this.followups.push(message) })
-  readonly whenIdle = vi.fn(async () => {})
-
-  constructor(options: { session?: unknown } = {}) {
-    this.session = options.session ?? new FakeSession()
-  }
-}
-
-/** Minimal session surface used by the gate: id, header, history, records. */
-class FakeSession {
-  readonly id = 'sess-limit'
-  readonly header = {}
-  ownEvents(): unknown[] { return [] }
-  deriveMessages(): unknown[] { return [] }
-  append(): number { return 0 }
-}
-
 /* ------------------------------------------------------------------ helpers -- */
 
 const contexts: FakeContext[] = []
@@ -197,32 +180,13 @@ const contexts: FakeContext[] = []
 function newContext(overrides: Record<string, unknown> = {}): FakeContext {
   const ctx = new FakeContext()
   contexts.push(ctx)
-  // `mode: 'full'` keeps the front desk out of the picture: these tests are about
-  // the objective limit, not about tiering. The answer strategy stays at its
-  // default (`in-turn`), so the gate answers the turn it was given.
+  // These tests are about the objective limit, not about tiering, and the answer
+  // strategy stays at its default (`in-turn`).
   // `grokDefault: 'on'` on purpose: grok mode is a per-session toggle whose
   // default is `off`, and an off session passes every batch through as normal
   // chat (`mode-off`). These tests are about *admitted* batches, so they opt in.
-  apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on', ...overrides })
+  apply(ctx as never, { grokDefault: 'on', ...overrides })
   return ctx
-}
-
-function userMessage(text: string): UserMessage {
-  return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never }) as UserMessage
-}
-
-function payload(agent: FakeAgent, messages: UserMessage[]): Record<string, unknown> {
-  return { agent, messages, turn: 1, step: 1, signal: new AbortController().signal }
-}
-
-function passingNext(messages: UserMessage[]) {
-  return vi.fn(async () => ({ kind: 'enter' as const, messages }))
-}
-
-function textOf(message: UserMessage): string {
-  return message.content
-    .map(block => (block as { type: string; text?: string }).type === 'text' ? (block as { text?: string }).text ?? '' : '')
-    .join('\n')
 }
 
 function exec(): Record<string, unknown> {
@@ -243,72 +207,6 @@ async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
 
 afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.dispose()
-})
-
-/* ------------------------------------------------------- 1. the gate path -- */
-
-describe('objective limit — gate entry path', () => {
-  it.each([4_000, 4_001, 32_000])(
-    'admits a %i-character message and forwards the whole objective',
-    async (chars) => {
-      const ctx = newContext()
-      const agent = new FakeAgent({ session: Session.create(`sess-gate-${chars}` as never) })
-      const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(chars))]), passingNext([])) as { kind: string }
-
-      expect(decision.kind).toBe('enter')
-      // A fresh session's first turn answers with the words alone and runs the team
-      // behind them (0.13.24), so the run reaches the engine a microtask later.
-      await vi.waitFor(() => {
-        if (ctx.engine.startCalls.length === 0) throw new Error('the run did not start')
-      })
-      expect(ctx.engine.startCalls).toHaveLength(1)
-      const objective = String((ctx.engine.startCalls[0]!.args as { objective: string }).objective)
-      expect(objective.length).toBeLessThanOrEqual(OBJECTIVE_LIMIT)
-      // The message itself is never shortened. Below the limit the gate keeps its
-      // "Current request:" label; at exactly 32 000 the label is dropped so the
-      // objective is exactly the request instead of one line over the limit.
-      expect(objective).toBe(chars === OBJECTIVE_LIMIT ? 'x'.repeat(chars) : `Current request:\n${'x'.repeat(chars)}`)
-      expect(agent.followups.some(message => textOf(message).includes('workflow objective limit'))).toBe(false)
-    },
-  )
-
-  it('refuses a 32 001-character message with the 32 000 limit and starts no run', async () => {
-    const ctx = newContext()
-    const agent = new FakeAgent()
-    const decision = await ctx.preStep()(
-      payload(agent, [userMessage('x'.repeat(OBJECTIVE_LIMIT + 1))]),
-      passingNext([]),
-    ) as { kind: string; messages: UserMessage[] }
-
-    // The default in-turn strategy answers the turn instead of leaving it empty:
-    // the refusal is an entered notice, not a workflow run.
-    expect(decision.kind).toBe('enter')
-    const refusal = decision.messages.map(textOf).join('\n')
-    expect(refusal).toContain('32000')
-    expect(refusal).toContain('32000-character workflow objective limit')
-    // The refusal is bilingual and measured: the reader learns the received
-    // count and how many parts it would take, in both shipped languages.
-    expect(refusal).toContain('32001')
-    expect(refusal).toContain('parts')
-    expect(refusal).toContain('工作流目标上限')
-    expect(ctx.engine.startCalls).toHaveLength(0)
-    expect(agent.followups).toHaveLength(0)
-  })
-
-  it('refuses a message with no text to route with the same bilingual rule', async () => {
-    const ctx = newContext()
-    const agent = new FakeAgent()
-    const decision = await ctx.preStep()(
-      payload(agent, [userMessage('   \n ')]),
-      passingNext([]),
-    ) as { kind: string; messages: UserMessage[] }
-
-    expect(decision.kind).toBe('enter')
-    const refusal = decision.messages.map(textOf).join('\n')
-    expect(refusal).toContain('no text to route')
-    expect(refusal).toContain('没有可派工的文字')
-    expect(ctx.engine.startCalls).toHaveLength(0)
-  })
 })
 
 /* --------------------------------------------- 2. the direct tool-call path -- */
@@ -423,15 +321,11 @@ describe('built artifacts agree with the source constants', () => {
     expect(script).toContain('workflow objective <= 32000 chars')
   })
 
-  it('lib/input.js, lib/intake.js and lib/gate.js carry the same 32000 limit', () => {
+  it('lib/input.js and lib/intake.js carry the same 32000 limit', () => {
     expect(source('lib/input.js')).toContain('objectiveChars: 32_000')
-    // The gate no longer compares the length itself: admission refusal and the
-    // late objective path both ask the intake pass, and the intake pass takes its
-    // bound from `TASK_LIMITS.objectiveChars`. Asserting the seam instead of the
-    // literal expression keeps the parity check pointed at where the decision now
-    // lives, so the two files cannot drift apart silently.
-    expect(source('lib/gate.js')).toContain('inspectPrompt(verdict.request)')
-    expect(source('lib/gate.js')).toContain('refuseOversizePrompt(request.length)')
+    // The tool path asks the intake pass, and the intake pass takes its bound from
+    // `TASK_LIMITS.objectiveChars`. Asserting the seam instead of the literal
+    // expression keeps the parity check pointed at where the decision lives.
     expect(source('lib/intake.js')).toContain('promptChars: TASK_LIMITS.objectiveChars')
   })
 

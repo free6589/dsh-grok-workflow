@@ -1,0 +1,86 @@
+M3.3 real-machine soak — setup, the migration finding, and the boundary
+2026-11-25, DSH 0.2.2-rc.3 (build 6b729fe), Node v26.8.1
+
+Build under test: worktree .tmp/wt-m3-delete-gate, branch feat/m3-delete-gate,
+src+lib at 09aa1bd, tests+docs at d2d5115, version 0.13.34, lib/ rebuilt and
+committed. The dispatcher ran `TMPDIR=$PWD/.tmp npm run ci` = exit 0 (98 files /
+1850 tests, 15 warnings / 0 errors, lib byte-identical); the soak re-ran none of
+that and does not claim to have.
+
+--- setup -------------------------------------------------------------------
+
+scratch home:  .tmp/m3-soak-3/dsh-home   (DSH_HOME for everything below)
+live home:     ~/.dsh — READ-ONLY, cloned out of, never written (proof below)
+port:          3311 (free at start; the live instances on 3080 / 3065 / 3086 /
+               3109 were never touched)
+
+1) clone the live web profile (the repo's own script and its refusals in play):
+
+   $ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web \
+       --home .tmp/m3-soak-3/dsh-home --name m33 --force
+   clone-profile: ok — .tmp/m3-soak-3/dsh-home/profiles/m33
+     files 7699 -> 7699 (88444883 bytes)
+     links 5 (relinked 2, already dangling in the source 1)
+     parity 5/5 equal after redaction
+     dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+     credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
+
+2) install the build:
+
+   $ DSH_HOME=<scratch>/dsh-home dsh plugin --profile m33 add \
+       /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-delete-gate
+   EXIT=0
+   + dsh-grok-workflow link:../../../../wt-m3-delete-gate
+
+3) version read-back (both sides, so "what got installed" is not assumed):
+
+   installed (profile node_modules): 0.13.34
+   source worktree package.json:     0.13.34
+
+--- migration finding: an old patch must drop the removed keys ---------------
+
+The live profile's own plugin config carried `mode: triage`. The first boot of
+the clone refused to activate the plugin, with the new message the code was
+supposed to produce:
+
+   dsh: warning: 1 entry did not activate
+   grok-workflow (dsh-grok-workflow): Error: removed configuration key "mode":
+     it was removed in an earlier release and is no longer accepted; delete it
+     from your patch
+       at assertKnownKeys (lib/config.js:719:19)
+       at resolveConfig (lib/config.js:1053:5)
+       at readConfig (lib/index.js:62:33)
+       at new apply (lib/index.js:106:20)
+
+This is the intended behaviour (CONFIRMED on a real profile), and it is a
+migration note for the release: `mode` and `legacyGate` must be deleted from
+every existing `cordis.patch.yml`. After removing that one line the plugin
+activated with no warning.
+
+Two further setup-only failures were mine, not the plugin's: re-pointing every
+model route at one provider made `roles.worker` repeat the same route twice, and
+the subagent model-selection list repeat it three times. Both were refused with
+their own messages ("roles.worker repeats the same route twice", "subagent model
+selection repeats route …"); deduplicating the scratch patch cleared them.
+
+--- live home untouched ------------------------------------------------------
+
+   $ stat -c '%s %Y' ~/.dsh
+   before: 1548 1795362020
+   after:  1548 1795362020
+
+No credential was copied out of the live home and none was read. Every model
+route in the scratch profile was re-pointed at bifrost-responses /
+opencode-go/muse-spark-1.3-contributor (BIFROST_VIRTUAL_KEY present in this
+environment), and the route was proved live with one 200-response before use.
+
+--- boundary ----------------------------------------------------------------
+
+- The GUI scenario used Playwright's Chromium (headless) against the real web
+  app, not a visible window; the client bundle, the websocket and the session
+  log are the real ones.
+- The four MCP servers in the cloned profile (serena, mdcg, phone, mobile) fail
+  to write outside the workspace under this sandbox and log tracebacks at boot.
+  They are unrelated to this plugin; boot continues and the plugin activates.
+- Nothing here exercises a hot unload: the instance was stopped before the
+  bundle row was removed.

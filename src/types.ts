@@ -1,6 +1,6 @@
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
-    /** A validated workflow report relayed by the mandatory-entry gate. */
+    /** A validated workflow report relayed by the plugin's own relay turn. */
     'grok-workflow': { kind: 'grok-workflow' }
   }
 }
@@ -150,15 +150,13 @@ export type SynthesisMode = 'deterministic' | 'model'
 /**
  * Plugin configuration (also the DSH Schemastery schema shape).
  *
- * The settings page exposes 13 keys. Every other former
+ * The settings page exposes 16 keys. Every other former
  * key is rejected as an unknown key (R-06) and takes effect as a fixed
  * internal value (see FIXED_* in `src/config.ts`).
  */
 export interface GrokWorkflowConfig {
   /** Model-facing tool name. */
   toolName?: string
-  /** Front-desk routing mode (t52). The page shows `auto` for `triage`. */
-  mode?: TriageMode
   /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
   grokDefault?: 'on' | 'off'
   /** Per-role ordered model chains (planner/worker/verifier/synthesizer/supervisor). */
@@ -235,27 +233,15 @@ export interface GrokWorkflowConfig {
   /**
    * Block intake (接单台子) switch. A load-time switch, not a live one: off means
    * the feature does not exist in this load — the six tools and the heartbeat
-   * listener are never registered — so it cannot be a `volatile()` field.
+   * listener are never registered — so it cannot be a `volatile()` field. On by
+   * default.
    */
   blockIntake?: boolean
-  /**
-   * Whether the old front desk (`installGate`) is registered. Off by default: the
-   * narrow heartbeat listener is the only `agent/pre-step` listener and the one owner
-   * of a beat. On is an explicit opt-in that registers the front desk for user-message
-   * routing only — never for heartbeats. Load-time for the same reason as
-   * `blockIntake`: a registration cannot be flipped live.
-   */
-  legacyGate?: boolean
 }
 
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
 export interface ResolvedConfig {
   toolName: string
-  /**
-   * Front-desk mode (t52): `full` keeps the pre-t52 rule that every message runs
-   * the team; `triage` routes each message to chat / fast / team / ask.
-   */
-  mode: TriageMode
   /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
   grokDefault: 'on' | 'off'
   /** Effective per-role chains; an empty array means "inherit the run's route". */
@@ -306,15 +292,10 @@ export interface ResolvedConfig {
   /**
    * Block intake (接单台子) switch. A load-time switch, not a live one: off means
    * the feature does not exist in this load — the six tools and the heartbeat
-   * listener are never registered — so it is not a `volatile()` field.
+   * listener are never registered — so it is not a `volatile()` field. On by
+   * default.
    */
   blockIntake: boolean
-  /**
-   * Old front desk switch. Load-time. Off (the default) registers nothing from it, so
-   * the narrow heartbeat listener is the only listener on the chain; on registers
-   * `installGate` for user-message routing, never for heartbeats.
-   */
-  legacyGate: boolean
   configVersion: number
 }
 

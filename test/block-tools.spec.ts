@@ -147,7 +147,7 @@ async function mount(): Promise<Mounted> {
     name: 'stub-workflow-engine',
     apply(inner: Context) { inner.provide('workflowEngine', engine) },
   } as never, {} as never)
-  apply(ctx as never, { blockIntake: true, grokDefault: 'off', mode: 'triage' } as never)
+  apply(ctx as never, { blockIntake: true, grokDefault: 'off' } as never)
   mountedContexts.push(ctx)
   return { ctx, engine }
 }

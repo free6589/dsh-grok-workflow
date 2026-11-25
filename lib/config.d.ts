@@ -205,34 +205,18 @@ export declare const DEFAULT_LOOP_ENABLED = false;
 /**
  * Whether the block intake (接单台子) is mounted at all.
  *
- * Off by default, and off means *inert*: `src/index.ts` registers none of the six
- * `grok_*block*` tools and installs no extra `agent/pre-step` listener, so a
- * profile that never asked for the feature keeps the pre-block surface and the
- * pre-block delivery decisions byte for byte. On registers the six tools plus one
- * narrow heartbeat observer; it never changes a routing decision.
+ * On by default (M3.3): the six `grok_*block*` tools and one `agent/pre-step`
+ * observer are part of a default load. Off means *inert*: `src/index.ts` registers
+ * none of the six tools and installs no observer, so a profile that turns the
+ * feature off keeps the intake-free surface. The switch never changes a routing
+ * decision.
  *
  * Plain, not `volatile()`: this is a load-time switch (the tools it gates are
  * registered once, at `apply()`), so projecting it onto the settings page would
  * promise a live edit that a reload alone can honor. `toolName` and
  * `configVersion` are plain for the same reason.
  */
-export declare const DEFAULT_BLOCK_INTAKE = false;
-/**
- * Whether the old front desk (`installGate`) is registered at all.
- *
- * Off by default (M3.2): the front desk is not registered, so the narrow heartbeat
- * listener (`src/heartbeat-listen.ts`) is the only `agent/pre-step` listener a profile
- * gets, and the only owner of a beat's fate. On is an explicit opt-in for the old
- * shape — the front desk registers and decides ordinary user messages again — but it
- * never decides a heartbeat: `classifyPreStep` passes a beat through as
- * `non-user-source`, and the narrow listener, which is outermost, has already
- * answered it.
- *
- * Plain, not `volatile()`, for the same reason as {@link DEFAULT_BLOCK_INTAKE}: a
- * registration cannot appear or disappear without a reload, so projecting it onto
- * the settings page would promise a live edit that a reload alone can honor.
- */
-export declare const DEFAULT_LEGACY_GATE = false;
+export declare const DEFAULT_BLOCK_INTAKE = true;
 export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
 export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
 /**
@@ -256,7 +240,7 @@ export declare const DEFAULT_ITERATE_INTERVAL_MIN = 0;
  * guard-first (an open round or a dirty tree means no new round), and explicit
  * about stopping. It deliberately carries **no** routing marker: a self-iteration
  * delivery routes as an ordinary schedule message (`docs/knowledge/HEARTBEATS.md`
- * §2), so editing this text can never change how the gate routes it.
+ * §2), so editing this text can never change how a delivery is routed.
  *
  * `docs/iterate-template.md` is the reader-facing copy of this same text, and
  * `test/iterate-template.spec.ts` asserts the two are byte-identical — the file
@@ -299,7 +283,7 @@ export declare const FIXED_RECORD_RUNS = true;
 export declare const FIXED_SHOW_PROGRESS = true;
 /** Empty means the built-in switching policy. */
 export declare const FIXED_SWITCH_ON: Array<'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'>;
-/** Gate is always on; `gate.ts` no longer consults any preset/required switch. */
+/** The old front desk was always on: no preset or required switch could turn it off. */
 export declare const FIXED_GATE_ON = true;
 /**
  * Bounded grace window an unload gives the child calls already in flight.
@@ -329,15 +313,15 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Twenty-one keys in the accepted surface; seventeen of them reach the settings
- * page (`toolName`, `blockIntake`, `legacyGate` and `configVersion` are plain, not
+ * Nineteen keys in the accepted surface; sixteen of them reach the settings
+ * page (`toolName`, `blockIntake` and `configVersion` are plain, not
  * volatile, so the runtime projection drops them — pinned in
  * `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "legacyGate", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -348,8 +332,14 @@ export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "
 export declare const ROLE_KEYS: readonly ["planner", "worker", "verifier", "synthesizer", "supervisor"];
 /** The keys one route object may carry; `maxInFlight` is the per-route lane ceiling. */
 export declare const ROUTE_KEYS: readonly ["provider", "model", "maxInFlight"];
-/** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
-export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
+/**
+ * Every key this build no longer accepts; a patch that still carries one is rejected
+ * (R-06).
+ *
+ * The first twenty-three went with the T4 slim-down; `mode` and `legacyGate` went with
+ * M3.3, which deleted the old front desk and the routing mode it read.
+ */
+export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress", "mode", "legacyGate"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
     field: LimitField;
@@ -382,15 +372,13 @@ export declare function limitOverrunWarning({ field, stored, cap }: LimitOverrun
  * Every user-editable field is `volatile()`: the runtime then hands it over as a
  * live holder (`.get()`) and an edit does not remount the plugin — a remount
  * would kill an in-flight run (E-12/E-31). The structural fields stay plain:
- * `toolName` is fixed at registration and `configVersion` is a wire contract
- * (the old `enforceGate`/`gateRequired` switch is gone: the gate always runs,
- * and a runtime without its hook fails the load, round-54).
+ * `toolName` is fixed at registration, `blockIntake` is fixed at registration, and
+ * `configVersion` is a wire contract.
  * `snapshotConfig()` below turns holders back into plain values, so one reader
  * serves a hand-written config, a profile patch and a live settings form alike.
  */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     toolName: z<string, string, "defined">;
-    mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
@@ -405,7 +393,6 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
-    legacyGate: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -510,7 +497,6 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     configVersion: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     toolName: z<string, string, "defined">;
-    mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
@@ -525,7 +511,6 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
-    legacyGate: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -744,7 +729,7 @@ export interface ConfigReader {
     lastGood(): ResolvedConfig;
 }
 /**
- * Build the reader used by the tool and the gate.
+ * Build the reader used by the tool and the plugin's own surfaces.
  *
  * A settings edit invalidates nothing by itself: the next `read()` validates the
  * new values, so a broken edit refuses the next message with its exact reason

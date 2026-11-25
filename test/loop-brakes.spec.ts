@@ -6,8 +6,6 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
 import { HARD_LIMITS, resolveConfig } from '../src/config.js'
-import { classifyPreStep } from '../src/gate.js'
-import type { PreStepPayload } from '../src/gate.js'
 import { installHeartbeatListen, readHeartbeatListenObservations } from '../src/heartbeat-listen.js'
 import { LOOP_PROMPT_PREFIX, LOOP_TASK_TITLE, loopPolicyFromConfig } from '../src/loop.js'
 import {
@@ -29,6 +27,20 @@ import { createActiveState } from '../src/run.js'
 import type { WorkflowLogger } from '../src/run.js'
 
 /**
+ * The `agent/pre-step` payload this listener reads.
+ *
+ * The type used to live in `src/gate.ts`; M3.3 deleted that module, and the narrow
+ * listener is the only consumer left, so the shape is stated here.
+ */
+interface PreStepPayload {
+  agent: { session: Session }
+  messages: UserMessage[]
+  turn: number
+  step: number
+  signal: AbortSignal
+}
+
+/**
  * The loop's finite brakes and the pre-step listener that applies them.
  *
  * A heartbeat is one Host Schedule delivery and the driver owns no timer, so these
@@ -44,7 +56,7 @@ import type { WorkflowLogger } from '../src/run.js'
 const silent: WorkflowLogger = { warn: () => {}, info: () => {} }
 
 function config(overrides: Record<string, unknown> = {}) {
-  return resolveConfig({ mode: 'full', grokDefault: 'on', ...overrides })
+  return resolveConfig({ grokDefault: 'on', ...overrides })
 }
 
 const NOW = Date.UTC(2026, 10, 19, 4, 0, 0)
@@ -370,13 +382,23 @@ describe('the narrow listener routes a heartbeat instead of reading it as a requ
     ])
   })
 
-  it('leaves a user message that merely quotes the marker to the gate', () => {
-    // The gate no longer routes heartbeats, but it still decides a user message: the
-    // marker alone is not a beat, because the delivery source has to agree with it.
-    const session = new LoopSession()
+  it('leaves a user message that merely quotes the marker to the next listener', () => {
+    // The marker alone is not a beat: the delivery source has to agree with it. The
+    // narrow listener is the only dispatcher left, so "a person typing the prefix is not
+    // a heartbeat" is its answer, and it must cost nothing: no review, no round.
+    const session = Session.create('sess-own-note' as never)
     const message = text(`${LOOP_PROMPT_PREFIX} this is my own note`, 'user')
-    const verdict = classifyPreStep({ config: config() }, { agent: agentOf(session) as never, messages: [message], turn: 1, step: 1, signal: new AbortController().signal })
-    expect(verdict).toMatchObject({ kind: 'admit' })
+    const wired = listenForTest()
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [message] }))
+
+    return wired.handler(
+      { agent: agentOf(session) as never, messages: [message], turn: 1, step: 1, signal: new AbortController().signal },
+      next,
+    ).then(decision => {
+      expect(decision).toEqual({ kind: 'enter', messages: [message] })
+      expect(next).toHaveBeenCalledTimes(1)
+      expect(readLoopRounds(session)).toHaveLength(0)
+    })
   })
 })
 

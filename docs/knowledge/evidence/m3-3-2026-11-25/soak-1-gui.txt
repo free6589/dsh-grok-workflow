@@ -1,0 +1,62 @@
+M3.3 soak scenario 1 — a plain message in the real GUI, and the message the old
+front desk would have claimed (2026-11-25)
+
+Build: feat/m3-delete-gate @ 09aa1bd (0.13.34). Home: .tmp/m3-soak-3/dsh-home.
+Profile m33 (the web clone). Port 3311. Live ~/.dsh untouched.
+
+Boot:  dsh web: http://127.0.0.1:3311/?token=<REDACTED>
+       "did not activate": 0 lines; no line mentioning grok in the boot log.
+
+Profile config in force: grokDefault: on (the clone's own value), blockIntake
+absent (so the new default, true). So the old shape's trigger — grok mode on —
+is on, and a default load now carries the narrow listener plus the intake
+observer.
+
+--- message 1: "用一句话说明 3 加 4 等于多少。" -------------------------------
+
+GUI (Playwright, real web app): 已完成，用时 8秒 ; answer "3 加 4 等于 7。"
+
+Session log session-2355deb5 (zstd -dc session.v4.jsonl.zstd):
+
+  seq  9  user/message      source.kind=user  text="用一句话说明 3 加 4 等于多少。"  (verbatim)
+  seq 18  assistant/message "3 加 4 等于 7。"
+  source kinds: {user: 1, runtime-context: 1, skill-catalog: 1, time-context: 1}
+  grok-workflow relay messages: 0
+  tool-workflow/* events:       0
+
+--- message 2 (the old desk's classic victim): "今天天气怎么样？" ---------------
+
+With grok mode on, this used to be claimed by the front desk and answered by a
+planner + worker + verifier. Now:
+
+  GUI: 已完成分析，用时 31秒 — the model answered directly and asked which city
+       ("你想查哪个城市今天的天气？（你当前的时区是 Asia/Singapore，我先默认新加坡）")
+       with its own question card. No receipt, no team run.
+
+Session log session-bb299515:
+
+  seq  9  user/message      source.kind=user  text="今天天气怎么样？"  (verbatim)
+  seq 17  assistant/message "今天天气怎么样？我来帮你查一下——先确认下城市。"
+  grok-workflow relay messages: 0
+  tool-workflow/* events:       0
+
+--- what the model was offered (blockIntake default true is visible) ----------
+
+request/header tools: 96 total, 9 grok tools:
+  grok_accept_block, grok_block_status, grok_close_block, grok_loop,
+  grok_open_block, grok_replan_intents, grok_steer, grok_stop, grok_workflow
+
+(The six block tools are part of a default load now. grok_loop is present
+because this profile sets loopEnabled: true.)
+
+--- claims -------------------------------------------------------------------
+
+| claim                                                        | status    |
+|--------------------------------------------------------------|-----------|
+| a plain message is answered directly (8 s)                    | CONFIRMED |
+| the message reaches the model verbatim, source.kind=user      | CONFIRMED |
+| zero grok-workflow relay messages for either message          | CONFIRMED |
+| zero tool-workflow events for either message                  | CONFIRMED |
+| "今天天气怎么样？" no longer buys a team run                    | CONFIRMED |
+| the six block tools are registered on a default load          | CONFIRMED |
+| a visible browser window (not headless)                       | NOT_RUN — headless Chromium was used, see soak-all.txt boundary |

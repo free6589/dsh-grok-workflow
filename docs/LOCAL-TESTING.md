@@ -43,10 +43,10 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configuration-reference).
-The plugin accepts exactly twenty-one keys (`toolName`, `mode`, `grokDefault`, `roles`,
+The plugin accepts exactly nineteen keys (`toolName`, `grokDefault`, `roles`,
 `guardianModel`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `childTimeoutMs`, `replan`, `switchOnRateLimit`, `loopEnabled`,
 `loopMaxRounds`, `loopFailStreak`, `loopIntervalMin`, `iterateIntervalMin`,
-`iterateTemplate`, `blockIntake`, `legacyGate`, `configVersion`);
+`iterateTemplate`, `blockIntake`, `configVersion`);
 everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
 a removed key is rejected at load. `timeoutMs` defaults to `0` (unlimited);
@@ -92,7 +92,8 @@ Acceptance for "it is really active" (all four, in this order):
 | --- | --- |
 | boot output | no `grok-workflow (...) pending` and no `did not activate` warning |
 | `POST /api/settings/describe` | a namespace `grok-workflow` with `autoGenerate: true` |
-| Plugins page (web GUI) | a card `Grok workflow`; opening it shows the settings page |
+| Settings panel (web GUI) | left column lists **Workflow** (peer of General / Models / Built-in plugins); opening it shows the full settings form |
+| Plugins page (web GUI) | a card `Grok workflow`; opening it shows the same settings page |
 | a real session's `request/header.tools` | contains `grok_workflow` |
 
 Verified again on `0.2.2-rc.3` (RSI round 8, 2026-11-18): a fresh profile created from the

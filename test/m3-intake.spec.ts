@@ -21,8 +21,8 @@
  *    `heartbeats-listen.jsonl` (what it did). With the intake off, only the second file
  *    exists and the first is never created.
  * 5. **Registration.** The intake switch adds the observer and the six tools and nothing
- *    else; the narrow listener is there either way; `legacyGate: true` adds the gate, and
- *    a heartbeat still never reaches the gate's decision.
+ *    else; the narrow listener is there either way, and it answers a beat before any
+ *    other listener in the chain runs.
  *
  * The design doc's §3.1 case list is not in this repository, so these five groups are
  * written as its intent rather than as a transcription of it.
@@ -55,7 +55,6 @@ import {
   isHeartbeatMessage,
   readHeartbeatListenObservations,
 } from '../src/heartbeat-listen.js'
-import { classifyPreStep } from '../src/gate.js'
 import { resolveConfig } from '../src/config.js'
 import { LOOP_PROMPT_PREFIX } from '../src/loop.js'
 import type { LoopBrakeInput, LoopBrakePort } from '../src/loop-brakes.js'
@@ -126,7 +125,8 @@ const noRunEngine = {
  * Mount the plugin on a real context.
  *
  * No overrides means the shipped defaults, which is what group 3 calls "the default
- * configuration": the intake off (`blockIntake` is M3.3) and `legacyGate` off (M3.2).
+ * configuration": the intake on (`blockIntake` is on by default since M3.3) and no other
+ * admission listener, because the front desk is gone.
  * @param overrides - configuration overrides for the case.
  */
 async function mount(overrides: Record<string, unknown> = {}): Promise<Context> {
@@ -137,7 +137,7 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Context> 
     name: 'stub-workflow-engine',
     apply(inner: Context) { inner.provide('workflowEngine', noRunEngine) },
   } as never, {} as never)
-  apply(ctx as never, { mode: 'full', grokDefault: 'on', ...overrides } as never)
+  apply(ctx as never, { grokDefault: 'on', ...overrides } as never)
   mountedContexts.push(ctx)
   return ctx
 }
@@ -377,13 +377,13 @@ function stubLoop(review: () => 'continue' | 'stop'): {
 /* ------------------------- 3. the narrow listener is the only brake owner -- */
 
 describe('3. the narrow listener is the only brake owner', () => {
-  it('leaves exactly one agent/pre-step listener on the default configuration', async () => {
-    // The default is the new shape: the intake is still off (M3.3) and `legacyGate` is off,
-    // so the narrow listener is the whole chain.
-    expect(resolveConfig({}).legacyGate).toBe(false)
-    expect(resolveConfig({}).blockIntake).toBe(false)
+  it('leaves the narrow listener as the only brake owner on the default configuration', async () => {
+    // The default is the new shape: the intake is on (M3.3), so the chain carries the
+    // narrow listener plus the intake's own observer — and no admission listener at all,
+    // because the front desk and the routing key it read were deleted.
+    expect(resolveConfig({}).blockIntake).toBe(true)
     const ctx = await mount()
-    expect(listenerCount(ctx), 'the narrow listener alone').toBe(1)
+    expect(listenerCount(ctx), 'the narrow listener plus the intake observer').toBe(2)
   })
 
   it('answers a stopped beat with reject, opens no turn, stops the loop once, and records the code', async () => {
@@ -520,6 +520,15 @@ describe('5. registration', () => {
     expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(1)
   })
 
+  it('registers the six block tools on a default load', async () => {
+    // M3.3 flipped the default: a load that says nothing carries the intake, so the tools
+    // an operator expects are there without a patch entry.
+    const ctx = await mount()
+    for (const name of Object.values(BLOCK_TOOL_NAMES)) {
+      expect(ctx.tools.get(name), `${name} must be registered by default`).toBeDefined()
+    }
+  })
+
   it('adds the intake observer — and nothing else — when the intake is on', async () => {
     const off = await mount({ blockIntake: false })
     const on = await mount({ blockIntake: true })
@@ -531,36 +540,28 @@ describe('5. registration', () => {
     expect(linesOf(HEARTBEATS_FILE)).toHaveLength(1)
   })
 
-  it('adds the gate when legacyGate is true', async () => {
-    const without = await mount()
-    const withGate = await mount({ legacyGate: true })
-    expect(listenerCount(withGate) - listenerCount(without), 'the gate is the only addition').toBe(1)
+  it('never intercepts a user message on the default load', async () => {
+    // M3.3's product promise: with no configuration at all, nothing stands between the
+    // user and the model. The message comes back as the same object, the turn is entered,
+    // and no run was started to make that decision.
+    const ctx = await mount()
+    const messages = [userMessage(OBJECTIVE)]
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-reg-user')), messages)
+    expect(decision.kind).toBe('enter')
+    expect(decision.messages).toBe(messages)
+    expect(nextCalls, 'no listener answered on its own').toBe(1)
   })
 
-  it('never lets a heartbeat reach the gate\'s decision, even with the gate registered', async () => {
-    // The gate's classifier is where a beat used to be routed. It takes no brake port any
-    // more and answers "not a user request", so a beat's fate is not its decision: no
-    // `loop-stop`, and no `loop-continuation` either.
-    const verdict = classifyPreStep(
-      { config: resolveConfig({}) },
-      {
-        agent: new FakeAgent(headed('sess-reg-gate')) as never,
-        messages: [heartbeat()],
-        turn: 1,
-        step: 1,
-        signal: new AbortController().signal,
-      } as never,
-    )
-    expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
-
-    // And on the composed chain: a stopped beat is refused before the gate is reached,
-    // so the gate cannot be the thing that decided it.
-    const marker = join(ledger, 'STOP-gate-shape')
+  it('never lets a stopped beat reach the rest of the chain', async () => {
+    // The narrow listener is registered first and answers `reject` without calling
+    // `next()`, so nothing behind it — the intake observer, or anything a profile adds —
+    // ever decides a stopped beat.
+    const marker = join(ledger, 'STOP-before-chain')
     writeFileSync(marker, '')
     process.env['GROK_WORKFLOW_STOP_FILE'] = marker
-    const withGate = await mount({ legacyGate: true })
-    const { decision, nextCalls } = await dispatch(withGate, new FakeAgent(headed('sess-reg-gate-stop')), [heartbeat()])
+    const mounted = await mount({ blockIntake: true })
+    const { decision, nextCalls } = await dispatch(mounted, new FakeAgent(headed('sess-reg-stop-chain')), [heartbeat()])
     expect(decision.kind).toBe('reject')
-    expect(nextCalls, 'the narrow listener answers before the gate runs').toBe(0)
+    expect(nextCalls, 'the narrow listener answers before the observer runs').toBe(0)
   })
 })

@@ -2,8 +2,8 @@
  * Host surface of the workflow master switch: the browser button's HTTP route.
  *
  * The switch has exactly one source of truth — the session's own durable mode
- * record (`src/mode.ts`, `plugin:grok-workflow/mode`) — and exactly one reader,
- * `src/gate.ts` `classifyPreStep` (`mode-off`). This module adds the *write* path a
+ * record (`src/mode.ts`, `plugin:grok-workflow/mode`) — and one set of readers,
+ * the session's own. This module adds the *write* path a
  * composer button needs: a browser request cannot call a slash command, and a
  * second copy of the state (a global file, a profile field) would let the record
  * say `on` while the button says `off`. So the route reads and writes that same
@@ -11,8 +11,8 @@
  * the state it read back — never with the state it merely asked for.
  *
  * `status` is the fallback-aware read: with no record written, the effective value
- * is the live `grokDefault === 'on'`, which is the rule the gate applies at
- * `src/gate.ts` (`isModeEnabled(session, grokDefault === 'on')`). The default is
+ * is the live `grokDefault === 'on'`, which is the fallback the plugin reports when
+ * no record exists. The default is
  * therefore never restated here or in the button; both ask this route.
  *
  * Like `src/loop-surface.ts`, the route is optional in a composition (mounted when

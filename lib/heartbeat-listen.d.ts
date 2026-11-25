@@ -3,8 +3,8 @@
  *
  * Why its own listener at all: a block's work outlives the turn that started it, and the
  * only clock the Host gives this plugin is a scheduled delivery. The old front desk
- * (`src/gate.ts`) used to decide a beat's fate from inside its own branch; since M3.2 it
- * does not route heartbeats at all, so this listener is what reviews the brakes, charges
+ * (`src/gate.ts`, deleted in M3.3) used to decide a beat's fate from inside its own
+ * branch; this listener is what reviews the brakes, charges
  * a round, or refuses the step. `src/index.ts` installs it unconditionally, outside the
  * intake's own switch: a profile with the intake off must still have a brake owner, or a
  * stopped loop would keep running with nobody left to stop it.
@@ -114,8 +114,8 @@ export interface HeartbeatReviewInput {
 /**
  * Review one heartbeat's brakes.
  *
- * The order is the contract, inherited from the front desk's own heartbeat branch (M3.1)
- * and now the only review on the chain: a delegated child never owns a loop, a load
+ * The order is the contract, inherited from the front desk's own heartbeat branch (M3.1,
+ * deleted in M3.3) and now the only review on the chain: a delegated child never owns a loop, a load
  * without a driver can only continue, and a tripped brake stops before anything is
  * charged. This stays a pure function with no listener and no I/O, so the one thing that
  * decides a beat's fate is testable without a Host.

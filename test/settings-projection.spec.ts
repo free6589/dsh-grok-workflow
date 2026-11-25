@@ -17,15 +17,15 @@ describe('the settings fixture matches the runtime projection', () => {
     const descriptor = realSettingsDescriptor()
     const projected = Object.keys(descriptor.value).sort()
     // 19 keys exist in the config surface; the runtime's form only carries the
-    // 17 volatile ones; `toolName` and `configVersion` are plain and therefore
-    // invisible to the form.
-    expect(projected).toHaveLength(17)
+    // 16 volatile ones. `toolName` and `configVersion` are plain, and `blockIntake`
+    // is read at load time only, so none of the three reaches the form.
+    expect(projected).toHaveLength(16)
     expect(projected).toEqual([
       'childTimeoutMs', 'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled', 'loopFailStreak',
-      'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'replan', 'roles',
+      'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'replan', 'roles',
       'switchOnRateLimit', 'synthesis', 'timeoutMs',
     ])
-    for (const structural of ['toolName', 'configVersion']) {
+    for (const structural of ['toolName', 'configVersion', 'blockIntake']) {
       expect(projected).not.toContain(structural)
     }
   })

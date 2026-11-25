@@ -11,9 +11,10 @@
  * silently steering one heartbeat into the other's handler.
  *
  * What is real: the shipped constants (`LOOP_*` and `ITERATE_*`), `isLoopHeartbeat` /
- * `isLoopSlot` / `isLoopTask`, the real `classifyPreStep` dispatcher, the real narrow
- * heartbeat listener (`src/heartbeat-listen.ts`, the only thing that decides a beat
- * since M3.2), and two real `createLoopService` instances — the same wiring
+ * `isLoopSlot` / `isLoopTask`, the real narrow heartbeat listener
+ * (`src/heartbeat-listen.ts`, the only thing that decides a beat since M3.2 and the only
+ * dispatcher since M3.3 deleted the front desk), driven through a real cordis
+ * `agent/pre-step` waterfall, and two real `createLoopService` instances — the same wiring
  * `src/index.ts` builds. What is a boundary fake: DSH's Schedule service (a durable Host
  * service this bundle cannot start in CI) and the brake port, which is a spy here
  * precisely because the property under test is *not being called*.
@@ -29,12 +30,10 @@ import { fileURLToPath } from 'node:url'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import { resolveConfig } from '../src/config.js'
-import { classifyPreStep } from '../src/gate.js'
-import type { PreStepPayload } from '../src/gate.js'
 import { installHeartbeatListen } from '../src/heartbeat-listen.js'
 import {
-  ITERATE_ROUTE_PATH,
   ITERATE_TASK_TITLE,
   LOOP_PROMPT_PREFIX,
   LOOP_ROUTE_PATH,
@@ -96,32 +95,39 @@ function brakePort(verdict: { kind: 'continue' } | { kind: 'stop'; code: string;
 }
 
 /**
- * The narrow listener, installed on a bare context so a case can call it directly.
+ * The narrow listener on a real cordis context, driven through the real waterfall.
  *
- * It is the one thing that decides a heartbeat's fate (M3.2), so the identity question
- * is asked of it too: a delivery carrying the *other* heartbeat's marker must never
- * reach `review`. The observation directory is a throwaway, so no case writes to a real
- * ledger.
- * @param loop - the brake port (a spy here).
- * @returns the registered `agent/pre-step` handler.
+ * Since M3.3 there is no front desk in the chain, so this listener *is* the dispatcher:
+ * asking it through `ctx.waterfall` asks the shipped registration, not a copy of its
+ * classification.
+ * @param loop - the brake port (a spy).
+ * @param messages - the batch one delivery carries.
+ * @returns the decision and how often the chain's base callback ran.
  */
-function listenHandler(loop: unknown): (payload: unknown, next: () => Promise<unknown>) => Promise<unknown> {
-  let listener: unknown
-  const ctx = {
-    on: (event: string, registered: unknown) => {
-      if (event === 'agent/pre-step') listener = registered
-      return () => {}
-    },
-  }
+async function throughWaterfall(
+  loop: unknown,
+  messages: UserMessage[],
+): Promise<{ decision: unknown, nextCalls: number }> {
+  const ctx = new Context()
   installHeartbeatListen({
-    ctx,
+    ctx: ctx as never,
     logger: { warn: () => {} },
     enabled: true,
     loop: loop as never,
     config: resolveConfig({ grokDefault: 'on' }),
-    options: { dir: mkdtempSync(join(tmpdir(), 'heartbeat-identity-')) },
+    options: { dir: mkdtempSync(join(tmpdir(), 'heartbeat-identity-wf-')) },
   })
-  return listener as (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>
+  let nextCalls = 0
+  try {
+    const decision = await ctx.waterfall(
+      'agent/pre-step',
+      { agent: agentOf(), messages, turn: 1, step: 1, signal: new AbortController().signal } as never,
+      async () => { nextCalls += 1; return { kind: 'enter', messages } },
+    )
+    return { decision, nextCalls }
+  } finally {
+    await ctx.fiber.dispose()
+  }
 }
 
 /** One Schedule row; only the fields this plugin reads. */
@@ -221,54 +227,60 @@ describe('the two heartbeats have identities that cannot be confused', () => {
   })
 })
 
-describe('the dispatcher routes a delivery to exactly one handler', () => {
-  const config = resolveConfig({ grokDefault: 'on' })
-  const classify = (message: UserMessage) =>
-    classifyPreStep({ config }, { agent: agentOf(), messages: [message], turn: 1, step: 1 } as unknown as PreStepPayload)
-
-  it('sends an Iterate delivery through the non-user pass, never into the Loop handler', () => {
-    const verdict = classify(delivery(iterateHeartbeatPrompt()))
-    // The generic pass is the *only* correct destination: it starts no run and charges
-    // no round. `loop-continuation` here would mean the RSI turn was billed to the loop.
-    expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
+describe('the narrow listener is the dispatcher, and it reads identity rather than text', () => {
+  it('passes an Iterate delivery through without consulting a brake', async () => {
+    const loop = brakePort()
+    const message = delivery(iterateHeartbeatPrompt())
+    const { decision, nextCalls } = await throughWaterfall(loop, [message])
+    // The only correct destination is the chain's own callback: it starts no run and
+    // charges no round. Reviewing it would mean the RSI turn was billed to the loop.
+    expect(decision).toEqual({ kind: 'enter', messages: [message] })
+    expect(nextCalls).toBe(1)
+    expect(loop.review).not.toHaveBeenCalled()
+    expect(loop.stop).not.toHaveBeenCalled()
   })
 
-  it('sends a Loop delivery through the same non-user pass, and charges nothing', () => {
-    // M3.2: the front desk stopped routing heartbeats. A beat it sees is not a request
-    // and not its business — the narrow listener, installed outermost, has already
-    // answered it, so no brake is consulted and no round is spent here.
-    expect(classify(delivery(defaultLoopPrompt(3)))).toEqual({ kind: 'pass', reason: 'non-user-source' })
+  it('reviews a Loop delivery and lets the turn continue', async () => {
+    const loop = brakePort({ kind: 'continue' })
+    const message = delivery(defaultLoopPrompt(3))
+    const { decision, nextCalls } = await throughWaterfall(loop, [message])
+    expect(decision).toEqual({ kind: 'enter', messages: [message] })
+    expect(nextCalls).toBe(1)
+    expect(loop.review).toHaveBeenCalledTimes(1)
+    expect(loop.stop).not.toHaveBeenCalled()
   })
 
-  it('treats a user message that pastes the Loop marker as an ordinary request', () => {
+  it('treats a user message that pastes the Loop marker as an ordinary turn', async () => {
     // The marker alone is not identity: a person can type it. Only the pair
     // (`source.kind === 'schedule'` *and* the marker) is a heartbeat, so a pasted marker
-    // must still be admitted as the request it is.
+    // is nobody's business but the chain's.
+    const loop = brakePort()
     const pasted = createUserMessage({
       content: [{ type: 'text', text: `${LOOP_PROMPT_PREFIX} Loop heartbeat: continue` }],
       source: { kind: 'user' } as never,
     }) as unknown as UserMessage
-    expect(classify(pasted)).toMatchObject({ kind: 'admit' })
+    const { decision, nextCalls } = await throughWaterfall(loop, [pasted])
+    expect(decision).toEqual({ kind: 'enter', messages: [pasted] })
+    expect(nextCalls).toBe(1)
+    expect(loop.review).not.toHaveBeenCalled()
   })
 
-  it('lets the narrow listener stop a Loop delivery the gate would only pass', async () => {
+  it('stops a Loop delivery, and never a delivery that only looks like one', async () => {
     // A brake verdict that would stop the loop is the sharpest probe available: if the
     // Iterate prompt reached `review`, this delivery would spend the loop's row.
     const loop = brakePort({ kind: 'stop', code: 'loop/stop-file', detail: 'stop marker exists' })
-    const handler = listenHandler(loop)
-    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
-    const beat = (prompt: string): unknown => ({ agent: agentOf(), messages: [delivery(prompt)] })
 
-    // The Iterate delivery is not a beat to this listener: passed, never reviewed.
-    expect(await handler(beat(iterateHeartbeatPrompt()), next)).toEqual({ kind: 'enter', messages: [] })
+    const iterate = delivery(iterateHeartbeatPrompt())
+    expect(await throughWaterfall(loop, [iterate])).toEqual({ decision: { kind: 'enter', messages: [iterate] }, nextCalls: 1 })
     expect(loop.review).not.toHaveBeenCalled()
     expect(loop.stop).not.toHaveBeenCalled()
-    // The positive control: the same brake stops a real Loop delivery, and the refusal
-    // is the listener's — the gate answers the very same batch with a plain pass.
-    expect(await handler(beat(defaultLoopPrompt(3)), next)).toEqual({ kind: 'reject' })
+
+    // The positive control: the same brake stops a real Loop delivery, and the refusal is
+    // the listener's — the chain's callback never runs.
+    const beat = delivery(defaultLoopPrompt(3))
+    expect(await throughWaterfall(loop, [beat])).toEqual({ decision: { kind: 'reject' }, nextCalls: 0 })
     expect(loop.review).toHaveBeenCalledTimes(1)
     expect(loop.stop).toHaveBeenCalledWith({ sessionId: 'session-a', code: 'loop/stop-file', detail: 'stop marker exists' })
-    expect(classify(delivery(defaultLoopPrompt(3)))).toEqual({ kind: 'pass', reason: 'non-user-source' })
   })
 })
 
