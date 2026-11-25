@@ -1,4 +1,4 @@
-# 用户视角回归（隔离 fork 的 live web 档案，真模型）— 2026-11-26
+# 用户视角回归（隔离 fork 的 live web 档案，真模型）— 2026-11-25
 
 结论先说：**六项里五项能用，两项红。** 开关、真任务、跑中插话、预览→开工、监工判决都真跑通了；
 卡片点头也通了，但**只有在把宿主的提问工具改成 timed 模式之后**才通。红的两条是：
@@ -346,10 +346,10 @@
 
 ## 9. 产物
 
-    .rsi/evidence/user-regression-2026-11-26/README.md                     本文件（全部读数与边界）
-    .rsi/evidence/user-regression-2026-11-26/ledger/blocks.jsonl           块账本原样 4 行（预览批准 / 接单 / 交卷 …）
-    .rsi/evidence/user-regression-2026-11-26/ledger/verdicts.jsonl         监工判决原样 1 行（judged 的那一条）
-    .rsi/evidence/user-regression-2026-11-26/block-deliverable-notes.md    块交付物（监工判 pass 的那个文件）
+    .rsi/evidence/user-regression-2026-11-25/README.md                     本文件（全部读数与边界）
+    .rsi/evidence/user-regression-2026-11-25/ledger/blocks.jsonl           块账本原样 4 行（预览批准 / 接单 / 交卷 …）
+    .rsi/evidence/user-regression-2026-11-25/ledger/verdicts.jsonl         监工判决原样 1 行（judged 的那一条）
+    .rsi/evidence/user-regression-2026-11-25/block-deliverable-notes.md    块交付物（监工判 pass 的那个文件）
 
 `.tmp/user-regression/` 下的东西（隔离 home、克隆档案、会话转录、脚本、浏览器缓存）是 gitignored 的临时件，
 跑完即删；仓库里只留上面这三件 + 本文件。

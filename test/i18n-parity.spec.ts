@@ -131,9 +131,10 @@ describe('client i18n: both locales carry every key the UI asks for', () => {
     expect(unitKeys.length, 'every number row carries a unit key').toBeGreaterThanOrEqual(6)
     for (const key of unitKeys) expect(key.startsWith('unit.'), key).toBe(true)
 
-    // The status line builds `${key}.detail` from `status.on` / `status.off`.
+    // The status line builds `${key}.detail` from `status.on` / `status.off`, so both
+    // the base keys and the details they derive are named here explicitly.
     expect(SOURCE).toContain('`${key}.detail`')
-    const statusKeys = ['status.on', 'status.off'].map((key) => `${key}.detail`)
+    const statusKeys = ['status.on', 'status.on.detail', 'status.off', 'status.off.detail']
 
     // Both sets are read by `t(...)`, so a typo there renders as the raw key: assert
     // them in both dictionaries instead of trusting the source.

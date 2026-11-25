@@ -7683,7 +7683,7 @@ soak 用 scratch home `.tmp/m3-soak/dsh-home`（`node scripts/clone-profile.mjs 
 
 **证据：** `docs/knowledge/evidence/m3-1-2026-11-25/`（`README.md` 是清单与边界）。
 
-## 用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签（`fix/user-regression`）— 2026-11-26 (`CONFIRMED`，未发版，未改产品)
+## 用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签（`fix/user-regression`）— 2026-11-25 (`CONFIRMED`，未发版，未改产品)
 
 环境：worktree `.agents/worktrees/fix/user-regression`（分支 `fix/user-regression`，基线 `main` 尖端 `6e9bc56`）；
 Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/user-regression/dsh-home`（profile `web-clone`），
@@ -7711,7 +7711,7 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/user
 | live 未碰 | `stat -c '%Y %y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`；`touch ~/.dsh/.user-regression-write-probe`；`curl 127.0.0.1:3080`；读 live 装版本 | `~/.dsh` = **2026-11-22 23:40:20**（本轮前后同值）、`~/.dsh/profiles` = 2026-11-22 16:59:46（同值）；写探针 **`Read-only file system`**；3080 前后都是 **401**；live 仍装 **`0.13.35`**（依赖仍是浮动 `github:free6589/dsh-grok-workflow`，锁解析到 `84efda0`）。本轮对 live **一行未写**、未重载、未重启。**一处要说准**：`~/.dsh/profiles/web` 这个**目录**的 mtime 在本轮中段动了一次（12:09:52 → **13:16:10**），但里面的**文件**没有一个晚于 12:09:50（`find -newermt` 逐条看过），本进程对它也只能读（EROFS 探针）。也就是「目录条目出现过又没了」，不是内容被改；是谁造成的**没有查到底**（`HYPOTHESIS`：能写它的进程——运行中的 live 实例或别的会话——的临时件，不是这次 soak） |
 | 发版 / 推送 / 合流 | — | **NOT_RUN**：未打 tag、未 push、未合 `main`、未 npm publish；`package.json` 仍 `0.13.36` |
 
-**Changed（本轮改动，只有证据与记忆）：** `.rsi/evidence/user-regression-2026-11-26/README.md`、`STATE.md`、`VALIDATION.md`（本条）、
+**Changed（本轮改动，只有证据与记忆）：** `.rsi/evidence/user-regression-2026-11-25/README.md`、`STATE.md`、`VALIDATION.md`（本条）、
 `HANDOFF.md`。**`src/`、`test/`、`lib/` 一个字未改。**
 
 **Honest boundary（逐条）：**
@@ -7725,4 +7725,40 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/user
 5. **设置页渲染、live 上升级、多块切分、心跳** 四项 `NOT_RUN`（理由见证据文件 §6）。
 6. **本 worktree 的 `serena` MCP 起不来**（`~/.serena` 在本沙箱只读，`OSError: [Errno 30]`），与本轮结论无关，记一笔免得下一个人以为是自己搞坏的。
 
-**证据：** `.rsi/evidence/user-regression-2026-11-26/README.md`（含逐条逐字读数、红单与边界）。
+**证据：** `.rsi/evidence/user-regression-2026-11-25/README.md`（含逐条逐字读数、红单与边界）。
+
+## 设置页文案改说实话：`grokDefault` 只是「没打 `/grok` 时报什么」（`fix/settings-copy`）— 2026-11-25 (`CONFIRMED`，未发版，未改行为)
+
+分支 `fix/settings-copy`（worktree `.worktrees/fix-settings-copy`，基线 `main` 尖端 `50dad03`），产品提交 **`05f9e2b`**；
+Node **v26.8.1** / npm **11.19.0**；隔离 home `.tmp/soak-settings-copy/dsh-home`（profile `web-clone`），
+**自有端口 `127.0.0.1:3321`**（live 在 3080，全程没有访问一次）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 门禁 | `TMPDIR=$PWD/.tmp npm run ci`（在 `05f9e2b`） | **EXIT=0**；oxlint `Found 15 warnings and 0 errors.`（177 文件）；`verify:lib` → `lib/ at 05f9e2b is the build of src/ at 05f9e2b (281 files, byte-identical)`；`npm run build` → `client bundle: 330313 bytes → lib/client.js`（基线 `50dad03` 提交的 `lib/client.js` 是 **329354 B**，本轮 **+959**）；vitest `Test Files 98 passed (98)` / `Tests 1841 passed (1841)`（87.98 s） |
+| 定向守卫（先红后绿） | `npx vitest run test/client.spec.ts test/command.spec.ts test/i18n-parity.spec.ts test/docs-config-keys.spec.ts` | 旧文案下 `Test Files 2 failed \| 1 passed (3)` / `Tests 2 failed \| 158 passed (160)`（`zh status.on must name /grok`、`README.md still promises the deleted mode selector`）；改完 `Test Files 4 passed (4)` / `Tests 187 passed (187)` |
+| 克隆 | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak-settings-copy/dsh-home --name web-clone --force` | exit 0；`files 7720 -> 7720 (88421847 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)` |
+| 删 `mode:` | 克隆档案里删掉 `grok-workflow` 行的 `mode: triage` | 只删这一行，别的一行未改（这个键 M3.3 已删，留着该行会拒绝激活） |
+| 装两版 | run 1 装主检出（树 = `50dad03`）；run 2 装本 worktree：`dsh plugin --profile web-clone add "$PWD/.worktrees/fix-settings-copy"` | run 2 依赖读回 `link:../../../../../.worktrees/fix-settings-copy`，版本 **`0.13.36`** |
+| 起服 | `dsh --profile web-clone --host 127.0.0.1 --port 3321 --no-open` | 端口 **3321**；启动日志 `pending` / `did not activate` **0 行** |
+| 改前页面 | playwright-cli headless chromium → `设置` → 左栏 `Workflow` → 读 `[data-page=grok-workflow]` 的 innerText | `开着：工作流工具可用` / `复杂目标走工作流，小问题直接回答。` / `总开关` / `默认下大力气`；**0 console errors** |
+| 改后页面 | 同上：同一个克隆、同一个 profile、同一个浏览器 | `开：没打过 /grok 的会话报这个` / `只是报出来的默认值：要在这个会话里开可复核的块，还得这个会话自己打一句 /grok。` / `会话默认` / `没打 /grok 时的默认`；开关本身仍是「开」（部署默认、会话没有 `/grok` 记录） |
+| live 未碰 | `stat -c '%Y %y' ~/.dsh ~/.dsh/profiles`；`touch ~/.dsh/.settings-copy-probe`；`curl 127.0.0.1:3080` | `~/.dsh` = **2026-11-22 23:40:20**（1795362020）、`~/.dsh/profiles` = 2026-11-22 16:59:46（1795337986），与本会话开始时同值；写探针 **`Read-only file system`**；3080 → **401**；live 档案仍钉浮动 `github:free6589/dsh-grok-workflow`，装着的版本本轮 **`NOT_RUN`**（没探）。未 push、未打 tag、未 bump、未 publish |
+| 环境备注 | 本 worktree 的 `node_modules` | 现在是指向主检出 `node_modules` 的符号链接（gitignore）。第一次门禁失败与代码无关：`ln -sfn` 在已存在的空 `node_modules/` 上把链接做进了目录里面，`verify:lib` 报 `Cannot find module …/node_modules/typescript/bin/tsc`；`rm -rf node_modules && ln -s <main>/node_modules node_modules` 后 **EXIT=0** |
+
+**Changed（本轮改动）：** `src/client/index.js`（EN/ZH 五处文案 + 三处注释）、`src/command.ts`（`/grok on` 回执加
+`as long as the block intake is switched on`，仍是纯字符串、无新增 config 读取）、`README.md`、`README.zh-CN.md`
+（设置页段落换成五组现状，删掉 `auto`/`full` 模式选择器）、三个守卫 spec 与 `test/command.spec.ts` 的 `ON_TEXT`、
+重建的 `lib/client.js` / `lib/command.*`。`/grok off` 文案、记录形状、读回检查**一字未改**。
+
+**Honest boundary（逐条）：**
+1. **`/grok on` 回执 `NOT_RUN`（GUI）**：克隆落地页是「生图」工作台，新会话要先选模型输入框才能发，这一轮没拿到真回执读数；
+   字符串由 `test/command.spec.ts` 逐字钉住（27 tests），diff 证明启用分支没有新增 config 读取。
+2. **设置页只读了文本**：没逐个控件点击、没翻到第 4/5 组、没试保存。
+3. `~/.dsh/profiles/web` 这个**目录**的 mtime = 2026-11-25 13:16:10，早于本会话第一条命令（13:46），
+   与上一轮记的同一个目录条目观测，不是本轮造成的。
+4. 浏览器 daemon 在两次工具调用之间被沙箱杀掉过，几个步骤重跑；表里的读数取成功那一次。
+5. live 档案里装着的插件版本本轮 `NOT_RUN`：只读了依赖行，没探版本号。
+
+**证据：** `.rsi/evidence/settings-copy-2026-11-25/`（`README.md` 是逐条读数；`settings-before.png` /
+`settings-after.png` 两张 1280×720 真截图，sha256 见其 §3）。

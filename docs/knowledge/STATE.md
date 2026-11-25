@@ -3423,7 +3423,7 @@ PASS**（对 `4803f42` 的 2128 是 **+2 测试**，文件数不变）、oxlint 
 未 push、未打 tag、未发版，`package.json` 仍 `0.13.34`。清理：`.tmp/soak-card` 整棵（含克隆 home 与两份
 tarball）跑完即删，仓库里只留证据文件。
 
-Last updated: 2026-11-26 15:10 +08:00（**用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签，六项里五项通、两项红，`CONFIRMED`，本分支只放证据与记忆** — 分支
+Last updated: 2026-11-25 15:10 +08:00（**用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签，六项里五项通、两项红，`CONFIRMED`，本分支只放证据与记忆** — 分支
 `fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`）。隔离：`clone-profile.mjs` 从
 `~/.dsh/profiles/web` 克隆成 `web-clone`（7720 文件 / 88 421 847 B、parity 5/5、0 未解析依赖、抹掉 1 行生图渠道密钥），删掉
 `mode: triage` 那一行（克隆里本来没有 `legacyGate:`），端口 **3311**，插件按固定标签装
@@ -3452,10 +3452,10 @@ headless 没把聊天面板点出来，0 console errors 是唯一读数）、默
 `Read-only file system`、线上 3080 前后都是 401、live 仍装 **0.13.35**（依赖仍浮动、锁解析到 `84efda0`）。一处要说准：
 `~/.dsh/profiles/web` 这个**目录**的 mtime 中段动过一次（12:09:52 → 13:16:10），但里面的文件没有一个晚于 12:09:50，
 本进程对它只读（EROFS），成因 `HYPOTHESIS`（别的东西的临时条目），没有查到底；未 push、未打 tag、未发版、未合流，
-`package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-26/README.md`。
+`package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-25/README.md`。
 红一另开分支 `fix/grok-command-text` 修，不混进本分支。）
 
-补记（2026-11-26 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
+补记（2026-11-25 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
 `.agents/worktrees/fix/command-text`，基线 `6e9bc56`）两个提交 `5c120b1`（fix，9 文件 / +24 −15，含 `lib/command.js`
 重建）+ `78c9091`（只加证据）。新话两句：`Grok workflow ON — the model may commission reviewed blocks of work in this
 session. Messages themselves are not turned into a workflow.`；`/grok off` 的答案、记录形状、路由、接单台准入都没动。
@@ -3464,3 +3464,17 @@ session. Messages themselves are not turned into a workflow.`；`/grok off` 的�
 （`98 files / 1839 tests`、`15 warnings / 0 errors`）。它顺手把两个 README 里「`grokDefault: on` 认领每条用户消息」改成实话
 （`on` 只是没有记录时会话报出来的回退值，本身不让接单台接活）——**这句改动把红二的矛盾写实了，而准入规则没动**。
 红二没修：开关认部署默认、接单台只认会话记录，两处设计撞在一起，修哪个都改用户可见行为，要决定号。
+
+Last updated: 2026-11-25 14:10 +08:00（**设置页与 `/grok on` 的文案改说实话，`CONFIRMED`，未发版、未改行为** — 分支
+`fix/settings-copy`（worktree `.worktrees/fix-settings-copy`，基线 `main` 尖端 `50dad03`），产品提交 **`05f9e2b`**。
+设置页第 1 组现在写「会话默认 / 没打 `/grok` 时的默认」，状态行写「开：没打过 `/grok` 的会话报这个」，副行写明
+「只是报出来的默认值……还得这个会话自己打一句 `/grok`」；`/grok on` 回执补了 `as long as the block intake is
+switched on`（纯字符串，无新增 config 读取）；两个 README 的设置页段落删掉 `auto`/`full` 模式选择器、改成页面真实
+渲染的五组。**门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`98 files / 1841 tests`、`15 warnings / 0 errors`、
+`lib/ at 05f9e2b is the build of src/ at 05f9e2b (281 files, byte-identical)`、`lib/client.js` 329354 → **330313 B**）。
+**隔离真机**：克隆 live `web` 档案（7720 文件 / 88 421 847 B、parity 5/5、0 未解析依赖、抹 1 行生图渠道密钥），端口 **3321**，
+同一个浏览器里前后两版逐字对读：改前 `开着：工作流工具可用` / `总开关` / `默认下大力气`，改后 `开：没打过 /grok 的会话报这个`
+/ `会话默认` / `没打 /grok 时的默认`（0 console errors）。**红线**：`~/.dsh` = 2026-11-22 23:40:20、
+`~/.dsh/profiles` = 2026-11-22 16:59:46（前后同值）、写探针 `Read-only file system`、3080 → 401、未 push / 未打 tag / 未 bump；
+`/grok on` 回执在 GUI 里 **`NOT_RUN`**（克隆落地页是生图工作台，新会话要先选模型）。证据
+`.rsi/evidence/settings-copy-2026-11-25/`。)

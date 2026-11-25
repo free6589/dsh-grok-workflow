@@ -4092,3 +4092,35 @@ spine 为空，pre-fix 形状会进脊柱。
   - `test/docs-config-keys.spec.ts` 的那条守卫**再次证明自己有用**：它抓到了「整段删掉」这个看起来更干净、实际是删掉事实的改法。
   - 判据可复用：**删一个零读者符号之前，先问「它是协议还是实现」**——协议词汇要在文档里有载体才能删，实现细节删了就删了；
     以及**文档里的数字必须有代码出处**，没有出处就删数字、留事实。
+
+## D-152 · 设置页把 `grokDefault` 说成「没打 `/grok` 时报什么」，`/grok on` 回执用纯文本写 `blockIntake` 前提（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`05f9e2b`：EN/ZH 五处文案 + 三处注释、`src/command.ts` 启用分支一句、两个 README 的设置页段落、
+  三个守卫 spec 与 `ON_TEXT`；`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`98 files / 1841 tests`、
+  `15 warnings / 0 errors`、`lib/ at 05f9e2b is the build of src/ at 05f9e2b (281 files, byte-identical)`、
+  `lib/client.js` 329354 → 330313 字节）；隔离真机前后两版逐字对读在 `VALIDATION.md` 同日条）
+- **Date:** 2026-11-25
+- **Context:** 0.13.35（M3.3）删掉入口闸门之后，用户消息前面没有任何东西路由、认领或改写它；`grokDefault` 只剩一个作用：
+  给**没有 `/grok` 记录的会话**决定「报什么」。而设置页还在卖旧承诺——第 1 组叫「总开关」、字段叫「默认下大力气」、
+  状态行写「开着：工作流工具可用」与「复杂目标走工作流」，`/grok on` 回执照旧只提「可以下单」，两个 README 里还摆着
+  一个 M3.3 就删掉的 `auto`/`full` 模式选择器。**文案在承诺一条已经不存在的路由，这就是错。**
+- **Decision:**
+  1. 设置页 EN/ZH 五处（`card.summary`、`status.on`/`status.off` 及两个 `.detail`、`field.grokDefault`、`group.mode`）
+     改写成「会话在没打 `/grok` 时报什么」，并在副行点名「要开可复核的块，还得这个会话自己打一句 `/grok`」。
+  2. `/grok on` 回执加 `as long as the block intake is switched on`——**纯字符串，命令里不读 `blockIntake`**。
+  3. 两个 README 的设置页段落删掉 `auto`/`full`，改成页面真实渲染的五组（两个预算字段各带一行说明、底部升级卡片、无诊断面板）。
+  4. 守卫补三处：`test/client.spec.ts` 钉四条状态文案必须点名 `/grok`、且八个已删说法不得出现在任何词典值里；
+     `test/i18n-parity.spec.ts` 把四个状态键写进「拼接键」那张表；`test/docs-config-keys.spec.ts` 在任一 README 还提
+     `auto`/`full` 或旧「五样东西」清单时变红。
+- **Alternatives considered / rejected:**
+  - **只改 `status.*` 四条，`group.mode` 的「总开关」先留着。** 否决：组标题是这组里最大的字，它说「总开关」而下面写
+    「没打 `/grok` 时」，等于把自相矛盾留给读者调和。**这一项比派发单原来点的五处多一处**，已向派发方明示，不是偷偷加的。
+  - **命令里读 `config.blockIntake`，按它分支出两种回执文字。** 否决：回执只需要说清前提；在一条命令里读载入期开关，会把
+    「写了一句记录」的确认变成第二个 config 读取点，多一条只有真机才分得出差别的分支，也多一个会漂的真相来源。
+- **Consequences:**
+  - 页面上不再有任何一处说这颗开关会让工作流「跑起来」；要开块，页面、命令、README 三处都指向「这个会话自己打 `/grok`」。
+  - 行为零变化：`/grok off` 文案、记录形状、读回检查一字未改；`lib/client.js` 的 +959 字节全是文案。
+  - 判据可复用：**开关/默认值类文案只能写「报什么」，不能写「会发生什么」**；前提若不在同一处可读，就写进回执的纯文本里，
+    不要为此新增读取点。
+  - 仍有余账（见 `HANDOFF.md` 同日条「故意没改」）：FIELDS 注释、`src/index.ts`/`src/mode-surface.ts` 的 “master switch” 散文、
+    `page.intro`/`group.limits` 的「下多大力气」框、`switchOnRateLimit` 渲染不出来。

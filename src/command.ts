@@ -93,8 +93,8 @@ function currentStateText(record: ModeRecord | undefined): string {
  * The `kind: 'error'` settle text for a write that did not land.
  *
  * It must never carry the success wording: a refused write answered with
- * "the model may commission reviewed blocks of work" is the user acting on a
- * toggle that does not exist.
+ * "the model may commission reviewed blocks of work in this session" is the
+ * user acting on a toggle that does not exist.
  */
 function toggleFailureText(reason: string, current: ModeRecord | undefined): string {
   return `Grok workflow toggle not changed: ${reason}. In this session ${currentStateText(current)}.`
@@ -321,10 +321,14 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
           text: toggleFailureText(written.reason ?? 'the session did not record it', current),
         }
       }
+      // The ON receipt names the record this write actually creates (the intake's
+      // admission rule reads it) and the load-time switch that has to be on for
+      // the tools to exist at all. Both qualifiers are plain text: reading
+      // `blockIntake` here would turn a receipt into a second config reader.
       return {
         kind: 'success',
         text: enable
-          ? 'Grok workflow ON — the model may commission reviewed blocks of work in this session. Messages themselves are not turned into a workflow.'
+          ? 'Grok workflow ON — the model may commission reviewed blocks of work in this session, as long as the block intake is switched on. Messages themselves are not turned into a workflow.'
           : 'Grok workflow OFF — normal chat.',
       }
     },
