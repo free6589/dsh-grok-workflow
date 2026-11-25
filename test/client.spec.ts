@@ -912,6 +912,13 @@ const toggleOf = (tree: unknown) => walk(tree).find((element) => element.props['
 const toggleIn = (tree: unknown) => walk(tree).find((element) => element.props['data-mode-toggle'] === true)!
 const lampIn = (tree: unknown) => walk(tree).find((element) => element.props['data-mode-lamp'] !== undefined)
   ?.props['data-mode-lamp']
+/**
+ * The state line's own words, apart from the row's label. The label and the state words are
+ * short enough to overlap as substrings, so a check on the whole row reads as true whatever
+ * the state is; these read the one element that is *about* the state.
+ */
+const noteIn = (tree: unknown) => walk(tree).find((element) => element.props['data-mode-note'] !== undefined)!
+const noteText = (tree: unknown) => texts(noteIn(tree)).join('')
 
 /** A fetch stand-in: records the POST body and answers from a script, one per call. */
 function scriptedFetch(script: Array<{ status?: number, body?: unknown, throws?: boolean }>) {
@@ -3242,14 +3249,14 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
 
     expect(toggleIn(tree).props['disabled']).toBe(false)
     expect(toggleIn(tree).props['aria-checked']).toBe(true)
-    expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.on'])
+    expect(noteText(tree)).toBe(zhDict['mode.switch.on'])
     expect(lampIn(tree)).toBe('on')
 
     // The click asks the Host for `off` and paints the answer, not the click.
     const after = await view.click(tree)
     expect(posted[1]).toEqual({ action: 'set', sessionId: SESSION, enabled: false })
     expect(toggleIn(after).props['aria-checked']).toBe(false)
-    expect(texts(after).join(' ')).toContain(zhDict['mode.switch.off'])
+    expect(noteText(after)).toBe(zhDict['mode.switch.off'])
   })
 
   it('says off three ways, and never leaves the on-copy on screen', async () => {
@@ -3264,10 +3271,13 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
     // The word, the lamp and the pill: a person who only sees the pill still sees grey
     // and a hollow ring, and a person who only reads sees 关.
     expect(toggle.props['aria-checked']).toBe(false)
-    expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.off'])
+    expect(noteText(tree)).toBe(zhDict['mode.switch.off'])
     expect(lampIn(tree)).toBe('off')
     expect((toggle.props['style'] as Record<string, unknown>)['background']).toBe('#d1d5db')
-    expect(texts(tree).join(' ')).not.toContain(zhDict['mode.switch.on'])
+    // The state line, not the whole row: the label carries 开 as part of its own word.
+    const note = walk(tree).find((element) => element.props['data-mode-note'] !== undefined)
+    expect(note, 'the switch renders its state line').toBeDefined()
+    expect(texts(note).join(' ')).not.toContain(zhDict['mode.switch.on'])
     // The lamp is decoration, not content: a screen reader hears the switch and the line.
     expect(walk(tree).find((element) => element.props['data-mode-lamp'] !== undefined)!.props['aria-hidden']).toBe('true')
   })
@@ -3311,7 +3321,7 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
     // The click re-read; it did not post a guess at a value it never saw.
     expect(posted[1]).toEqual({ action: 'status', sessionId: SESSION })
     expect(toggleIn(recovered).props['aria-checked']).toBe(false)
-    expect(texts(recovered).join(' ')).toContain(zhDict['mode.switch.off'])
+    expect(noteText(recovered)).toBe(zhDict['mode.switch.off'])
   })
 
   it('mounts in the tool row after the two heartbeats, with the namespace when one exists', () => {
@@ -3360,7 +3370,11 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
       expect(zhDict[key], key).not.toBe(enDict[key])
     }
     // The task's own wording, character for character.
-    expect(zhDict['mode.switch.label']).toBe('workflow总开关')
+    expect(zhDict['mode.switch.label']).toBe('工作流开关')
+    // …and the label must not collapse into the state word, nor `on` into `off`. Either one
+    // makes a state check pass in both states, which is a green guard that proves nothing.
+    expect(zhDict['mode.switch.label']).not.toBe(zhDict['mode.switch.on'])
+    expect(zhDict['mode.switch.on']).not.toBe(zhDict['mode.switch.off'])
     const mode = modeSwitch()
     expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: false } })).toBe(zhDict['mode.switch.off'])
     expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: false } })).toBe(enDict['mode.switch.off'])
@@ -3423,19 +3437,19 @@ describe('client composer tool row: the workflow switch against the real Host ro
       // was written by a read.
       expect(readModeRecord(session)).toBeUndefined()
       expect(toggleIn(tree).props['aria-checked']).toBe(false)
-      expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.off'])
+      expect(noteText(tree)).toBe(zhDict['mode.switch.off'])
 
       const on = await view.click(tree)
       const written = readModeRecord(session)
       expect(written).toMatchObject({ v: 1, enabled: true, setBy: 'switch:mode', workflowMode: 'full' })
       expect(toggleIn(on).props['aria-checked']).toBe(true)
-      expect(texts(on).join(' ')).toContain(zhDict['mode.switch.on'])
+      expect(noteText(on)).toBe(zhDict['mode.switch.on'])
 
       const off = await view.click(on)
       expect(readModeRecord(session)).toMatchObject({ v: 1, enabled: false, setBy: 'switch:mode' })
       expect(readModeRecord(session)!.workflowMode).toBeUndefined()
       expect(toggleIn(off).props['aria-checked']).toBe(false)
-      expect(texts(off).join(' ')).toContain(zhDict['mode.switch.off'])
+      expect(noteText(off)).toBe(zhDict['mode.switch.off'])
       // The lamp agrees with the record, not with the click count.
       expect(walk(off).find((element) => element.props['data-mode-lamp'] !== undefined)!.props['data-mode-lamp']).toBe('off')
     } finally {

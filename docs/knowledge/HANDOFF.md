@@ -1,3 +1,57 @@
+## 2026-11-25 — 对话框底部开关的文案改成「工作流开关 / 开」（`fix/composer-label`，未发版）：下一步是评审取词、决定「命令写入后不刷新」修不修（用户文档的旧叫法已在本轮一并改掉）
+
+- **From:** 记忆收口（`agent-153/memory-scribe`）· **To:** 操作者 / 下一个接手者
+- **这一支是什么**：分支 `fix/composer-label`（worktree `.tmp/wt-composer-label`），基线 `main` 尖端 **`424ed99`**，功能提交 **`2f218d0`**
+  「`fix(client): say the workflow switch plainly, without the deleted full-crew mode`」（**3 文件 / +31 −17**：`src/client/index.js`
+  4/4、`lib/client.js` 4/4、`test/client.spec.ts` +23 −9），其后再一条**只写记忆的文档提交**（`CHANGELOG.md` + `docs/knowledge/` 四份 +
+  `.rsi/evidence/composer-label-2026-11-25/README.md`）。**未 push、未发版、未合 `main`、没有 PR**，`package.json` 仍是 **`0.13.35`**。
+- **改了什么（用户能看到的那一层）**：对话框底部第三个开关的四条文案——EN 标签 `Workflow` → **`Workflow switch`**、EN 开启态
+  `On · full crew` → **`On`**；ZH 标签 `workflow总开关` → **`工作流开关`**、ZH 开启态 `开 · 全员模式` → **`开`**。原因是旧文案在指一个
+  已经删掉的东西：「全员模式 / full crew」是旧前台那一档的名字，而旧前台在 0.13.35 已整条链删除。八个 `mode.switch.*` 键里其余六个
+  （`aria`/`off`/`reading`/`busy`/`noSession`/`failed`）一字未动。**行为零变化**：同一条会话记录、同一个请求、同一次点击。
+- **已经证实的**：`TMPDIR=$PWD/.tmp npm run ci` 在 `2f218d0` 上 **EXIT=0**——`98 files` / **`1832 tests`**（与基线同数，本轮没增删用例）、
+  `Found 15 warnings and 0 errors.`（与 0.13.35 那 15 条相同）、`lib/ at 2f218d0 is the build of src/ at 2f218d0 (281 files, byte-identical)`、
+  `client bundle: 321607 bytes`（基线 `424ed99` 提交的是 321631，**差 24 字节**就是四条文案变短）。定向测试
+  `npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → **2 files / 138 tests PASS**（`client` 132、`i18n-parity` 6）。
+  `src/`、`test/` 与两个 README 里 `full crew` / `全员模式` / `workflow总开关` **0 命中**（`README.zh-CN.md:248` 那处本轮一并改了）。
+  逐行读数在 `VALIDATION.md` 同日条与 `STATE.md` 顶部；
+  证据在 `.rsi/evidence/composer-label-2026-11-25/README.md`。
+- **这一轮顺带结案的旧疑点（方向与旧记录相反，值得先看这段）**：`VALIDATION.md:410` 那条 `HYPOTHESIS`（「`/grok off` 后开关显示关、
+  下一回合又显示开 · 全员模式，疑似回落到 profile 默认值」）**结案了，而且回落不成立**。真机（live `web` profile 克隆到
+  `.tmp/soak-label/dsh-home`，端口 **3321**，`~/.dsh` 与 3080 全程未碰）的读数是：**同一个有记录的会话**，reload 前、reload 后、
+  下一回合三次读到的都是 `source:"record", enabled:false`，与账本逐字一致；看到的「回开」是因为 reload 后前端打开的是**另一个新建的
+  空会话**，那里没有记录，宿主诚实地答 `source:"default"`，于是显示默认的开。**真正存在的是另一个缺陷、方向也相反：开关只在挂载时读一次，
+  用命令写入后不刷新**（点击会刷新，因为写响应会回填状态；打字 `/grok off` 不会——40 秒观察窗加下一回合，`/grok-workflow/mode` 一共只有
+  挂载时那 1 次请求）。旧记录原文不回改（写下时为真），以 `VALIDATION.md` 新条目为准。
+- **下一步（按顺序）**：
+  1. **合并前请评审文案取词**：英文 `Workflow switch`、中文 `工作流开关`；开启态只有 `On` / `开`，与 `Off` / `关` 相对。这是**产品取词**，
+     不是实现细节，所以没有替操作者拍板——若不喜欢（比如英文想用 `Grok workflow`、中文想用「工作流总开关」），改的是同一个字典里的
+     两对字符串加 `test/client.spec.ts` 里那条钉中文标签的字面量。**注意：** 中文标签与状态词现在都是短词，**任何「整行文本包含状态词」的
+     断言都会退化成永真**（标签 `工作流开关` 自带 `开` 字）——换词之后结构上那两条防塌陷守卫（`label ≠ on`、`on ≠ off`）**必须留着**。
+  2. **决定是否修「命令写入后开关不刷新」**（`D-149`）。若修，路子有两条：订阅 `session/event`（命令写记录时收到事件再读一次），
+     或者让命令路径的写响应回填到已挂载的开关（点击那条路现在就是这么工作的）。**这是另一次决定，别在这里实现**——本轮的任务是
+     「改文案 + 把现象与成因分开」，两件事混在一个 diff 里，评审就分不清哪一半是文案、哪一半是行为。
+  3. **未发版**：`package.json` 仍 **`0.13.35`**，本轮没有 bump、没有 tag、没有 Release。要发版时照 `AGENTS.md` §7 的五步流程走；
+     `CHANGELOG.md` 的 `[Unreleased]` 下已经有一条 `### Changed / 变更`（中英双语）等着被收进版本段。
+- **用户文档已跟上新叫法（本轮一并改掉，不再是待办）**：`README.zh-CN.md:248` 原来写着「**再接一个「workflow总开关」**」，已改成
+  「**再接一个「工作流开关」**」——**+1 −1，只动这一处措辞**；同段「挂载时读一次 / 会话没有记录时显示 `grokDefault` / 关闭三重提示」的描述
+  **一字未改**（那些仍然是真话），英文 `README.md` 本来就叫 `The workflow switch`，没动。改后两个 README 里
+  `full crew` / `全员模式` / `workflow总开关` 都不再出现，六个文档守卫 **6 files / 79 tests PASS**。
+  **仍留给下一轮的一件小事**：那段「挂载时读一次」的说明现在是**已知缺陷的说明书**，值得顺手加一句「命令写入后不会自动刷新」，
+  否则读者会以为它已经是实时的——但那是与修「命令后不刷新」（下一步 ②）同一批决定的文案，本轮没有替操作者写。
+- **三件会踩的事**：
+  1. **中文短词把整行断言变成了假绿**：这是本轮唯一的技术陷阱。状态词缩成单字之后，「整行包含」类断言在两种状态下都为真。
+     本轮的解法是量**状态行那个元素**（`data-mode-note`，渲染侧挂的是 `state.phase`，文字由 `modeSwitchText` 给），并对它断言
+     相等，再加 `label ≠ on`、`on ≠ off` 两条守卫。**换任何短词都别退回「整行包含」。**
+  2. **`verify:lib` 只验提交、不验工作树**：工作树里 `lib/` 换了却还没提交时，它会说**旧提交**自洽。引用读数时只认
+     `lib/ at <当前提交> is the build of src/ at <同一提交>` 这行，别拿祖先提交的输出给工作树背书。
+  3. **真机必须克隆 live profile，不能软链插件**：软链会让 Node 解析到仓库自带的 `@deepseek-ai/*`，与宿主不是同一个类实例、开关直接挂
+     （`docs/LOCAL-TESTING.md` 的 trap 清单里有这条）。本轮是 `node scripts/clone-profile.mjs` → `.tmp/soak-label/dsh-home`
+     （**7699 文件** / parity **5/5** / **1 行凭据按设计脱敏**），删掉克隆里已移除的键 `mode: triage` 再起，端口 **3321**。
+- **一条要如实说的话**：真机**没有验到模型回合**——隔离克隆按设计把 `AGENT2API_API_KEY` 脱敏掉了，每次发消息都是 `MISSING_CREDENTIAL`
+  的 `turn/end error`。读数覆盖的是「发出一条消息、开一回合」这一层；模型回答本身 `NOT_RUN`。另外，
+  **「打字 `/grok off` 之后开关显示关」这半句本轮没能复现**——按读数，打字不会让已挂载的开关变关。
+
 ## 2026-11-25 — M3.4 死代码收尾完成（`fix/m3-dead-code`，未发版）：下一步是剩下三个常量与一个归档函数的去留，以及两个 README 里那个没有出处的数字
 
 - **From:** 记忆收口（`agent-152/memory-writer`）· **To:** 操作者 / 下一个接手者
