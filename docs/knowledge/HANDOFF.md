@@ -1,4 +1,82 @@
+## 2026-11-26 — `0.13.45` 已发布并收口：一个发布提交（8 文件 / +22 −20、单父）、一份门禁 `GATE_EXIT=0`（`103 files / 1948 tests`）、`main` 尖端 `63793eb`、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**（live 里装的仍读 `0.13.39`）、**真机 soak `NOT_RUN`**
+
+- **From:** 包工头（`agent-194`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**发版轮 + 收口轮**，不写代码。`0.13.45` 已经出去（tag 推了、Release 建了、资产在）；
+  本轮只做三份记忆（`STATE` / 本文件 / `VALIDATION`）+ 一份证据索引
+  （`.rsi/evidence/release-0.13.45-2026-11-26/README.md`），然后提交推送、清掉发布 worktree。
+  **没有重跑门禁、没有跑任何 npm 脚本、没有碰 `src/` / `test/` / `lib/`**（`AGENTS.md` §12），
+  所以**这一轮没有红可记**——用户拿到的那条行为的红/绿在功能轮 `fix/settled-rows` 那一条里
+  （`git stash push -- src` → `1 failed | 24 skipped`），见本文件下方。
+- **身份**：发布提交 **`63793eb93b19723d4ec2e90ec23c86a1804a53a7`** `chore(release): prepare v0.13.45`，
+  父提交 **`e2ed221`**（**单父，发布提交不是合并**），**8 文件 / +22 −20**，全是版本字面量与清单尾巴：
+  `CHANGELOG.md` +2 −0（只插入 `## [0.13.45] - 2026-11-26` 标题行 + 它上面一个空行；`### Fixed / 修复`
+  那段的条目正文中英一字未改，`## [Unreleased]` 留空站在上面）、`README.md` 5/5、`README.zh-CN.md` 5/5、
+  `docs/LOCAL-TESTING.md` 3/3（三处 tarball 名：第 77 行的安装示例、第 163 与第 164 行的打包 + 安装）、
+  `lib/client.js` 2/2、`package-lock.json` 2/2（第 3 行与第 9 行两处）、`package.json` 1/1、
+  `src/client/index.js` 2/2；`src/` 与 `lib/` 的唯一改动是 `PLUGIN_VERSION` / `UPDATE_LATEST`
+  `'0.13.44'` → `'0.13.45'`（`lib/client.js` 与 `src/client/index.js` 是**同一个 blob**，
+  `ea4d107` → `93b7562`，各 **348559 字节**）。**附注标签 `v0.13.45`** 对象
+  **`ca4a42c618b469a5bfc6db5442c8530c59a79065`** → 剥出 `63793eb`、消息 `Grok Workflow for DSH v0.13.45`、
+  `tagger` 时刻 **2026-11-26 05:11:02 +0800**（`1795641062 +0800`），标签上的 `package.json` 读 `0.13.45`。
+  **`main` = `origin/main` = 发布提交 = 标签剥出的提交 = `63793eb`**，没有 force-push、没有移动任何已发布标签
+  （本轮重读 `v0.13.41` `96dd9cc`/`a64a50a`、`v0.13.42` `98b9c45`/`651f3dd`、`v0.13.43` `e084e4b`/`549a579`、
+  `v0.13.44` `e1a0044`/`7cc4a90`，四条与开工前基线逐字一致）。
+- **一处历史褶皱照实记**：`main` 上有一对**内容相同**的合并提交 `d975dba`（父 `d6c338e` + `a3ef7e1`）与
+  `e2ed221`（父 `d6c338e` + `d975dba`），`git diff d975dba e2ed221` 为空、两棵树都是 `dc11ac3`——第二颗是空合并，
+  什么都没丢、也没有重写历史；发布提交 `63793eb` 是它的单父子提交。
+- **用户看到的一件事**：跑中加进来的要求，是拿一份「做完的那一半看得见判决和标题」的计划来判的。
+  **口径要写准**：简报列了两条内容，但**「钥匙被拒会在同一条路由上再问一次」那条已经在 `0.13.44` 发出去过**
+  （`fix/auth-retry` 轮、`D-164`），`0.13.45` **只带**「已沉淀行」这一条；`v0.13.44..main` 里除记忆/证据提交之外
+  只有一颗产品提交 `4fc24b3`（加 `a3ef7e1` 证据与两颗合并）。升级须知是「不用准备任何东西」。
+- **门禁读数（一份，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci`、worktree `.tmp/wt-release-0.13.45` 的干净树、
+  `HEAD = 63793eb`、**`GATE_EXIT=0`**。转录 `.rsi/evidence/release-0.13.45-2026-11-26/gate-release-63793eb.out`
+  （**412 行 / 25328 字节**、`sha256 0649e838902ccd513ab6c8650fc6c51d6c1cc573bbc90199f0f94b45054fd0a0`、
+  末行 `GATE_EXIT=0`；与本轮那份原件 `cmp` 逐字节相同）。读数：第 2 / 6 / 10 行读作
+  `> dsh-grok-workflow@0.13.45 ci` / `… typecheck` / `… lint`（**门禁树里 `package.json` 已经是 `0.13.45`**）、
+  第 162 行 `Found 15 warnings and 0 errors.`、第 163 行 `Finished in 87ms on 184 files with 96 rules using 6 threads.`、
+  第 168 与第 178 行 `client bundle: 348559 bytes → lib/client.js`（同值）、第 169 行
+  `lib/ at 63793eb is the build of src/ at 63793eb (289 files, byte-identical)`、第 407 行
+  **`Test Files 103 passed (103)`**、第 408 行 **`Tests 1948 passed (1948)`**、第 410 行
+  `Duration 147.60s (transform 2.83s, setup 0ms, import 10.05s, tests 125.49s, environment 11ms)`、
+  第 412 行 `GATE_EXIT=0`。`grep -cE 'FAIL|failed'` = **4，四条都不是失败**（`FAIL` 0 命中）：
+  checkpoint 夹具故意造的 `[smoke] status=failed …`（第 209 行）、用例标题
+  `✓ re-fires once when the answer cannot be parsed, then reports a failed judge`（第 261 行）、用例标题
+  `✓ maps in_progress→running and failed→blocked with the detail as blockedReason`（第 307 行）、
+  `stderr | … keeps still reading, read failed and not served as three different pages` 那条日志（第 310 行）。
+  **没有第二份门禁**：父提交 `e2ed221` 就是功能轮的合流尖端，那一轮已带自己的块内门禁
+  （`.rsi/evidence/settled-rows-2026-11-26/`：`gate-typecheck.out`、`gate-lint.out`、`gate-specs.out` 45 passed、
+  `gate-build.out`、`gate-docs-guards.out`、`red-before-fix.out`）。
+- **用例算术（本轮从 git 对象数过）**：spec 文件 `v0.13.44` → `main` **103 → 103**（没有增删测试文件）；
+  `test/replan.spec.ts` 带词边界的 `it(` **24 → 25**（+1，就是 `4fc24b3` 那例 `runReal`）；所以
+  **1947 → 1948** 来自功能提交、不随发版提交走（`git diff --name-only v0.13.44 main -- test` 只有这一个文件）。
+- **远端读数（`gh run view` 重读）**：Release run **`45701977660`**（workflow `Release`、`headBranch v0.13.45`、
+  sha `63793eb`、**success**、单 job `Validate and publish v0.13.45`、`2026-11-25T21:11:15Z → 21:12:34Z` 约 1m19s、
+  run 建于 `21:11:12Z` / 更新 `21:12:35Z`，`gh run watch … --exit-status` 退出 0）、`main` 的 CI run
+  **`45701972085`**（sha `63793eb`、**success**）；GitHub Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.45 名字 `Grok Workflow for DSH v0.13.45`、
+  `publishedAt 2026-11-25T21:12:30Z`、非 draft / 非 prerelease、target `main`、正文 **2151 字节**
+  （`gh release view --json body` 读回 17 行正文 + 末尾一个换行）、唯一资产
+  **`dsh-grok-workflow-0.13.45.tgz` = 988089 字节**、摘要
+  `sha256:8d56730583a0c22f429d2e54eef7f4272be3adc8fc1ba0d1da41b9daae985ad9`（上一版 987079 → **+1010**）。
+- **`BLOCKED`（`AGENTS.md` §13 的 live 档案升级，就是下一件事）**：**没做成**——本会话文件策略 `workspace-write`、
+  `~/.dsh` 在工作区外，写探测 `: > ~/.dsh/.release-probe-0.13.45` 返回 **`Read-only file system`**（退出 1、只试一次、
+  没有重试），**没写、没重载、没重启**，3080 那个实例全程没碰；只读读到的：live 档案里装的
+  `dsh-grok-workflow` 仍读 **`0.13.39`**，mtime `~/.dsh` `2026-11-25 23:14:14`、`~/.dsh/profiles`
+  `2026-11-22 16:59:46`、`profiles/web/cordis.patch.yml` `2026-11-25 23:04:40`。
+- **下一步那一件事**：由**有写权限的人**把 live 那条插件行钉到**确切的标签 `v0.13.45`**（绝不用浮动范围、`latest`
+  或分支名），把装好的版本读回来确认；读不回 `0.13.45` 就回滚那一行——跑发布版时它必须读作 `0.13.45`。
+- **`NOT_RUN`（真机 soak）**：发版轮没有新行为可 soak；这里发出去的行为是 `fix/settled-rows` 那一轮在隔离档案里
+  用真模型验过的（证据 `.rsi/evidence/settled-rows-2026-11-26/`）。本轮也没跑门禁、没跑任何 npm 脚本。
+- **清理（推送成功后做，已做完）**：`git worktree remove .tmp/wt-release-0.13.45`（`git worktree list` 现在只剩主检出
+  `/home/fish/projects_mine/dsh-grok-workflow 63793eb [main]`）、`git branch -d release/0.13.45`；
+  **远端分支一个不删、标签一个不删**。`.gitignore`(modified) 与 `.rsi/evidence/progress-now/`(未跟踪) 是别的会话的
+  遗留，没碰、没暂存、没提交。
+
+---
+
 ## 2026-11-26 — `fix/settled-rows`：边界子读到的是结算行本身（判决 + 标题），不再是 `[undefined] `；真机两道边界都读对了；未合 `main`、未 push、未发版
+
+（**本节「未合 `main`、未 push、未打 tag、未发版，版本仍 `0.13.44`」的现状已被上面这一轮取代**：那个修复已经并进 `main`（`4fc24b3` + `a3ef7e1`，两道合并 `d975dba` / `e2ed221`）并随 **`0.13.45`** 发布（`main` 尖端 = 发布提交 = `63793eb`、附注标签 `v0.13.45`）。本节其余内容原样保留。）
 
 - **From:** 包工头（`agent-193`）· **To:** 下一个接手者
 - **这一轮是什么**：修 `fix/replan-shape` 在真机上照实记下、当时判「留给下一块」的那条观察。调用点把
