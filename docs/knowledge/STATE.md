@@ -3601,3 +3601,18 @@ Last updated: 2026-11-25 16:10 +08:00（**红二修完：没有记录的会话�
 live 仍装 `0.13.35`、真实工作区目录 `~/Documents/deepseek-harness/default-workspace` mtime 前后都是 2026-11-15 13:42:07；
 未 push、未打 tag、未 bump、未合流。scratch `.tmp/soak-switch-default`（105 MB）跑完整棵删除。证据
 `.rsi/evidence/switch-default-state-2026-11-25/`。**没跑**：模型回合、点卡片、真任务、监工判决（`NOT_RUN`，与本改动无关）。）
+
+Last updated: 2026-11-25 20:00 +08:00（**进度页重画成一页三态，`CONFIRMED`，未发版、未合流** — 分支
+`feat/progress-redesign`（worktree `.agents/worktrees/feat/progress-redesign`，基线 `main` 尖端 `ff5c5ec`），交付 HEAD
+**`87f14e1`**。六段固定脊椎、环、连接线、实测 SVG 干线、结算条、百分比与详情弹层**整体退场**；换成头部（run 名 + 五态胶囊）、
+「现在」主标题 + 一行小字、一步一段的分段条 + 琥珀重做提示 + 「后面还有」、步骤清单（每步 执行 → 检查 → 复核 链）、
+「经过」逐行日志（一行一条调用）、「交卷」卡（稿名 + 打开胶囊，没有 `summary-final` 就如实写缺口）、底部只填框不代发的按钮，
+聊天任务卡片同一套五态词与琥珀色。**门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`100 files / 1855 tests`、
+`15 warnings / 0 errors`、`lib/ at 87f14e1 … (285 files, byte-identical)`、`client bundle: 334321 bytes`；基线 `ff5c5ec`
+是 `100 files / 1870 tests` / `340426 bytes`）。**真机**（隔离克隆 + 打包 `0.13.38` + 真模型，端口 3361）：等你点头 / 进行中 /
+已完成三态都拍到了，`consoleErrors: []`，第二次运行的交卷卡真机渲染出「汇总·第2稿（定稿）」。**真机改掉的契约**：规划不再算一步
+（§19.2 改成只把工作腿算作步骤，没有步时主标题写「正在拆活」）。**上游缺口**：`src/report.ts:1170` 只认
+`check=pass verify=pass drafts=N`，有些运行因此不写 `summary-final`，交卷卡只能是空的——本轮不修，记在 HANDOFF。**红线**：
+`~/.dsh` / `~/.dsh/profiles` 前后同值、写探针 `Read-only file system`、3080 前后 401、live 仍装 `0.13.38`；未 push、未打 tag、
+未 bump、未发布。证据 `.rsi/evidence/progress-redesign-2026-11-25/`。**没跑**：未通过/已取消两态的真机截图、点按钮后输入框内容、
+窄屏真机截图（`NOT_RUN`，只有组件断言）。）

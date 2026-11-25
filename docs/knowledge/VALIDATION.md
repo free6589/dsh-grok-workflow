@@ -7984,3 +7984,21 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak
 
 **证据：** `.rsi/evidence/switch-default-state-2026-11-25/`（`README.md` 是逐条读数与边界，`probe-final.json` 是那一次的
 `/grok-workflow/mode` 全部请求/答复与开关 `data-*` 读数）。
+
+## 2026-11-25 — 进度页重画：一页三态（`feat/progress-redesign`，未发版）
+
+**对象**：分支 `feat/progress-redesign`（worktree `.agents/worktrees/feat/progress-redesign`），基线 `main` 尖端 `ff5c5ec`，
+交付 HEAD `87f14e1`（产品提交 `e85c35f`；12 条产品提交 + 2 条 `chore(build)` + 设计/记忆/证据提交）。决定：`D-156`；契约：`DESIGN-progress-tab.md` §19。
+
+| 项 | 命令 / 读数 | 结论 |
+| --- | --- | --- |
+| 门禁（基线） | `TMPDIR=$PWD/.tmp npm run ci`（`ff5c5ec` 干净树） | **EXIT=0**；`100 files / 1870 tests`；`15 warnings / 0 errors`；`client bundle: 340426 bytes`；`lib/ … (285 files, byte-identical)` |
+| 门禁（交付） | 同一条命令（`87f14e1`） | **EXIT=0**；`100 files / 1855 tests`（**−15**）；`15 warnings / 0 errors`（未变）；`client bundle: 334321 bytes`（**−6105**）；`lib/ at 87f14e1 … (285 files, byte-identical)` |
+| 定向先红后绿 | 六处，原文见证据 README §3 | 取数 13 红 → 69 绿；重画 24 红 → 135 绿；`summary-final` 3 红（两轮）→ 137 绿；同名常量 1 红 → 56 绿；工作腿 2 红 → 57 绿；日志行 5 红 → 142 绿 |
+| 真机（隔离克隆 + 打包安装 + 真模型） | 端口 3361；`sha256(lib/client.js)` = `4292bdf7…` 与工作树逐字相同；版本 `0.13.38` | **三态都拍到了**（等你点头 / 进行中 / 已完成），`consoleErrors: []`；第二次运行的 `summary-final` 也在真机上渲染成「汇总·第2稿（定稿）」 |
+| 真机改掉的契约 | 19:37 那轮把「规划」当一步（「第 1 步，共 1 步 / 要干的 1 件事：规划」） | §19.2 改成只把工作腿算作步骤；`56796f0` + `64b69af` 两处实现 + 两条新守卫 |
+| 上游缺口（不修） | 该轮 `tool-workflow/*` 24 条里 `summary-final` **0** 条；根因 `src/report.ts:1170` 只认 `check=pass verify=pass drafts=N` | 本页如实显示 `progress.final.missing`（不猜）；修报告格式超出本轮范围 |
+| 红线 | `~/.dsh` / `~/.dsh/profiles` 前后同值；写探针 `Read-only file system`；3080 前后 401；未 push / 未 tag / 未 bump / 未发布 | live 装的版本读回仍 `0.13.38`；`~/.dsh/profiles/web` **目录** mtime 在 19:39–19:41 动过、内含 135 个新文件，**不是本会话写的**（成因 `HYPOTHESIS`：另一个会话的插件操作） |
+| 没跑 | 未通过与已取消两态的真机截图、点按钮后输入框内容、窄屏真机截图 | `NOT_RUN`，均由组件用例覆盖，不冒充真机 |
+
+证据：`.rsi/evidence/progress-redesign-2026-11-25/`（三张截图 + 逐字文本 + console + 门禁与红线读数）。

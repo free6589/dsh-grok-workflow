@@ -527,11 +527,14 @@ section.gw-progress
   `stopReason` 由 `src/records.ts` 按报告写，`completed` 已经等于「每个任务都核过」，不是「程序跑完了」。
 - **步骤（轨道分段）**：有计划任务（`kind === 'extra'` 且 `taskNumber` 有值、非 Guardian）时，
   一步 = 一个计划任务，按 `taskNumber` 排；没有计划任务时（triage / 单调用 run），
-  一步 = 一行已声明的调用，按 `seq` 排。`total = steps.length`。
+  一步 = 一行已声明的**工作腿**调用（`执行` / `检查` / `复核`），按 `seq` 排——`规划` 与 `汇总`
+  两条腿不是「要做的事」，它们照常出现在「经过」里，但不占一步（真机读数见 §19.9 第 1 条）。
+  `total = steps.length`。
   `at` = 第一个 `doing` 的步，否则第一个 `failed`，否则第一个未完成的步，否则 `total`。
 - **段色**：`done → 绿`、`doing → 蓝（流动）`、`failed → 琥珀`、其余 `灰`。**任何地方不出现红**。
-- **现在**：主标题 = 当前步的标题（计划任务标题原样，不截断不重编号）；没有步时写
-  `progress.now.planning`，已结束且全过时写 `progress.now.done`。小字 = 正在跑的那一行的角色 +
+- **现在**：主标题 = 当前步的标题（计划任务标题原样，不截断不重编号）；**没有步时**（还没拆出计划、
+  这一轮没有计划任务、或计划任务都还没声明）一律写 `progress.now.planning`；已结束且全过时写
+  `progress.now.done`。小字 = 正在跑的那一行的角色 +
   `progress.now.suffix`，已结束写 `progress.now.allPassed`，并附 `progress.now.step`。
 - **琥珀提示条**：仅当当前步存在未恢复的失败时出现，数字取该单元的尝试次数
   （label 的 `（尝试 n）` 后缀，已有 `progressAttemptOf` 一类规则）。
@@ -662,3 +665,28 @@ section.gw-progress
   `setDraft` 且**没有**调用 `send`（用手写替身门面断言调用记录）。
 - 模型：`test/progress-tab.spec.ts` 新增同一批 fixture 的 `deriveProgressStory` 断言（TS 与
   `src/client/index.js` 的手写镜像双份，沿用 §11 的做法）。
+
+### 19.9 回填：第一轮真机读数（2026-11-25 19:37–19:39，`CONFIRMED`）
+
+环境：隔离克隆（`node scripts/clone-profile.mjs` 从 live `~/.dsh/profiles/web` 克隆，profile `web-clone`）、
+`DSH_HOME=.tmp/soak-progress/dsh-home`、端口 **3361**、`npm pack` 后 `dsh plugin --profile web-clone add
+file:…/dsh-grok-workflow-0.13.38.tgz`（版本读回 `0.13.38`，`sha256(lib/client.js)` = `abaac0e9…` 与工作树逐字相同）、
+五个角色 + guardian + 默认 agent 模型钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`（本机没有
+`AGENT2API_API_KEY`）、工作区指到一次性 `.tmp/soak-progress/work`。一个真实运行：目标「写 notes.md 三行安装步骤 +
+写 test.txt 一行 hello」，**9 条声明调用 / 2 个计划任务 / 约 2.5 分钟 / `console_errors: []`**，页面先 `进行中`
+后 `已完成`（截图与逐字文本在 `.rsi/evidence/progress-redesign-2026-11-25/`）。
+
+**这条读数改了一处契约（§19.2，已改）**：没有计划任务的窗口里，旧规则把「规划」这条腿算成一步，
+于是屏幕上写着「第 1 步，共 1 步 / 要干的 1 件事：规划」。规划与汇总是 run 自己的两头，不是要做的事，
+所以它们现在只出现在「经过」里、不占一步；没有步时主标题写 `progress.now.planning`。
+
+**一条上游缺口（`CONFIRMED`，本轮不修，不是本页的错）**：这次运行产出了 `汇总·第1稿/第2稿/第3稿` 三条，
+却**没有写 `summary-final` 事件**（会话日志里 `tool-workflow/*` 共 24 条：`run-start` 1、`agent-start` 10、
+`agent-end` 10、`guardian-start` 1、`guardian-end` 1、`run-end` 1、`summary-final` **0**）。
+原因是 `src/report.ts:1170` 的 `shippedSummaryDraft()` 只认 review 里逐字出现的 `check=pass verify=pass drafts=N`；
+这一轮的 review 不是这个形状，于是「哪一稿是定稿」从未被记录。本页因此如实显示 `progress.final.missing`——
+它没有猜（§19.7 第 2 条），但这也意味着：**交卷卡在真机上多半是空的，直到那条 review 形状被修**。
+
+**没有截到的一态**：`等你点头`（`declared === 0`）的窗口是 `run-start` 到第一条 `agent-start` 之间，
+真机上手点不到（D-156 已写明截不到就照实报 `NOT_RUN`）。这一态由组件用例覆盖（真实 DOM + 真实事件 fixture），
+不冒充真机读数。
