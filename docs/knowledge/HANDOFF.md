@@ -1,3 +1,27 @@
+## 2026-11-25 — 429 开关那一行补上控件（`fix/ratelimit-toggle`，`534b867`）：14 个声明字段现在 14 个都有控件
+
+- **From:** 实现手（`agent-163/impl`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：分支 `fix/ratelimit-toggle`（worktree `.tmp/wt-ratelimit-toggle`，基线 `main` 尖端 **`4def476`**），一个产品提交
+  **`534b867`** `feat(settings): the 429 switch gets a control — the last declared field without one`（3 文件 / +141 −2），
+  其后再一条只放文档与证据的提交。设置页「谁来干」卡里，`switchOnRateLimit`（默认 `true`）从「有文案没控件」变成一行真控件：
+  `FieldRow` + `Toggle` + 提示段，位置在 **Guardian 之后、五条角色链之前**。默认值、schema、`src/config.ts`、版本号（仍 `0.13.36`）都没动。
+- **门禁与体积**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（包工头跑：`98 files / 1845 tests`、`15 warnings / 0 errors`、
+  `lib/ at 534b867 is the build of src/ at 534b867 (281 files, byte-identical)`）；
+  **六个文档守卫 6 文件 / 80 例绿**（`docs-version 8`、`docs-config-keys 14`、`i18n-parity 6`、`docs-architecture-version 3`、
+  `update-entry 20`、`update-surface 29`；注意基线是 **80**，旧记的 79 是 `0.13.36` 发布轮的过期口径，那时 `docs-config-keys` 只有 13 例）。；`lib/client.js` **330313 → 331626（+1313）**。
+- **真机读数**：隔离 home `.tmp/soak-ratelimit/fresh-home`、端口 **3327**、装上的 `sha256(lib/client.js)` =
+  `f9408813d6312cecf1996a23245966ea7ce09a152a029f6d5311fe379f7f7ad0`（与 worktree 逐字节相同，版本读回 `0.13.36`）；
+  中英两语言的行文案/状态/提示都读回，点开关 → `Save` 的 `settings/mutate` 只有一条 `set switchOnRateLimit=false`，
+  隔离 profile 的 `cordis.patch.yml` 里读到 `switchOnRateLimit: false`，reload 后仍是关、`pageerror` 0 条。
+  逐条见 `VALIDATION.md` 同日条与 `.rsi/evidence/ratelimit-toggle-2026-11-25/`。
+- **下一个接手的人必须知道（偏差 (a)，`HYPOTHESIS`）**：按派单先 `clone-profile.mjs` 克隆 live `web` 档案那一次，
+  `POST /api/settings/describe` **始终没有 `grok-workflow` 命名空间**（22 个），页面也不请求插件的 client bundle，于是没有「Workflow」这一栏；
+  换 `--from-default-profile web` 新建隔离 profile + `dsh plugin add` 打进本构建后，同一个 `describe` 是 **23 个命名空间含它**
+  （`autoGenerate: true`），页面出现。**两条路的差别没查到根因，只记现象**。以后做设置页真机 soak，先确认 `describe` 里有这个命名空间，
+  再去开页面——否则会误判成「控件没写出来」。模型回合本轮 `NOT_RUN`（隔离 profile 不带凭据，也不需要）。
+- **顺手补的一件事**：`GuardianModelRow` 的卡上加了 `data-field="guardianModel"`（原先只有 `data-gw-guardian`），
+  否则新增的「每个声明字段都必须有控件」总守卫（按 `GROK_WORKFLOW_FIELDS` 全量遍历）对 14 个 key 走不全。
+
 ## 2026-11-25 — 设置页与 `/grok on` 的文案改说实话（`fix/settings-copy`，`05f9e2b`）：**改的是话，不是行为**；还欠着五处「总开关」旧账，都记在下面
 
 - **From:** 文案块（`agent-160` 派发的 `copy-hand`）· **To:** 操作者 / 下一个接手者
@@ -21,7 +45,10 @@
   1. `src/client/index.js` 的 FIELDS 注释（`// Total switch (mock “总开关”) …`）仍把这颗开关叫 total switch。
   2. `src/index.ts:391`、`src/mode-surface.ts:2`、`test/command.spec.ts` 的散文里仍写 “master switch”。
   3. `page.intro` 与 `group.limits`（“How much effort” / “下多大力气”）还在用「下多大力气」的框。
-  4. `switchOnRateLimit` 仍有文案与 schema 行，但页面上**渲染不出来**（14 个声明字段里唯一没有控件的一个）。
+  4. ~~`switchOnRateLimit` 仍有文案与 schema 行，但页面上**渲染不出来**（14 个声明字段里唯一没有控件的一个）。~~
+     **已关闭（2026-11-25，`534b867`）**：「谁来干」卡里有了这一行（`FieldRow` + `Toggle` + 提示段，Guardian 之后、五条角色链之前），
+     两语言都读回、保存落盘、reload 仍保留；并且新增了一条按 `GROK_WORKFLOW_FIELDS` 全量遍历的总守卫，下一个「声明了但没画」的字段会直接变红。
+     读数见 `VALIDATION.md` 同日条与 `.rsi/evidence/ratelimit-toggle-2026-11-25/`，判据见 `DECISIONS.md` 的 `D-153`。
   5. `docs/knowledge/STATE.md` 里 2026-11-25 13:30 那条补记逐字引的是**上一版** `/grok on` 回执，现在缺了新的限定语。
 
 ## 2026-11-25 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板

@@ -1,3 +1,39 @@
+Last updated: 2026-11-25 15:32 +08:00（**设置页「谁来干」卡里那个 429 开关补上了控件：`switchOnRateLimit` 之前是 14 个声明字段里唯一「有文案、有 schema、就是不画」的一个，现在有一行 `FieldRow` + `Toggle` + 提示段，位置在 Guardian 之后、五条角色链之前；默认值仍是 `on`，行为一个字没改，没加任何文案键、没动 schema、没动版本号 `0.13.36`，未 push、未发版** —
+分支 **`fix/ratelimit-toggle`**，worktree `.tmp/wt-ratelimit-toggle`，基线 `main` 尖端 **`4def476`**。**代码与测试提交 `534b867`**
+`feat(settings): the 429 switch gets a control — the last declared field without one`（**3 文件 / +141 −2**：`lib/client.js` 21/1、
+`src/client/index.js` 21/1、`test/client.spec.ts` 99/0；`test/client.spec.ts` 的 `it(` 由 **140 → 144**），其后再一条**只放文档与证据**的提交。
+**改了什么**：状态词复用页面已有的那一对 On/Off（`option.replan.on` / `option.replan.off`），**没有**新增 `option.switchOnRateLimit.*`——
+页面每种语言已经有一份 On/Off，新增两条等于把同一句话写第二遍，而本轮规定不加文案键（`D-153`）；`GuardianModelRow` 的卡上补了一个
+`data-field="guardianModel"`（原先只有 `data-gw-guardian`），否则「每个声明字段都必须有控件」那条总守卫对 14 个 key 走不全。
+**门禁（包工头跑，`CONFIRMED`，`534b867` 这棵树）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：
+`Found 15 warnings and 0 errors.`、`client bundle: 331626 bytes → lib/client.js`、
+`lib/ at 534b867 is the build of src/ at 534b867 (281 files, byte-identical)`、`Test Files 98 passed (98)` / **`Tests 1845 passed (1845)`**、
+`Duration 92.12s (transform 2.68s, setup 0ms, import 8.07s, tests 72.87s, environment 11ms)`。基线算术（包工头核过）：全量 **1845 − 4 = 1841**，
+`Found 15 warnings` 与基线同数。**本轮记录者自己跑的定向四条**：`TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts
+test/config.spec.ts test/settings-projection.spec.ts` → **EXIT=0，`4 files / 204 tests`**。
+**构建体积**：`lib/client.js` **330313 → 331626 字节（+1313）**；重跑 `npm run build` 后 `git status` 仍干净，即提交里的产物就是提交里 `src/` 的构建。
+**真机读数（隔离实例，`CONFIRMED`）**：`DSH_HOME` 用的是 `.tmp/soak-ratelimit/fresh-home`（profile `web-clone`），端口 **3327**，
+`sha256(lib/client.js)` = **`f9408813d6312cecf1996a23245966ea7ce09a152a029f6d5311fe379f7f7ad0`**（与 worktree 逐字节相同，拷进 profile 不是软链）、
+`sha256(lib/index.js)` = `d7db20f2…`、版本读回 **`0.13.36`**。英文行 `Switch model on 429` / `aria-checked="true"` / On，中文行
+`限流（429）时换模型` / `aria-checked="false"` / 关，两语言提示文字与 `field.switchOnRateLimit.hint` 逐字一致；点开关后 `Save` 发出
+`settings/mutate` → `ops=[{"op":"set","path":["switchOnRateLimit"],"value":false}]`，隔离 profile 的 `cordis.patch.yml` 出现
+`switchOnRateLimit: false`；reload 后仍是关，`pageerror` 全程 **0** 条。**live `~/.dsh` 与 3080 上的实例全程未写、未重载**（包工头在 soak
+前后各量一次：`~/.dsh` size **1548** / mtime **1795362020**，`~/.dsh/profiles/web/cordis.patch.yml` size **21606** / mtime **1795530213**，两次完全一致）。
+**三条如实残留，都不掩盖**：**(a)** 派单要求克隆 live `web` 档案那一次（`clone-profile.mjs`，`files 7720 -> 7720`、`parity 5/5`、1 行凭据按设计脱敏），
+`POST /api/settings/describe` **始终没有 `grok-workflow` 命名空间**（22 个），页面也没有请求插件的 client bundle，因而没有「Workflow」这一栏可打开；
+改用 `--from-default-profile web` 新建隔离 profile 再 `dsh plugin add` 打进本构建后，同一个 `describe` 是 **23 个命名空间含它**
+（`autoGenerate: true`），页面出现——**两条路的差别未查到根因，记 `HYPOTHESIS`，只写现象不写结论**，本轮真机读数全部来自后者。
+**(b)** 模型回合 **`NOT_RUN`**：隔离 profile 按设计不带凭据，本轮也不需要。**(c)** `GuardianModelRow` 的卡上补 `data-field="guardianModel"`
+（属 `src/client/index.js` 内一行属性 + 一段 docstring，已含在 `534b867`），理由见上；**(d)** 状态词复用 `option.replan.on/off`，没有新增文案键。
+**这一轮的守卫**：`test/client.spec.ts` 新增四条（两语言的行与提示、按 `GROK_WORKFLOW_FIELDS` 全量遍历的「每个声明字段都有控件」总守卫、
+一次点击写一条 `set` op、`aria-checked` 跟着存值走）；反向验证做过——把控件块临时摘掉重建后，`-t "429 switch"` 的两条与 `-t "declared field"`
+的总守卫一起变红（`zh switchOnRateLimit has no row`），恢复后转绿。已有用例一条没改、一条没放宽。
+**六个文档守卫（本轮自查）**：`TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts
+test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` → **EXIT=0，6 files / 80 tests**
+（`update-entry 20`、`update-surface 29`、`docs-config-keys 14`、`docs-version 8`、`i18n-parity 6`、`docs-architecture-version 3`）。
+**文档守卫的基线是 80，不是 79**：79 是 `0.13.36` 发布轮的过期口径，那一轮 `docs-config-keys` 只有 13 例，设置文案那轮加了一条；
+不要拿 79 去算漂移（出处：`4def476` 与当前树逐文件数 `it(` 都是 8/14/6/3/20/29）。
+
 Last updated: 2026-11-25 12:33 +08:00（**`0.13.36` 已经发出去了：本地门禁跑绿（`Test Files 98 passed (98)` / `Tests 1839 passed (1839)` / `Found 15 warnings and 0 errors.`），`main` 与标签 `v0.13.36` 都推上去了，远端 Release 跑绿（run **`45547073752`**）、`main` 上的 CI 也绿（run **`45547060845`**），GitHub Release 已发布、唯一资产 `dsh-grok-workflow-0.13.36.tgz` **943206 字节**；**唯一没做的是本机 live 档案的自动升级**——档案里可能还留着 `mode:` 或 `legacyGate:` 两行，先删再升，否则那一行拒绝激活、工作流从界面消失，所以这一条记 **`BLOCKED`（等操作者动手），不是失败**；版本 `0.13.36`** —
 分支 **`main`**，发布提交 **`26dc370`** `chore(release): prepare v0.13.36`（**8 文件 / +35 −30**），标签 **`v0.13.36`** 是附注标签，标签对象 **`0ff357b`**、剥出的提交正是 **`26dc370`**。
 **发的是哪些字**：`package.json` 与 `package-lock.json` 的版本、`src/client/index.js` 里 `PLUGIN_VERSION` 与 `UPDATE_LATEST` 两行、`lib/client.js` 里同样那两行的重建、两个 README 的声明版本 / 两处安装固定点 / 正文里那个反引号版本 / 已发布标签清单（英文尾部是 `v0.13.34`, `v0.13.35` 与 `v0.13.36`；中文尾部是 `v0.13.34`、`v0.13.35`、`v0.13.36`）、`docs/LOCAL-TESTING.md` 三个 tarball 名（全部都是 `dsh-grok-workflow-0.13.36.tgz`）、以及 `CHANGELOG.md`。**`src/` 与 `lib/` 的改动只有那两行版本字面量，没有一行逻辑。**
