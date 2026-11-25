@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "objective": "算出 7 乘 6",
+  "routing": {
+    "planner": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "worker": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "verifier": [
+      "authprobe/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "supervisor": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ],
+    "synthesizer": [
+      "bifrost-responses/opencode-go/muse-spark-1.3-contributor"
+    ]
+  },
+  "synthesis": "model",
+  "switches": [
+    {
+      "role": "verifier",
+      "chainIndex": 0,
+      "route": "authprobe/opencode-go/muse-spark-1.3-contributor",
+      "attempt": 1,
+      "outcome": "failed",
+      "failureClass": "model-unavailable",
+      "reason": "verifier call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type"
+    },
+    {
+      "role": "verifier",
+      "chainIndex": 0,
+      "route": "authprobe/opencode-go/muse-spark-1.3-contributor",
+      "attempt": 1,
+      "outcome": "failed",
+      "failureClass": "model-unavailable",
+      "reason": "verifier call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type"
+    },
+    {
+      "role": "verifier",
+      "chainIndex": 0,
+      "route": "authprobe/opencode-go/muse-spark-1.3-contributor",
+      "attempt": 2,
+      "outcome": "failed",
+      "failureClass": "model-unavailable",
+      "reason": "verifier call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type"
+    },
+    {
+      "role": "verifier",
+      "chainIndex": 0,
+      "route": "authprobe/opencode-go/muse-spark-1.3-contributor",
+      "attempt": 2,
+      "outcome": "failed",
+      "failureClass": "model-unavailable",
+      "reason": "verifier call produced no result: the child run ended abnormally (authprobe API error (401): {\"message\":\"401 Unauthorized: virtual key is required. Provide a virtual key via the x-bf-vk header.\",\"type"
+    }
+  ]
+}

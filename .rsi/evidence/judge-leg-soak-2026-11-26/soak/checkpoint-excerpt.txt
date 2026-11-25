@@ -1,0 +1,10 @@
+# .tmp/soak/dsh-home/checkpoints/grok-workflow/checkpoint-bcd45b43-79ab-41b6-a2ce-573382c0e032-78a12e81.json
+
+/run/status = "completed"
+/time/durationMs = 161324
+/plan/source = "planner"
+/plan/taskCount = 2
+/plan/tasks = [{"id":"step1_mult","title":"第一步只算12乘12乘法"},{"id":"step2_add","title":"第二步只在第一步结果上加1"}]
+/stages = ["completed","completed","completed"]
+/tasks = [{"id":"step1_mult","status":"verified","attempts":1},{"id":"step2_add","status":"verified","attempts":1}]
+# the checkpoint carries no per-attempt judgeRetried flag (see README §4)

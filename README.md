@@ -352,7 +352,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` runs typecheck, lint, build and **1850 deterministic tests across 98 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the message-path pass-through, the delivery path, the block intake, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, recursion, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+`npm run ci` runs typecheck, lint, build and **1948 deterministic tests across 103 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the message-path pass-through, the delivery path, the block intake, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, recursion, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
 
 ## Security and compatibility
 

@@ -1,3 +1,43 @@
+## 判腿那条被拒的走廊：真机五条判据全中；README 两处门禁数字按本轮实测改成 `103 / 1948` — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：**不改产品代码**。只补一条真机证据 + 订正两份 README 里过期的门禁数字。
+判腿（verifier）那一半「钥匙被拒 → 同一条路由上再问一次」此前只有单测（`judge-leg-retry` 9 条 + 红/绿），
+`auth-retry-2026-11-26` 只跑过规划腿；本轮把判腿**单独**指到拒一次的小代理上，其余四条腿直连。
+
+**命令与结果**：
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npx vitest run` | worktree `.tmp/wt-judge-leg`、`HEAD = c7975cc`（= `main` 尖端、树干净）、独立 `npm ci` | **`Test Files 103 passed (103)` / `Tests 1948 passed (1948)`**、`Duration 101.60s`、`VITEST_EXIT=0` | `.rsi/evidence/judge-leg-soak-2026-11-26/gate-full-suite.out`（214 行 / 15235 字节、`sha256 a4bd7ba0…fd83f`） |
+| `ls test/*.spec.ts \| wc -l` | 同上 | **103** | 同目录 `gate-numbers.txt` |
+| 全量 `npm run ci` | — | **`NOT_RUN`**（§12；这一轮只跑 `vitest run` 一截，为了写 README 那两个数） | — |
+| `typecheck` / `lint` / `build` / `verify:lib` | — | **`NOT_RUN`**：没有代码改动、`lib/` 没重建；装进 soak 的 `lib/` 与工作树**逐字节同哈希**（`233d327e…2e22` / `201f6788…28b7d6` / `689e64ec…2ff4b`） | 同目录 `soak/installed-lib-sha256.txt` |
+| `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak/dsh-home --name judgeleg-clone --force` | 隔离 home，live `~/.dsh` 只读 | `parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、凭据抹掉 1 行 | 同目录 `soak/clone-report.txt` |
+| `dsh plugin --profile judgeleg-clone add file:…0.13.45.tgz` → `list` | `DSH_HOME=.tmp/soak/dsh-home` | `dsh-grok-workflow@0.13.45`、tgz `sha256 8d567305…985ad9` | 同目录 `soak/installed-lib-sha256.txt` |
+| 真机（绿）：`dsh --profile judgeleg-clone --port 3517 --host 127.0.0.1`，headless Chromium + CDP 发一句话 | 判腿独占拒一次小代理 `127.0.0.1:18190` → 真网关 `18088`；其余四条腿直连 | 运行 `bcd45b43`、`05:37:05` 起、`161324 ms`、**12 条子腿**；报告 `Grok workflow: COMPLETED` / `Plan: planner; 2 task(s); 2 verified` / 两行 `verified (1 attempt)`；checkpoint `run.status completed`、`plan.source planner` | `.rsi/evidence/judge-leg-soak-2026-11-26/soak/{agent-legs,verifier-legs,routing-record.json,report,checkpoint-excerpt}.txt` |
+| 真机（红，只为把字面量打出来）：同装置 + `PROBE_ALWAYS=1`（每次都 401） | 同上 | 运行 `d7c1017c`、`93328 ms`、10 条子腿、判腿被拒 4 次、整轮 `FAILED`；审计尾逐字 `Attempt 1 — route … — judge re-fired — not passed`（两次尝试各一行） | 同目录 `soak/refused-report.txt`、`soak/refused/` |
+| 红线 | `~/.dsh` 在工作区外、本会话 `workspace-write` | `~/.dsh` 与 `profiles` 系列 mtime 全在会话开始（05:27）之前；写探测 `: > ~/.dsh/.judge-leg-probe` → **`Read-only file system`**；live 3080 前后都是 **401** | 同目录 `soak/redlines.txt` |
+
+**判腿的五条判据（逐条，全部 `CONFIRMED`）**：
+
+1. **裁判第一次 401**：判腿第一条腿 `检查 · 任务 1`（child `b76ef3b2`）死在 `authprobe` 上，原文
+   `authprobe API error (401): {"message":"401 Unauthorized: virtual key is required. …"}`、`code AUTH`；小代理
+   日志 `seq 1 … -> 401 injected`。
+2. **再问一次回到同一条路由**：同一次尝试里的第二条 `检查` 腿（child `2128a20e`）`request/context` 仍是 `authprobe/…`、`completed`；
+   小代理 `seq 2 … -> forwarded 200`。
+3. **干活腿只跑一次**：任务 1 的 `执行` 腿只出现一次（child `c6fd9e66`）；checkpoint `attempts 1`；报告两行 `verified (1 attempt)`。
+4. **整轮 `completed`**：报告首行 `COMPLETED`、2/2 verified；checkpoint `run.status = "completed"`、三段 stage 全 `completed`。
+5. **路由不记死路**：台账里**只有一行** `verifier / chainIndex 0 / attempt 1 / failed / model-unavailable`，
+   **没有 `chainIndex > 0` 的行**；红的那一跑有 4 行但**全部 `chainIndex 0`** —— 再问一次算同路由的又一次失败，不算换路由。
+
+**红线/失败要照实留的两处**：
+
+- 这次 soak 的**第一次尝试是装置故障**：小代理的模型条目漏了 `reasoningEfforts`，判腿在 provider 层就死
+  （`UNSUPPORTED_REASONING_EFFORT`），**一个 HTTP 都没发出**，那一轮（`7f6292d1`）`failed` 并作废；
+  补上同一份表后重跑。（`soak/first-attempt-rig-fault.txt`）
+- 绿跑**不打印** `judge re-fired` 字面量：它挂在技术审计尾上，而审计尾只随**非 `completed`** 的报告附出
+  （`src/index.ts:282`）。绿跑的等价记录是「同一次尝试里两条判腿」，字面量由红的那一跑（每次都拒）拿到。
+
 ## `0.13.45` 发版收口：唯一一份门禁（发布树 `63793eb`）`GATE_EXIT=0`（`103 files / 1948 tests`、转录 412 行 / 25328 字节），发布身份、两个远端 run、Release 与资产、live 档案写探测都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.45` 已经出去（tag 推了、Release 建了、资产在），

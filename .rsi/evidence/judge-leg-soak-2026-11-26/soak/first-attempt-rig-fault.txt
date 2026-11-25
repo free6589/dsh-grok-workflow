@@ -1,0 +1,17 @@
+# the FIRST attempt of this soak died of a RIG fault, not of product behavior
+# run 7f6292d1-1fcb-4389-87a6-8f03cb02fee1, discarded, scratch home deleted with the soak
+
+## the judge child's own death, verbatim
+{"kind":"error","error":{"message":"pi-ai provider \"authprobe\" model \"opencode-go/muse-spark-1.3-contributor\" does not support reasoning effort \"high\"","code":"UNSUPPORTED_REASONING_EFFORT"}}
+
+## that run's checkpoint
+run.status failed plan.source planner tasks ["mult_12x12","add_one"]
+task rows [{"id":"mult_12x12","status":"failed","attempts":2},{"id":"add_one","status":"failed","attempts":1}]
+
+## the proxy's log proves the judge never reached the wire
+(nothing was logged by the proxy for this run: the call died in the provider layer)
+
+## what was wrong
+the rig's authprobe provider entry declared no reasoningEfforts, and every role is
+pinned to reasoningEffort high, so the provider refused the call before any HTTP.
+fix: the probe model entry now carries the same reasoningEfforts map as bifrost-responses.
