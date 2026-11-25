@@ -1,10 +1,17 @@
 ## 2026-11-25 — `fix/synth-outcome`：汇总结论补上「全被退回 + 最后一次为什么不过」交付、跑绿、**真机验过通过态**，**未合 main、未 push、未发版**；本分支的决定日期是 **2026-11-26**
 
 - **From:** 实现 + 记忆收口（`agent-174/impl-synth-outcome`）· **To:** 操作者 / 下一个接手者
-- **这一轮是什么**：一条 `fix/*` 分支上的收尾，不是发布轮。分支从 `main` 尖端 **`57dcf04`** 长出，**两颗提交**：
-  `5388f22` 主体（脚本标记、读回、事件、折叠、卡片、文案、重建 `lib/`），加一颗证据/文档提交。
-  改动面 36 个文件：`src/` 六个（`script.ts`、`report.ts`、`records.ts`、`run.ts`、`progress-tab.ts`、
-  `client/index.js`）、`lib/` 十九个构建产物、五个 spec、证据目录五个文件。
+- **这一轮是什么**：一条 `fix/*` 分支上的收尾，不是发布轮。分支从 `main` 尖端 **`57dcf04`** 长出，**四颗提交**：
+  `5388f22` 主体（脚本标记、读回、事件、折叠、卡片、文案、重建 `lib/` + 测试）、
+  `4f395c7` 证据（红/绿转录、门禁、真机读数与截图），紧随其后的
+  `docs(memory): record the all-rejected summary outcome and its evidence`（本文档、`CHANGELOG`，以及最终树门禁的转录），
+  再一颗 `docs(memory): correct the commit count and record the final-tree gate`（只改文字：把提交数与改动面改准、补上最终树门禁的转录）。
+  **后两颗在文档里不自指提交号**（一个提交写不出自己的 sha）。
+  **改动面分两段对账**：`57dcf04..5388f22` **36 个文件**（`src/` 六个——`script.ts`、`report.ts`、`records.ts`、
+  `run.ts`、`progress-tab.ts`、`client/index.js`；`lib/` 十九个构建产物；五个 spec；证据目录最初那一份 README 加四件产物）；
+  文档提交再加 **10 个新文件**（`CHANGELOG.md`、六个 `docs/knowledge/*`——`STATE` / `HANDOFF` / `VALIDATION` /
+  `DECISIONS` / `RESEARCH` / `DESIGN-progress-tab`、证据目录三份转录与红记录）并对上面那份 README 追加一节
+  （README 在总量里只算一次）。`57dcf04..HEAD` 合计 **46 个文件**，与 `git diff --stat 57dcf04..HEAD` 对得上。
 - **修的是什么**：闸门此前只记录「通过」——分层策略写 `check=fail verify=pass drafts=N` 却不带理由，
   plain `model` 策略连标记都不写，只剩 `synthesis.error` 的一段散文；于是进度页对「这一轮没交卷」
   只会说那句 `progress.final.missing`。现在 `synthesis.review` 带**结论**：通过仍是
@@ -12,7 +19,7 @@
   `summaryGateOutcome()`，事件是新的 `tool-workflow/summary-rejected`，卡片分成**三态**。
 - **用户能看到的**：交卷卡片不再只有「这一轮没有交卷稿」一句。每一稿都被退回时，它写成琥珀色两块——
   「第 {n} 稿全被退回」和「最后不过：<理由>」，没有名字、没有（定稿）、没有胶囊；交过稿的运行与以前逐字一致。
-- **门禁与算术（`CONFIRMED`）**：最终树上 `TMPDIR=$PWD/.tmp npm run ci` **`EXIT=0`**——
+- **门禁与算术（`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` 跑了三遍、都是 **`EXIT=0`**——代码树 `5388f22`、证据提交 `4f395c7` 上的独立复核、文档提交 `6d8a98f` 的最终树——
   `Found 15 warnings and 0 errors.`、`client bundle: 352002 bytes → lib/client.js`、
   `lib/ at <sha> is the build of src/ at <sha> (285 files, byte-identical)`、**`102 files / 1903 tests`**；
   `node scripts/verify-lib.mjs` 单独跑同句、exit 0；另一遍独立复核在 `4f395c7` 上同样 `EXIT=0`。
@@ -38,7 +45,8 @@
   与插件安装真正相关的 `profiles/web/cordis.patch.yml` 停在 `19:27:31`，没被动过。
 - **给下一个人的三条操作提示**：① 证据在 **`.rsi/evidence/synth-outcome-2026-11-25/`**（README + 两份门禁转录
   + 两份红 + 真机读数与截图 + 会话事件摘录），**引用归档那份，别引用 `.tmp/`**。② 权威数字只有三个地方：
-  `gate-<sha>-docs.out`（最终树）、`gate-5388f22.out`（代码树）、`soak-readings-completed.json`（真机那一次）；
+  `gate-6d8a98f.out`（最终树）、`gate-5388f22.out`（代码树）、`soak-readings-completed.json`（真机那一次），
+  外加 `gate-4f395c7-docs.out`（文档写入后、提交前那一遍；与最终树那一遍同数，两次读都真）；
   记忆里的 `102 / 1903`、`352002`、`285 files` 都能从这三处回指。③ **`test/records.spec.ts` 不存在**——
   记录器的既有用例在 `test/progress.spec.ts`，这一轮新增的记录器规则在 `test/summary-outcome.spec.ts`；
   找「recorder 怎么写事件」别去翻一个不存在的文件。

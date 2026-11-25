@@ -38,6 +38,11 @@ Test Files  102 passed (102)
 `src/` 与 `lib/` 在这一轮一个字节没动，文档提交不改变构建产物；`102 files / 1903 tests` 与代码树同数，
 六个文档守卫都在这一遍里跑过。
 
+文档提交之后的**最终树**又由派单方独立跑了一遍，归档为 `gate-6d8a98f.out`（22235 字节，`sha256` `b2961030…83729`，
+与它留在 `.tmp/foreman-final-ci.out` 的原件 `cmp` 逐字节相同）：`EXIT=0`、`15 warnings / 0 errors`、
+`352002 bytes`、`lib/ at 6d8a98f … (285 files, byte-identical)`、`102 files / 1903 tests`。
+两份转录是**两次不同的读**（一次在文档未提交时、一次在文档提交后），读数一致。
+
 `node scripts/verify-lib.mjs` 单独再跑一次：`lib/ at 5388f22 is the build of src/ at 5388f22 (285 files, byte-identical)`，exit 0。
 
 用例数增量，逐文件（基线 101 文件 / 1884 用例，本分支 102 / 1903，差 +1 文件 / +19）：
