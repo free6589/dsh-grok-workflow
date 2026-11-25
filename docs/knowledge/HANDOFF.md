@@ -1,3 +1,43 @@
+## 2026-11-25 — `0.13.38` 已发布：一次零冲突合流、两次门禁跑绿、标签与 GitHub Release 都在；live 档案升级只剩沙箱这一条 `BLOCKED`
+
+- **From:** 记忆收口（`agent-168/memclose`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：**发布轮，不是代码轮**。`main` 尖端 **`c3d729f`** 上，特性分支 `fix-removed-keys-warn`（尖端 **`b6e8598`**，
+  严格领先 **5 交付 / 0 落后**）在 worktree `.tmp/wt-release-0.13.38` 里真 `--no-ff` 折入：合并提交 **`8f8a463`**
+  `merge: a leftover removed key is ignored and named, not fatal`，父提交 **`c3d729f` + `b6e8598`**，**零冲突**——
+  合并树 `63e3fa819b1f9439c62a21536eeb271668bcae02` 与 `b6e8598^{tree}` 同一个，`git diff --stat b6e8598 8f8a463` 空。
+  其后发布提交 **`8c9b028`** `chore(release): prepare v0.13.38`（**8 文件 / +22 −20**，树 `2bc5d845…`）：`src/` 与 `lib/`
+  只有版本字面量那一对 `'0.13.37'` → `'0.13.38'`，没有一行逻辑。
+- **门禁两次都 `EXIT=0`**（`TMPDIR=$PWD/.tmp npm run ci`，发布 worktree；包工头跑，两份转录本轮**逐行核对**，没有重跑）：
+  `100 files / 1870 tests`、`Found 15 warnings and 0 errors.`、`client bundle: 340426 bytes`、
+  `lib/ … (285 files, byte-identical)`，`96.51s` / `94.56s`。**`8c9b028` 那一遍才是发布门禁。** 逐行读数见
+  `VALIDATION.md` 同日条与 `.rsi/evidence/release-0.13.38-2026-11-25/`。
+- **`main` 是快进前进的**：`git merge --ff-only release/0.13.38`，所以 `main` 尖端**就是**门禁提交、也是标签剥出来的那个
+  （`main` = `v0.13.38^{}` = **`8c9b028`**；远端 `refs/heads/main` 本轮实读同值，推送 `c3d729f..8c9b028  main -> main`）。
+- **远端（`CONFIRMED`，本轮用 `gh` 重读）**：Release 工作流 run **`45594337910`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45594337910 ；`main` 的 CI run **`45594332536`** success
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45594332536 。两个 run 的 head sha 都是 `8c9b028`。
+  Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.38 ，名字 `Grok Workflow for DSH v0.13.38`，
+  发布 **`2026-11-25T10:23:49Z`**，非 draft、非 prerelease，唯一资产 **`dsh-grok-workflow-0.13.38.tgz` = 958707 字节**，
+  正文就是 `## [0.13.38] - 2026-11-25` 那一节（35 行）。
+- **下一个接手的人必须知道（一条，最要紧）**：**残留的被删键从 `0.13.38` 起不再致命**——`mode: triage` 这种行留着，
+  那一行照常激活，只在载入日志点名一次、设置页给一条提示（`D-155`）。所以 `0.13.35`–`0.13.37` 三条升级须知的
+  「**先删掉那一行，再升级**」这个前置条件**已经作废**：现在可以直接升级，删不删都行。谁再把它写回须知，
+  就是把插件自己的历史包袱重新塞回用户手里。
+- **live 档案升级没做，记 `BLOCKED`，而且只剩一条理由**：本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，
+  审批提示在本会话被禁用（不能申请提权），所以**从这里写不进去**。上一轮的第二条理由（「`mode: triage` 还在，装了会让
+  那一行拒载」）在 `0.13.38` 上**已经不成立**。只读实读：那一行 `config:` 下仍写着 `mode: triage`，已装版本 **`0.13.35`**，
+  依赖仍是浮动的 `github:free6589/dsh-grok-workflow`（无标签）。`~/.dsh` size 1548 / mtime 1795362020、`~/.dsh/profiles`
+  size 226 / mtime 1795337986，与上一轮记录同值——**未写、未重载、未重启**，3080 上的实例全程没碰。
+- **收尾状态（按观察到的事实，不按口述）**：这一轮清理**确实做完了**（与上一轮不同）：`git worktree list` 只剩主检出
+  （`/home/fish/projects_mine/dsh-grok-workflow 8c9b028 [main]`），`git branch` 只剩 `main`（外加与发布无关的
+  `backup/*` 三条与 `feat/audit-layer`），`.tmp/wt-release-0.13.38` 与 `.agents/worktrees/fix-removed-keys-warn`
+  都已不在盘上，本地 `release/0.13.38` / `fix-removed-keys-warn` 也已删；远端本来就没有 `release/0.13.38`
+  （`git ls-remote origin 'refs/heads/release*'` 只有 `release/0.13.27`）。主检出剩下的唯一改动是与发布无关的
+  `.gitignore` 本地忽略规则，**从未被暂存**。
+- **一处读数偏差，照实记**：派单说两份转录的抬头都读 `> dsh-grok-workflow@0.13.38 ci`。实读：两份的**第 1 行都是空行**，
+  抬头在第 2 行；`gate-release-8c9b028.out` 读 `@0.13.38`，而 `gate-merge-8f8a463.out` 读 **`@0.13.37`**——这是**对的**，
+  版本号是发布提交才升的，合并提交那棵树仍写着 `0.13.37`（与上一轮 `5c58afd` 读 `@0.13.36` 同形）。门禁结论不受影响。
+
 ## 2026-11-25 — `fix-removed-keys-warn`：被删键改成「忽略 + 点名」（`D-155`），真机激活成立、设置页提示在这台宿主上不可见
 
 - **From:** 实现者（`agent-167/impl-removed-keys`）· **To:** 包工头（`agent-167`）/ 下一个接手者

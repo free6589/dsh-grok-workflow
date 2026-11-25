@@ -1,0 +1,386 @@
+
+> dsh-grok-workflow@0.13.38 ci
+> npm run typecheck && npm run lint && npm run verify:lib && npm test
+
+
+> dsh-grok-workflow@0.13.38 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> dsh-grok-workflow@0.13.38 lint
+> oxlint src test
+
+
+  ! eslint(no-useless-escape): Unnecessary escape character '['
+     ,-[src/redact.ts:290:355]
+ 289 |     name: 'key-value',
+ 290 |     pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|cookie|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+     :                                                                                                                                                                                                                                                                                                                                                                   ^^
+ 291 |     replacement: '$1$2$3[REDACTED]',
+     `----
+  help: Replace `\[` with `[`.
+
+  ! eslint(no-unused-vars): Parameter 'status' is declared but never used. Unused parameters should start with a '_'.
+     ,-[test/delivery.spec.ts:394:38]
+ 393 |     const mk = (tasks: WorkflowReport['tasks']): WorkflowReport => {
+ 394 |       const planTasks = tasks.map(({ status, attempts, error, ...rest }) => rest)
+     :                                      ^^^|^^
+     :                                         `-- 'status' is declared here
+ 395 |       return assertWorkflowReport({
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'attempts' is declared but never used. Unused parameters should start with a '_'.
+     ,-[test/delivery.spec.ts:394:46]
+ 393 |     const mk = (tasks: WorkflowReport['tasks']): WorkflowReport => {
+ 394 |       const planTasks = tasks.map(({ status, attempts, error, ...rest }) => rest)
+     :                                              ^^^^|^^^
+     :                                                  `-- 'attempts' is declared here
+ 395 |       return assertWorkflowReport({
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Parameter 'error' is declared but never used. Unused parameters should start with a '_'.
+     ,-[test/delivery.spec.ts:394:56]
+ 393 |     const mk = (tasks: WorkflowReport['tasks']): WorkflowReport => {
+ 394 |       const planTasks = tasks.map(({ status, attempts, error, ...rest }) => rest)
+     :                                                        ^^|^^
+     :                                                          `-- 'error' is declared here
+ 395 |       return assertWorkflowReport({
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'run' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/waves.spec.ts:249:11]
+ 248 |     )
+ 249 |     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), agent)
+     :           ^|^
+     :            `-- 'run' is declared here
+ 250 |     // `a` spends its bounded retry (maxRetries 1 → two attempts); `b` never runs.
+     `----
+  help: Consider removing this declaration.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new array unnecessarily.
+    ,-[test/unload-drain.spec.ts:50:29]
+ 49 |   emit(name: string, ...args: unknown[]): void {
+ 50 |     for (const listener of [...this.handlers.get(name) ?? []]) listener(...args)
+    :                             ^^^
+ 51 |   }
+    `----
+  help: `for…of` can iterate over iterable, it's unnecessary to convert to an array.
+
+  ! eslint(no-unused-vars): Variable 'runArgs' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/timeout.spec.ts:337:19]
+ 336 |     const deadline = 30_000
+ 337 |     const { args: runArgs, config: runConfig } = argsFor(deadline, { guardianModel: { model: 'guardian-x' } })
+     :                   ^^^|^^^
+     :                      `-- 'runArgs' is declared here
+ 338 |     const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'runConfig' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/timeout.spec.ts:337:36]
+ 336 |     const deadline = 30_000
+ 337 |     const { args: runArgs, config: runConfig } = argsFor(deadline, { guardianModel: { model: 'guardian-x' } })
+     :                                    ^^^^|^^^^
+     :                                        `-- 'runConfig' is declared here
+ 338 |     const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Interface 'TaskRow' is declared but never used.
+     ,-[test/timeout-config.spec.ts:252:13]
+ 251 | 
+ 252 |   interface TaskRow {
+     :             ^^^|^^^
+     :                `-- 'TaskRow' is declared here
+ 253 |     id: string
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'out' is declared but never used. Unused parameters should start with a '_'.
+     ,-[test/progress-hint-absent.spec.ts:177:31]
+ 176 | /** The word-like strings of a stub tree: glyphs and separators are not copy. */
+ 177 | function words(node: unknown, out: string[] = []): string[] {
+     :                               ^|^
+     :                                `-- 'out' is declared here
+ 178 |   return visible(node).filter((text) => /[\p{Script=Han}]|[A-Za-z]{2}/u.test(text))
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Identifier 'LoopError' is imported but never used.
+   ,-[test/iterate.spec.ts:7:3]
+ 6 |   LOOP_TASK_TITLE,
+ 7 |   LoopError,
+   :   ^^^^|^^^^
+   :       `-- 'LoopError' is imported here
+ 8 |   createLoopService,
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'failureClassForCode' is imported but never used.
+    ,-[test/null-collapse.spec.ts:11:3]
+ 10 |   createChildOutcomeLog,
+ 11 |   failureClassForCode,
+    :   ^^^^^^^^^|^^^^^^^^^
+    :            `-- 'failureClassForCode' is imported here
+ 12 |   reclassifyNullCollapses,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'task' is imported but never used.
+    ,-[test/replan.spec.ts:9:21]
+  8 | import type { NormalizedTask } from '../src/types.js'
+  9 | import { execution, task, verification } from './fixtures.js'
+    :                     ^^|^
+    :                       `-- 'task' is imported here
+ 10 | import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Parameter 'draft' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/client/index.js:939:24]
+ 938 |      */
+ 939 |     function comboWarn(draft) {
+     :                        ^^|^^
+     :                          `-- 'draft' is declared here
+ 940 |       return false
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'copied' is declared but never used. Unused variables should start with a '_'.
+      ,-[src/client/index.js:1593:14]
+ 1592 |         : (typeof fetch === 'function' ? fetch.bind(undefined) : undefined)
+ 1593 |       const [copied, setCopied] = useState(false)
+      :              ^^^|^^
+      :                 `-- 'copied' is declared here
+ 1594 |       /**
+      `----
+  help: Consider removing this declaration.
+
+Found 15 warnings and 0 errors.
+Finished in 45ms on 180 files with 96 rules using 6 threads.
+
+> dsh-grok-workflow@0.13.38 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 340426 bytes → lib/client.js
+lib/ at 8c9b028 is the build of src/ at 8c9b028 (285 files, byte-identical)
+
+> dsh-grok-workflow@0.13.38 test
+> npm run build && vitest run
+
+
+> dsh-grok-workflow@0.13.38 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 340426 bytes → lib/client.js
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-0.13.38
+
+ ✓ test/timeout.spec.ts (22 tests) 12150ms
+     ✓ settles a hung call as a timeout and retries the task instead of failing the run  1062ms
+     ✓ extends a stalled call once the guardian says wait, and the child still wins  2506ms
+     ✓ kills the stalled call when the guardian says kill, and the task still retries  1004ms
+     ✓ stops granting waits at the run deadline without asking the guardian again (rule B)  3005ms
+     ✓ broadcasts a rescue line when the guardian says rescue, and grants the slice  2504ms
+     ✓ fails a stalled call straight to retry when no guardian is configured  1004ms
+     ✓ settles a hung call within budget in a realm with no timer at all  1011ms
+ ✓ test/taskboard.spec.ts (26 tests) 8611ms
+     ✓ creates a pending unowned row at version 1 and persists status/owner/deps/version  549ms
+     ✓ walks the full state machine, including blocked requeue to pending  609ms
+     ✓ applies only on a matching expectedVersion and reports both versions on conflict  436ms
+     ✓ concurrent claims on different rows keep both rows (no lost update)  589ms
+     ✓ reopening the same directory recovers status/owner/dependencies/version  473ms
+     ✓ blocks claim while a predecessor is unfinished and releases it when done  1615ms
+     ✓ assign and setDependencies re-check the wiring  399ms
+     ✓ failed rows requeue to pending and keep their dependency gate  364ms
+     ✓ an interrupted write leaves the last committed store authoritative and its temp file inert  333ms
+     ✓ recovers a real board after a writer process is SIGKILLed mid-mutation  962ms
+     ✓ breaks a lock left by a process killed while holding it  442ms
+     ✓ guards a claim after restart with the version that is actually stored  407ms
+ ✓ test/block-supervisor.spec.ts (20 tests) 2968ms
+     ✓ 1 · plan coverage: a criterion no task claims  1023ms
+     ✓ treats a changed handoff as a new attempt  329ms
+ ✓ test/dispatcher.spec.ts (19 tests) 3404ms
+     ✓ resume restores the persisted board from disk  727ms
+     ✓ clears the stale block reason when a blocked task is reassigned  376ms
+     ✓ changes nothing when it refuses a completed task or a verdict write  309ms
+     ✓ never writes a verdict when recording or reassigning a task  1326ms
+ ✓ test/block-tools.spec.ts (23 tests) 3802ms
+     ✓ returns the plan id, the split, the scope and the progress  525ms
+     ✓ vetoes a three-line handoff without spending a model call  310ms
+     ✓ passes a complete handoff through the judge and accepts the block  321ms
+     ✓ returns the same verdict for the same evidence instead of a second line  336ms
+     ✓ judges by default when the row carries no switch at all  349ms
+(node:243) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/planner-resubmit.spec.ts (10 tests) 3239ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1025ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1026ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1011ms
+ ✓ test/checkpoint-wiring.spec.ts (44 tests) 3238ms
+     ✓ writes a running checkpoint with the phases the script actually emitted  340ms
+ ✓ test/checkpoint-schema.spec.ts (38 tests) 2550ms
+     ✓ reads back a payload the writer accepted above the row-count ceiling  311ms
+     ✓ bounds the payload by the file bound minus the integrity record  848ms
+ ✓ test/block-ledger.spec.ts (20 tests) 1641ms
+     ✓ 同一 id 写到第 20 版后，第 21 版报 version-limit 且账本仍是 20 行  626ms
+(node:291) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/dead-routes.spec.ts (24 tests) 2234ms
+     ✓ counts a call that hung, even though a hang does not switch models  2022ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 2657ms
+     ✓ SIGKILLs a run mid-task, then restarts from disk with exactly-once completion and preserved evidence  2187ms
+     ✓ refuses to restart, and executes nothing, when the evidence a checkpoint names no longer matches  316ms
+(node:334) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run with no extra child calls from the resume scan
+[smoke] status=completed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-0.13.38/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-fc4a3eef-79ec-4bbe-abfa-88b0114c250c-cb257852.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-0.13.38/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-9f40c960-5121-436a-89d2-1a0834cb2338-6daebc43.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (6 tests) 2059ms
+     ✓ records a verified run with no extra child calls from the resume scan  399ms
+     ✓ carries this session's cancelled checkpoint into the next run  314ms
+     ✓ starts fresh when the leftover may still be live  323ms
+     ✓ lets an explicit caller carry-over outrank the leftover  527ms
+ ✓ test/plugin-lifecycle.spec.ts (19 tests) 1858ms
+     ✓ registers the tool and prompt section, then executes through the workflow engine  301ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 1843ms
+     ✓ records what it cancelled before it cancels it  349ms
+     ✓ keeps a process-wide backstop and names the sessions holding it  302ms
+ ✓ test/checkpoint-bound.spec.ts (5 tests) 1632ms
+     ✓ measures the integrity record and derives the payload ceiling from it  668ms
+     ✓ writes at the payload ceiling and reads the file back intact  392ms
+     ✓ refuses one payload byte above the ceiling as too large  553ms
+ ✓ test/block-preview.spec.ts (93 tests) 1388ms
+ ✓ test/m3-intake.spec.ts (19 tests) 883ms
+ ✓ test/objective-limit.spec.ts (12 tests) 1429ms
+     ✓ accepts a 4000-character objective and returns a report carrying it whole  354ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 985ms
+ ✓ test/delivery-human-block.spec.ts (46 tests) 1200ms
+     ✓ stays inside the cap for every knob, in both language orders  576ms
+ ✓ test/timeout-config.spec.ts (12 tests) 949ms
+     ✓ fires a configured 3600000 ms deadline with a Timeout report naming the bound  319ms
+(node:446) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 979ms
+     ✓ records which summary draft the run shipped, and nothing when no draft passed  302ms
+ ✓ test/unload-drain.spec.ts (5 tests) 1014ms
+     ✓ settles the child call already running before it cancels the run  359ms
+(node:474) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/experience-pack.spec.ts (26 tests) 676ms
+     ✓ closes the delivered block and records the settlement on the report  325ms
+(node:486) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (20 tests) 759ms
+ ✓ test/dispatcher-board.spec.ts (4 tests) 1087ms
+     ✓ persists creates to store.jsonl (never board.json) and reloads them  374ms
+     ✓ keeps a mark-blocked reason across a reload via the board detail  354ms
+ ✓ test/board-reader.spec.ts (2 tests) 671ms
+     ✓ maps in_progress→running and failed→blocked with the detail as blockedReason  646ms
+ ✓ test/guardian.spec.ts (29 tests) 661ms
+(node:553) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:553) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:553) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/block-flag.spec.ts (11 tests) 642ms
+ ✓ test/heartbeat-guard.spec.ts (15 tests) 664ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+ ✓ test/client.spec.ts (150 tests) 441ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 234ms
+(node:1138) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/null-collapse.spec.ts (29 tests) 224ms
+ ✓ test/profile-clone.spec.ts (6 tests) 390ms
+ ✓ test/reliability.spec.ts (19 tests) 430ms
+ ✓ test/issue-watch.spec.ts (2 tests) 278ms
+ ✓ test/config-limits-repair.spec.ts (28 tests) 252ms
+ ✓ test/waves.spec.ts (28 tests) 256ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 250ms
+(node:1443) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/naming-sequence.spec.ts (6 tests) 248ms
+ ✓ test/iterate-plan.spec.ts (21 tests) 242ms
+ ✓ test/orchestrator.spec.ts (26 tests) 221ms
+ ✓ test/command.spec.ts (27 tests) 205ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 200ms
+ ✓ test/paths.spec.ts (18 tests) 186ms
+ ✓ test/update-entry.spec.ts (20 tests) 161ms
+ ✓ test/routing.spec.ts (25 tests) 162ms
+ ✓ test/synthesis-guardrails.spec.ts (18 tests) 157ms
+ ✓ test/loader.spec.ts (3 tests) 144ms
+(node:1609) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 145ms
+(node:1617) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 138ms
+ ✓ test/wave4-acceptance.spec.ts (8 tests) 136ms
+ ✓ test/inheritance.spec.ts (16 tests) 132ms
+ ✓ test/report-audit.spec.ts (13 tests) 133ms
+ ✓ test/block-flag-baseline.spec.ts (14 tests) 130ms
+ ✓ test/carryover.spec.ts (22 tests) 127ms
+ ✓ test/final-answer-rewrite.spec.ts (12 tests) 125ms
+ ✓ test/config.spec.ts (50 tests) 117ms
+ ✓ test/redact.spec.ts (47 tests) 110ms
+ ✓ test/captain-memory.spec.ts (8 tests) 105ms
+ ✓ test/loop-surface.spec.ts (21 tests) 100ms
+ ✓ test/verifier-resubmit.spec.ts (8 tests) 90ms
+ ✓ test/judge-leg-retry.spec.ts (8 tests) 88ms
+ ✓ test/naming.spec.ts (18 tests) 85ms
+(node:1730) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 86ms
+ ✓ test/replan.spec.ts (17 tests) 80ms
+ ✓ test/mode-surface.spec.ts (25 tests) 77ms
+ ✓ test/loop.spec.ts (35 tests) 72ms
+ ✓ test/loop-brakes.spec.ts (33 tests) 74ms
+ ✓ test/update-surface.spec.ts (29 tests) 68ms
+ ✓ test/compact-step-pairing.spec.ts (7 tests) 61ms
+ ✓ test/records-redaction.spec.ts (3 tests) 56ms
+(node:1789) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1789) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:1789) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/composition.spec.ts (8 tests) 51ms
+ ✓ test/delivery.spec.ts (15 tests) 28ms
+ ✓ test/report.spec.ts (45 tests) 25ms
+ ✓ test/progress-tab.spec.ts (48 tests) 28ms
+ ✓ test/config-removed-keys.spec.ts (7 tests) 21ms
+ ✓ test/progress-connector.spec.ts (19 tests) 21ms
+ ✓ test/settings-projection.spec.ts (4 tests) 21ms
+ ✓ test/heartbeat-identity.spec.ts (16 tests) 22ms
+ ✓ test/resume-validator.spec.ts (20 tests) 14ms
+ ✓ test/docs-config-keys.spec.ts (14 tests) 16ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 17ms
+ ✓ test/report-ledger-parity.spec.ts (8 tests) 15ms
+ ✓ test/panel-links.spec.ts (16 tests) 14ms
+ ✓ test/progress-hint-absent.spec.ts (6 tests) 13ms
+ ✓ test/mode.spec.ts (16 tests) 12ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+ ✓ test/handoff.spec.ts (15 tests) 11ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 11ms
+ ✓ test/iterate.spec.ts (9 tests) 11ms
+ ✓ test/docs-version.spec.ts (8 tests) 11ms
+ ✓ test/config-notices-route.spec.ts (8 tests) 8ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/child-evidence.spec.ts (15 tests) 7ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/intake.spec.ts (9 tests) 6ms
+ ✓ test/upstream.spec.ts (8 tests) 6ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+
+ Test Files  100 passed (100)
+      Tests  1870 passed (1870)
+   Start at  18:19:55
+   Duration  94.56s (transform 2.37s, setup 0ms, import 7.98s, tests 75.31s, environment 11ms)
+
+EXIT=0
