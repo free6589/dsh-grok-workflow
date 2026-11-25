@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **The boundary planner now sees what already settled, with each verdict and title / 波边界那个规划子现在真的看得到已经沉淀的任务，连判决和标题一起** —
+  A run that reaches a wave boundary asks the same planner to fold any new demand into the waves that have not started, and the prompt hands it
+  the settled half of the plan as a list. That list was built from a bare id → status map while the prompt printed each row's verdict and title,
+  so on a live machine every settled line read `- count-agents [undefined] `: the boundary child could not tell which tasks had passed, what they
+  were called, or what they produced evidence for. It now receives the settlement rows themselves, so every settled line reads
+  `- count-agents [verified] Count the agents` — the verdict and the title the plan gave the task. What the user sees: a demand added while a run
+  is working is judged against a plan whose finished half is visible to the planner instead of a blank, so it is less likely to be merged onto a
+  settled task or to miss a dependency on one. **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 一次运行走到波边界时，会请同一位规划子把新要求并进还没开始的波，提示词里把计划已经沉淀的那一半列出来。这一列以前由「编号 → 状态」
+  的纯字符串表拼出来，而提示词读的是每一行的判决与标题，于是在真机上每一行都读作 `- count-agents [undefined] `：边界子看不出哪些任务过了、
+  它们叫什么、为哪些内容留下过证据。现在传的是结算行本身，所以每一行读作 `- count-agents [verified] Count the agents`——判决和计划给它的标题都在。
+  用户看到的：跑中加进来的要求，是拿一份「做完的那一半看得见」的计划来判的，而不是对着空白判，因此更不容易被并到已沉淀的任务上、
+  也不会漏掉对它们的依赖。**升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.44] - 2026-11-26
 
 ### Fixed / 修复

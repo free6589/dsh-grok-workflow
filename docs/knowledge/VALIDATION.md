@@ -1,3 +1,49 @@
+## `fix/settled-rows`：边界子的 `SETTLED TASKS` 从 `[undefined] ` 变成「判决 + 标题」，红先绿后，真机两道边界都读对 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`fix/replan-shape` 在真机上记下的那条观察（`.rsi/evidence/replan-shape-2026-11-26/README.md` §8）。
+调用点把 `statuses`（`Record<id, string>`）交给 `requestReplan`，而 `replanPrompt` 按 `row.status` / `row.task.title`
+读，于是每一行印成 `- count-agents [undefined] `。修法：调用点交**结算行本身**；`requestReplan` 形参改名 `settledRows`、
+原样传给 `replanPrompt`（**渲染一行没改**）；`mergeReplan` 要的状态在 `requestReplan` 里**从同一批行派生**，
+**`src/replan.ts` 一个字没动**。
+
+**命令与结果（`CONFIRMED`：都在 worktree `.tmp/wt-settled-rows` 的同一棵树上跑，转录在 `.rsi/evidence/settled-rows-2026-11-26/`）**：
+
+| 命令 | 环境 | 结果 | 转录 |
+| --- | --- | --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | 工作树 | `TSC_EXIT=0`（无输出） | `gate-typecheck.out` |
+| `npx oxlint src test` | 工作树 | `Found 15 warnings and 0 errors.` / `184 files` / `LINT_EXIT=0` | `gate-lint.out` |
+| `TMPDIR=$PWD/.tmp npx vitest run test/replan.spec.ts test/naming-sequence.spec.ts test/steering-inbox.spec.ts` | 工作树 | **`Test Files 3 passed (3)` / `Tests 45 passed (45)`** / `SPECS_EXIT=0` | `gate-specs.out` |
+| `TMPDIR=$PWD/.tmp npm run build` | 工作树 | `client bundle: 348559 bytes → lib/client.js` / `BUILD_EXIT=0`；`lib/script.js` **265049 字节**、`sha256 233d327e…2e22` | `gate-build.out` |
+| 红：`git stash push -- src` 后只跑新用例 | 基线 `d6c338e` 的 `src/` | **`1 failed | 24 skipped`**，`expected '- a [undefined] ' to be '- a [verified] Task a'` / `RED_EXIT=1` | `red-before-fix.out` |
+| `npm run ci`（全量） | — | **`NOT_RUN`**（§12，留给发版提交） | — |
+| `node scripts/verify-lib.mjs` | — | **`NOT_RUN`**（它比对 `HEAD` 的 `src/`↔`lib/`；按要求由产品提交之后那一遍覆盖） | — |
+
+**顺序说明**：这一轮是**先写用例、后修**，红不是在修好之后用 stash 补造出来的——用例写进树里、源码还没改时
+先跑了一遍才动 `src/script.ts`；上面那份 `red-before-fix.out` 是同一件事留档的那一遍（`git stash push -- src`
+把源码临时退回 `d6c338e`，跑完立刻 `git stash pop`）。
+
+**真机（`CONFIRMED`，隔离档案、真模型、只跑「边界提示词」这一态）**：
+
+| 读数 | 值 | 出处 |
+| --- | --- | --- |
+| 装置 | `clone-profile.mjs` 克隆 live `web` 档案（`settled-clone`），只删 `mode: triage`、把 `agent-default-model` + 五个角色 + `guardianModel` 钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`；`DSH_HOME=.tmp/soak/dsh-home`、端口 3487；headless Chromium + 上一轮 CDP 驱动 | `soak/clone-report.txt` |
+| 装的是本轮的包 | `dsh-grok-workflow@0.13.44`；`lib/script.js` 与工作树逐字节同哈希（`233d327e…2e22`、265049 字节） | `soak/installed-lib-sha256.txt` |
+| 运行 | `tool/call` seq 19 `grok_workflow`（不传 `tasks`，让插件自己规划三波）；`run-end stopReason completed`；`tool/result` 读作 `Plan: planner; 3 task(s); 3 verified` | `soak/root-tool-and-result.txt` |
+| 边界 1（`规划（第2次）`） | `- count_readme [verified] 统计 README.md 行数` | `soak/boundary-settled-lines.txt` |
+| 边界 2（`规划（第3次）`） | `- count_readme [verified] …` / `- count_changelog [verified] …` | 同上 |
+| `undefined` | 两份边界提示词里**都不出现** | 同上 |
+| 界面 | 「已完成，用时 5分40秒」+ 三波全 `verified` | `soak/done-transcript.txt` |
+
+**这一轮没做的（`NOT_RUN` / 边界）**：全量门禁、`verify:lib`（见上）；真机上「合并被拒 / 边界子补丁式编辑」
+两态（合并器契约没改、单测覆盖）；`SETTLED TASKS` 的 `- none` 分支（要有边界而一个任务都没沉淀）；
+合 `main`、push、打 tag、发版、live 档案升级（都没做）。
+
+**红线（实测）**：`~/.dsh` / `profiles` / `profiles/web` / `cordis.patch.yml` / `.credentials.yaml` 的 mtime
+全在本会话之前、前后同值；写探测 `: > ~/.dsh/.settled-rows-probe` → `Read-only file system`；
+live 3080 soak 前后都是 **401**；scratch `.tmp/soak`（275 MB）整棵删除、3487 与 9223 已关（`soak/red-lines.txt`）。
+
+---
+
 ## `0.13.44` 发版收口：唯一一份门禁（发布树 `7cc4a90`）`GATE_EXIT=0`（`103 files / 1947 tests`），提交的 `lib/` 就是它自己 `src/` 的构建；附注标签、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.44` 已经出去（tag 推了、Release 建了、资产在），

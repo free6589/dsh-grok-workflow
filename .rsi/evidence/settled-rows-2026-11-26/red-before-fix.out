@@ -1,0 +1,57 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-settled-rows
+
+(node:80) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/replan.spec.ts (25 tests | 1 failed | 24 skipped) 100ms
+     ↓ adds a task as its own wave and keeps the plan version moving
+     ↓ updates and removes only unstarted tasks
+     ↓ refuses to touch a settled task, naming why
+     ↓ refuses to touch a running task: in-flight work continues
+     ↓ refuses a stale version instead of merging into the wrong plan
+     ↓ re-orders the remaining waves when the boundary says so
+     ↓ refuses an order that drops or invents a task
+     ↓ refuses a dependency that points at the same or a later wave
+     ↓ keeps the wave ceiling and the task ceiling enforced
+     ↓ emits the guest source and evaluates it to the same function
+     ↓ reads a task body written beside "action" (a live boundary wrote one there)
+     ↓ hands every queued demand to the pull tool once
+     ↓ drops the oldest demand past the queue bound and counts it
+     ↓ answers an unknown token with an empty list instead of failing
+     ↓ closes the session channel with the run
+     ↓ closes only its own token, so an older run cannot unsteer a newer one
+     ↓ runs the merged task in the next wave and never re-runs settled work
+     ↓ continues on the old plan when the merge is refused, and says why
+     ↓ stays completely inert when the run carries no replan channel
+     ↓ lifts a task body written beside "action" and runs the added task
+     ↓ refuses the same answer for the content it never wrote, not for where it wrote it
+     × prints each settled row with its verdict and its title, and no "undefined" 98ms
+     ↓ hands the boundary planner the live token, then closes the queue with the run
+     ↓ keeps the payload byte-identical for a caller that asks for no channel
+     ↓ opens nothing when the live replan switch is off, even with a session named
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/replan.spec.ts > script: the boundary prompt names what already settled > prints each settled row with its verdict and its title, and no "undefined"
+AssertionError: expected '- a [undefined] ' to be '- a [verified] Task a' // Object.is equality
+
+Expected: "- a [verified] Task a"
+Received: "- a [undefined] "
+
+ ❯ test/replan.spec.ts:494:25
+    492|     // reads carries both the verdict and the title the plan gave it.
+    493|     const settledLine = boundary!.prompt.split('\n').find(line => line…
+    494|     expect(settledLine).toBe('- a [verified] Task a')
+       |                         ^
+    495|     expect(boundary!.prompt).not.toContain('undefined')
+    496|     expect(run.report.tasks.map(row => row.status)).toEqual(['verified…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 skipped (25)
+   Start at  04:54:55
+   Duration  1.36s (transform 1.01s, setup 0ms, import 1.13s, tests 100ms, environment 0ms)
+
+RED_EXIT=1

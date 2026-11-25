@@ -4751,3 +4751,44 @@ spine 为空，pre-fix 形状会进脊柱。
   运行 `818754a2…` 读作 `Plan: planner; 2 task(s); 2 verified` + `COMPLETED`，两次规划子会话的 `request/context`
   都是 `authprobe/opencode-go/muse-spark-1.3-contributor`（同一条路由），小代理日志 `seq 1 → 401`、`seq 2/3/4 → 200`
   （`.rsi/evidence/auth-retry-2026-11-26/soak/`）。
+
+## D-165 · 边界子读的就是结算行本身；给合并器的那份状态在 `requestReplan` 里从同一批行派生（2026-11-26，未发版）
+
+- **Date:** 2026-11-26
+- **Context:** 波边界的提示词（`replanPrompt`）按 `row.status` 与 `row.task.title` 逐行印出已沉淀任务，
+  而调用点（`runWaves`）以前先拼一份 `statuses`（`Record<id, string>`）再交给 `requestReplan`。两份形状对不上：
+  字符串上取 `.status` 与 `.task` 都是 `undefined`，于是真机提示词里每一行读作 `- count-agents [undefined] `
+  （`.rsi/evidence/replan-shape-2026-11-26/README.md` §8 记下，当时判定与本轮改动无关、留给下一块）。
+  边界子因此看不到已沉淀任务的判决与标题，只能靠编号和它自己的记忆判断哪些能做、哪些不能碰。
+- **Decision:**
+  1. **调用点交结算行本身**：`requestReplan(w, remaining, settled, version)`——`settled` 就是
+     `Record<id, { task, status, attempts… }>`，与提示词读的字段是同一批对象，中间不再经过一次投影。
+  2. **只改签名与传参，不改渲染**：`requestReplan` 的形参改名 `settledRows` 并在注释里写清形状；
+     `replanPrompt` 的循环与文案一个字没动（"渲染不用改"）。
+  3. **合并器仍然只吃状态**：`mergeReplan` 的契约（`settled: Record<id, TaskStatus>`）不变、`src/replan.ts` 一个字没动；
+     给它的那份状态改在 `requestReplan` 里**从同一批行派生**，所以只有一处来源，不会再出现「提示词一份、合并一份」。
+  4. **测试用真引擎**：`test/replan.spec.ts` 新增一例 `runReal`（真引擎 + 孪生 + 生成的脚本，模型是脚本化的），
+     断言边界子提示词里那一行读作 `- a [verified] Task a`、且整份提示词不含 `undefined`。
+- **Alternatives rejected:**
+  - **让 `replanPrompt` 对两种形状都做防御读取（`typeof row === 'string' ? row : row.status`）。** 那是把一次调用点的错
+    永久写进渲染层，之后每一份提示词都要同时维护两个契约，而真正的问题（调用点传错）还在。
+  - **给 `requestReplan` 同时传行与状态（两个参数）。** 两份数据可以各自漂移，正是这次事故的形状；
+    一份行、一处派生更窄。
+  - **改 `mergeReplan` 让它接受整行。** 合并器是纯函数、契约被 `test/replan.spec.ts` 的合并 API 用例钉住；
+    为了一个调用点的形状去改它的入参，会牵动 `replanMergeSource()` 生成的那份源码（脚本与宿主两侧共用），
+    收益为零——状态本来就能从行里一眼读出来。
+- **Consequences / 已知边界（照实记）：**
+  1. **提示词变长**：每行多了标题（最多与已沉淀任务数同阶），**子调用数不变**，也不新增任何一次调用。
+  2. **行的字段一旦变化，提示词与合并器同时看到**：派生在 `requestReplan` 里做，所以「行里有什么」是唯一真相；
+     将来若要印更多字段（例如 `attempts` 次数），改渲染即可。
+  3. **未在真机上重跑「合并被拒 / 补丁式编辑」两态**：本轮只跑了「两波边界、都 `none`」这一态
+     （`settled 2 行都 verified`）；合并路径由单测覆盖，理由与上一轮 `fix/replan-shape` 相同（§12：一块只跑改到的状态）。
+  4. **`SETTLED TASKS` 的「none」分支没在真机上出现**：它要有边界而一个任务都没沉淀才看得到，本轮的三波运行第一道边界
+     时 `count_readme` 已经 verified。
+- **Evidence:** 红：`git stash push -- src` 只跑新用例 → **`1 failed | 24 skipped`**，读作
+  `expected '- a [undefined] ' to be '- a [verified] Task a'`（`.rsi/evidence/settled-rows-2026-11-26/red-before-fix.out`）。
+  绿：`test/replan.spec.ts` **25 passed**（整份）、另跑 `naming-sequence` + `steering-inbox` 共 **3 files / 45 tests**。
+  真机（隔离档案 `settled-clone`、真模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、端口 3487、
+  live 3080 全程没碰）：`Plan: planner; 3 task(s); 3 verified`、`COMPLETED`，两道边界子的提示词读作
+  `- count_readme [verified] 统计 README.md 行数` 与 `- count_readme [verified] … / - count_changelog [verified] …`，
+  两份提示词都不含 `undefined`（`.rsi/evidence/settled-rows-2026-11-26/soak/boundary-settled-lines.txt`）。
