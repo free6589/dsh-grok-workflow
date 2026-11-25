@@ -1,3 +1,60 @@
+## 边界子的请求单（`fix/replan-shape`）：写在 `action` 旁边的任务字段被提到 `task` 里、缺的字段照旧拒绝并点名；真机上 `plan.version` 1 → 2、`addedTaskIds` 含 `task-4`、那条任务随后跑完并验过 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮的问题**：上一轮真机证明投递链通了，但边界子给出的 `add` 编辑把字段写在编辑层、没有 `task` 体，
+宿主按 `replan edit 1 adds a task with no body` 整条拒掉——运行本身 `COMPLETED`，计划没动。
+
+**改法（`D-163`，两个 `src/` 文件）**：
+
+- **`REPLAN_SCHEMA`**：`edits.items` 从一团 `{type:'object'}` 换成三分支 `oneOf`（`add` / `update` / `remove`）。
+  `add` 要求 `task` 存在且必填 `id/title/objective/expectedOutput/acceptanceCriteria`；字段、`edits`、`order` 各带说明
+  （"任务自己的字段属于 `task` 里面"）。这一层由宿主的 `structured_output` 参数校验**强制执行**，所以错形状在工具调用
+  那一刻就被拒、错误回到子代理手里，它可以在同一条会话里改。
+- **提层容忍**：`src/script.ts` 的 `replanEditBody(edit, keepId)` 与 `src/replan.ts` 合并器源码里的 `editBody(edit, keepId)`
+  共用同一份字段表（`id/title/objective/expectedOutput/acceptanceCriteria/context/constraints/writesPaths/dependsOn`）；
+  写在 `action` 旁边的体被提到 `task` 里，`update` 不提编辑层的 `id`（那里它是目标）。**提层不补内容**。
+- **拒绝语点名**：`adds an invalid task (missing or unusable: expectedOutput, acceptanceCriteria)`。
+- **提示词**：RULES 多两条（字段属于 `task`；`dependsOn` 只写本提示词印出来的 id）＋一条逐字可抄的完整 `apply` 例子。
+- **没做的**：合并被拒后的重投（`D-163` rejected 里写了为什么）、给未知依赖做「静默丢掉」的宽容（会得到「没有依赖」这个
+  最危险的默认）。
+
+**块内门禁（`CONFIRMED`）**：`npx tsc -p tsconfig.json --noEmit` `TSC_EXIT=0`；`npx oxlint src test`
+`Found 15 warnings and 0 errors.` / `184 files`；定向 7 份 spec（`replan` `block-tools` `naming-sequence`
+`planner-resubmit` `steering-inbox` `composition` `report-audit`）**`98 passed`**；六份文档守卫 **`82 passed`**；
+`npm run build` `client bundle: 348559 bytes`。**红**：`git stash push -- src` 退回 `main` 只跑 `test/replan.spec.ts`
+→ **`3 failed | 21 passed`**（`red-before-fix.out`），恢复后 `24 passed`。转录在 `.rsi/evidence/replan-shape-2026-11-26/`。
+全量 `npm run ci` **`NOT_RUN`**（§12）。
+
+**schema 子集（`CONFIRMED`，一次探针）**：把生成的 `REPLAN_SCHEMA` 交给真的 `assertObjectJsonSchema`
+（`@deepseek-ai/dsh-tools`）→ `SCHEMA_SUBSET_OK; oneOf branches = 3`。宿主只认
+`type/oneOf/properties/required/additionalProperties/items/enum/const` ＋注解；`maxItems` / `anyOf` / `pattern` 会让整条调用
+变成设置故障。原件 `schema-subset.out`。
+
+**真机（`CONFIRMED`，隔离档案 `replan-clone`、端口 3413、live 3080 全程没碰）**：装本轮 tgz
+（`lib/script.js` `2f37be12…f7bdb`、`lib/replan.js` `db776e66…f7f73`，与工作树逐字节相同），
+headless Chromium + 上一轮那份 CDP 驱动跑「三波数行数」并按 Ctrl+Enter 插话：
+
+- 根会话 `tool/call` seq 19、`agent/inbox/spliced`（target `next-step`）seq 33，两者之间没有 `tool/result`；
+- 边界子（`规划（第2次）· 波 1 边界`，session `7a60703f`）`grok_replan_intents`（token `steer-mwwi1v6s-1`）返回
+  `{"intents":[{"id":"steer-mwwi1v6s-1-1",…,"atMs":1795633928748}],"dropped":0}`，与 splice 差 **1 ms**；
+- 它的 `structured_output`：`{"action":"apply","edits":[{"action":"add","task":{…五个必填字段…,"dependsOn":["count-changelog"]}}]}`；
+- 下一道边界子（`1843bcfb`）的提示词读作 **`CURRENT PLAN VERSION: 2`**，`UNSTARTED TASKS` 里多出
+  **`wave 4: task-4 "报告 CHANGELOG 与 README 行数差值" dependsOn count-changelog`**；第三道（`cb35333f`）同版本、只剩 `wave 4: task-4`；
+- 报告 `Plan: planner; 4 task(s); 4 verified`、`Wave 4/4: - task-4: verified (1 attempt)`、`stopReason completed`；
+  `memory/grok-workflow/experience.md` 记 `verified 4/4`。被并进去的那句话仍按普通一轮被回答（`4287 − 396 = 3891`）。
+
+**判据**：`plan.version = 2` ✔、`addedTaskIds` 含 `task-4` ✔（`task-4` 随后真的执行并验收）。
+读数原件：`soak/boundary-chain.txt`、`soak/root-splice-and-report.txt`、`soak/w5-done.txt`、`soak/shots/`。
+
+**一条观察，照实记（与本轮改动无关，没修）**：真机提示词里 `SETTLED TASKS` 每行读作 `- count-agents [undefined] `。
+`requestReplan` 拿到的是 `statuses`（`Record<id, status>`），而 `replanPrompt` 按 `row.status` / `row.task.title` 读，
+所以边界子看不到已沉淀任务的状态与标题。要么改那行读取、要么把整行传进去——独立的小活。
+
+**红线（实测）**：`~/.dsh` `2026-11-25 23:14:14`、`~/.dsh/profiles` `2026-11-22 16:59:46`、
+`profiles/web` 与 `cordis.patch.yml` `2026-11-25 23:04:40`、`.credentials.yaml` `2026-11-14 22:47`（全在本会话之前，前后同值）；
+写探测 `Read-only file system`；live 3080 前后 **401**，没重启没重载没 kill；scratch **273 MB** 用完整棵删除。
+密钥只用布尔存在性判断（`BIFROST_VIRTUAL_KEY` 存在、`AGENT2API_API_KEY` 不存在，所以隔离档案的角色钉到 `bifrost-responses`），
+没有读值、没有打印、没有写进任何文件。
+
 ## 跑中插话的入口（`feat/inbox-steering`）：宿主那条 `agent/inbox/inserted` 在工具调用**跑着**的时候就发，插件据此把话排进那次运行的队列，真机上边界子真的取到了；**`replan` 关掉仍什么也不排**；块内 `typecheck` / `lint` / 6 份 spec 绿、红有记录 — 2026-11-26 (`CONFIRMED`)
 
 **这一轮的问题**：`D-161` 把活通道接回 `runWorkflow` 之后，管道通了却没有活的调用方（`grok_workflow` 占着那一轮、

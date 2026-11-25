@@ -1779,3 +1779,22 @@ boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`）
 读回入口在 `src/report.ts`：`shippedSummaryDraft(review)` 仍只认通过形式（既有调用方不变），
 `summaryGateOutcome(review)` 认两种结论并带出 stage 与理由。标记本身由 `src/script.ts` 的两处闸门写入：
 通过 `check=pass verify=pass drafts=N`，退回 `… drafts=N reason=<一行，≤300>`。
+
+## 2026-11-26 · 边界子的 `structured_output` 参数 schema 是宿主强制的，可用的 JSON Schema 是一个封闭子集（`CONFIRMED`，读源码）
+
+写 `REPLAN_SCHEMA` 之前必须先知道两件事，两件都在安装树里读到了：
+
+- **谁校验**：子代理的 `structured_output` 工具在 `@deepseek-ai/dsh-subagent/lib/index.js` 里由
+  `attachStructuredRuntime(childCtx, schema, canComplete)` 挂上；`schema` 是调用方（这里是工作流脚本 `agent(prompt, {schema})`）
+  给的那一棵。参数不合 schema 时工具执行失败、错误回到子代理自己手里（同一条会话里可以改），值不会被 `captured`；
+  一次都没captured 时父侧的 `agent()` 解析成 `null`，脚本按 `format-error` 处理。
+- **哪些关键字能用**：`@deepseek-ai/dsh-tools` 的 `assertSupportedJsonSchema` / `assertObjectJsonSchema`
+  （`lib/shared-DGx6D7zk.js`）只认 `type` / `oneOf` / `properties` / `required` / `additionalProperties` / `items` / `enum` / `const`
+  ＋注解 `description` / `title` / `default` / `examples`。**`maxItems`、`minItems`、`anyOf`、`allOf`、`pattern`、`format` 都不在其中**，
+  写进去会让整条调用变成设置故障（`JsonSchemaError`，子代理根本不会起）。`oneOf` 要求至少两个分支，且旁边只能有注解键
+  （`properties` / `required` / `additionalProperties` / `items` / `enum` / `const` 一律不许）。`required` 里的每个名字必须在
+  同层的 `properties` 里声明过。
+
+于是「三种编辑各写各的形状」只能用 `oneOf` 表达（`src/script.ts` 的 `REPLAN_EDIT_SCHEMAS`），「最多 16 条编辑」只能在脚本与
+合并器里校验，不能在 schema 里写。读回验证：把本轮的 `REPLAN_SCHEMA` 交给真的 `assertObjectJsonSchema` 得
+`SCHEMA_SUBSET_OK; oneOf branches = 3`（探针在 `.rsi/evidence/replan-shape-2026-11-26/`）。

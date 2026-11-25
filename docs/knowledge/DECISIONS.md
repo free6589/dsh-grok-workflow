@@ -4648,3 +4648,59 @@ spine 为空，pre-fix 形状会进脊柱。
   `grok_replan_intents` 取走、`replan` 关时什么也不排），红：把 `installSteeringInbox` 换成空实现 → **`14 failed`**
   （`.rsi/evidence/inbox-steering-2026-11-26/red-before-fix.out`）。真机读数见同目录 `probe/`（探针 bundle、事件流、
   根会话 splice 的 target 与 seq）。
+
+## D-163 · 边界子写下的任务字段提一层就认，缺的字段照旧拒绝并点名（2026-11-26，未发版）
+
+- **Date:** 2026-11-26
+- **Context:** `D-162` 把跑中插话的入口接上之后，真机上第一道边界真的取到了要求（拉取工具返回非空、`atMs` 与
+  `inserted` 同一毫秒），但计划没被改：边界子给出的 `{"action":"apply","edits":[…"action":"add","id":"task-4",
+  "title":…,"objective":…,"dependsOn":["changelog_count"]]}` 把任务自己的字段写在**编辑层**、没有 `task` 体，
+  宿主按 `replan edit 1 adds a task with no body` 整条拒掉（`src/script.ts` 的既有规则）。读数留在
+  `.rsi/evidence/inbox-steering-2026-11-26/soak-pull-and-merge.txt`。放进代码里看，是两层毛病叠在一起：
+  ① `REPLAN_SCHEMA` 里 `edits` 只是 `{type:'array',items:{type:'object'}}`——一个字都没说任务字段该放哪，
+  于是模型自己挑了一个层级；② 就算提到 `task` 里，那条回答也缺 `expectedOutput` 与 `acceptanceCriteria`，
+  依赖还指向 `changelog_count`（那是标题里的说法，不是任务 id）。**形状问题是我们的**，内容问题是模型的，两者要分开答。
+- **Decision:**
+  1. **形状写进 schema，不靠提示词暗示。** `edits.items` 改成三分支 `oneOf`（`add` / `update` / `remove`）：
+     `add` 要求 `task` 存在且带 `id/title/objective/expectedOutput/acceptanceCriteria`，`update` 要求 `id` 与
+     `task` 字段袋，`remove` 只要 `id`；每个分支与每个字段都带说明。子代理的 `structured_output` 参数 schema
+     由宿主强制校验，所以错形状在工具调用那一刻就被拒、子代理在同一条会话里能照着改——比事后归一化早一步。
+  2. **提一层就认，两侧都提。** 写在 `action` 旁边的任务字段在读之前被提到 `task` 里：`normalizeReplanAnswer`
+     （脚本侧，`replanEditBody`）与 `mergeReplan`（合并器源码，`editBody`）各一份、同一份字段表。层级不是决定的一部分，
+     一条说清「任务是什么」的回答不该因为多一层或少一层大括号被扔掉。`update` 不提编辑层的 `id`——那里它是目标，不是替换字段。
+  3. **缺的字段照旧拒绝，并且点名。** `add` 仍要过 `normalizeTask`：标题、目标、预期产出、至少一条验收标准缺一不可
+     （合并器还要它们全都非空）。拒绝语从「adds an invalid task」改成「adds an invalid task (missing or unusable:
+     expectedOutput, acceptanceCriteria)」，因为「哪里坏了」是下一个读者（和同一道边界的重投）唯一能用的信息。
+     **提层绝不补内容**：给缺失字段编默认值等于替模型写验收标准，那条任务之后会被判成「验收通过」，而没人写过它凭什么通过。
+  4. **编出来的依赖仍然拒绝，不静默丢。** `dependsOn` 指向计划里没有的 id（真机那条 `changelog_count`）照旧整条拒并点名。
+     丢掉它会得到「没有依赖」这个最危险的默认——新任务会在它需要的工作之前就开跑。
+  5. **提示词给一个完整例子，而不是形状摘要。** 规则里加两条（字段属于 `task`；`dependsOn` 只能写本提示词印出来的 id），
+     并在规则后放一条逐字可抄的 `apply` 例子（含 `add` 的完整 `task` 与一个真实的上游 id）。例子是提示词里唯一会被
+     原样照抄的一段，摘要不是。
+- **Alternatives rejected:**
+  - **只把 schema 收紧（`oneOf` + 必填），不加提层容忍。** 新会话会照着 schema 写对，但已经在跑的旧会话、以及任何一次
+    绕开 schema 的调用（host 侧直接调 `mergeReplan` 的路径、测试装置）仍然会被一层大括号绊倒；提层是三行的代价，收益是
+    「说清了就该被读懂」这条规则在两侧一致。
+  - **只加提层容忍，不改 schema 与提示词。** 那等于让模型每次都错、由我们每次修：真机那条回答提层之后仍然缺
+    `expectedOutput` 与 `acceptanceCriteria`、依赖仍然指向编出来的 id，合并照样拒——容忍救不了内容缺口。
+  - **给缺失字段补默认值**（`expectedOutput` 抄 `objective`、`acceptanceCriteria` 抄 `["任务完成"]`）。见 Decision 3：
+    那会把「没人写过的验收标准」变成一条判通过的记录，是本仓库最不能造的东西。
+  - **把未知依赖当「没有依赖」丢掉。** 见 Decision 4。
+  - **在合并被拒后再补一次重投。** 现在的重投只覆盖「没有结构化结果」（`format-error`）；把合并拒绝也接上去会让一道边界
+    花掉两次子代理调用，而拒绝理由（缺哪个字段、哪个 id 不存在）已经写进报告台账，重投属于下一块要不要买的开销。
+  - **用 `maxItems` 之类约束表达「最多 16 条编辑」。** 宿主支持的是 `type/oneOf/properties/required/additionalProperties/
+    items/enum/const` 这个子集（`dsh-tools` 的 `assertSupportedJsonSchema`），`maxItems` 不在其中，写进去会让整条边界
+    变成设置故障；上限仍由脚本与合并器各自校验。
+- **Consequences / 已知边界（照实记）：**
+  1. **schema 更严 = 子代理多一次自我纠正的机会，也多一次用错形状的机会。** 错形状在工具调用处被拒、错误回到子代理手里，
+     它可以在同一条会话里改；但如果它一直改不对，这一道边界会以 `format-error` 结束并走同一道边界的重投
+     （不花重试额度），与改动前「一次就拒」相比多花了一次调用。
+  2. **提层只在字段表里认。** 表外的字段（比如模型自造的 `assignee`）不会被提到 `task` 里，`task` 上的
+     `normalizeTask` 也只读它认识的字段；不认识的键**不会**被当成理由拒绝。
+  3. **本轮的判据是「并进计划」，不是「并进去之后任务跑得对」**：真机读数只证明 `plan.version` 从 1 变 2、
+     `addedTaskIds` 里有新增任务；那条任务本身的执行/验收质量属于运行质量，不是这次改动的形状问题。
+- **Evidence:** `test/replan.spec.ts` 21 → 24 条（+3，全部用真机原话：脚本侧「写在 `action` 旁边的任务体被提上来并真的跑了」
+  与「同一条回答因为没有 `expectedOutput`/`acceptanceCriteria` 被拒、拒绝语点名这两个字段」，合并器侧「同一条平铺编辑被读出，
+  而它编出来的 `changelog_count` 依赖仍被点名拒绝」）；红：把 `src/` 退回 `main` 只跑这份 spec → **`3 failed / 21 passed`**
+  （`.rsi/evidence/replan-shape-2026-11-26/red-before-fix.out`）。真机读数见同目录 `soak/`（隔离档案、真模型、插话、
+  `plan.version` 与 `addedTaskIds`）。

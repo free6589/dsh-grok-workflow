@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A demand added while a run is working now joins the plan instead of being refused over how it was written / 跑中加进来的要求现在真的会并进计划，不再因为写法被拒** —
+  The boundary planner is asked to change the plan through one structured answer, and that answer's shape was, until now, one undifferentiated
+  object: nothing said where a task's own fields go, so a live boundary on 2026-11-26 wrote `id`, `title` and `objective` beside `action`
+  instead of inside `task`, left out the expected output and the acceptance criteria entirely, and pointed its dependency at a name it had
+  invented. The plan did not move, and the demand the run had correctly understood was spent for nothing. Two things changed, and they answer
+  two different faults. **What the answer should look like is now spelled out**: the answer's schema describes each of the three edits
+  separately (add / update / remove), says that every task field belongs inside `task`, names the fields an added task must carry, and the
+  prompt carries one complete worked example instead of a shape summary. **And the nesting level itself is no longer a reason to refuse**:
+  a task body written beside `action` is lifted before the merge reads it, on both sides of the boundary, so an edit that says what the task
+  is gets merged. What a lift does *not* do is invent content — an added task still has to carry a title, an objective, an expected output and
+  at least one acceptance criterion, because a task without them cannot be verified, and the refusal now names exactly which of them is
+  missing. A dependency still has to be a task id the plan actually has: an invented one is refused and named rather than quietly dropped,
+  since dropping it would let the new task run before the work it needs. **Upgrade note: nothing to prepare — no key, schema, default or
+  stored record changed; an existing plan or report reads exactly as before.**
+  / 波边界那个规划子代理只能靠一条结构化回答改计划，而这条回答的形状以前是一团没有任何说明的对象：没有任何地方说清一个任务自己的字段该写在哪，
+  于是 2026-11-26 真机上的边界子把 `id`、`title`、`objective` 写在 `action` 旁边而不是 `task` 里面，`expectedOutput` 与验收标准干脆没写，
+  依赖还指向一个它自己编的名字。计划没动，那条运行其实已经读懂的要求就这么白花了。这次改了两件事，对应两种不同的毛病。
+  **回答该长什么样，现在写清楚了**：回答的 schema 把三种编辑（加 / 改 / 删）分别描述，说明任务自己的每个字段都属于 `task` 里面，
+  点名一条新增任务必须带的字段；提示词里也给了一个完整的例子，而不是只描述形状。**而嵌套层级本身不再是被拒的理由**：
+  写在 `action` 旁边的一整套任务字段，会在合并读到它之前被提到 `task` 里，两侧（脚本与合并器）都如此，所以一条说清了任务是什么的编辑会被并进去。
+  提上来**不会**做的是编内容——新增任务仍然必须带标题、目标、预期产出与至少一条验收标准，因为缺了这些就没法验收；拒绝时会点名缺的是哪一个。
+  依赖仍然必须是计划里真有的任务编号：编出来的会被拒绝并点名，而不是悄悄丢掉，因为丢掉它会让新任务在它需要的工作之前就跑起来。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化；已有的计划与报告读起来和以前一字不差。**
+
 ## [0.13.42] - 2026-11-26
 
 ### Fixed / 修复
