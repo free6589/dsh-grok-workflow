@@ -21,9 +21,9 @@
  * semantics are unchanged — only the argument handling is.
  *
  * The handler runs directly against the agent (no model message is created):
- * it writes the durable toggle in `src/mode.ts`, and `src/gate.ts` honors it on
- * the next message (`classifyPreStep`'s `mode-off` pass branch). The `turn`
- * field is informational metadata only — the gate reads only `enabled`.
+ * it writes the durable toggle in `src/mode.ts`, which the session's own readers
+ * consult. The `turn` field is informational metadata only — a reader looks at
+ * `enabled`.
  *
  * The settle text reports what the session's own log shows, not what the write
  * call did: an enable that did not land settles as `kind: 'error'` and never

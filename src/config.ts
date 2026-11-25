@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery'
 import { MAX_LOOP_PROMPT_CHARS } from './loop.js'
 import { CHILD_TIMEOUT_MAX_MS } from './timeout.js'
-import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js'
+import type { GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
@@ -220,34 +220,18 @@ export const DEFAULT_LOOP_ENABLED = false
 /**
  * Whether the block intake (接单台子) is mounted at all.
  *
- * Off by default, and off means *inert*: `src/index.ts` registers none of the six
- * `grok_*block*` tools and installs no extra `agent/pre-step` listener, so a
- * profile that never asked for the feature keeps the pre-block surface and the
- * pre-block delivery decisions byte for byte. On registers the six tools plus one
- * narrow heartbeat observer; it never changes a routing decision.
+ * On by default (M3.3): the six `grok_*block*` tools and one `agent/pre-step`
+ * observer are part of a default load. Off means *inert*: `src/index.ts` registers
+ * none of the six tools and installs no observer, so a profile that turns the
+ * feature off keeps the intake-free surface. The switch never changes a routing
+ * decision.
  *
  * Plain, not `volatile()`: this is a load-time switch (the tools it gates are
  * registered once, at `apply()`), so projecting it onto the settings page would
  * promise a live edit that a reload alone can honor. `toolName` and
  * `configVersion` are plain for the same reason.
  */
-export const DEFAULT_BLOCK_INTAKE = false
-/**
- * Whether the old front desk (`installGate`) is registered at all.
- *
- * Off by default (M3.2): the front desk is not registered, so the narrow heartbeat
- * listener (`src/heartbeat-listen.ts`) is the only `agent/pre-step` listener a profile
- * gets, and the only owner of a beat's fate. On is an explicit opt-in for the old
- * shape — the front desk registers and decides ordinary user messages again — but it
- * never decides a heartbeat: `classifyPreStep` passes a beat through as
- * `non-user-source`, and the narrow listener, which is outermost, has already
- * answered it.
- *
- * Plain, not `volatile()`, for the same reason as {@link DEFAULT_BLOCK_INTAKE}: a
- * registration cannot appear or disappear without a reload, so projecting it onto
- * the settings page would promise a live edit that a reload alone can honor.
- */
-export const DEFAULT_LEGACY_GATE = false
+export const DEFAULT_BLOCK_INTAKE = true
 export const DEFAULT_LOOP_MAX_ROUNDS = 10
 export const DEFAULT_LOOP_FAIL_STREAK = 3
 /**
@@ -273,7 +257,7 @@ export const DEFAULT_ITERATE_INTERVAL_MIN = 0
  * guard-first (an open round or a dirty tree means no new round), and explicit
  * about stopping. It deliberately carries **no** routing marker: a self-iteration
  * delivery routes as an ordinary schedule message (`docs/knowledge/HEARTBEATS.md`
- * §2), so editing this text can never change how the gate routes it.
+ * §2), so editing this text can never change how a delivery is routed.
  *
  * `docs/iterate-template.md` is the reader-facing copy of this same text, and
  * `test/iterate-template.spec.ts` asserts the two are byte-identical — the file
@@ -386,7 +370,7 @@ export const FIXED_RECORD_RUNS = true
 export const FIXED_SHOW_PROGRESS = true
 /** Empty means the built-in switching policy. */
 export const FIXED_SWITCH_ON: Array<'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'> = []
-/** Gate is always on; `gate.ts` no longer consults any preset/required switch. */
+/** The old front desk was always on: no preset or required switch could turn it off. */
 export const FIXED_GATE_ON = true
 /**
  * Bounded grace window an unload gives the child calls already in flight.
@@ -420,8 +404,8 @@ export const CONFIG_VERSION = 1
 
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Twenty-one keys in the accepted surface; seventeen of them reach the settings
- * page (`toolName`, `blockIntake`, `legacyGate` and `configVersion` are plain, not
+ * Nineteen keys in the accepted surface; sixteen of them reach the settings
+ * page (`toolName`, `blockIntake` and `configVersion` are plain, not
  * volatile, so the runtime projection drops them — pinned in
  * `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
@@ -430,7 +414,6 @@ export const CONFIG_VERSION = 1
  */
 export const CONFIG_KEYS = [
   'toolName',
-  'mode',
   'grokDefault',
   'roles',
   'guardianModel',
@@ -448,7 +431,6 @@ export const CONFIG_KEYS = [
   'iterateIntervalMin',
   'iterateTemplate',
   'blockIntake',
-  'legacyGate',
   'configVersion',
 ] as const
 
@@ -471,7 +453,13 @@ export const ROUTE_KEYS = ['provider', 'model', 'maxInFlight'] as const
  */
 const GUARDIAN_MODEL_KEYS = ['provider', 'model'] as const
 
-/** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
+/**
+ * Every key this build no longer accepts; a patch that still carries one is rejected
+ * (R-06).
+ *
+ * The first twenty-three went with the T4 slim-down; `mode` and `legacyGate` went with
+ * M3.3, which deleted the old front desk and the routing mode it read.
+ */
 export const REMOVED_CONFIG_KEYS = [
   'enforceGate',
   'gateRequired',
@@ -496,6 +484,8 @@ export const REMOVED_CONFIG_KEYS = [
   'recordRuns',
   'recordLimit',
   'showProgress',
+  'mode',
+  'legacyGate',
 ] as const
 
 const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
@@ -598,19 +588,13 @@ function clampedLimit(field: LimitField, min: number) {
  * Every user-editable field is `volatile()`: the runtime then hands it over as a
  * live holder (`.get()`) and an edit does not remount the plugin — a remount
  * would kill an in-flight run (E-12/E-31). The structural fields stay plain:
- * `toolName` is fixed at registration and `configVersion` is a wire contract
- * (the old `enforceGate`/`gateRequired` switch is gone: the gate always runs,
- * and a runtime without its hook fails the load, round-54).
+ * `toolName` is fixed at registration, `blockIntake` is fixed at registration, and
+ * `configVersion` is a wire contract.
  * `snapshotConfig()` below turns holders back into plain values, so one reader
  * serves a hand-written config, a profile patch and a live settings form alike.
  */
 export const Config = z.object({
   toolName: z.string().default('grok_workflow'),
-  // Front desk (t52, plan C): the mandatory entry became "every message passes
-  // the front desk and the front desk states its tier", not "every message runs
-  // the whole team". `full` restores the old rule exactly (D-021). The settings
-  // page shows `auto`/`full` (T4/T5); the schema value for auto is `triage`.
-  mode: z.union([z.const('full'), z.const('triage')]).default('triage').volatile(),
   // Config-level default for the per-session grok-mode toggle (src/mode.ts):
   // `off` means a batch passes through to the model as normal chat until the
   // session turns grok mode on (the runtime toggle overrides this default).
@@ -679,7 +663,7 @@ export const Config = z.object({
   // and the template is the whole prompt stored in the `RSI heartbeat` Schedule
   // task (edited on the settings page, persisted per profile). No routing marker:
   // these deliveries route as ordinary schedule messages, so editing the template
-  // can never change gate routing.
+  // can never change how a delivery is routed.
   iterateIntervalMin: clampedLimit('iterateIntervalMin', 0).default(DEFAULT_ITERATE_INTERVAL_MIN)
     .description('Minutes between self-iteration heartbeats, 0-10080; 0 asks for the floor (at least 60), not "start now". 自迭代心跳间隔几分钟，0-10080；0 表示用下限（至少 60 分钟），不是立刻开始')
     .volatile(),
@@ -689,19 +673,12 @@ export const Config = z.object({
   // Block intake (接单台子): the durable block ledger, its six tools and the
   // supervisor verdict. A load-time switch, not a volatile one — the tools are
   // registered once in `apply()`, so a live flip could only promise a surface a
-  // reload would have to provide. Off is the whole default: no tool is
-  // registered and no extra `agent/pre-step` listener is installed, which is what
-  // makes "off equals the pre-block baseline" a testable claim rather than a
-  // promise.
+  // reload would have to provide. On is the default: the six tools and the
+  // observer are part of a default load. Off registers nothing from the intake,
+  // which is what makes "off equals the intake-free surface" a testable claim
+  // rather than a promise.
   blockIntake: z.boolean().default(DEFAULT_BLOCK_INTAKE)
-    .description('Off by default: the block intake (its six tools and its supervisor) is registered only when this is on. 默认关闭：打开后才注册接单台的六个工具与监工'),
-  // The old front desk (T4's `installGate`) is opt-in since M3.2: the default chain is
-  // the narrow heartbeat listener alone. On registers the front desk for user-message
-  // routing only — it never decides a heartbeat. Load-time, like `blockIntake`: the
-  // gate is one `agent/pre-step` registration and a registration cannot be added or
-  // withdrawn without a reload.
-  legacyGate: z.boolean().default(DEFAULT_LEGACY_GATE)
-    .description('Off by default: the old front desk is not registered, and the narrow heartbeat listener is the only pre-step listener. On registers the front desk for user-message routing only, never for heartbeats. 默认关闭：旧闸门不注册，链上只有窄心跳监听；打开则显式注册旧闸门，只管用户消息、不管心跳'),
+    .description('On by default: the block intake (its six tools and its supervisor) is registered on a default load; off registers none of them. 默认开启：接单台的六个工具与监工随默认加载注册；关掉才一个都不注册'),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     worker: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
@@ -891,32 +868,6 @@ function assertKnownGuardianKeys(guardian: unknown): void {
 }
 
 /**
- * Validate and normalize the switching policy.
- *
- * An unknown class name would silently never switch, so it is refused: the
- * policy is a whitelist, and a typo in it must not look like "no fallback".
- * @param list - the configured classes, or undefined for the built-in policy.
- * @returns The normalized list (empty means the built-in policy).
- */
-function resolveSwitchOn(list: FailureClass[] | undefined): FailureClass[] {
-  if (list === undefined || list.length === 0) return []
-  const allowed = new Set<string>(SWITCHABLE_CLASSES)
-  const out: FailureClass[] = []
-  for (const entry of list) {
-    const name = typeof entry === 'string' ? entry.trim() : ''
-    if (!allowed.has(name)) {
-      throw new Error(
-        `switchOn has "${String(entry)}", which is not a switchable failure class; ` +
-        `accepted: ${SWITCHABLE_CLASSES.join(', ')} ` +
-        '(content and setup failures never switch: task-failed, verification-failed, budget-exhausted)',
-      )
-    }
-    if (!out.includes(name as FailureClass)) out.push(name as FailureClass)
-  }
-  return out
-}
-
-/**
  * Accept a bare model id where a route object is expected.
  *
  * Written as a migration aid: `worker: ['fast', 'slow']` reads naturally, and
@@ -988,30 +939,6 @@ function resolveChain(role: string, chain: Array<RouteInput> | undefined): Model
     out.push(route)
   }
   return out
-}
-
-/**
- * Parse one optional route written as a bare model id or `provider/model`.
- *
- * `triageModel` is one route, not a chain: the front desk has no fallback
- * (a failed greeting must not become a second workflow), so a chain would imply
- * a switch policy the tier does not have.
- * @param path - configuration key, used in the error message.
- * @param value - the raw value (`''` means unset).
- * @returns the route, or `undefined` when unset.
- */
-function parseSingleRoute(path: string, value: string | undefined): ModelRoute | undefined {
-  const raw = (value ?? '').trim()
-  if (raw === '') return undefined
-  if (raw.length > HARD_LIMITS.routeChars * 2) {
-    throw new Error(`${path} is longer than ${HARD_LIMITS.routeChars * 2} characters`)
-  }
-  const slash = raw.indexOf('/')
-  if (slash <= 0) return { model: raw }
-  const provider = raw.slice(0, slash).trim()
-  const model = raw.slice(slash + 1).trim()
-  if (provider === '' || model === '') throw new Error(`${path} must be "model" or "provider/model", got "${raw}"`)
-  return { provider, model }
 }
 
 function integer(name: string, value: number, min: number, max: number): number {
@@ -1164,10 +1091,6 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
       'backstop per task. Shorten the chains.',
     )
   }
-  const mode = config.mode ?? 'triage'
-  if (mode !== 'full' && mode !== 'triage') {
-    throw new Error(`mode must be "full" or "triage", got "${String((config as { mode?: unknown }).mode)}"`)
-  }
   // Guardian model (Q8): one route, normalized like a chain route but with its
   // own failure wording (the key is `guardianModel`, not `roles.<role>`). An
   // absent key, a null, or a route with a blank model all read as "no guardian",
@@ -1201,8 +1124,9 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   // schema refuses a bad value, but `resolveConfig` is also reached directly (a
   // hand-built config object, an embedder, a test double), and there a typo used to
   // survive as itself: `grokDefault: 'onn'` loaded, printed `grokDefault=onn` in the
-  // one-line signature and then behaved as off at the gate (`=== 'on'`), which is the
-  // silent-off failure this reader exists to prevent. Fail closed, like `mode`.
+  // one-line signature and then behaved as off wherever the toggle is read (`=== 'on'`),
+  // which is the silent-off failure this reader exists to prevent. Fail closed, like
+  // every other switch.
   const grokDefaultRaw: unknown = (config as { grokDefault?: unknown }).grokDefault
   if (grokDefaultRaw !== undefined && grokDefaultRaw !== 'on' && grokDefaultRaw !== 'off') {
     throw new Error(`grokDefault must be "on" or "off", got "${String(grokDefaultRaw)}"`)
@@ -1238,14 +1162,6 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   if (typeof blockIntake !== 'boolean') {
     throw new Error(`blockIntake must be true or false, got "${String(blockIntakeRaw)}"`)
   }
-  // The old front desk's switch, checked the same way and for the same reason: a
-  // string that reads as truthy would silently register the front desk a profile did
-  // not ask for, which is the one thing this key must never do by accident.
-  const legacyGateRaw: unknown = (config as { legacyGate?: unknown }).legacyGate
-  const legacyGate = legacyGateRaw === undefined ? DEFAULT_LEGACY_GATE : legacyGateRaw
-  if (typeof legacyGate !== 'boolean') {
-    throw new Error(`legacyGate must be true or false, got "${String(legacyGateRaw)}"`)
-  }
   // Self-iteration template (R-06): a string within the same bound the loop prompt
   // has; whitespace-only is legal and falls back to the built-in default at open
   // time, so a half-finished edit cannot arm an empty heartbeat.
@@ -1275,7 +1191,6 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     // an unconfigured run's resolved shape stays byte-identical to the pre-guardian one.
     ...guardianModel === undefined ? {} : { guardianModel },
     synthesis,
-    mode,
     grokDefault,
     maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
@@ -1291,7 +1206,6 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     iterateIntervalMin: integer('iterateIntervalMin', config.iterateIntervalMin ?? DEFAULT_ITERATE_INTERVAL_MIN, 0, HARD_LIMITS.iterateIntervalMin),
     iterateTemplate,
     blockIntake,
-    legacyGate,
     configVersion,
   }
 }
@@ -1354,7 +1268,7 @@ export interface ConfigReader {
 }
 
 /**
- * Build the reader used by the tool and the gate.
+ * Build the reader used by the tool and the plugin's own surfaces.
  *
  * A settings edit invalidates nothing by itself: the next `read()` validates the
  * new values, so a broken edit refuses the next message with its exact reason
@@ -1389,12 +1303,9 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     `maxConcurrency=${config.maxConcurrency}`,
     `maxRetries=${FIXED_MAX_RETRIES}`,
     `maxActiveRuns=${FIXED_MAX_ACTIVE_RUNS}/${FIXED_MAX_ACTIVE_RUNS_TOTAL}`,
-    'gate=on',
-    `mode=${config.mode}`,
     `grokDefault=${config.grokDefault}`,
     `synthesis=${config.synthesis}${config.synthesisRepaired === true ? ' (repaired)' : ''}`,
     `blockIntake=${config.blockIntake === true ? 'on' : 'off'}`,
-    `legacyGate=${config.legacyGate === true ? 'on' : 'off'}`,
     `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')} supervisor:${role('supervisor')}`,
   ].join(' ')
 }

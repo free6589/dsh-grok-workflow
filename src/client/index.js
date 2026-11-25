@@ -115,9 +115,6 @@ window.__ModuleLoader__.load({
       // Total switch (mock “总开关”): `off` means normal chat until the session
       // turns grok mode on; the session toggle overrides this default.
       { key: 'grokDefault', group: 'mode', kind: 'enum', options: ['off', 'on'], def: 'off' },
-      // Page shows auto/full (mock “模式”): auto maps to stored `triage`,
-      // full maps to stored `full`.
-      { key: 'mode', group: 'mode', kind: 'enum', options: ['triage', 'full'], def: 'triage' },
       // The two advanced numbers (mock “高级”): documented engine-hook limits.
       // Bounds mirror HARD_LIMITS.maxConcurrency / maxTasks (100) and
       // DEFAULT_MAX_CONCURRENCY / DEFAULT_MAX_TASKS (10); test/client.spec.ts
@@ -228,19 +225,16 @@ window.__ModuleLoader__.load({
       // Live one-line status under the intro, derived from the current draft.
       'status.off': 'Off — just chatting',
       'status.off.detail': 'Grok answers directly, no helpers. Send /grok for one serious run.',
-      'status.triage': 'On — auto pilot',
-      'status.triage.detail': 'Easy ones answered directly, hard ones get the team.',
-      'status.full': 'On — full crew',
-      'status.full.detail': 'The whole team on every message: best quality, slowest.',
+      'status.on': 'On — the workflow tool is available',
+      'status.on.detail': 'Substantial objectives go through the workflow; small questions are answered directly.',
 
-      'group.mode': 'Master switch & mode',
+      'group.mode': 'Master switch',
       'group.limits': 'How much effort',
       'group.roles': 'Who does what',
       'group.loop': 'Repeat runs',
       'group.iterate': 'Self-iteration',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
-      'field.mode': 'Mode',
       'field.grokDefault': 'Work hard by default',
       'field.maxConcurrency': 'Jobs at once',
       'field.maxTasks': 'Splits per job',
@@ -263,20 +257,12 @@ window.__ModuleLoader__.load({
       'field.iterateTemplate': 'Heartbeat prompt template',
       'field.iterateTemplate.hint': 'Stored in the profile; the Self-iterate switch arms a heartbeat with this text. Empty falls back to the built-in default.',
 
-      // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
-      'option.mode.triage': 'auto',
-      'option.mode.full': 'full',
       'option.grokDefault.off': 'Off',
       'option.grokDefault.on': 'On',
       'option.loopEnabled.off': 'Off',
       'option.loopEnabled.on': 'On',
       'option.replan.off': 'Off',
       'option.replan.on': 'On',
-
-      'mode.auto.title': 'Auto pilot',
-      'mode.auto.detail': 'Judge first, then call the team only when needed.',
-      'mode.full.title': 'Full crew',
-      'mode.full.detail': 'The whole team on every message.',
 
       'role.planner': '1 · Break it down',
       'role.worker': '2 · Do the work',
@@ -471,19 +457,16 @@ window.__ModuleLoader__.load({
 
       'status.off': '关着：只聊天',
       'status.off.detail': '问什么答什么，不派帮手。发 /grok 认真干一次。',
-      'status.triage': '开着：自动挡',
-      'status.triage.detail': '简单的直接答，难的才开团队。',
-      'status.full': '开着：全员上',
-      'status.full.detail': '每条消息都走完整团队：质量最高，也最慢。',
+      'status.on': '开着：工作流工具可用',
+      'status.on.detail': '复杂目标走工作流，小问题直接回答。',
 
-      'group.mode': '总开关和模式',
+      'group.mode': '总开关',
       'group.limits': '下多大力气',
       'group.roles': '谁来干',
       'group.loop': '自动接着干',
       'group.iterate': '自迭代',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
-      'field.mode': '模式',
       'field.grokDefault': '默认下大力气',
       'field.maxConcurrency': '同时干几件',
       'field.maxTasks': '一次拆几件',
@@ -506,20 +489,12 @@ window.__ModuleLoader__.load({
       'field.iterateTemplate': '心跳提示词模板',
       'field.iterateTemplate.hint': '随档案保存；「自迭代」开关用心跳投递这段文字。留空则回退到内置默认模板。',
 
-      // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
-      'option.mode.triage': 'auto',
-      'option.mode.full': 'full',
       'option.grokDefault.off': '关',
       'option.grokDefault.on': '开',
       'option.loopEnabled.off': '关',
       'option.loopEnabled.on': '开',
       'option.replan.off': '关',
       'option.replan.on': '开',
-
-      'mode.auto.title': '自动挡',
-      'mode.auto.detail': '先看难易，难的才开团队。',
-      'mode.full.title': '全员上',
-      'mode.full.detail': '每条消息都走完整团队。',
 
       'role.planner': '1 · 拆活',
       'role.worker': '2 · 干活',
@@ -1087,17 +1062,10 @@ window.__ModuleLoader__.load({
       switchOn: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#2f9e44', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', padding: '2px' },
       /** The moving part. Without it the pill reads as a flat block, not a switch. */
       switchThumb: { width: '17px', height: '17px', borderRadius: '50%', background: 'var(--dsw-alias-label-inverse, #fff)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'transform 120ms ease' },
-      checkbox: { width: '16px', height: '16px', accentColor: '#3b6ef6', flex: 'none' },
       button: { minHeight: '32px', padding: '5px 12px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
       primary: { minHeight: '32px', padding: '5px 18px', borderRadius: '8px', border: '1px solid transparent', background: '#3b6ef6', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 600 },
       footer: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, padding: '12px 0', marginTop: '4px', borderTop: `1px solid ${HAIRLINE}`, background: 'var(--dsh-settings-footer-bg, rgba(128,128,128,0.12))', backdropFilter: 'blur(8px)' },
       step: { minWidth: '32px', minHeight: '32px', padding: '0 8px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit', fontSize: '15px', lineHeight: 1 },
-      cards: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
-      card2: { display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', textAlign: 'left', border: '1px solid rgba(128,128,128,0.35)', borderRadius: '10px', padding: '12px 14px', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
-      card2On: { borderColor: '#3b6ef6', background: 'rgba(59,110,246,0.08)' },
-      card2Top: { display: 'flex', gap: '8px', alignItems: 'center' },
-      card2Check: { color: '#3b6ef6', fontWeight: 700 },
-      card2Tag: { fontSize: '12px', opacity: 0.6 },
       groupTitle: { fontSize: '15px', fontWeight: 650, margin: '0 0 4px', letterSpacing: '-0.01em' },
       error: { color: STATUS_COLOR.failed },
       errorBox: { background: 'rgba(229,72,77,0.07)', border: '1px solid rgba(229,72,77,0.35)', borderRadius: '10px', padding: '10px 14px' },
@@ -1315,43 +1283,6 @@ window.__ModuleLoader__.load({
       }))
     }
 
-    function ScalarField(props) {
-      const { field, draft, disabled, onChange, t } = props
-      const value = draft[field.key]
-      if (field.kind === 'boolean') {
-        return h('input', {
-          type: 'checkbox', checked: value === true, disabled,
-          style: styles.checkbox,
-          onChange: (event) => onChange(field.key, event.target.checked),
-          'data-field': field.key,
-        })
-      }
-      if (field.kind === 'enum') {
-        return h(EnumField, { field, value, disabled, onChange, t })
-      }
-      if (field.kind === 'number') {
-        return h('input', {
-          type: 'number', style: { ...styles.input, ...styles.narrow }, value: String(value), disabled,
-          min: field.min, max: field.max, step: 1,
-          onChange: (event) => onChange(field.key, event.target.value === '' ? '' : Number(event.target.value)),
-          'data-field': field.key,
-        })
-      }
-      return h('input', {
-        type: 'text', style: styles.input, value: String(value === undefined ? '' : value), disabled,
-        placeholder: field.key === 'subagentProvider' ? t('roles.manualProvider') : undefined,
-        onChange: (event) => onChange(field.key, event.target.value),
-        'data-field': field.key,
-      })
-    }
-
-    // T5 removed the ClassPicker body: `switchOn` is a fixed internal policy
-    // since T4. The function stays (never called by the page) so the removal
-    // site is explicit instead of a silent deletion.
-    function ClassPicker(props) {
-      return null
-    }
-
     /**
      * One route row: provider dropdown + model dropdown, with free-text fallback.
      *
@@ -1498,12 +1429,6 @@ window.__ModuleLoader__.load({
             }))))
     }
 
-    // T5 removed the TriageModelPicker body with `triageModel` (fixed
-    // internal behavior since T4). The function stays (never called by the
-    // page) so the removal site is explicit instead of a silent deletion.
-    function TriageModelPicker(props) {
-      return null
-    }
     /**
      * The version/upgrade card: installed version, newest release, and the one button
      * that can actually move it.
@@ -1729,17 +1654,16 @@ window.__ModuleLoader__.load({
 
     /**
      * The live one-line status under the intro, derived from the current draft:
-     * off → plain chat; on + triage → smart triage; on + full → full team.
+     * off → plain chat; on → the workflow tool is available for this session.
      * It follows the draft in real time and is never saved.
      */
     function StatusLine(props) {
       const { draft, t } = props
       const on = draft.grokDefault === 'on'
-      const full = draft.mode === 'full'
-      const key = !on ? 'status.off' : (full ? 'status.full' : 'status.triage')
+      const key = on ? 'status.on' : 'status.off'
       const detailKey = `${key}.detail`
-      const dot = !on ? STATUS_COLOR.pending : (full ? STATUS_COLOR.doing : STATUS_COLOR.done)
-      return h('div', { style: !on ? styles.statusOff : styles.statusOn },
+      const dot = on ? STATUS_COLOR.done : STATUS_COLOR.pending
+      return h('div', { style: on ? styles.statusOn : styles.statusOff },
         h('span', { style: { ...styles.statusDot, background: dot } }),
         h('strong', null, t(key)),
         h('span', { style: { marginLeft: '8px', opacity: 0.75, fontSize: '12px' } }, t(detailKey)))
@@ -1867,13 +1791,6 @@ window.__ModuleLoader__.load({
 
       // T5: no usage hints anywhere on the page (mock has none).
       const fieldByKey = (key) => FIELDS.find((field) => field.key === key)
-      const enumRow = (key) => {
-        const field = fieldByKey(key)
-        return h(FieldRow, {
-          key, fieldKey: key, title: t(`field.${key}`),
-          control: h(EnumField, { field, value: draft[key], disabled, onChange, t }),
-        })
-      }
       // Number input with a unit suffix (paired `unit.*` dict keys).
       // The FIELDS min/max/def stay untouched.
       // Q9 (v0.13): a field whose stored unit differs from the unit it is edited in.
@@ -1931,32 +1848,6 @@ window.__ModuleLoader__.load({
         })
       }
 
-      // Mode as two radio cards (not a dropdown): the difference between the
-      // two is the point of the control, hiding it in a select is why readers
-      // could not tell them apart. Stored values stay `triage`/`full`.
-      const modeCards = () => {
-        const options = [
-          { stored: 'triage', titleKey: 'mode.auto.title', detailKey: 'mode.auto.detail', labelKey: 'option.mode.triage' },
-          { stored: 'full', titleKey: 'mode.full.title', detailKey: 'mode.full.detail', labelKey: 'option.mode.full' },
-        ]
-        return h('div', { style: styles.cards, 'data-field': 'mode' },
-          options.map((option) => {
-            const selected = draft.mode === option.stored
-            return h('button', {
-              key: option.stored, type: 'button',
-              style: selected ? { ...styles.card2, ...styles.card2On } : styles.card2,
-              disabled, 'aria-pressed': selected,
-              onClick: () => onChange('mode', option.stored),
-              'data-mode': option.stored,
-            },
-            h('span', { style: styles.card2Top },
-              h('strong', null, t(option.titleKey)),
-              selected ? h('span', { style: styles.card2Check }, '✓') : null),
-            h('span', { style: styles.hint }, t(option.detailKey)),
-            h('span', { style: styles.card2Tag }, t(option.labelKey)))
-          }))
-      }
-
       return h('div', { style: styles.page, 'data-page': 'grok-workflow' },
         h(PageStyle, null),
         h('div', null,
@@ -1964,7 +1855,7 @@ window.__ModuleLoader__.load({
           h('p', { style: { ...styles.hint, margin: '0 0 12px', fontSize: '13px' } }, t('page.intro')),
           h(StatusLine, { draft, t }),
           progressNote),
-        // --- 1 · 总开关 + 模式 ---
+        // --- 1 · 总开关 ---
         h('div', { style: styles.card },
           h('h3', { style: styles.groupTitle }, t('group.mode')),
           h(FieldRow, {
@@ -1975,8 +1866,7 @@ window.__ModuleLoader__.load({
               onFlip: (next) => onChange('grokDefault', next ? 'on' : 'off'),
               label: t(draft.grokDefault === 'on' ? 'option.grokDefault.on' : 'option.grokDefault.off'),
             }),
-          }),
-          modeCards()),
+          })),
         // --- 2 · 谁来干 (the guardian judge, then the five role chains) ---
         h('div', { style: styles.card },
           h('h3', { style: styles.groupTitle }, t('group.roles')),
@@ -2620,7 +2510,7 @@ window.__ModuleLoader__.load({
      * `检查` / `汇总` (`phaseLabel`: plan, execute, verify, synthesize) —
      * plus the plan tasks the engine announces as `任务 n · 标题` (`taskGroupTitle`), which
      * are appended between `执行` and `检查` because that is where the workers run.
-     * The final answer is delivered by the gate (`relayText` in the turn's own message),
+     * The final answer is relayed in the turn's own message (`relayText`),
      * never as a workflow child call, so no `回答` event can ever reach this track —
      * the spine does not list a stage no event can fill.
      *

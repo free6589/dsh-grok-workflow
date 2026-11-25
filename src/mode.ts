@@ -30,8 +30,8 @@ export interface ModeRecord {
    * Workflow shape the toggle selects while enabled.
    *
    * `full` runs the whole plan -> execute -> verify pipeline for every claimed
-   * message; `triage` keeps the pre-existing front desk. Absent means "use the
-   * deployment's `mode` config", which is what a config-level default does.
+   * message. `triage` was the old front desk's shape, which M3.3 deleted; the
+   * value stays accepted so a record an earlier build wrote still validates.
    * An explicit `/grok` opts the session into `full`, because that is what the
    * command promises the user.
    */
