@@ -5,6 +5,33 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.46] - 2026-11-26
+
+### Fixed / 修复
+
+- **The README gate numbers now match the suite, and the judge leg's refusal soak is in the repo / README 的门禁数字换成了套件真跑出来的数，判腿被拒的真机读数也进了仓库** —
+  Both READMEs told a reader that `npm run ci` runs 98 test files and 1850 deterministic tests. The suite had grown past that
+  and neither number was ever revisited, so anyone sizing the gate from the README undercounted it by five files and 98 tests.
+  Both now read **103 test files / 1948 deterministic tests**, the count a full `vitest run` on this machine printed and the
+  same one the 0.13.45 release gate reported, so the number a reader plans around is the number the suite runs. The same merge
+  brings the judge leg's real-machine evidence for the 0.13.44 key-refusal re-ask into the repo under
+  `.rsi/evidence/judge-leg-soak-2026-11-26/`: the full gate output those two counts were read from, plus two soak runs that
+  point only the verifier route at a proxy answering the first call with 401. The green run re-asked the same route inside the
+  same attempt, ran the worker leg once, finished `completed`, and never wrote the refused route down as dead; the red one, a
+  proxy refusing every call, prints the audit trail's literal `judge re-fired` and leaves every routing row on chain 0. What the
+  user sees: a suite size they can plan around, and a 0.13.44 claim they can check against the run that produced it. No plugin
+  behaviour changed: this release corrects documentation and lands evidence.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 两份 README 以前都说 `npm run ci` 跑 98 个测试文件、1850 条确定性测试。套件早长过这个数，两个数字一直没人回头改，照着
+  README 估门禁规模的人会少算五个文件、98 条测试。现在两份都写着 **103 个测试文件 / 1948 条确定性测试**：这是本机完整跑一次
+  `vitest run` 打印出来的数，也是 0.13.45 发版门禁报出的同一个数，所以读者拿来规划的正是套件真实的量。同一次合并还把判腿针对
+  0.13.44「钥匙被拒就在同一条路由上再问一次」的真机证据放进了仓库，在 `.rsi/evidence/judge-leg-soak-2026-11-26/` 下：
+  既有读那两个数所用的完整门禁输出，也有两次真机 soak，只把裁判那条腿指到一个「第一次调用回 401」的小代理上。绿的那一跑
+  在同一次尝试里又问了同一条路由，干活那条腿只跑一遍，整轮收在 `completed`，被拒的路由没有被记成死路；红的那一跑小代理
+  每次都回 401，报告的技术审计尾逐字打出 `judge re-fired`，路由台账每一行仍停在 chain 0。用户看到的：估测试规模时可以直接
+  照 README 的数，0.13.44 的那句承诺也能对着跑出它的那次运行去核。插件行为没有变化，这一版只订正文档、补上证据。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.45] - 2026-11-26
 
 ### Fixed / 修复
