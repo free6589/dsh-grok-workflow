@@ -2,7 +2,7 @@
  * The five block tools, registered only when `blockIntake` is on.
  *
  * The shape of the surface is the shape of the work: a user previews a split, says
- * yes in their own words, one block is claimed by a foreman, the foreman reports a
+ * yes in their own words, one block is claimed by a dispatcher, the dispatcher reports a
  * four-line handoff, and an independent judge decides. Every tool here is one step of
  * that loop, and none of them is a place where the plugin makes a judgement of its own
  * except `grok_close_block`, which defers to `src/supervisor/`.
@@ -398,7 +398,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
             acceptance: { type: 'array' as const, required: true as const, description: 'Testable acceptance checks; the supervisor judges each one.', items: { type: 'string' as const } },
             writesPaths: { type: 'array' as const, description: 'The scope this block may write. Nothing outside it passes the supervisor.', items: { type: 'string' as const } },
             dependsOn: { type: 'array' as const, description: 'Titles of sibling blocks that must be accepted first.', items: { type: 'string' as const } },
-            execution: { type: 'string' as const, description: '"foreman" (a foreman dispatches it) or "workflow" (a workflow script runs it).' },
+            execution: { type: 'string' as const, description: '"foreman" (a dispatcher owns it) or "workflow" (a workflow script runs it).' },
             owner: { type: 'string' as const, description: 'Subagent name for a workflow block.' },
           },
         },
@@ -509,7 +509,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     name: BLOCK_TOOL_NAMES.accept,
     description: [
       'Claim one approved block: keep it open, give it a plan id if it has none, and return the split, the write scope and the progress.',
-      'A claim is not a start of work — it is the record that a foreman owns this block.',
+      'A claim is not a start of work — it is the record that a dispatcher owns this block.',
     ].join(' '),
     parameters: {
       block_id: { type: 'string' as const, required: true as const, description: 'The id `grok_open_block` returned.' },
@@ -764,7 +764,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     name: BLOCK_TOOL_NAMES.steer,
     description: [
       'Steer a block that a workflow is running: queue one demand for its next wave boundary.',
-      'A block a foreman owns is steered with send_message to the foreman instead; this tool says so and queues nothing.',
+      'A block a dispatcher owns is steered with send_message to the dispatcher instead; this tool says so and queues nothing.',
     ].join(' '),
     parameters: {
       block_id: { type: 'string' as const, required: true as const, description: 'The block to steer.' },
@@ -788,7 +788,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       if (row === undefined) throw new BlockToolError('not-found', `账本里没有块 ${blockId}`)
       const block = blockOf(row, selectorOf(args))
       if (block.execution !== 'workflow') {
-        throw new BlockToolError('invalid', `这一块是包工头执行的（execution: ${block.execution}），用 send_message 找包工头，不入 steering 队列`)
+        throw new BlockToolError('invalid', `这一块是调度执行的（execution: ${block.execution}），用 send_message 找调度，不入 steering 队列`)
       }
       const queue = steeringForSession(sessionIdOf(agent))
       if (queue === undefined) {
@@ -803,7 +803,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     name: BLOCK_TOOL_NAMES.stop,
     description: [
       'Stop the workflow a block is running in.',
-      'A foreman-owned block is stopped by messaging the foreman; this tool says so and cancels nothing.',
+      'A dispatcher-owned block is stopped by messaging the dispatcher; this tool says so and cancels nothing.',
     ].join(' '),
     parameters: {
       block_id: { type: 'string' as const, required: true as const, description: 'The block to stop.' },
@@ -823,7 +823,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       if (row === undefined) throw new BlockToolError('not-found', `账本里没有块 ${blockId}`)
       const block = blockOf(row, selectorOf(args))
       if (block.execution !== 'workflow') {
-        throw new BlockToolError('invalid', `这一块是包工头执行的（execution: ${block.execution}），用 send_message 找包工头叫停，这里不取消任何东西`)
+        throw new BlockToolError('invalid', `这一块是调度执行的（execution: ${block.execution}），用 send_message 找调度叫停，这里不取消任何东西`)
       }
       if (block.runId === undefined || block.runId === '') {
         return { block_id: row.id, stopped: false, reason: '这一块还没有记下 run_id，没有可停的运行' } as never

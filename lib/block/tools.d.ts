@@ -2,7 +2,7 @@
  * The five block tools, registered only when `blockIntake` is on.
  *
  * The shape of the surface is the shape of the work: a user previews a split, says
- * yes in their own words, one block is claimed by a foreman, the foreman reports a
+ * yes in their own words, one block is claimed by a dispatcher, the dispatcher reports a
  * four-line handoff, and an independent judge decides. Every tool here is one step of
  * that loop, and none of them is a place where the plugin makes a judgement of its own
  * except `grok_close_block`, which defers to `src/supervisor/`.

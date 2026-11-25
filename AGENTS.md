@@ -201,29 +201,29 @@ remote agent can see local-only commits.
 
 12. 兜底心跳：超截止时间未收到完成通知，主代理主动查询一次任务状态；活着继续等，失败/丢失只重派失败块，不重启已完成部分。
 
-## 10. Foreman layer
+## 10. Dispatcher layer
 
-Multi-agent work runs inside a foreman layer. The foreman is a delegated agent
+Multi-agent work runs inside a dispatcher layer. The dispatcher is a delegated agent
 that owns one work block end to end; it is the only interface the main agent
 talks to for that block.
 
-- The main agent dispatches to the foreman and receives from the foreman. It
-  does not manage the foreman's children directly; the foreman splits the block
+- The main agent hands a block to the dispatcher and receives its result. It
+  does not manage the dispatcher's children directly; the dispatcher splits the block
   into subagents itself and owns their assignment, steering, and collection.
-- The foreman distributes work and accepts results. It does not write code
+- The dispatcher distributes work and accepts results. It does not write code
   itself — no edits to source, tests, docs, or artifacts. When a piece needs
-  hands, the foreman delegates it to a subagent and reviews the returned
+  hands, the dispatcher delegates it to a subagent and reviews the returned
   evidence.
-- The foreman returns one whole, verifiable deliverable: the complete block,
+- The dispatcher returns one whole, verifiable deliverable: the complete block,
   with the commands run and their results, not a progress log or a fragment a
   reviewer would have to finish.
-- Merging happens only at the main agent. The foreman never merges into another
+- Merging happens only at the main agent. The dispatcher never merges into another
   block's work, never touches a branch it was not given, and never integrates
   two blocks on its own. The main agent collects finished blocks, cross-checks
   them, and owns the final integration.
-- The deadline and heartbeat rules above apply to the foreman unchanged: it
+- The deadline and heartbeat rules above apply to the dispatcher unchanged: it
   registers the subagents it spawns, waits on completion notifications rather
-  than polling, and on a missed deadline the main agent checks the foreman once
+  than polling, and on a missed deadline the main agent checks the dispatcher once
   and re-dispatches only the failed part.
 
 ## 11. Auto-upgrade after a release

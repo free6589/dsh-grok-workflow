@@ -1,7 +1,22 @@
+## 角色改名「包工头」→「调度」（`fix/rename-foreman`）— 2026-11-25 (`CONFIRMED`)
+
+纯文字改动：面向用户的称呼、记忆文档与 `AGENTS.md` §10 的层名。分支 `fix/rename-foreman`（worktree `.tmp/wt-rename-foreman`），
+基线 `main` 尖端 `061693e`；版本仍 `0.13.34`，未发版、未打 tag。账本值 `execution: "foreman"`、`src/dispatcher/` 模块名与
+历史证据原文一律未动（理由见 `DECISIONS.md` 的 `D-141`）。
+
+| state | command（环境） | result |
+|---|---|---|
+| 全量门禁（改完之后的工作树） | `TMPDIR=$PWD/.tmp npm run ci`（Node v26.8.1，worktree `.tmp/wt-rename-foreman`） | **exit 0**：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；vitest **`Test Files 112 passed (112)` / `Tests 2149 passed (2149)`**（174.06 s）；`verify:lib` → **`lib/ at 061693e is the build of src/ at 061693e (301 files, byte-identical)`**（提交前，只证明基线自洽） |
+| 真机 soak | —— | **`NOT_RUN`**：本轮没有改任何行为，也没有改注册面；按 §3 的 soak 门槛由「改行为」触发，这一轮不满足 |
+| live profile | —— | **`BLOCKED`（本侧）**：沙箱是 `workspace-write`，`~/.dsh` 不在可写范围；没有写入、没有重载、没有重启 |
+
+**为什么这一轮仍要跑全量**：`docs/knowledge/*.md` 是 triage 的输入（`D-140`）——改记忆就是改行为，所以文字改动也得过门禁。
+另外 `docs-version` / `docs-architecture-version` / `docs-config-keys` 三个守卫读的正是这几份文档。
+
 ## M3.2 默认不拦截、刹车单主人、准入生效（`feat/m3-switch`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `feat/m3-switch`（worktree `.tmp/wt-m3-switch`），
-基线 `main` 尖端 `7b25890`，分支尖端 **`7f172ae`**。门禁与 soak 分别由包工头和 soak 工人跑出来；**收口轮只做只读复核**
+基线 `main` 尖端 `7b25890`，分支尖端 **`7f172ae`**。门禁与 soak 分别由调度和 soak 工人跑出来；**收口轮只做只读复核**
 （`git diff` / `git show` / `grep` / `sed` / 读 `.tmp/ci-m3-2.log` 与六份证据原文），外加跑文档守卫 spec；
 **没有重跑 `npm run ci`，也没有重跑 soak**。**修正轮（第二轮记忆收口）**在分支尖端移到 `7f172ae` 之后做了三件事：
 把这一条改成 `7f172ae` 的读数、把「记忆提交把分支弄红」这条回归逐行记进来、并按 `AGENTS.md` §3 在**自己的文档改完之后**重跑全量套件
@@ -15,7 +30,7 @@
 | 注册顺序（源码事实） | `sed -n '417,470p' src/index.ts` | `installHeartbeatListen({ … enabled: true … })` 在 `if (config.blockIntake === true)` **之前**、无条件；接单台分支里才是 `installHeartbeatBrakes` + `registerBlockTools`；`if (config.legacyGate === true)` 最后。默认（两开关都关）= 链上恰好一个监听。**`CONFIRMED`** |
 | 红：权威 intake spec 打在基线上 | 一次性 `git archive 7b25890` 解包到 `.tmp/m3-2-red`（不是仓库根），`node_modules` 软链自父 checkout，只拷本分支的 `test/m3-intake.spec.ts`；`cd .tmp/m3-2-red && TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts` | **EXIT=1**：`Test Files 1 failed (1)` / `Tests 15 failed \| 3 passed (18)`。15 条全是行为红：准入仍失效、六个工具照样作答、`legacyGate` 缺省仍 on、写 `observed` 而不是 `continued`、pre-M3.2 的注册矩阵、闸门仍在分类一拍心跳（`expected "pass" reason "non-user-source"` 实收 `"loop-continuation"`）。spec 里每个 import 在基线上都能解析，**整份 transcript 没有 "cannot find module"**。原文 `docs/knowledge/evidence/m3-2-2026-11-25/red-spec-on-baseline.out`。**`CONFIRMED`** |
 | 绿：五个 spec（两半合起来） | `TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts test/block-tools.spec.ts test/block-ledger.spec.ts test/block-preview.spec.ts test/block-supervisor.spec.ts` | **EXIT=0**：`Test Files 5 passed (5)` / `Tests 174 passed (174)`（逐文件 18 / 23 / 20 / 93 / 20），13.99 s。被测树用另一名工人五个源文件的 sha256 钉在 transcript 里。原文 `green-spec.out`。**`CONFIRMED`** |
-| 门禁 #1（全量，包工头跑） | `TMPDIR=$PWD/.tmp npm run ci`（**`7f172ae`** 的树） | **exit 0**（包工头的记录；日志本身只打印那四行）：`Test Files 112 passed (112)`、`Tests 2149 passed (2149)`、`Found 36 warnings and 0 errors.`、**`lib/ at 7f172ae is the build of src/ at 7f172ae (301 files, byte-identical)`**。**`CONFIRMED`** |
+| 门禁 #1（全量，调度跑） | `TMPDIR=$PWD/.tmp npm run ci`（**`7f172ae`** 的树） | **exit 0**（调度的记录；日志本身只打印那四行）：`Test Files 112 passed (112)`、`Tests 2149 passed (2149)`、`Found 36 warnings and 0 errors.`、**`lib/ at 7f172ae is the build of src/ at 7f172ae (301 files, byte-identical)`**。**`CONFIRMED`** |
 | 门禁 #2（`verify:lib` 单跑） | `npm run verify:lib` | **exit 0**，同一行原文：`lib/ at 7f172ae is the build of src/ at 7f172ae (301 files, byte-identical)`。**`CONFIRMED`** |
 | typecheck | `npm run typecheck` | **exit 0**。**`CONFIRMED`** |
 | **回归：症状** | `TMPDIR=$PWD/.tmp npx vitest run test/phase1-dialogue.spec.ts`（`295cfd2` 之上，`src`/`test`/`lib` 与上一次全绿时逐字节相同） | **`B04` 与 `B08` 红**：`keeps an earlier unanswered request when a second question arrives (B04)` 与 `cuts the resumed request to the objective budget instead of refusing the run (B08)`。两次全量门禁之间 `git diff` 只有 `docs/` 下的记忆文件，**没有一行源码或测试变化**。**`CONFIRMED`** |
@@ -57,7 +72,7 @@
    （是否拦截、运行次数、准入、卸载）；但它确实不是线上 profile 的原样模型配置。
 5. **场景 ② 没跑任务书那条字面命令**：`dsh --profile m32 headless '<objective>'` 在本机 exit 1（`too many arguments`）。
    换的是同配置、同 build、只换 app bundle 的兄弟 profile。
-6. **门禁的 `exit 0` 来自包工头的记录，日志本身不打印退出码**；`7f172ae` 那次逐字可见的是 `112 / 2149`、
+6. **门禁的 `exit 0` 来自调度的记录，日志本身不打印退出码**；`7f172ae` 那次逐字可见的是 `112 / 2149`、
    `36 warnings and 0 errors`、`lib/ at 7f172ae … (301 files, byte-identical)` 四行。门禁跑在分支尖端 **`7f172ae`** 上，
    之后没有提交，所以没有源码行落在门禁之外。
 7. **收口轮没有重跑 `npm run ci`，也没有重跑 soak**：只读了 `.tmp/ci-m3-2.log`、六份证据原文，并跑了文档守卫 spec。
@@ -101,7 +116,7 @@
 ## 接单台子收口：七处文字、`lib/` 重建、提交后门禁、模型监工真机 soak（`fix/supervisor-soak-evidence`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，只到推理的写 `HYPOTHESIS`。门禁与 soak 的读数分别由文字工人、soak 那一轮
-和包工头跑出来；**收口轮（写这一条的这一轮）只做只读复核**：`git diff` / `git show` / `sha256sum` / `grep` / `sed`，加读 `.tmp/` 下那三份
+和调度跑出来；**收口轮（写这一条的这一轮）只做只读复核**：`git diff` / `git show` / `sha256sum` / `grep` / `sed`，加读 `.tmp/` 下那三份
 门禁日志，**没有重跑 `npm run ci`，也没有重跑 soak**。分支 `fix/supervisor-soak-evidence`（worktree `.agents/worktrees/fix-supervisor-soak-evidence`），
 基线 `main` 尖端 `6501012`，工作提交 `49377e8`。
 
@@ -137,8 +152,8 @@
 `text-gate.txt` 217 行）。记忆收口这一提交只动 `docs/knowledge/{STATE,HANDOFF,VALIDATION,DECISIONS}.md`。
 
 **Honest boundary（逐条）：**
-1. **门禁读数不是收口轮跑出来的**：`49377e8` 那次是包工头提交后跑的，我只读了 `.tmp/ci-foreman.log`——`111 files / 2128 tests`、
-   `Found 36 warnings and 0 errors.`、`lib/ at 49377e8 … (293 files, byte-identical)` 三行逐字可见；**`EXIT=0` 来自包工头的记录，
+1. **门禁读数不是收口轮跑出来的**：`49377e8` 那次是调度提交后跑的，我只读了 `.tmp/ci-foreman.log`——`111 files / 2128 tests`、
+   `Found 36 warnings and 0 errors.`、`lib/ at 49377e8 … (293 files, byte-identical)` 三行逐字可见；**`EXIT=0` 来自调度的记录，
    日志本身不打印退出码**。收口轮没有重跑 `npm run ci`，也没有重跑 soak。
 2. **`verify:lib` 只能按字面读**：它比的是 HEAD 的 `src` 与 HEAD 的 `lib`。所以只有提交后那次（`lib/ at 49377e8`）覆盖本轮重建的 `lib/`；
    先前两次写 `6501012`，覆盖的是旧 `lib/`——那两次的 `111 / 2128`、`36 warnings` 本身有效，但**不能**用来证明新 `lib/` 一致。
@@ -170,7 +185,7 @@
 | 基线读数与增量 | 同命令在 `main` 的 `9b55d2d` 上 | 基线 **105 files / 1954 tests** ⇒ 本轮 **+6 文件 / +174 例**；`105+6=111`、`1954+174=2128`，逐项相等。六个新 spec：`block-ledger` **20**、`block-preview` **93**、`block-tools` **21**、`block-supervisor` **20**、`block-flag` **8**、`block-flag-baseline` **12**。**`CONFIRMED`** |
 | 发版提交 | `git show --stat 3c5d388` | `chore(release): prepare v0.13.34`，**8 files / +22 −20**，与 `26628c2`（0.13.33 的 prep）同构：`CHANGELOG.md`(2/0)、`README.md`(5/5)、`README.zh-CN.md`(5/5)、`docs/LOCAL-TESTING.md`(3/3)、`lib/client.js`(2/2)、`package-lock.json`(2/2)、`package.json`(1/1)、`src/client/index.js`(2/2)。**`CONFIRMED`** |
 | changelog 位置 | `head -12 CHANGELOG.md`（收口轮只读复核） | `## [0.13.34] - 2026-11-25` 在第 **8** 行（索引 7），紧接 `## [Unreleased]`（第 6 行，仍存在且为空）；发版工作流抽取的那一段 **43 行**；中英条目原文一个字没改。**`CONFIRMED`** |
-| 门禁 #2 | `TMPDIR=$PWD/.tmp npm run ci`（`3c5d388`） | **EXIT=0**：vitest `111 files / 2128 tests`、oxlint 36/0、`verify:lib` → **`lib/ at 3c5d388 is the build of src/ at 3c5d388 (293 files, byte-identical)`**。**独立跑了两次**（发版 lane 与包工头各跑一遍全量，两次都 exit 0）。**`CONFIRMED`** |
+| 门禁 #2 | `TMPDIR=$PWD/.tmp npm run ci`（`3c5d388`） | **EXIT=0**：vitest `111 files / 2128 tests`、oxlint 36/0、`verify:lib` → **`lib/ at 3c5d388 is the build of src/ at 3c5d388 (293 files, byte-identical)`**。**独立跑了两次**（发版 lane 与调度各跑一遍全量，两次都 exit 0）。**`CONFIRMED`** |
 | 针对性守卫 | 与门禁分开单跑（`3c5d388`） | **6 files / 79 tests PASS**：`docs-version` 8 + `docs-config-keys` 13 + `docs-architecture-version` 3 + `update-entry` 20 + `update-surface` 29 + `i18n-parity` 6。**`CONFIRMED`** |
 | 合 `main` | `git merge --no-ff release/0.13.34`；`git diff --stat release/0.13.34 main` | merge **`d01da81`**「… shipped as 0.13.34」；差分为**空**，即 main 的树与被门禁的那个发版提交逐字节相同。**`CONFIRMED`**（差分是在两条分支删除之前读的） |
 | 标签 | `git cat-file -t v0.13.34`；`git rev-parse v0.13.34^{}`；`git show v0.13.34^{}:package.json`（收口轮只读复核） | `tag`（注解标签，非轻量）；剥皮 **`d01da81`**；`package.json` 读到 `"version": "0.13.34"`。**`CONFIRMED`** |
@@ -211,13 +226,13 @@
 
 分支 `feat/block-intake`（worktree `.agents/worktrees/feat-block-intake`，基线 `main` 尖端 `9b55d2d`）。
 **下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，没验到的写 `HYPOTHESIS`。**
-两次全量门禁与真机 soak 是 M2 这一轮在这棵树里真跑出来的读数（由包工头转述进本文件）；
+两次全量门禁与真机 soak 是 M2 这一轮在这棵树里真跑出来的读数（由调度转述进本文件）；
 收口这一轮只做了只读复核 + 新 spec 单跑：`git status`、文件行数、`.tmp/red-block-*.txt`、
 `.rsi/evidence/block-intake-2026-11-25/{soak,ledger-extract}.txt`，**没有重跑 `npm run ci`，也没有重跑 soak**。
 **一个时间点要说清**：那两次全量门禁的读数（`110 files / 2116 tests`）是在 `test/block-flag-baseline.spec.ts`
 落地**之前**的树上取的；那个 spec 与它的夹具在收口这一轮期间才写盘（01:12–01:13），所以现在这棵树是
 **111 个 spec 文件**、两个新 spec 单跑分别是 162 例与 12 例（都绿）。**合起来的那棵树的全量门禁是 `NOT_RUN`**，
-由包工头在提交前后跑，读数以那次实跑为准。
+由调度在提交前后跑，读数以那次实跑为准。
 
 | state | command（环境） | result |
 | --- | --- | --- |
@@ -228,11 +243,11 @@
 | lint 零新增 | `npm run lint` | **`Found 36 warnings and 0 errors.`**，与基线同量（36/0），本轮零新增 warning。**`CONFIRMED`** |
 | 五个新 spec（收口轮实跑） | `TMPDIR=$PWD/.tmp npx vitest run test/block-ledger.spec.ts test/block-preview.spec.ts test/block-tools.spec.ts test/block-supervisor.spec.ts test/block-flag.spec.ts` | **5 files / 162 tests PASS**，13.49 s。逐文件：`block-ledger` **20**、`block-preview` **93**、`block-tools` **21**、`block-supervisor` **20**、`block-flag` **8**。**`CONFIRMED`** |
 | 第六个新 spec（收口轮实跑，落地晚于那两次门禁） | `TMPDIR=$PWD/.tmp npx vitest run test/block-flag-baseline.spec.ts` | **1 file / 12 tests PASS**，3.87 s。它拿 `test/fixtures/block-flag-baseline.json`（99477 B，由基线 `9b55d2d` 的源码跑同一批八个载荷生成、`id` 归一化）逐字节比对决策，所以钉的是「`blockIntake: false` 复现出功能之前那棵树」，而不是「两次装载互相一致」。**`CONFIRMED`** |
-| 合起来的树跑全量门禁 | `TMPDIR=$PWD/.tmp npm run ci`（含第六个 spec 的树） | **`NOT_RUN`**：收口这一轮没跑，由包工头在提交前后跑；文件数会从 110 变 111、例数从 2116 变 2128 的量级，**以实跑读数为准** |
+| 合起来的树跑全量门禁 | `TMPDIR=$PWD/.tmp npm run ci`（含第六个 spec 的树） | **`NOT_RUN`**：收口这一轮没跑，由调度在提交前后跑；文件数会从 110 变 111、例数从 2116 变 2128 的量级，**以实跑读数为准** |
 | 红→绿（模块级） | `head .tmp/red-block-*.txt`（收口轮只读复核） | 四个 spec 在基线上的红是模块不存在：`Error: Cannot find module '../src/block/index.js'`（`block-supervisor`、`block-tools`、`block-flag`、`block-ledger` 各自的 `Failed Suites`）。**`CONFIRMED`** |
 | 红→绿（行为级） | 同上；`.tmp/red-block-flag-loader.txt`、`.tmp/red-block-preview.txt` | ① 基线载入器逐字拒绝新键：`unknown configuration key "blockIntake"; accepted keys: …`（到 `configVersion` 为止，不含 `blockIntake`）；② `block-preview` 在基线树上 **89 例全红**（现在 93 例）。**`CONFIRMED`** |
 | `verify:lib`（本轮读数，按字面读） | `npm run verify:lib` | 报 `lib/ at 9b55d2d is the build of src/ at 9b55d2d (249 files, byte-identical)`——它比的是 **HEAD 的 `src` 与 HEAD 的 `lib`**，249 文件说明的是「基线仍然一致」，**没有覆盖**本轮新增的 `lib/block/**` 与 `lib/supervisor/**`。**`CONFIRMED`（读数）/ 覆盖范围有缺口（如实记）** |
-| `verify:lib`（提交后 293 文件） | `npm run verify:lib`（在包含新增 `lib/block/**`、`lib/supervisor/**` 的提交上） | **`NOT_RUN`**：本文件这一版还没提交，复验由包工头在提交后补；预期读数 `293 files, byte-identical`，未跑之前不写成已验 |
+| `verify:lib`（提交后 293 文件） | `npm run verify:lib`（在包含新增 `lib/block/**`、`lib/supervisor/**` 的提交上） | **`NOT_RUN`**：本文件这一版还没提交，复验由调度在提交后补；预期读数 `293 files, byte-identical`，未跑之前不写成已验 |
 | soak 环境（隔离） | `scripts/clone-profile.mjs`（从线上 `web` profile 克隆）→ `DSH_HOME=.tmp/soak-m2/dsh-home HOME=.tmp/soak-m2/home dsh --profile web-clone --host 127.0.0.1 --port 3197 --no-open` | 克隆 **7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**；实例在 `127.0.0.1:3197`；线上 `100.111.111.88:3080` 全程未碰；`~/.dsh` 零写入（`touch /home/fish/.dsh/.soak-write-probe` → `Read-only file system`，`stat` 前后 mtime 相同）。**`CONFIRMED`** |
 | soak 四项激活核对 | 见 `.rsi/evidence/block-intake-2026-11-25/soak.txt` §3 | ① boot 日志无 `pending`、无 `did not activate`；② `POST /api/settings/describe` → 24 个 namespace，其中 `grok-workflow` 带 `autoGenerate: true`，`blockIntake` 不在投影里（设计如此，见 `src/settings.ts:375`）；③ 插件页读到 `Grok workflow` 卡片；④ 会话 `request/header` 两次都是 **`tools: 101`**，六个块工具（`grok_open_block` / `grok_accept_block` / `grok_close_block` / `grok_block_status` / `grok_steer` / `grok_stop`）全在。**`CONFIRMED`** |
 | soak 用户四步 | 见 soak.txt §4 | `/grok off`（写入 `enabled:false`，全会话唯一一条 mode 记录）→ 普通聊天（无接单回执、无后台 run）→ `grok_open_block` 预览（`split_hash 8c3ad606…`）+ 纯文本「确认」后 `mode:start` 拿到 `block_id` → `grok_close_block` 三次判决 **`veto` / `veto` / `pass`**，块走到 `accepted`。**`CONFIRMED`** |
@@ -287,7 +302,7 @@
 | 合并后整体 soak | — | **`NOT_RUN`**（本版没有重跑合并后的整体 soak，不写成「已重跑」） |
 | soak 证据（复用，未重跑） | `.rsi/evidence/full-escape-2026-11-24/`、`.rsi/evidence/audit-render-half-2026-11-24/` | 三块各自的真机证据在案。复用它的理由是「合流没改产品代码（`src/report.ts` 由 `ort` 自动合并）+ 发版提交只改版本常量、两个 README / `CHANGELOG` 与随构建走的 `lib/client.js`」，而版本常量正是 `test/docs-version.spec.ts` 与 `test/docs-config-keys.spec.ts` 钉住的，两例都在两次全量门禁里过了 |
 | 收尾 | `git worktree remove …` ×4；`git branch -d …` ×5；`git worktree list`；`git branch -vv`（收口轮复核） | 四个 worktree（`feat-full-escape`、`feat-audit-render-half`、`fix-naming-resubmit`、`fix-timeout-probe-settle`）移除、五条已合分支用 `-d` 删掉（未用 `-D`；前三条 `ahead=0`、`fix/timeout-probe-settle` 也是 0、`release/0.13.33` 曾在 `26628c2`）。现在 `git worktree list` 只剩 `/home/fish/projects_mine/dsh-grok-workflow 24d517e [main]`；分支只剩 `main` 与**故意没动**的 `feat/audit-layer`（`7626233`）与三条 `backup/wip-2026-11-24-*`（`de7ba6a`、`292a4ae`、`b91ff17`，写死删除日 2026-11-27）。**`CONFIRMED`** |
-| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.33` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——包工头与收口手的沙箱都是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.33` |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.33` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——调度与收口手的沙箱都是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.33` |
 
 **Changed（本版随出去的代码面）：** `feat/full-escape` 的前台（逃生口 + 先问先能后送 + 首答盖在接单回执前）、`feat/audit-render-half` 的报告审计尾段
 （`src/report-audit.ts` 与 `src/report.ts` 的可选拼接）、`fix/naming-resubmit` 的带序号调用名 / 终稿标记 / replan 交底，外加 `lib/` 同一次构建的产物、
@@ -355,7 +370,7 @@
 | 先红（用例先写、实现未动） | `npx vitest run test/naming-sequence.spec.ts test/naming.spec.ts test/progress-tab.spec.ts test/client.spec.ts`（Node 26.8.1，worktree） | **红**：`Test Files 4 failed (4)`、`Tests 11 failed \| 187 passed (198)`。逐条失败原因是本轮要的行为：`plannerCallLabel is not defined`（guest 副本还没有它们）、`parseMemberLabel('规划（第1次）')` → `undefined`、`汇总·第2稿` 认不出角色、`规划（第1次）` 没落进 `规划` 阶段、`summary-final` 折叠还没实现 |
 | 后绿（实现完） | 同上命令 | **绿**：`4 files / 198 tests PASS` |
 | 真机形状新用例 | `npx vitest run test/naming-sequence.spec.ts` | **绿 6/6**：两稿汇总行名 `汇总·第1稿 / 汇总·第1稿 / 汇总·第2稿`（第二个是同一稿的 resubmit）+ `parseMemberLabel` 反解；进阶规划 `规划（第1次）/（第2次）/（第3次）` 且行名=提示词首行；replan 提示词不含 `structured result only` 且明确要调工具；边界纯文本 → 同棒补交 → `plan.version` 2、`addedTaskIds ['d']`；两次都不交 → `decision rejected`、`waves [['a'],['b']]` 原样 |
-| 全量（未提交，HEAD 仍是 `1f70103`） | `npm run ci`（`TMPDIR=$PWD/.tmp`，Node 26.8.1） | **exit 0**：typecheck 干净；`oxlint src test` → `Found 36 warnings and 0 errors`；`verify:lib` → `lib/ at 1f70103 is the build of src/ at 1f70103 (245 files, byte-identical)`（**注意：这一步校验的是 HEAD，本轮的 lib/ 还在工作树里，所以它在提交前只能证明基线自洽**）；vitest **102 files / 1927 tests PASS**（125.35 s；提交前树，缺包工头复核新增的两条用例） |
+| 全量（未提交，HEAD 仍是 `1f70103`） | `npm run ci`（`TMPDIR=$PWD/.tmp`，Node 26.8.1） | **exit 0**：typecheck 干净；`oxlint src test` → `Found 36 warnings and 0 errors`；`verify:lib` → `lib/ at 1f70103 is the build of src/ at 1f70103 (245 files, byte-identical)`（**注意：这一步校验的是 HEAD，本轮的 lib/ 还在工作树里，所以它在提交前只能证明基线自洽**）；vitest **102 files / 1927 tests PASS**（125.35 s；提交前树，缺调度复核新增的两条用例） |
 | 提交后门禁 | `npm run ci`（代码提交 `a335388`） | **exit 0**：typecheck 干净；`oxlint` **36 warnings / 0 errors**；`verify:lib` → `lib/ at a335388 is the build of src/ at a335388 (245 files, byte-identical)`；vitest **102 files / 1929 tests PASS** |
 | 单独 `verify:lib`（提交后） | `npm run verify:lib`（`a335388`） | **exit 0**，`lib/ at a335388 is the build of src/ at a335388 (245 files, byte-identical)` |
 | lint | `npm run lint`（ci 内） | `Found 36 warnings and 0 errors`（171 文件，全是既有告警，与本轮基线一致） |
@@ -397,7 +412,7 @@
 6. worktree 里 `scripts/verify-lib.mjs` 需要完整 `node_modules`：本轮把 worktree 的 `node_modules` 换成指向主检出的符号链接
    （该目录本就在 `.gitignore` 里，没有进提交），否则 scratch 构建拿不到 `typescript` / `@types/node` / `@deepseek-ai/*`。
 
-**复核意见落地（同一提交内，包工头 2026-11-24 三条）：**
+**复核意见落地（同一提交内，调度 2026-11-24 三条）：**
 1. **replan 同棒补交进预算算式**：`maxTotalAgentsFor()` 的边界项改成 `maxBoundaries × 2 × planner × waitFactor`（每边界两问：
    首问 + 同棒补交），钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`
    （带 replan 的 cap 减不带 replan 的 cap = `REPLAN_LIMITS.maxBoundaries × 2 × planner`）。原先「吃 `+2` 余量、未进算式」的说法已作废。
@@ -452,7 +467,7 @@
 6. **「3080 没重启」只是间接证据**：沙箱 `--unshare-pid`，`ss -ltnp` 拿不到 3080 的 pid。
 7. **模型不是任务点名的那个 id**（见上表），两相一致，但严格说存在偏离。
 
-## 两条无计时器探针改由探针持钟：远端 Node 24 的红转绿（本地红 `NOT_RUN`）— 2026-11-24（提交 `141dccd`；门禁与远端数字由包工头实测，本地红/绿数字由本轮执行手实测）
+## 两条无计时器探针改由探针持钟：远端 Node 24 的红转绿（本地红 `NOT_RUN`）— 2026-11-24（提交 `141dccd`；门禁与远端数字由调度实测，本地红/绿数字由本轮执行手实测）
 
 这一条只改 `test/timeout.spec.ts` 两条用例的等待形状：`races on Atomics.waitAsync where no setTimeout exists` 与
 `settles a hung call within budget in a realm with no timer at all`，都从裸 `await` 换成 `test/helpers.ts` 的
@@ -461,7 +476,7 @@
 
 | state | command（环境） | result |
 | --- | --- | --- |
-| 远端红（这是本条的起点，`CONFIRMED`，引用包工头实测） | CI run **45378449742**（`main` `ca65df8`） | **Node 22 绿 / Node 24 红**，逐字 `FAIL test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`、`Error: Test timed out in 30000ms.`、`Tests 1 failed \| 1909 passed (1910)` |
+| 远端红（这是本条的起点，`CONFIRMED`，引用调度实测） | CI run **45378449742**（`main` `ca65df8`） | **Node 22 绿 / Node 24 红**，逐字 `FAIL test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`、`Error: Test timed out in 30000ms.`、`Tests 1 failed \| 1909 passed (1910)` |
 | 本地修前复现 | 8 种打法，逐行相加 **102** 次执行（Node 26.8.1 与 `mise exec node@22.23.4`；含 18/24 个 busy 循环、整文件、全量套件、`--pool=threads`） | **`NOT_RUN`——0 红**。逐条见下表和 `HANDOFF.md` 顶部同节；早先口头报的「118 次」是误算，以 102 为准 |
 | 本地修前 8 种打法 | ①单条兜底 ×20 ②单条 Atomics ×20 ③18 busy + 兜底 ×10 ④24 busy + 整文件 ×6 ⑤24 busy + Atomics（Node 22）×10 ⑥24 busy + 兜底（Node 22）×10 + Node 22 整文件 ×3 ⑦`npx vitest run` 全量 ×3 ⑧24 busy + `--pool=threads` 两条各 ×10 | **102 次全绿**：兜底 1063–1215 ms、Atomics 约 40 ms、整文件 14.6–16.8 s、全量 123–128 s；loadavg 峰 **27.80**。**没有红可贴** |
 | 修后（24 个 busy 循环下，两条各 15 次） | `npx vitest run test/timeout.spec.ts -t '…'` ×30 | **30/30 绿**：Atomics 53–69 ms、兜底 **1211–1572 ms**（仍是预算驱动，不是靠 15 s 兜底）；loadavg 27.80 |
@@ -470,8 +485,8 @@
 | 修后 Node 22 | `mise exec node@22.23.4 -- npx vitest run test/timeout.spec.ts` ×3 | **3/3 绿**，22 passed，12.80–15.67 s |
 | 具名失败真的会触发（变异实测） | 临时把 Atomics 用例的入参换成 `new Promise<string>(() => {})` 后单跑 | **红成它自己**：`Error: the bare-realm Atomics wait did not settle within 15000 ms`，栈指 `test/helpers.ts:141`，`tests 15.01s`、整轮 15.78 s——不是 runner 的 30 s。跑完按 sha256 `859d39d…` 还原 |
 | typecheck / lint（本地，`141dccd`） | `npm run typecheck`；`npm run lint` | typecheck rc=0；lint **36 warnings / 0 errors**（171 文件，全既有，与基线一致） |
-| 全量门禁（包工头实测） | `npm run ci`（`141dccd`） | **exit 0**：typecheck 干净；lint **36 warnings / 0 errors**；`verify:lib` → `lib/ at 141dccd is the build of src/ at 141dccd (245 files, byte-identical)`；vitest **101 files / 1910 tests PASS**，**122.98 s** |
-| 远端双绿（包工头实测） | **PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284** | **Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红**已转绿** |
+| 全量门禁（调度实测） | `npm run ci`（`141dccd`） | **exit 0**：typecheck 干净；lint **36 warnings / 0 errors**；`verify:lib` → `lib/ at 141dccd is the build of src/ at 141dccd (245 files, byte-identical)`；vitest **101 files / 1910 tests PASS**，**122.98 s** |
+| 远端双绿（调度实测） | **PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284** | **Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红**已转绿** |
 
 **Changed：** 只 `test/timeout.spec.ts`（+19 / −8）：`./helpers.js` 的 import 加 `settledWithin`；两条用例的 `await` 包进
 `settledWithin(…, 15_000, 'the bare-realm Atomics wait' / 'the no-timer fallback run')`，其余逐字未动。`src/`、`lib/`、`scripts/`、
@@ -483,7 +498,7 @@
 3. **`settledWithin` 只在循环醒来时校验预算**（既有形状，本轮未动）：把兜底用例的探针预算临时改成 600 ms 仍绿（1064 ms）说明 20 ms tick
    也会被 sleep 吞掉；15 s 因此是「醒来时的界」，不是硬实时界。
 4. **断言、用例 `20_000`、`testTimeout: 30_000`、skip/only、`vitest.config.ts`、`noTimerScript` 的两处文本破坏全部未动**——这一条是收紧而不是放宽。
-5. 全量 `npm run ci` 本轮由**包工头**跑（1 次，exit 0）；执行手没有重跑全量门禁，本地只跑了上表里那些定向命令。
+5. 全量 `npm run ci` 本轮由**调度**跑（1 次，exit 0）；执行手没有重跑全量门禁，本地只跑了上表里那些定向命令。
 
 ## 0.13.32 发布：合流无冲突、门禁、标签、推送、远端两条流水线，以及 Node 24 的一次既有探针红 — 2026-11-24 (`CONFIRMED`)
 
@@ -508,7 +523,7 @@
 | 探针来源（是不是本版引入的） | `git log --oneline -1 -- test/timeout.spec.ts`；`git log --oneline c6a3611..3a9f7bd -- test/timeout.spec.ts src/timeout.ts` | 最后一次改动是 **`d7f8df6`**（`src/timeout.ts` 同一个提交）；本版区间对这两个文件**输出为空**，即 `0.13.32` 一条都没碰过它们。与在案的 vitest realm 等待器抖动**同族**：guest realm 没有 `setTimeout`，`Atomics.waitAsync` 的等待器不被服务，只有 runner 的 30 s 超时能收尾 → **既有、非本版引入**。**`CONFIRMED`** |
 | 远端 `CI`（重跑） | `gh run rerun 45376766890 --failed` | 没改断言、没抬 `testTimeout`、没跳过任何用例；重跑后 `Node 22` 与 `Node 24` 都 **success**，run **completed / success**（`attempt=2`）。**`CONFIRMED`** |
 | 收尾 | `git worktree remove .agents/worktrees/feat-update-button`；`git branch -d feat/update-button`（曾在 `09a21c2`）；`git branch -d release/0.13.32`（曾在 `97687ce`）；`git status --short --branch` | worktree 移除、两条已合分支用 `-d` 删掉（未用 `-D`）；工作树 `## main...origin/main`，干净。`.agents/worktrees/team-dispatch-v1`（分支**未合**）故意没动。**`CONFIRMED`** |
-| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.32` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——包工头的沙箱是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.32` |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.32` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——调度的沙箱是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.32` |
 
 **Changed（本版随出去的代码面）：** `src/update-surface.ts`（新增，802 行）、`src/index.ts`（+8）、`src/client/index.js`（396 改动行）、
 `test/update-surface.spec.ts`（新增，752 行）、`test/update-entry.spec.ts`（+549）、`lib/`（同一次构建的产物）、`DECISIONS.md` D-129、
@@ -520,7 +535,7 @@
 2. **门禁只跑了一次**（`97687ce`，exit 0），没有重复或加压跑；本条记的是那一次的读数。
 3. **那条 `timeout.spec.ts` 的红只做了「来源核查 + 重跑」**：确认本版没碰过这两个文件、确认同族抖动在案，但没有在这一轮把根因进一步收窄
    （没有复现、没有插桩）；「既有」这个判断的依据是提交区间为空 + 同族症状在案，而不是一次受控复现。
-4. **live profile 未升级**（`BLOCKED`）：包工头这一侧的沙箱写不到工作区以外，这台机器上正在跑的那份插件仍是旧版本。
+4. **live profile 未升级**（`BLOCKED`）：调度这一侧的沙箱写不到工作区以外，这台机器上正在跑的那份插件仍是旧版本。
 5. **收口的这一提交是纯文档**：只动 `docs/knowledge/{STATE,HANDOFF,VALIDATION}.md`，所以没有为它重跑 `npm run ci`；`src/`、`test/`、`lib/`、
    `package.json`、`CHANGELOG.md`、两个 README 与 tag 状态一行未动。
 
@@ -563,7 +578,7 @@
 | 远端 `Release` | run **45349634592**（tag push，event `push`，headBranch `v0.13.30`） | **success**；已发布 <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.30>，资产 `dsh-grok-workflow-0.13.30.tgz` = **917 321 bytes**。**`CONFIRMED`** |
 | 挂死形状取证（本版随出去的第三条） | 目录 `.rsi/evidence/soak-hang-shape-2026-11-24/`（README 308 行 + 两轮原始日志 + `analyze-*.txt` + `baseline.txt`），**只出证据、不出代码** | **PASS**：五个任务的真机一轮里挂死路整轮被调用 **3 次**（任务 1 自己的两次尝试；任务 2–5 一次没打它），每次挂死调用都由这一轮自己的 45 s 子调用预算结算（端点侧 **44.65–44.93 s**），第 3 次是传输层 300 s 后把第一次尝试遗留的孤儿请求原样重发（请求体字节数相同），**两轮独立复现形状一致**。**`CONFIRMED`**（口径与缺口见下一张表） |
 | 收尾（worktree / 分支 / 标记） | `git worktree remove` ×2（只删已合并且干净的：`feat/dead-routes` `0113211`、`release/0.13.27` `2141071`）；`git checkout -- .rsi/STOP` | 两个 worktree 连分支删掉；另 **6 个**故意没动（带未提交的活或未合分支）；`.rsi/STOP`（tracked，`Operator stop — RSI self-iteration halted 2026-11-21`）此前被某个会话在工作树里删掉、没有提交解释，这次复原，操作员的停止继续有效。**`CONFIRMED`** |
-| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30` | **`BLOCKED`（本侧）**：包工头的沙箱写不到工作区以外，`~/.dsh` 不在可写范围。这一条**没有**做，留给操作员执行，并在执行后读回版本确实是 `0.13.30` |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30` | **`BLOCKED`（本侧）**：调度的沙箱写不到工作区以外，`~/.dsh` 不在可写范围。这一条**没有**做，留给操作员执行，并在执行后读回版本确实是 `0.13.30` |
 
 ### 取证目录 `.rsi/evidence/soak-hang-shape-2026-11-24/`：现在已提交，它的 PASS 建立在什么上
 
@@ -792,7 +807,7 @@ Node 的模块解析会向上走到主 checkout 的 `node_modules`，所以 `npx
 （`node_modules/` 在 `.gitignore` 第一行，不进版本树、不出现在 `git status`）。修好后 `verify:lib` 通过。
 下一个在这台机器上开 worktree 的人会撞到同一处，值得在开 worktree 的脚本里钉成绝对路径。
 
-## 判定腿同 attempt 补打（第二刀）— 2026-11-24（包工头 A / agent-113，分支 `feat/leg-retry`，未合流）
+## 判定腿同 attempt 补打（第二刀）— 2026-11-24（调度 A / agent-113，分支 `feat/leg-retry`，未合流）
 
 | state | command | result |
 | --- | --- | --- |
@@ -823,7 +838,7 @@ Node 的模块解析会向上走到主 checkout 的 `node_modules`，所以 `npx
 （`verifierCalls === 2`）——那正是本特性的缺席。改成钉新契约：`maxRetries` 1 时共 4 次判定调用（每次尝试首打 + 一次补打）、
 **worker 每次尝试只打一次**、两条 attempt 都带 `judgeRetried` 且 `failure.class === 'server-error'`。
 
-**独立交叉核对（包工头自己做，不只信子代理自述）：** 逐行读 diff（两条走廊位置在 B/C 之前，所以「补打回来还是不能解析」
+**独立交叉核对（调度自己做，不只信子代理自述）：** 逐行读 diff（两条走廊位置在 B/C 之前，所以「补打回来还是不能解析」
 会落成 `format-error` 由 B/C 再打一次＝第三趟，与预算 3 一致）；读新用例 8 条与其断言；改前改后各跑一次全量门禁与
 `verify:lib`；确认 `git status` 只剩预期文件。
 

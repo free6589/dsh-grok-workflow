@@ -19,6 +19,11 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Changed / 变更
 
+- **The role that splits a block is now called the dispatcher / 「包工头」改叫「调度」** — The delegated agent that splits one block into
+  subagents, accepts their results and writes no code is now named the dispatcher, in the tool descriptions, the preview line and the
+  refusal messages alike. Nothing else moved: a block row still records `execution: "foreman"`, and the L1 dispatcher on the task board
+  keeps its own name. / 把一块活拆给子代理、收结果、自己不写代码的那个角色，现在叫「调度」，工具说明、预览那一行和拒绝消息里都改了。
+  其余没动：块账本里照样记 `execution: "foreman"`，任务板那一层的 L1 大管家还是它自己的名字。
 - **Your messages are no longer intercepted by default / 默认不再有人拦你的消息** — An ordinary message now goes straight to the model:
   no front-desk reply is inserted, and what you typed reaches the model word for word. The old front desk is opt-in now — a profile has to
   ask for it with `legacyGate: true`. / 普通一句话现在直接到模型：中间不再插一条前台的转述，你打的字逐字到达模型。
