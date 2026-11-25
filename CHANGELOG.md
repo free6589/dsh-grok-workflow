@@ -5,6 +5,16 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The switch at the bottom of the message box is now called the workflow switch, and says only on or off / 对话框底部那个开关现在就叫「工作流开关」，只说是开还是关** —
+  Its label read `Workflow` in English and `workflow总开关` in Chinese, and its on-state read `On · full crew` / `开 · 全员模式` — the name of a mode that no longer
+  exists, because the old front desk was deleted in 0.13.35. The label is now `Workflow switch` / `工作流开关` and the state is just `On` / `开`, set against
+  `Off` / `关`. Nothing else moves: the same session record, the same request, the same click, the same three ways of saying off. Only the words on screen.
+  / 标签原来是英文 `Workflow`、中文 `workflow总开关`，开着的时候读 `On · full crew` / `开 · 全员模式`——那个「全员模式」在 0.13.35 删掉旧前台之后就不存在了，
+  屏幕上却还写着。现在标签统一叫 `Workflow switch` / `工作流开关`，状态只有 `开`，与 `关` 相对。别的都没动：同一条会话记录、同一个请求、同一次点击、
+  同样那三种说法表示关。变的只是屏幕上那几个字。
+
 ### Removed / 移除
 
 - **Dead code, not features: the last unused exports left by the 0.13.35 deletion are gone / 删掉的是死代码，不是功能：0.13.35 那次删除留下的最后一批没人用的导出已经清掉** —
