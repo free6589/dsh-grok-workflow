@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.41] - 2026-11-26
+
 ### Fixed / 修复
 
 - **A demand sent while a run is working reaches that run again / 跑中插话又能送进正在跑的那一轮** —
