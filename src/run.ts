@@ -43,6 +43,7 @@ import type { DisposeDrain, DisposeRecord, DisposeRunInfo } from './records.js'
 import { createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
 import { RELAY_SOURCE_KIND } from './answer.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
+import { closeSteering, mintSteeringToken, openSteering } from './steering.js'
 import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, StopCause, WorkflowReport } from './types.js'
 
 /** Minimal logger surface used by the runtime modules. */
@@ -634,13 +635,20 @@ export interface RunWorkflowOptions {
   /** Extra cancellation sources (the tool's exec signal, or the gate's own). */
   signals?: AbortSignal[]
   /**
-   * Live steering token (L2), opened by the caller through `src/steering.ts`.
+   * The conversation this run may be steered from (L2), or absent for no channel.
    *
-   * A run that carries one lets the script's boundary planner child pull the
-   * demands queued while it works; a run without one has no channel at all, so a
-   * mid-run message keeps its pre-L2 meaning (a queued round).
+   * A mid-run demand (`grok_steer`) is resolved by session id, so the caller — the
+   * one place that knows which conversation the tool call happened in — names it
+   * here. The run then owns the whole channel: it mints the token (the request
+   * payload budgets the boundary calls from it), registers the queue just before
+   * the engine is asked to start, and closes it in `finally`.
+   *
+   * Absent means **no channel at all**: no queue, no `replan` token, no boundary
+   * call, and a request payload byte-identical to the pre-L2 one. Every existing
+   * caller and every spec that does not ask for a channel therefore keeps its old
+   * shape, which is what makes the switch testable at all.
    */
-  steeringToken?: string
+  steering?: { sessionId: string }
   /**
    * The captain's three sheets (round-071), compiled and bounded by
    * `src/captain-memory.ts`. The planner and the boundary planner read it as
@@ -952,6 +960,17 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   }
 
   const inheritance = inheritanceForSession(sessionOfAgent(agent))
+  // L2 live steering: the token exists before the request is built, because the
+  // payload budgets one boundary call per wave visit from it. The queue the token
+  // belongs to is registered later — immediately before the engine is asked to
+  // start — so a run that never gets that far (a recorder or the guardian throws
+  // while being created) leaves no channel behind for `grok_steer` to queue into.
+  // `replan` is the switch: off means every message is its own round, and that is
+  // exactly "no channel".
+  const steeringSession = options.steering !== undefined && config.replan
+    ? options.steering.sessionId.trim()
+    : ''
+  const steeringToken = steeringSession === '' ? undefined : mintSteeringToken()
   const request = buildWorkflowRequest(
     objective,
     callerTasks,
@@ -960,10 +979,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     carryover,
     busyHint,
     inheritance,
-    // L2: the token the boundary planner child quotes to pull queued demands. The
-    // caller that opened the channel owns closing it, so this function never leaks a
-    // channel on an early return (cap refusal, pre-start cancellation).
-    options.steeringToken,
+    // L2: the token the boundary planner child quotes to pull queued demands.
+    steeringToken,
     // Round-071: what the captain remembers about this user and this history.
     options.captainBrief,
   )
@@ -1379,6 +1396,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       if (typeof message === 'string' && message.includes('guardian rescue')) guardian.noteRescue(info, message)
     }))
   }
+  // Registration is the last step before the run's own `try`: everything that can
+  // still throw here is the engine's start, and the `finally` below owns the
+  // channel from the moment it exists.
+  const steering = steeringToken === undefined ? undefined : openSteering(steeringSession, steeringToken)
   try {
     try {
       const start: WorkflowStartRequest = {
@@ -1637,6 +1658,19 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     const detail = redactSecrets(String(result.error ?? 'unknown workflow failure'))
     return failure('Engine error', detail, 'engine-error')
   } finally {
+    // The channel closes with the run, first thing: from here on `grok_steer` finds
+    // no queue and says so, instead of queueing into a run that has already
+    // settled. A demand that arrived after the last boundary is counted, never
+    // handed to a later run under this token — and never silently swallowed.
+    if (steering !== undefined) {
+      const unmerged = steering.queue.size
+      closeSteering(steering.token)
+      if (unmerged > 0) {
+        logger.warn(
+          `steering: ${unmerged} demand(s) were queued after this run's last wave boundary and could not be merged into it`,
+        )
+      }
+    }
     if (timer !== undefined) clearTimeout(timer)
     if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
     // Settle the resident guardian first. Its findings are diagnostic

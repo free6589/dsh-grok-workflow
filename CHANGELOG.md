@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A demand sent while a run is working reaches that run again / 跑中插话又能送进正在跑的那一轮** —
+  Every run now opens its own live channel when it starts: the conversation it belongs to is what a mid-run demand is looked up by,
+  the boundary planner child is handed the run's token, and the queue is closed when the run settles, so a message can never be
+  promised a channel that belongs to a run that already ended. A demand queued with `grok_steer` while the run works is merged into
+  the remaining plan at the next wave boundary — settled work is not redone — and a demand that arrives after the last boundary is
+  counted in the log instead of vanishing. Since 0.13.35 nothing opened that queue, so `grok_steer` always answered "this block has
+  no workflow running" and a mid-run demand could not be merged at all. The `replan` switch still decides whether a channel exists:
+  off means every message is its own round, exactly as before, and a run that is given no conversation has no channel.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.** The one thing a reader should expect is
+  the cost the switch always described: a run with several waves spends one planner-route call per boundary (at most four per run),
+  because "nothing was queued" is only knowable by asking.
+  / 现在每一轮跑起来时都会给自己开一条活通道：跑中插话按「哪个会话」找到它，波边界那个规划子代理会拿到这一轮的口令，
+  运行结束时队列随之关闭，所以一条消息不会被许诺一条已经结束的运行还开着的通道。跑中经 `grok_steer` 排进来的要求，
+  会在下个波边界并进还没跑的计划——已验证的成果不重做；最后一道边界之后才到的要求会在日志里记个数，不会凭空消失。
+  从 0.13.35 起没有任何东西开过这个队列，所以 `grok_steer` 总是回答「这一块现在没有在跑的 workflow」，跑中的要求根本并不进来。
+  `replan` 开关仍然决定有没有通道：关掉就是每条消息另起一轮、与以前一致；没有告诉它会话的运行也不开通道。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。** 该预期的一件事是这颗开关一直写着的代价：
+  多波的运行每道边界花一次规划路由调用（一轮最多四次），因为「队列是不是空的」只有问了才知道。
+
 ## [0.13.40] - 2026-11-26
 
 ### Changed / 变更

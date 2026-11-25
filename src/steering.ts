@@ -111,20 +111,52 @@ const bySession = new Map<string, SteeringQueue>()
 let tokenCounter = 0
 
 /**
+ * Mint a run token without registering anything.
+ *
+ * The token is needed *before* the queue exists: `buildWorkflowRequest` budgets
+ * the boundary calls from it, while the registration must happen as late as
+ * possible in the run's setup (a run that never starts leaves no queue behind —
+ * see `runWorkflow`). Minting and registering are therefore two steps, and this
+ * is the first one.
+ * @returns a token unique within this process.
+ */
+export function mintSteeringToken(): string {
+  tokenCounter += 1
+  return `steer-${Date.now().toString(36)}-${tokenCounter}`
+}
+
+/**
  * Register a run's steering channel.
  * @param sessionId - the session the run belongs to.
- * @param token - the run token (a fresh one when omitted, for tests).
+ * @param token - the run token; omitted means a fresh one (tests, callers that
+ *   do not need to know it in advance).
  * @returns the queue and the token the script must quote.
  */
 export function openSteering(
   sessionId: string,
-  token: string = `steer-${Date.now().toString(36)}-${(tokenCounter += 1)}`,
+  token: string = mintSteeringToken(),
 ): { token: string, queue: SteeringQueue } {
   const queue = new SteeringQueue(token)
   queues.set(token, queue)
   // A session has at most one live queue: its newest run owns the channel.
   bySession.set(sessionId, queue)
   return { token, queue }
+}
+
+/**
+ * Close one run's channel; called from the run's `finally`.
+ *
+ * Only this token's entries are removed. A newer run in the same session that
+ * already took the channel over keeps it: the session mapping is dropped only
+ * when it still points at *this* token, so closing an older run cannot make a
+ * live run unsteerable.
+ * @param token - the token returned by {@link openSteering}.
+ */
+export function closeSteering(token: string): void {
+  queues.delete(token)
+  for (const [sessionId, queue] of bySession) {
+    if (queue.token === token) bySession.delete(sessionId)
+  }
 }
 
 /** Close every channel (plugin unload). */

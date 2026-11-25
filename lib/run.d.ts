@@ -187,13 +187,22 @@ export interface RunWorkflowOptions {
     /** Extra cancellation sources (the tool's exec signal, or the gate's own). */
     signals?: AbortSignal[];
     /**
-     * Live steering token (L2), opened by the caller through `src/steering.ts`.
+     * The conversation this run may be steered from (L2), or absent for no channel.
      *
-     * A run that carries one lets the script's boundary planner child pull the
-     * demands queued while it works; a run without one has no channel at all, so a
-     * mid-run message keeps its pre-L2 meaning (a queued round).
+     * A mid-run demand (`grok_steer`) is resolved by session id, so the caller — the
+     * one place that knows which conversation the tool call happened in — names it
+     * here. The run then owns the whole channel: it mints the token (the request
+     * payload budgets the boundary calls from it), registers the queue just before
+     * the engine is asked to start, and closes it in `finally`.
+     *
+     * Absent means **no channel at all**: no queue, no `replan` token, no boundary
+     * call, and a request payload byte-identical to the pre-L2 one. Every existing
+     * caller and every spec that does not ask for a channel therefore keeps its old
+     * shape, which is what makes the switch testable at all.
      */
-    steeringToken?: string;
+    steering?: {
+        sessionId: string;
+    };
     /**
      * The captain's three sheets (round-071), compiled and bounded by
      * `src/captain-memory.ts`. The planner and the boundary planner read it as
