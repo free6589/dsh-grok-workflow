@@ -298,3 +298,13 @@
 
 **边界**：这跑用的角色路由是 `bifrost-responses`（见 §2 第 2 条，本机没有 `agent2api` 的钥匙），
 所以它证明的是「引擎主链在这条路由上真跑通」，不证明 live 档案那一套 `agent2api` 路由在本机能跑。
+
+## 9. 产物
+
+    .rsi/evidence/user-regression-2026-11-26/README.md                     本文件（全部读数与边界）
+    .rsi/evidence/user-regression-2026-11-26/ledger/blocks.jsonl           块账本原样 4 行（预览批准 / 接单 / 交卷 …）
+    .rsi/evidence/user-regression-2026-11-26/ledger/verdicts.jsonl         监工判决原样 1 行（judged 的那一条）
+    .rsi/evidence/user-regression-2026-11-26/block-deliverable-notes.md    块交付物（监工判 pass 的那个文件）
+
+`.tmp/user-regression/` 下的东西（隔离 home、克隆档案、会话转录、脚本、浏览器缓存）是 gitignored 的临时件，
+跑完即删；仓库里只留上面这三件 + 本文件。
