@@ -1,3 +1,64 @@
+## `0.13.52` **发出去并收口**：合并提交 `ebc5f37`、发布提交 `9cc2e43`、`main` 从 `226d673` 快进、附注标签 `v0.13.52` 对象 `9c7ebe3c…`、两个远端 run 都 success、Release 资产 **1021062** 字节（比 `0.13.51` **+1229**）；发布门禁在 `9cc2e43` 上 **`GATE_EXIT=0`**（`105 files / 2060 passed` / `101.40s`，转录 **412 行 / 25120 字节 / `sha256 d1171a72…`**）；**第二遍门禁 / 真机 soak / npm publish `NOT_RUN`**、**live 档案升级 `BLOCKED`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`0.13.52` 的发布收口。**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）——这一版发出去的东西
+是功能分支 `fix/card-approval` 的两颗提交（源码 + 用例 + `lib/` 的 `b0c3f5d`、记忆 + 证据的 `22ca3d0`），
+契约见 `D-172`，块内门禁与真机两轮对照的读数在下面那一段（写于合并之前）。这一轮的活是：合流、发版、推 `main` 与标签、
+盯两个远端 run 到 success、核对 Release 元数据与资产、写记忆、确认本机收尾，最后做一次 live 升级探测（预期被拒）。
+**本轮自己重读的是 `git` 与 `gh` 侧**（合并提交的两父、`merge-base` 与 `--is-ancestor`、标签对象与剥离结果、`tagger`、远端 refs、
+两个 run 的 id 与结论、Release 字段与资产），门禁那份转录是**只读复核**（`wc -lc` + `sha256sum` + 逐行读关键读数），
+**没有重跑门禁、没有重跑任何套件**。
+
+**发布身份（`CONFIRMED`，本轮自己 `git` 读的）**
+
+| 项 | 值 |
+| --- | --- |
+| 合并提交 | `ebc5f37`（`Merge branch 'fix/card-approval' into release/0.13.52`），两父 `226d673efcc56ebb0889ec658e5c270fcaadd0e2` + `22ca3d0c5d912d4b3ecbfc5e17849080c7dc1d61`，28 文件 / +670 −24 |
+| 「解冲突」这一步 | **空操作**：功能分支基点正是 `main` 尖端 `226d673`——`git merge-base 226d673 22ca3d0` = `226d673…`、`git merge-base --is-ancestor 226d673 22ca3d0` 为真 |
+| 发布提交 | `9cc2e43e0420fc8d26f3533c54b90bb3ca3468fd`（`chore(release): prepare v0.13.52`），单亲 `ebc5f37`，8 文件 / **+24 −22** |
+| 合流方式 | 发布分支从 `226d673` 长出（`git merge --no-ff` 并出 `ebc5f37`，再落 `9cc2e43`）；`main` 从 `226d673` **快进**到 `9cc2e43`，推送输出逐字 `226d673..9cc2e43  main -> main`（**派单记录**） |
+| 标签对象 | `v0.13.52`，`git cat-file -p` 读到 `type commit` / `object 9cc2e43…` / `tag v0.13.52` |
+| 剥离 | `git rev-parse v0.13.52^{}` = **`9cc2e43e0420fc8d26f3533c54b90bb3ca3468fd`**（= 发布提交） |
+| 标签消息 / 时刻 | `Grok Workflow for DSH v0.13.52` / **`2026-11-26 17:13:05 +0800`**（`1795684385 +0800`） |
+| `main` 现状 | `git rev-parse main` = `git rev-parse origin/main` = `git rev-parse HEAD` = `9cc2e43…`；`git ls-remote origin refs/heads/main` 也是 `9cc2e43…` |
+| 推标签 | `* [new tag]         v0.13.52 -> v0.13.52`、推前本地与远端都没有 `v0.13.52`——**派单记录**；本轮推后读到远端 `refs/tags/v0.13.52` = `9c7ebe3c…`、其 `^{}` = `9cc2e43…`，只多这一条；**没有 force-push、没有移动任何已发布标签** |
+
+**发布门禁（`CONFIRMED`，转录 `.rsi/evidence/release-0.13.52-2026-11-26/gate-release-9cc2e43.out`，跑在已发布的树 `9cc2e43` 上，也是这一版唯一一次整份门禁）**
+
+| 项 | 值 |
+| --- | --- |
+| 环境 | worktree `.tmp/wt-release-0.13.52`、分支 `release/0.13.52`、`HEAD: 9cc2e43…`、`node v26.8.1`、`# started: 2026-11-26T17:10:56+08:00` |
+| 命令 | `TMPDIR=$PWD/.tmp npm run ci`（= `typecheck && lint && verify:lib && test`） |
+| 转录 | **412 行 / 25120 字节 / `sha256 d1171a72d5aac97ca67d18ca3bc2d05ba65d349217eae8e81c1c7f8556e08575`**，末行第 412 行 `GATE_EXIT=0` |
+| lint | `Found 15 warnings and 0 errors.`（第 167 行） |
+| `verify:lib` | `lib/ at 9cc2e43 is the build of src/ at 9cc2e43 (293 files, byte-identical)`（第 174 行） |
+| 客户端包 | `client bundle: 386534 bytes → lib/client.js`（第 173 行 `verify:lib` 那一步、第 183 行 `npm run build` 那一步） |
+| 套件 | `Test Files 105 passed (105)`（第 407 行）、`Tests 2060 passed (2060)`（第 408 行）、`Duration 101.40s`（第 410 行） |
+
+**与上一版（`0.13.51`）的算术**：用例 `2057 → 2060`（**+3**）、测试文件 `105 → 105`（不变）、lint `15 / 0`（不变）、
+`lib/` 文件数 `293 → 293`（不变）、客户端 bundle **386534 字节不变**（这一版没动浏览器包）、Release 资产 `1019833 → 1021062`（**+1229**）。
+
+**远端两个 run（`CONFIRMED`，`gh run view` 只读读的）**
+
+| run | id | 触发 | 头分支 / sha | 结论 |
+| --- | --- | --- | --- | --- |
+| CI | **`45789924394`** | `push` | `main` / `9cc2e43` | `completed` / **`success`**（job `Node 22`、`Node 24` 都 success） |
+| Release | **`45789939770`** | `push` | `v0.13.52` / `9cc2e43` | `completed` / **`success`**（`2026-11-26T09:13:17Z` → `09:14:28Z`，job `Validate and publish v0.13.52`） |
+
+**GitHub Release（`CONFIRMED`，`gh release view v0.13.52` 只读读的）**：`Grok Workflow for DSH v0.13.52`、
+<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.52>、`tagName v0.13.52`、非 draft、非 prerelease、
+`targetCommitish main`、`publishedAt 2026-11-26T09:14:24Z`、正文 19 行 / 1856 字节（`--json body` 的字符串自测）；
+唯一资产 `dsh-grok-workflow-0.13.52.tgz` = **1021062** 字节、`digest sha256:0df246c80c4cf23079047b393e1a154c4c20abb0ee4c79ecec29494a73f81cab`、
+state `uploaded`（上一版 `0.13.51` 是 **1019833** 字节）。
+
+**`NOT_RUN` 照实记：** 第二遍整份门禁（`AGENTS.md` §12）、真机 soak（发布这一轮没跑；卡片路径的两轮真机对照在块里那一轮，
+证据 `.rsi/evidence/card-approval-2026-11-26/`）、npm publish（本仓库不发 npm）。
+**`BLOCKED` 一条：** `AGENTS.md` §13 的 live 档案升级——`~/.dsh` 在工作区外、本会话 `workspace-write`、审批提示被禁用，
+探测 `: > ~/.dsh/.release-probe-0.13.52` 被拒（`Read-only file system`），**没写、没重试绕过、没重载、没重启、3080 端口没碰**；
+只读状态：live 那条插件行是浮动的 `github:free6589/dsh-grok-workflow`（写在 `~/.dsh/profiles/web/package.json` 的 dependencies 里，没钉 tag），
+装着的副本读作 **`0.13.48`**；留给有写权限的人一条动作——钉到确切的 `v0.13.52`、读回 `0.13.52`，读不回就回滚那一行并报出回滚后的版本。
+
+---
+
 ## `fix/card-approval` 上的卡片批准来源：账本从 `user` 改记 `question-reply`（`CONFIRMED`）— 2026-11-26
 
 **这一轮是什么**：D-137 让卡片答案能开出块之后留下的那一格——账本把卡片点头和打字点头写成同一个 `kind:"user"`。本块把来源拆开：

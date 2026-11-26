@@ -1,3 +1,59 @@
+Last updated: 2026-11-26 17:15 +08:00（**`0.13.52` 已发出并收口；这一版发出去的就是「点问题卡片开的块，记录里写明这是点卡片点的」（`CONFIRMED`）** —
+发布提交 **`9cc2e43e0420fc8d26f3533c54b90bb3ca3468fd`**（`chore(release): prepare v0.13.52`，**8 文件 / +24 −22**——`CHANGELOG.md`、`README.md`、
+`README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js`），
+它的**单亲是合并提交 `ebc5f37`**（`Merge branch 'fix/card-approval' into release/0.13.52`，两父 **`226d673`** + **`22ca3d0`**、
+**零冲突**、28 文件 / +670 −24）；**发布分支从 `226d673` 长出来**（`git merge --no-ff` 把功能分支并成 `ebc5f37`，再在发布分支上落 `9cc2e43`），
+`main` 则是**快进** `226d673` → `9cc2e43`，推送输出逐字 **`226d673..9cc2e43  main -> main`**（**派单记录**，发布那一轮当场打印的那一行）。
+现在 **`main` = `origin/main` = 发布提交 = 标签剥出的提交 = `9cc2e43`**（本轮自己 `git rev-parse main origin/main HEAD`、
+`git ls-remote origin refs/heads/main` 各读一次，三处与远端都是 `9cc2e43…`）。
+**「解冲突」这一步是经过验证的空操作**：功能分支的基点**正是**当时的 `main` 尖端 `226d673`——本轮自己读
+`git merge-base 226d673 22ca3d0` = `226d673…`、`git merge-base --is-ancestor 226d673 22ca3d0` 为真，所以合进去时没有一段需要人解；
+这条分支自己的两颗提交是源码 + 用例 + `lib/` 一起的 **`b0c3f5d`**（16 文件 / +165 −24）与记忆 + 证据 **`22ca3d0`**（12 文件 / **+505**）。
+附注标签 **`v0.13.52`** 对象 **`9c7ebe3ca62cd90df7158149a22ca88be74ffe3c`** → `git rev-parse v0.13.52^{}` 剥出 `9cc2e43`、
+消息 `Grok Workflow for DSH v0.13.52`、`tagger` 时刻 **`2026-11-26 17:13:05 +0800`**（`1795684385 +0800`，本轮自己 `git cat-file -p v0.13.52` 读的）；
+推标签输出 `* [new tag]         v0.13.52 -> v0.13.52`、**没有 force-push、没有移动任何已发布标签**、`v0.13.52` 推之前本地与远端都不存在
+（这三句是**派单记录**，推送当场没有留转录、本轮无法回读）；**本轮推后自己读**到远端 `refs/tags/v0.13.52` = 对象 `9c7ebe3c…`、其 `^{}` = `9cc2e43…`，远端只有这一条。
+**发布门禁只有一份，也是这一版唯一一次完整门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在**已发布的树 `9cc2e43`** 上由派单的 foreman 跑 →
+**`GATE_EXIT=0`**（转录末行）、`Test Files 105 passed (105)`（第 407 行）、`Tests 2060 passed (2060)`（第 408 行）、`Duration 101.40s`（第 410 行）、
+`Found 15 warnings and 0 errors.`（第 167 行）、`lib/ at 9cc2e43 is the build of src/ at 9cc2e43 (293 files, byte-identical)`（第 174 行）、
+`client bundle: 386534 bytes → lib/client.js`（第 173 / 183 行）；转录 **`.rsi/evidence/release-0.13.52-2026-11-26/gate-release-9cc2e43.out`**，
+本轮自己 `wc -lc` + `sha256sum` 读到 **412 行 / 25120 字节 / `sha256 d1171a72d5aac97ca67d18ca3bc2d05ba65d349217eae8e81c1c7f8556e08575`**，末行就是 `GATE_EXIT=0`；**没有重跑第二遍**（`AGENTS.md` §12）。
+**两个远端 run 都 `completed success`**（本轮自己 `gh run view` 只读复核，不是转述）：CI **`45789924394`**（`push` / `main` / `9cc2e43`，两个 job `Node 22`、`Node 24` 都 success）、
+Release **`45789939770`**（`push` / `v0.13.52` / `9cc2e43`，`2026-11-26T09:13:17Z` → `09:14:28Z`，job `Validate and publish v0.13.52`）。
+**GitHub Release**（本轮自己 `gh release view` 读的）`Grok Workflow for DSH v0.13.52`、<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.52>、
+`tagName v0.13.52`、非 draft、非 prerelease、`targetCommitish main`、`publishedAt 2026-11-26T09:14:24Z`，正文 **19 行 / 1856 字节**
+（`--json body` 读到的字符串 1856 字节 UTF-8、末尾带换行；`--jq` 输出会多一个换行，所以那条 `wc -lc` 读到 `19 / 1857`），
+唯一资产 `dsh-grok-workflow-0.13.52.tgz` = **1021062** 字节、`digest sha256:0df246c80c4cf23079047b393e1a154c4c20abb0ee4c79ecec29494a73f81cab`、
+state `uploaded`（上一版 `0.13.51` 是 **1019833** 字节，**+1229**）。**用户看到的这一版就一件事**：点问题卡片开出来的块，
+批准在记录里记成 `question-reply`（不再和打字确认混成同一个 `user`），`quote` 里仍然只有你自己说的那句话；**没有要迁移的东西**。
+**用例与产物的算术**（与 `0.13.51` 发布门禁读数比）：用例 `2057 → 2060`（**+3**）、测试文件 `105 → 105`、lint `15 / 0` 不变、
+`lib/` 文件数 `293 → 293` 不变、客户端 bundle **386534 字节不变**（这一版没动浏览器包，`lib/client.js` 那两行是版本字符串替换）；
+`README.md` / `README.zh-CN.md` 的用例句在发布提交里改成了 `2060` / `105 个文件 / 2060 个确定性测试`。
+**本机收尾（`CONFIRMED`，本轮自己 `git worktree list` / `git branch -vv` / `git status --short --branch` 读的）**：发布是在
+**`.tmp/wt-release-0.13.52`** 这个 worktree 里做的（gitignored 的临时目录，`node_modules` 从主检出软链过去），**主检出从头到尾没切过**——
+它现在仍是 `## main...origin/main` 加 ` M .gitignore` 与 `?? .rsi/evidence/progress-now/` 两处**别人的东西，原样没动、一个都没 stage**；
+`git worktree list` 只剩两条（主检出 `main` @ `9cc2e43`、本 worktree `release/0.13.52` @ `9cc2e43`），功能分支的 worktree
+`.agents/worktrees/fix-card-approval` 已不在列表里；分支 `fix/card-approval`（`22ca3d0`）与 `release/0.13.52`（`9cc2e43`）**都还在、没删**
+（删分支不在本轮范围，`AGENTS.md` §5 的 24 小时窗口从今天的合并算起）。
+**块里留着、这一版照原样带下去的四条（不是本轮发现的新问题）**：① 监工的**模型判断**那条腿（`src/supervisor/verdict.ts`）**一次都没有在真机上跑过**，
+这一版只证明确定性那六道检查与卡片点头的记账来源；② `verdict.ts` 那句 `（这次交工没有报任务拆法）` **已不可达但仍在**（第 1 道检查先否决），
+**故意留着**，因为导出的 `supervisorPrompt` 仍可被直接塞空拆法；③ `cardAnswerText()` 的空答案兜底（`selected: []` 且没有 `custom` 时回落成整段 JSON）
+**从 D-137 起一个字没动**；④ **`question-reply` 是新增的合法值，方向是单向的**——新构建读老行没问题，**旧构建读到新行会跳过那一行**，所以不要承诺降级。
+**`NOT_RUN` 三条**：第二遍整份门禁（`AGENTS.md` §12）、真机 soak（发布这一轮没跑；卡片路径的两轮真机对照在块里那一轮，证据在
+`.rsi/evidence/card-approval-2026-11-26/`）、npm publish（本仓库不发 npm，发布面只有 GitHub Release）。
+**`BLOCKED` 一条**：`AGENTS.md` §13 的 live 档案升级——`~/.dsh` 在工作区外、本会话 `workspace-write`、审批提示被禁用，
+探测 `: > ~/.dsh/.release-probe-0.13.52` 被拒（`Read-only file system`），**没写、没重试绕过、没重载、没重启、3080 端口没碰**；
+只读探到的现状：live 里那一行读作**浮动的** `github:free6589/dsh-grok-workflow`（在 `~/.dsh/profiles/web/package.json` 的 dependencies 里，没钉 tag；
+`cordis.patch.yml` 里 `id: grok-workflow` 那一行本身不带版本），装着的副本读作 **`0.13.48`**。
+**有写权限的人要做的（一条）**：把那条插件行钉到**确切的 `v0.13.52`**（绝不用浮动范围、`latest` 或分支名），读回版本必须是 **`0.13.52`**，
+读不回就**回滚那一行**并报出回滚后的版本。本轮的记忆提交只碰五件（三个记忆文件 + 证据目录的 `README.md` 与那份转录的登记），
+**没有改动转录一个字节**（写前后各读一次 `wc -lc` + `sha256sum`，两次都是 `412 / 25120 / d1171a72…`）。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 16:22 的 **`0.13.51` 收口那一轮**，它记的是上一版的发布身份、门禁读数、
+两条带下去的缺口与当时被拒的 live 探测；再往下是 16:10 的**批准目录那一轮**与更早各轮。
+**卡片批准那一轮**（写于合并之前：未推、未打 tag、版本仍是 `0.13.51`）按那一轮自己的做法**追加在文件末尾**
+（`Last updated: 2026-11-26 17:00 +08:00`），不在本段下面。它们的结论一字未改。）
+
 Last updated: 2026-11-26 16:22 +08:00（**`0.13.51` 已发出并收口；这一版发出去的就是「关单去当初批准的那个文件夹里核对产物、空拆法硬拒」（`CONFIRMED`）** —
 发布提交 **`16453c4cd715e53f960478d572f3ab0f4345c0e3`**（`chore(release): prepare v0.13.51`，**8 文件 / +24 −22**——`CHANGELOG.md`、`README.md`、
 `README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js` 各 1–6 行），

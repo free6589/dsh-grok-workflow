@@ -1,3 +1,57 @@
+## 2026-11-26 — **`0.13.52` 已发布并收口**（合并提交 `ebc5f37`、发布提交 `9cc2e43`、附注标签 `v0.13.52` 对象 `9c7ebe3c…`、两个远端 run 都 success、Release 资产 **1021062** 字节）；**live 档案升级 `BLOCKED`，一条动作留给有写权限的人；四条缺口照原样带下去**
+
+- **From:** 发布收口这一轮（`agent-216/release-memory`）· **To:** 有写权限做 live 档案升级的人 / 下一个接手监工模型那条腿的人
+- **发布身份（`CONFIRMED`）**：合并提交 **`ebc5f37`**（`Merge branch 'fix/card-approval' into release/0.13.52`，两父 `226d673` + `22ca3d0`、
+  **零冲突**、28 文件 / +670 −24）→ 发布提交 **`9cc2e43e0420fc8d26f3533c54b90bb3ca3468fd`**（`chore(release): prepare v0.13.52`，
+  单亲 `ebc5f37`，8 文件 / **+24 −22**）；`main` 从 `226d673` **快进**到 `9cc2e43`，推送输出逐字 `226d673..9cc2e43  main -> main`（**派单记录**）；
+  附注标签 **`v0.13.52`** 对象 **`9c7ebe3ca62cd90df7158149a22ca88be74ffe3c`** → `git rev-parse v0.13.52^{}` 剥出 `9cc2e43`、
+  消息 `Grok Workflow for DSH v0.13.52`、`tagger` `2026-11-26 17:13:05 +0800`（`1795684385 +0800`）；推标签输出
+  `* [new tag]         v0.13.52 -> v0.13.52`。**没有 force-push、没有移动任何已发布标签**，`v0.13.52` 推前本地与远端都不存在——
+  **这两行推送输出与「推前不存在」是派单记录**，推送当场没留转录、本轮无法回读；本轮自己推后读到的是远端
+  `refs/tags/v0.13.52` = 对象 `9c7ebe3c…` 且其 `^{}` = `9cc2e43…`、`refs/heads/main` = `9cc2e43…`，远端只多出这一条标签。
+  **「解冲突」这一步是经过验证的空操作**：功能分支的基点**正是**当时的 `main` 尖端 `226d673`（本轮自己读
+  `git merge-base 226d673 22ca3d0` = `226d673…`、`git merge-base --is-ancestor 226d673 22ca3d0` 为真），所以合进去时没有一段需要人解。
+  分支自己的两颗提交是 **`b0c3f5d`**（源码 + 用例 + `lib/`，16 文件 / +165 −24）与 **`22ca3d0`**（记忆 + 证据，12 文件 / **+505**）。
+- **跑过什么（`CONFIRMED`）**：发布门禁只有一份，是这一版唯一一次完整门禁——`TMPDIR=$PWD/.tmp npm run ci` 在**已发布的树 `9cc2e43`** 上由 foreman 跑，
+  转录 `.rsi/evidence/release-0.13.52-2026-11-26/gate-release-9cc2e43.out`（**412 行 / 25120 字节 /
+  `sha256 d1171a72d5aac97ca67d18ca3bc2d05ba65d349217eae8e81c1c7f8556e08575`**，末行 `GATE_EXIT=0`）；本轮**逐行读了这份转录**，不是转述：
+  第 167 行 `Found 15 warnings and 0 errors.`、第 174 行 `lib/ at 9cc2e43 is the build of src/ at 9cc2e43 (293 files, byte-identical)`、
+  第 173 / 183 行 `client bundle: 386534 bytes → lib/client.js`、第 407 行 `Test Files 105 passed (105)`、
+  第 408 行 `Tests 2060 passed (2060)`、第 410 行 `Duration 101.40s`。远端两个 run 本轮自己 `gh run view` 复核：
+  CI **`45789924394`**（`push` / `main` / `9cc2e43`，job `Node 22` 与 `Node 24` 都 success）与 Release **`45789939770`**
+  （`push` / `v0.13.52` / `9cc2e43`，`2026-11-26T09:13:17Z` → `09:14:28Z`）都 `completed` / **`success`**；
+  Release 本轮自己 `gh release view` 读：`Grok Workflow for DSH v0.13.52`、非 draft、非 prerelease、`targetCommitish main`、
+  `publishedAt 2026-11-26T09:14:24Z`、正文 19 行 / 1856 字节、唯一资产 `dsh-grok-workflow-0.13.52.tgz` **1021062** 字节 /
+  `digest sha256:0df246c80c4cf23079047b393e1a154c4c20abb0ee4c79ecec29494a73f81cab`、
+  <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.52>（上一版 `0.13.51` 资产 **1019833** 字节，**+1229**）。
+- **没跑什么（`NOT_RUN` / `BLOCKED`）**：第二遍整份门禁 `NOT_RUN`（`AGENTS.md` §12）；真机 soak `NOT_RUN`（发布这一轮没跑——
+  卡片路径的两轮真机对照在块里那一轮，证据 `.rsi/evidence/card-approval-2026-11-26/`）；npm publish `NOT_RUN`（本仓库不发 npm）；
+  `AGENTS.md` §13 的 live 档案升级 **`BLOCKED`**（见本节最后）。
+
+### 交给下一个人的四件事（**都是原有缺口，这一版照原样带下去；没做，不是做了没记**）
+
+1. **监工的模型判断那条腿仍然没有真机验证。** `0.13.52` 证明的是**确定性那六道检查**照旧绿、卡片点头的记账来源照旧对；
+   `grok_close_block` 里真正的模型判断（`src/supervisor/verdict.ts`）**一次都没有在真机上跑过**，也没有在隔离 `DSH_HOME` 里
+   走完一次「批准→交工→判词」的完整回合。要收这条，得在隔离档案里装 `v0.13.52`、用真会话走一遍。
+2. **`src/supervisor/verdict.ts` 那句 `（这次交工没有报任务拆法）` 还在，而且已经不可达**（第 1 道检查先否决，模型不会被问到）。
+   **故意留着**，因为导出的 `supervisorPrompt` 仍可被直接塞一份空拆法。谁要删，连它的用例一起看，别只删文案。
+3. **`cardAnswerText()` 的空答案兜底没动**——`selected: []` 且没有 `custom` 时它回落成整段 JSON，那时连「确认」都能从模型自己的
+   选项标签里匹配上（一寸没改，从 `D-137` 起就是这个样子）。要收得先定「一个字都没答算不算点头」，单独一条决定。
+4. **`question-reply` 是新增的合法值，方向是单向的**——新构建读老行没问题，**旧构建读到新行会跳过那一行**（读路本来就是「不认识就跳过并记 `skipped`」），
+   所以别承诺能降级。
+
+### live 档案升级（`BLOCKED`，一条动作）
+
+- `~/.dsh` 在工作区外、本会话 `workspace-write`、审批提示被禁用。探测 `: > ~/.dsh/.release-probe-0.13.52` 被拒：`Read-only file system`。
+  **什么都没写、没重试绕过、没重载、没重启、3080 端口没碰。**
+- 只读看到：live 那条插件行是**浮动的** `github:free6589/dsh-grok-workflow`——它写在 `~/.dsh/profiles/web/package.json` 的 dependencies 里，
+  没钉 tag；`cordis.patch.yml` 里 `id: grok-workflow` 那一行本身不带版本。装着的副本读作 **`0.13.48`**，也就是说 live 上还差四个小版本。
+- **有写权限的人要做的（就这一条）**：把那条插件行钉到**确切的 `v0.13.52`**（绝不用浮动范围、`latest` 或分支名），读回版本必须是
+  **`0.13.52`**；读不回来就**回滚那一行**，并报出回滚后的版本。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 的**卡片批准那一轮**（写的是 `fix/card-approval` **合并之前**的状态：
+块内门禁绿、真机两轮对照、未合 `main`、版本仍是 `0.13.51`），再往下面是 **`0.13.51` 收口那一轮**与更早各轮。它们的结论一字未改。）
+
 ## 2026-11-26 — **卡片批准在账本里有了自己的来源：`kind:"question-reply"`**（分支 `fix/card-approval`，提交 `b0c3f5d` + 本条记忆提交）；**块内门禁绿 + 真机两轮对照，未合**
 
 - **From:** 这一块的唯一执行者（`agent-215/worker-card-approval`）· **To:** 合并这条分支的人 / 下一个接手卡片路径的人
