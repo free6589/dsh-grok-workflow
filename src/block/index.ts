@@ -53,6 +53,7 @@ export {
 } from './store.js'
 
 export {
+  canonicalDirectory,
   normalizeSplit,
   previewBlocks,
   previewById,

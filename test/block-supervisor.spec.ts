@@ -10,13 +10,20 @@
  * 2. **A veto changes nothing but the verdict file.** The block row is the same object
  *    before and after, and the verdict file grew by exactly one line.
  *
+ * A third property is pinned in its own describe: **a declared path is read in the
+ * directory the block was approved in**, and two spellings of one file (a symlinked
+ * one included) compare equal. Those cases use no seam at all — a real `mkdtempSync`
+ * root, a real directory, a real symlink and the real filesystem, because a set of
+ * injected strings cannot answer a question about where a path points.
+ *
  * Boundary: the ledger is real (files under `.tmp/`), the supervisor script is the real
  * generated guest script executed in a VM, and the engine is a fake that records every
- * `start` — no model is called.
+ * `start` — no model is called. The artifact seam is injected everywhere except the
+ * path-resolution cases, which are deliberately on the real disk.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { BLOCK_LEDGER_VERSION, readVerdictRows } from '../src/block/index.js'
@@ -31,6 +38,8 @@ import { runWorkflowScript } from './helpers.js'
 
 let ledgerDir = ''
 const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+/** Real approval roots this file made, removed in one pass at the end. */
+const scratchRoots: string[] = []
 
 beforeAll(() => {
   mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
@@ -41,6 +50,9 @@ beforeAll(() => {
 afterAll(() => {
   if (previousLedgerDir === undefined) delete process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
   else process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = previousLedgerDir
+  for (const dir of scratchRoots) {
+    try { rmSync(dir, { recursive: true, force: true }) } catch { /* already gone */ }
+  }
   try { rmSync(ledgerDir, { recursive: true, force: true }) } catch { /* already gone */ }
 })
 
@@ -152,19 +164,32 @@ const GOOD_HANDOFF = [
 /** Every path this suite declares exists, so the artifact check is a stated fact. */
 const exists = (): boolean => true
 
+/** A real approval root under `.tmp/`, deleted with the rest of the scratch. */
+function scratchRoot(): string {
+  const dir = mkdtempSync(join(process.cwd(), '.tmp', 'block-root-'))
+  scratchRoots.push(dir)
+  return dir
+}
+
 /** Run one verdict against a fresh engine. */
 async function judge(options: {
   block?: Partial<BlockEntry>
   siblings?: BlockEntry[]
-  tasks?: BlockTaskRow[]
+  /** `null` omits the split entirely, so the block's own `tasks` decide. */
+  tasks?: BlockTaskRow[] | null
   handoff?: string
   engine?: FakeEngine
   override?: { who: string, why: string }
   judge?: boolean
-  exists?: (path: string) => boolean
+  /** `null` means the real filesystem, for the cases about real files. */
+  exists?: ((path: string) => boolean) | null
+  /** The directory the block was approved in; absent keeps the process cwd. */
+  root?: string
 } = {}): Promise<{ outcome: Awaited<ReturnType<typeof runBlockSupervisor>>, engine: FakeEngine }> {
   const engine = options.engine ?? new FakeEngine()
   const block = blockOf(options.block)
+  const seam = options.exists === null ? undefined : options.exists ?? exists
+  const tasks = options.tasks === null ? undefined : options.tasks ?? goodTasks()
   const outcome = await runBlockSupervisor({
     ctx: ctxWith(engine),
     config: resolveConfig({}),
@@ -173,10 +198,11 @@ async function judge(options: {
     row: rowOf(block, options.siblings ?? []),
     block,
     handoff: options.handoff ?? GOOD_HANDOFF,
-    tasks: options.tasks ?? goodTasks(),
+    ...tasks === undefined ? {} : { tasks },
     ...options.override === undefined ? {} : { override: options.override },
     ...options.judge === undefined ? {} : { judge: options.judge },
-    exists: options.exists ?? exists,
+    ...seam === undefined ? {} : { exists: seam },
+    ...options.root === undefined ? {} : { root: options.root },
     dir: ledgerDir,
     now: Date.parse('2026-01-02T00:00:00.000Z'),
   })
@@ -201,6 +227,22 @@ describe('the six deterministic checks veto without spending a model call', () =
     expect(outcome.outcome).toBe('veto')
     expect(outcome.verdict.route).toBe('deterministic')
     expect(outcome.failures.map(failure => failure.criterion)).toContain(CRITERIA[1])
+    expect(engine.startCalls).toHaveLength(0)
+    expect(verdictLines()).toHaveLength(1)
+  })
+
+  it('1b · plan coverage: a close that reports an empty task split', async () => {
+    const { outcome, engine } = await judge({ tasks: [] })
+    expect(outcome.outcome).toBe('veto')
+    expect(outcome.failures.map(failure => failure.criterion)).toContain('任务拆法')
+    expect(engine.startCalls).toHaveLength(0)
+    expect(verdictLines()).toHaveLength(1)
+  })
+
+  it('1c · plan coverage: a close that omits the split while the block carries none', async () => {
+    const { outcome, engine } = await judge({ tasks: null, block: { tasks: [] } })
+    expect(outcome.outcome).toBe('veto')
+    expect(outcome.failures.map(failure => failure.criterion)).toContain('任务拆法')
     expect(engine.startCalls).toHaveLength(0)
     expect(verdictLines()).toHaveLength(1)
   })
@@ -265,6 +307,91 @@ describe('the six deterministic checks veto without spending a model call', () =
     })
     expect(JSON.stringify(row)).toBe(before)
     expect(verdictLines()).toHaveLength(1)
+  })
+})
+
+describe('declared paths are read in the directory the block was approved in', () => {
+  /** A split whose one task writes exactly these paths. */
+  function writing(writesPaths: string[]): BlockTaskRow[] {
+    return [{ id: 't1', title: '写笔记', objective: '写一段笔记', acceptanceCriteria: [...CRITERIA], writesPaths }]
+  }
+
+  it('joins a relative declared path onto the root instead of the process cwd', async () => {
+    const root = scratchRoot()
+    mkdirSync(join(root, 'notes'), { recursive: true })
+    writeFileSync(join(root, 'notes', 'a.md'), '# notes\n')
+
+    const { outcome } = await judge({
+      root,
+      exists: null,
+      judge: false,
+      block: { writesPaths: ['notes'] },
+      tasks: writing(['notes/a.md:1']),
+    })
+    expect(outcome.failures).toEqual([])
+    expect(outcome.outcome).toBe('pass')
+
+    // The same root, a file it does not hold: the check still answers, so the pass above
+    // is a real answer about the root and not a check that stopped looking.
+    const absent = await judge({
+      root,
+      exists: null,
+      judge: false,
+      block: { writesPaths: ['notes'] },
+      tasks: writing(['notes/b.md']),
+    })
+    expect(absent.outcome.outcome).toBe('veto')
+    expect(absent.outcome.failures.map(failure => failure.criterion)).toContain('notes/b.md')
+    expect(JSON.stringify(absent.outcome.failures)).toContain('路径不存在')
+  })
+
+  it('treats a symlinked spelling of the approved directory as inside it', async () => {
+    const root = scratchRoot()
+    mkdirSync(join(root, 'real'), { recursive: true })
+    writeFileSync(join(root, 'real', 'a.md'), '# a\n')
+    symlinkSync(join(root, 'real'), join(root, 'link'), 'dir')
+
+    const { outcome } = await judge({
+      root,
+      exists: null,
+      judge: false,
+      block: { writesPaths: ['real'] },
+      tasks: writing(['link/a.md']),
+    })
+    expect(outcome.failures.map(failure => failure.criterion)).not.toContain(SCOPE_CRITERION)
+    expect(outcome.outcome).toBe('pass')
+  })
+
+  it('keeps the scope failure when the two spellings name directories that really differ', async () => {
+    const root = scratchRoot()
+    mkdirSync(join(root, 'real'), { recursive: true })
+    mkdirSync(join(root, 'other'), { recursive: true })
+    writeFileSync(join(root, 'real', 'a.md'), '# a\n')
+    symlinkSync(join(root, 'real'), join(root, 'link'), 'dir')
+
+    const { outcome } = await judge({
+      root,
+      exists: null,
+      judge: false,
+      block: { writesPaths: ['other'] },
+      tasks: writing(['link/a.md']),
+    })
+    expect(outcome.outcome).toBe('veto')
+    const scope = outcome.failures.find(failure => failure.criterion === SCOPE_CRITERION)
+    expect(scope?.evidence, "the verdict quotes the caller's spelling, never a canonical path").toBe('link/a.md')
+  })
+
+  it('hands a relative path to an injected seam unchanged when there is no root', async () => {
+    const seen: string[] = []
+    const { outcome } = await judge({
+      judge: false,
+      exists: (path: string) => {
+        seen.push(path)
+        return true
+      },
+    })
+    expect(outcome.outcome).toBe('pass')
+    expect(seen, 'no root, no rewriting: the seam sees the string the caller wrote').toEqual(['src/block/tools.ts'])
   })
 })
 

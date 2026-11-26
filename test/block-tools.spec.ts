@@ -17,17 +17,17 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import { Session } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, Session } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
-import { previewBlocks, resetPreviews } from '../src/block/index.js'
+import { previewBlocks, previewById, resetPreviews } from '../src/block/index.js'
 import { BLOCK_TOOL_NAMES } from '../src/block/tools.js'
 import { setMode } from '../src/mode.js'
 import { closeAllSteering, openSteering, pullSteering } from '../src/steering.js'
@@ -38,6 +38,21 @@ import { delay } from './helpers.js'
 let ledgerDir = ''
 const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
 const previousStopFile = process.env['GROK_WORKFLOW_STOP_FILE']
+/**
+ * Real session directories this suite made.
+ *
+ * They are real mkdtemp directories on purpose: the approval-directory cases assert
+ * about what the filesystem says, so a mocked directory would prove nothing. They live
+ * under `.tmp/` (gitignored) and are removed when the suite ends.
+ */
+const tempDirs: string[] = []
+
+/** A real directory under `.tmp/`, gone when the suite ends. */
+function tempDir(label: string): string {
+  const dir = mkdtempSync(join(process.cwd(), '.tmp', `block-tools-${label}-`))
+  tempDirs.push(dir)
+  return dir
+}
 
 beforeAll(() => {
   mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
@@ -54,6 +69,9 @@ afterAll(() => {
   if (previousStopFile === undefined) delete process.env['GROK_WORKFLOW_STOP_FILE']
   else process.env['GROK_WORKFLOW_STOP_FILE'] = previousStopFile
   try { rmSync(ledgerDir, { recursive: true, force: true }) } catch { /* already gone */ }
+  for (const dir of tempDirs.splice(0)) {
+    try { rmSync(dir, { recursive: true, force: true }) } catch { /* already gone */ }
+  }
 })
 
 beforeEach(() => {
@@ -159,9 +177,22 @@ async function mount(): Promise<Mounted> {
  * cases are about the tools, not about admission: so the harness session writes the
  * same durable record `/grok on` writes. `grokDefault: 'off'` in the mount is the
  * deployment default and is deliberately not an admission — the session's own record is.
+ *
+ * `dir` is opt-in. With it the session carries a real {@link SessionHeader} whose `cwd`
+ * is that directory — the shape a session created in a real project has, and the second
+ * source the tool layer reads a session directory from. Without it the header is the
+ * synthesised minimal one every other case has always used.
  */
-function headed(id: string): Session {
-  const live = Session.create(id as never)
+function headed(id: string, dir?: string): Session {
+  const live = dir === undefined
+    ? Session.create(id as never)
+    : Session.create(id as never, undefined, {
+        version: SESSION_FORMAT_VERSION,
+        id: id as never,
+        createdAt: Date.now(),
+        cwd: dir,
+        isSeeded: false,
+      } as never)
   live.append('step/start', { turn: 1, step: 1 })
   live.append('system/message', { turn: 1, step: 1, message: createSystemMessage('test head') }, { surfaceOp: 'append' })
   live.append('step/end', { turn: 1, step: 1 })
@@ -298,6 +329,54 @@ async function approveAfterPreview(live: Session, text = '确认'): Promise<void
   await delay(5)
   say(live, text)
 }
+
+/** Preview a split, take the user's nod, and start it — the whole desk, through the tools. */
+async function startSplit(
+  mounted: Mounted,
+  live: Session,
+  extra: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const previewed = await preview(mounted, live, extra)
+  await approveAfterPreview(live)
+  return await call(mounted, BLOCK_TOOL_NAMES.open, {
+    mode: 'start',
+    preview_id: previewed['preview_id'],
+    split_hash: previewed['split_hash'],
+    approval: { kind: 'user', quote: '确认' },
+  }, live)
+}
+
+/** The row the ledger wrote on `index`, read back from disk rather than trusted from the answer. */
+function ledgerRow(index: number): { id?: string, root?: string } {
+  const line = ledgerLines()[index]
+  if (line === undefined) throw new Error(`the ledger has no line ${index}`)
+  return JSON.parse(line) as { id?: string, root?: string }
+}
+
+/**
+ * A split whose only declared scope is `notes`.
+ *
+ * The approval-directory cases need one real artifact that exists under exactly one
+ * directory, and a scope wide enough to declare it: `notes/a.md` inside the approved
+ * `notes`.
+ */
+const NOTES_BLOCKS = [
+  {
+    title: '写笔记',
+    objective: '把一条笔记写进 notes/a.md',
+    deliverable: 'notes/a.md',
+    acceptance: ['notes/a.md 写好了'],
+    writesPaths: ['notes'],
+  },
+] as const
+
+/** The handoff for the notes cases: four lines, and an evidence line worth the name. */
+const NOTES_HANDOFF = [
+  '做了什么：在 notes/a.md 里写下了一条笔记',
+  '证据：notes/a.md 写好了，文件就在批准的目录里',
+  '没做：没有写第二份，也没有改批准范围外的文件',
+  '下一步：等验收',
+].join('\n')
 
 /* -------------------------------------------------------------------- tests -- */
 
@@ -536,6 +615,10 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
     const closed = await call(mounted, BLOCK_TOOL_NAMES.close, {
       block_id: started['block_id'],
       handoff: '做了什么：读完了\n证据：blocks.jsonl 有一行\n没做：无',
+      // A task split is reported so this case keeps arguing about the thing it is named
+      // for: a close without one is refused before the checks run (see the refusal case
+      // below), and a refusal would not tell us whether a short handoff vetoes.
+      tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'] }],
     }, live)
     expect(closed['outcome']).toBe('veto')
     expect(closed['block_status']).toBe('open')
@@ -708,6 +791,164 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
     expect(closed['not_judged']).toBeUndefined()
     expect(mounted.engine.startCalls).toHaveLength(1)
     expect(mounted.engine.startCalls[0]!.meta.name).toBe('Block supervisor')
+  })
+
+  it('refuses a close with no task split at all, before any check or model call', async () => {
+    const mounted = await mount()
+    const live = headed('sess-close-notasks')
+    const started = await startSplit(mounted, live)
+    // The row's block was opened with `tasks: []` and close reports none: there is no
+    // split to judge, so nothing may reach the checks or the model.
+    await expect(call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      handoff: [
+        '做了什么：读完了 blocks.jsonl 并写了结论',
+        '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
+        '没做：没有跑真机 soak',
+        '下一步：等调度验收',
+      ].join('\n'),
+    }, live)).rejects.toMatchObject({ code: 'invalid', message: expect.stringContaining('任务拆法') })
+    expect(verdictLines(), 'a refusal is not a verdict').toHaveLength(0)
+    expect(mounted.engine.startCalls, 'and it is not a model call either').toHaveLength(0)
+  })
+
+  it('keeps a second close working off the split the accepted row already carries', async () => {
+    const mounted = await mount()
+    const live = headed('sess-close-recorded')
+    const started = await startSplit(mounted, live)
+    const handoff = [
+      '做了什么：读完了 blocks.jsonl 并写了结论',
+      '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
+      '没做：没有跑真机 soak',
+      '下一步：等调度验收',
+    ].join('\n')
+    const first = await call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      block: '读账本',
+      handoff,
+      tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
+    }, live)
+    expect(first['outcome']).toBe('pass')
+    // The accepted row carries the split it was judged on, so a later close that reports
+    // none falls back to it (`tasksOf`) instead of being refused as an empty hand-in.
+    const second = await call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      block: '读账本',
+      handoff,
+    }, live)
+    expect(second['outcome']).toBe(first['outcome'])
+    expect(second['evidence_unchanged']).toBe(true)
+    expect(verdictLines(), 'the same evidence never earns a second verdict').toHaveLength(1)
+  })
+})
+
+describe('the approval directory: preview, then the row, then the close', () => {
+  it('records the session directory on the preview, and keeps it out of the split hash', async () => {
+    const mounted = await mount()
+    const dir = tempDir('root-preview')
+    const previewed = await preview(mounted, headed('sess-root-preview', dir))
+    expect(previewById(String(previewed['preview_id']))?.root).toBe(realpathSync.native(dir))
+    expect(ledgerLines(), 'a preview still writes nothing').toHaveLength(0)
+
+    // The same split approved in another directory is the same split: the tree the work
+    // lives in is not part of what the user approved.
+    const other = tempDir('root-preview-other')
+    const elsewhere = await preview(mounted, headed('sess-root-preview-other', other))
+    expect(elsewhere['split_hash']).toBe(previewed['split_hash'])
+    expect(previewById(String(elsewhere['preview_id']))?.root).toBe(realpathSync.native(other))
+
+    // A directory that cannot be named is dropped instead of refused: a preview stays
+    // total, and recording a guess would state a fact nobody gave.
+    const relativeRoot = previewBlocks({
+      sessionId: 'sess-root-relative',
+      objective: '把接单台子的账本读出来，然后写一句结论',
+      blocks: BLOCKS as never,
+      root: 'relative/dir',
+    })
+    expect(previewById(relativeRoot.previewId)?.root).toBeUndefined()
+  })
+
+  it('writes that directory onto the row, and omits the key when the session had none', async () => {
+    const mounted = await mount()
+    const dir = tempDir('root-start')
+    const started = await startSplit(mounted, headed('sess-root-start', dir))
+    // Read from the ledger, not from the tool's answer: the line on disk is the claim.
+    expect(ledgerRow(0).id).toBe(started['block_id'])
+    expect(ledgerRow(0).root).toBe(realpathSync.native(dir))
+
+    // A session with no directory records none, and the key is absent rather than empty,
+    // so a row written before this field existed stays byte-identical.
+    const bare = await startSplit(mounted, headed('sess-root-start-bare'))
+    expect(bare['reused']).toBe(false)
+    expect(ledgerLines()).toHaveLength(2)
+    expect(ledgerLines()[1]).not.toContain('"root"')
+  })
+
+  it('closes against the directory the block was approved in, not the closing session\'s', async () => {
+    const mounted = await mount()
+    mounted.engine.judgeAnswer = {
+      criteria: [{ text: 'notes/a.md 写好了', met: true, evidence: ['notes/a.md 就在批准的目录里'] }],
+    }
+    const dirA = tempDir('root-close-a')
+    const dirB = tempDir('root-close-b')
+    mkdirSync(join(dirA, 'notes'), { recursive: true })
+    writeFileSync(join(dirA, 'notes', 'a.md'), '# 笔记\n')
+    expect(existsSync(join(dirB, 'notes', 'a.md')), 'the closing session must not have the artifact').toBe(false)
+
+    const started = await startSplit(mounted, headed('sess-root-close-a', dirA), {
+      objective: '写一条笔记',
+      blocks: NOTES_BLOCKS,
+    })
+    expect(ledgerRow(0).root).toBe(realpathSync.native(dirA))
+
+    // Closed from a session standing in a different directory where the artifact does
+    // not exist: only the row's own directory can make this path real, so a pass proves
+    // the row wins over both the closing session and the plugin process cwd.
+    const closed = await call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      handoff: NOTES_HANDOFF,
+      tasks: [{ title: '写笔记', acceptanceCriteria: ['notes/a.md 写好了'], writesPaths: ['notes/a.md'] }],
+    }, headed('sess-root-close-b', dirB))
+    expect(closed['outcome']).toBe('pass')
+    expect(closed['block_status']).toBe('accepted')
+    expect(mounted.engine.startCalls.map(call => call.meta.name)).toEqual(['Block supervisor'])
+    expect(verdictLines()).toHaveLength(1)
+  })
+
+  it('does not fall back to the process cwd when the artifact only exists there', async () => {
+    const mounted = await mount()
+    const dir = tempDir('root-cwd-row')
+    // A real file that exists relative to the process cwd and nowhere under the row's
+    // directory. It is made inside gitignored scratch so the tree stays clean; the name
+    // is fixed lowercase because a declared write path is normalized to lowercase.
+    const underCwd = join(process.cwd(), '.tmp', `block-tools-cwd-${process.pid}-${tempDirs.length}`)
+    tempDirs.push(underCwd)
+    mkdirSync(join(underCwd, 'notes'), { recursive: true })
+    writeFileSync(join(underCwd, 'notes', 'a.md'), '# 笔记\n')
+    const declared = join(relative(process.cwd(), underCwd), 'notes', 'a.md')
+
+    const started = await startSplit(mounted, headed('sess-root-cwd-row', dir), {
+      objective: '写一条笔记',
+      blocks: [{
+        title: '写笔记',
+        objective: '把一条笔记写进 notes/a.md',
+        deliverable: 'notes/a.md',
+        acceptance: ['那条笔记写好了'],
+        // The approved scope covers the declaration, so the one thing wrong with it is
+        // the tree it resolves in.
+        writesPaths: [relative(process.cwd(), underCwd)],
+      }],
+    })
+    const closed = await call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      handoff: NOTES_HANDOFF,
+      tasks: [{ title: '写笔记', acceptanceCriteria: ['那条笔记写好了'], writesPaths: [declared] }],
+    }, headed('sess-root-cwd-close', tempDir('root-cwd-close')))
+
+    expect(closed['outcome']).toBe('veto')
+    expect(JSON.stringify(closed['reasons'])).toContain('不存在')
+    expect(mounted.engine.startCalls, 'a missing artifact is a deterministic veto').toHaveLength(0)
+    expect(verdictLines()).toHaveLength(1)
   })
 })
 
