@@ -5211,3 +5211,40 @@ spine 为空，pre-fix 形状会进脊柱。
   **本条最初写「真机 soak 与本条记忆并行、读数另一次落」是不准确的，按第二遍的实测订正**。
   **`NOT_RUN` 照实记：** 「等你点头 / 未通过 / 已取消」三态、卡住那句在真机上的文字、421–499 px 之间的宽度、
   live 档案升级与重载、读屏软件、Firefox / Safari、以及真 Mermaid 渲染器（这台机器上没有，也不联网）。
+
+## D-174 · 关单「跳过监工」记第三种结局 `skipped`：既不判过也不否决，验收行原样留着、读的时候必须走 `outcome`；范围否决带批准目录与两侧绝对路径（2026-11-26，`fix/verdict-honest`，worktree `.tmp/wt-verdict-honest`，基线 `main` 尖端 **`fe6d631`**；**未合、未推、未打 tag、版本仍是 `0.13.53`**）
+
+- **Status:** `CONFIRMED`（本轮自己跑的门禁：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**、
+  `npx oxlint src test` **`Found 14 warnings and 0 errors.`**、四份块相关 spec **`4 files / 175 passed`**（`block-ledger` 20 +
+  `block-supervisor` 29 + `block-tools` 31 + `block-preview` 95）、`npm run build` `client bundle: 399448 bytes`、
+  `npm run verify:lib` 在提交后重读为「`lib/` … byte-identical」；**真机 soak `NOT_RUN`**，见下）
+- **Date:** 2026-11-26
+- **Context:** `verify.blockSupervisor: false` 的关单过去写 `outcome:"pass"`、每条验收 `met:true`、证据是一句「未过监工」；
+  「没判过」只出现在答复的 `judged:false` / `not_judged` 里，**落到账本上的那一行读起来就是「通过」**。D-136 已经把
+  `pass + judged:true` 钉成「只可能来自被解析的模型答案」，这条 `pass + judged:false` 的第三形状与两者都混在一起。
+  另一面，范围否决的 `why` 只写「批准的范围是 X，这条写路径不在其中」——没写核对时站在哪个目录、也没写两边的绝对路径，
+  看记录的人无法复核，只能凭信。
+- **Decision:**
+  1. **第三种结局进账本**：`VerdictOutcome = 'pass' | 'veto' | 'skipped'`（`src/block/types.ts`），
+     写侧校验接受三个值（`src/block/store.ts` 的 `VERDICT_OUTCOMES`），读侧照旧宽容（不认识的行跳过并记 `skipped`）。
+  2. **跳过监工时写 `outcome:"skipped"`**、`route:"deterministic"`、`reasons: []`；验收行**保持原样**——
+     `met:true` + `SKIPPED_JUDGE_NOTE`（`src/supervisor/verdict.ts` 导出）。单条验收只有布尔，没有第三种值；
+     这一对不是判决，是「没有判决」，所以读的人必须走 `outcome`（或派生的 `judged`），不能只看 `met`。
+  3. **跳过的那次仍然把块收成 `accepted`**：开关是接单时的策略（用户批的是活，监工是可选项），而且跳过判决对同一份证据
+     是终局（`evidenceHash` 相同，再关单只会回那一行），不允许收下来块就永远收不了。答复同时给 `outcome:"skipped"`、
+     `judged:false`、`not_judged`，所以「收下」不会被读成「模型放行」。
+  4. **读侧如实**：`verdictView` 加派生 `judged`（`route !== 'deterministic'`），`grok_block_status` 多一个 `skips` 计数；
+     同一份证据在跳过时说「已经按『跳过监工』记过一次」，不再说「已经判过」。
+  5. **范围否决带得清**：`why` 写批准目录（没给目录时写明「按进程当前目录 X 解析」）+ 声明路径与批准范围两侧的绝对路径；
+     `criterion` / `evidence` 仍只引调用方自己的拼写（D-171 的口径不变）。
+- **Alternatives rejected:**
+  1. **把跳过写成 `veto`**：把「没有判」说成「判不过」，同样不诚实，还会让块停在 `open`。
+  2. **跳过时写 `met:false`**：把「没判过」说成「没满足」，读者会去找一个不存在的缺陷。
+  3. **给单条验收加第三态**：账本 schema、校验与所有消费方都要跟着改，收益只是一行文字；顶层结局 + 一句注记就能读准。
+  4. **跳过不收块、等真监工再收**：同证据再关单只会回那一行，块会卡死；要让开关可用就得为跳过开一条例外，等于把「跳过」又变回一种 pass。
+  5. **范围否决只写绝对路径、不写目录**：读者仍要自己反推「相对谁」；相对声明与绝对批准混在一起时，读不出是哪一侧错了。
+- **Consequences:** 旧账本一个字节不动：老行只有 `pass`/`veto`，读起来与以前完全一致。新行多一个合法值，
+  **旧构建读到 `skipped` 会跳过那一行**（读侧本来就是「不认识就跳过」），所以**不承诺降级**。
+  `pass + judged:true` 仍是唯一来自模型答案的组合；跳过与确定性否决都是 `judged:false`。
+  **`NOT_RUN` 照实记**：真机隔离 soak（本块只跑确定性门禁与真实文件系统的路径用例，没有装进隔离 profile 跑一次跳过关单）。
+- **Evidence:** 见 `VALIDATION.md` 本条目；用例在 `test/block-supervisor.spec.ts`（29 例）与 `test/block-tools.spec.ts`（31 例）。

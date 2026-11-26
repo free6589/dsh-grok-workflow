@@ -1,3 +1,12 @@
+Last updated: 2026-11-26 22:10 +08:00（**关单「跳过监工」现在记第三种结局 `skipped`：既不判过也不否决；验收行照原样留 `met:true` + 跳过注记，读的时候必须走 `outcome`；范围否决的 `why` 带批准目录和两侧绝对路径（`CONFIRMED`，四份块 spec 共 175 例、`tsc` EXIT=0、lint 14/0）** —
+分支 **`fix/verdict-honest`**（worktree `.tmp/wt-verdict-honest`），基线 `main` 尖端 **`fe6d631`**（v0.13.53）；**未合、未推、未打 tag、未发版，版本仍 `0.13.53`**。
+改动面：`src/block/{types,store,tools,index}.ts`、`src/supervisor/{index,verdict,checks}.ts`、两份 spec、`docs/ARCHITECTURE.md`、`CHANGELOG.md`、重建的 `lib/`。
+**操作者看到的三件事**：① 关掉监工交的活，答复与账本都写 `skipped`（判过没有，不是判过了），块仍然收下，答复明说「没有第三方判断」；
+② 读回一块时，跳过的判决带 `judged:false`，块上多一个 `skips` 计数；同一份证据再关单时，提示语说的是「按跳过监工记过一次」，不是「已经判过」；
+③ 因为范围被拒时，理由里写明核对用的目录、以及声明路径与批准范围两侧的绝对路径（引文仍是调用方自己的拼写）。
+**`NOT_RUN` 照实记**：真机隔离 soak（本块只跑确定性门禁与真实文件系统的路径用例）。
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 19:05 的**任务面板那一轮**（`feat/task-panel`），再往下是 17:15 的 `0.13.52` 收口、16:22 的 `0.13.51` 收口、16:10 的批准目录那一轮，以及更早各轮。）
+
 Last updated: 2026-11-26 19:05 +08:00（**进度页换成了任务面板：一句话 + 一张由 Mermaid 文本自己排出来的分支树 + 只在卡住时出现的一句；这一版在隔离档案里真装真跑了三次（`CONFIRMED`）** —
 分支 **`feat/task-panel`**（worktree `.tmp/wt-task-panel`），产品提交 **`45909bb`**（`feat(progress): the tab is a task panel — one sentence, a Mermaid-shaped tree, and where it is stuck`，
 10 文件 / **+5298 −4986**：`src/client/index.js` 与 `lib/client.js` 各 2020 行、用例 4 改 2 删 2 新），基线是 `main` 尖端 **`e44e26a`**（v0.13.52）。

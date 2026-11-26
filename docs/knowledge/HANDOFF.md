@@ -1,3 +1,19 @@
+## 2026-11-26 — 判决写入诚实化（`fix/verdict-honest`，worktree `.tmp/wt-verdict-honest`，基线 `main` 尖端 `fe6d631`，**未合、未推、未打 tag、版本仍 `0.13.53`**）
+
+- **From:** 5 并行第 5 块（`agent-226`，包工头自己写）· **To:** 合流的主代理 / 下一个接手判决面的人
+- **做了什么（`CONFIRMED`，分支上的提交与用例为准）**：关单「跳过监工」那次从 `pass` 改成第三种结局 `skipped`
+  （`VerdictOutcome` + 写侧校验）；验收行保持 `met:true` + `SKIPPED_JUDGE_NOTE`（单条验收只有布尔，这一对是「没有判决」，读的人走 `outcome`）；
+  跳过仍把块收成 `accepted`（开关是接单时策略，且同证据再关单只回那一行，不收就是卡死），但答复同时给 `judged:false` + `not_judged`；
+  读侧 `verdictView` 加派生 `judged`、`grok_block_status` 加 `skips`、同证据提示语在跳过时改说「按跳过监工记过一次」；
+  范围否决的 `why` 现在带批准目录（没目录就写「按进程当前目录 X 解析」）与声明/批准两侧的绝对路径，`criterion`/`evidence` 仍是调用方原拼写。
+- **用户看到什么**：交工时说「没有判过」，不再说「通过」；被范围拒的时候，理由能自己核对，不用凭信。
+- **跑过什么**：`tsc` `EXIT=0`、`oxlint src test` `14 warnings / 0 errors`、`block-ledger + block-supervisor + block-tools + block-preview`
+  **4 文件 / 175 通过**、`npm run build` `client bundle: 399448 bytes`、**提交后** `npm run verify:lib` 读回逐字节相同。细节与命令在 `VALIDATION.md`。
+- **没做（照实记）**：**真机隔离 soak `NOT_RUN`**（本块只跑确定性门禁与真实文件系统的路径用例）；没有 push、没有合、没有发版、没有碰 live 档案。
+- **下一步**：由主代理决定合流顺序；合流后按 §12 只跑一次发布门禁，不需要为这条改动单独抬版本。
+- **一处已知的读侧边界（不是缺陷，要写下来）**：旧构建读到 `skipped` 行会**跳过那一行**（读侧一贯「不认识就跳过」），所以**不承诺降级**；
+  新构建读老行没有任何变化。
+
 ## 2026-11-26 — 0.13.53 发布（main）**（合并提交 `c698a36`、发布提交 `50b3341`、附注标签 `v0.13.53` 对象 `8a0f9be0…`、两个远端 run 都 success、Release 资产 **1027274** 字节）；真机 soak 是复用的、带两条缺口；live 档案升级仍 `BLOCKED`**
 
 - **From:** 发布收口这一轮（`agent-218/memory-053`，只写文档）· **To:** 有写权限做 live 档案升级的人 / 下一个要补真机缺口或修取证瑕疵的人
