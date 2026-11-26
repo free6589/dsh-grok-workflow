@@ -152,7 +152,11 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'gw-progress-now',
     'gw-progress-eyebrow',
     'gw-progress-headline',
-    'gw-progress-sub',
+    // `gw-progress-sub` (the four-zone subtitle) and `gw-progress-subs` (the spine's
+    // sub-list) were retired with those pages, then re-issued by the matrix contract for a
+    // plan task's cell and the cells' list (追加 2). They are live names again, and
+    // `progress-flow.spec.ts` pins what they mean; `gw-progress-task` below still may not
+    // appear anywhere.
     'gw-progress-actor',
     'gw-progress-sep',
     'gw-progress-steps',
@@ -196,7 +200,11 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'gw-progress-badge',
     'gw-progress-dur',
     'gw-progress-meta',
-    'gw-progress-subs',
+    // …and the flowchart's own node list, which the lane matrix replaced (matrix §追加 2):
+    // `gw-progress-subs` / `gw-progress-sub` used to sit in this list as the four-zone page's
+    // subtitle and the spine's sub-list; the matrix contract re-issues both names for the
+    // task cells, so they are live vocabulary again and are pinned by `progress-flow.spec.ts`.
+    'gw-progress-nodes',
     'gw-progress-percent',
     '--gw-zoom',
     '--gw-wire-depth',
@@ -235,6 +243,7 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'data-gw-progress-failbadge',
     'data-gw-progress-dur',
     'data-gw-progress-meta',
+    'data-gw-progress-nodes',
     'data-gw-progress-label',
     'data-progress-percent',
     'data-progress-zoom',
@@ -306,28 +315,36 @@ describe('client progress tab: the flowchart is one flow, read top to bottom', (
     const at = (hook: string) => hooks.indexOf(hook)
     expect(at('data-gw-progress-bar')).toBeGreaterThanOrEqual(0)
     expect(at('data-gw-progress-flow')).toBeGreaterThan(at('data-gw-progress-bar'))
-    expect(at('data-gw-progress-nodes')).toBeGreaterThan(at('data-gw-progress-wires'))
-    expect(at('data-gw-progress-left')).toBeGreaterThan(at('data-gw-progress-nodes'))
+    expect(at('data-gw-progress-cols')).toBeGreaterThan(at('data-gw-progress-wires'))
+    expect(at('data-gw-progress-left')).toBeGreaterThan(at('data-gw-progress-cols'))
     expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-left'))
     // The retired two-zone body has no wrapper left to sit in.
     expect(hooks).not.toContain('data-gw-progress-columns')
   })
 
-  it('keeps one hook per node, one per call line, and one count line', () => {
+  it('keeps one hook per column, one per node, one per task, and one count line', () => {
     const elements = walk(renderRun(run))
     const count = (hook: string) => elements.filter((element) => Object.prototype.hasOwnProperty.call(element.props, hook)).length
     expect(count('data-gw-progress')).toBe(1)
     expect(count('data-gw-progress-bar')).toBe(1)
     expect(count('data-gw-progress-flow')).toBe(1)
     expect(count('data-gw-progress-wires')).toBe(1)
-    expect(count('data-gw-progress-nodes')).toBe(1)
-    // start + execute + check + end: the two legs, with the ends around them.
+    expect(count('data-gw-progress-cols')).toBe(1)
+    // start + execute + check + end: the two legs, with the ends around them, one column each.
+    expect(count('data-gw-progress-col')).toBe(4)
     expect(count('data-gw-progress-node')).toBe(4)
     expect(count('data-gw-progress-node-word')).toBe(4)
-    expect(count('data-gw-progress-node-toggle')).toBe(2)
+    // Both work legs walked `任务 1 · 读代码`, so both rows hang in a task cell: two cells,
+    // and no step node left with a row of its own to open.
+    expect(count('data-gw-progress-subs')).toBe(2)
+    expect(count('data-gw-progress-sub')).toBe(2)
+    expect(count('data-gw-progress-sub-word')).toBe(2)
+    expect(count('data-gw-progress-node-toggle')).toBe(0)
+    expect(count('data-gw-progress-sub-toggle')).toBe(2)
     expect(count('data-gw-progress-left')).toBe(1)
     // The calls are closed, so no line is drawn — and no retired list holds one.
     expect(count('data-gw-progress-node-calls')).toBe(0)
+    expect(count('data-gw-progress-sub-calls')).toBe(0)
     expect(count('data-gw-progress-log-row')).toBe(0)
   })
 

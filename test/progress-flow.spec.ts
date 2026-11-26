@@ -209,6 +209,27 @@ function ruleOf(selector: string): string | undefined {
   return progress.css.split('\n').find((line) => line.trim().startsWith(`${selector} {`))
 }
 
+/** Every class token the stylesheet styles, one per selector. */
+function styledClasses(): string[] {
+  const tokens = new Set<string>()
+  for (const line of progress.css.split('\n')) {
+    if (!line.includes('{') || line.trim().startsWith('@')) continue
+    const selector = line.slice(0, line.indexOf('{'))
+    for (const match of selector.matchAll(/\.([A-Za-z0-9_-]+)/g)) tokens.add(match[1]!)
+  }
+  return [...tokens]
+}
+
+/** The rule line that declares one selector, whether it stands alone or in a group. */
+function ruleWith(selector: string): string | undefined {
+  return progress.css.split('\n').find((line) => {
+    if (line.trim().startsWith('@')) return false
+    const at = line.indexOf('{')
+    if (at === -1) return false
+    return line.slice(0, at).split(',').map((part) => part.trim()).includes(selector)
+  })
+}
+
 /** The stylesheet from one media query on, or `''` when the query is not there. */
 function mediaBlock(query: string): string {
   const at = progress.css.indexOf(`@media (${query})`)
@@ -253,6 +274,43 @@ function guardianOf(findings: Finding[], overrides: Partial<NonNullable<Progress
 /** 等你点头: the run announced itself and declared nothing. */
 function waitingRun(): ProgressRun {
   return { runId: 'r-flow-waiting', name: '任务团队 · 0 个任务', anchorSeq: 1, members: [], details: [] }
+}
+
+/**
+ * 进行中 with three plan tasks under one execute visit.
+ *
+ * The engine records the plan-task group title (`任务 1 · 修复登录`) as the phase of the
+ * call that ran inside that task, so one execute visit that walked three tasks carries
+ * three numbered rows: they hang under the leg as three sub nodes, in task order, each
+ * coloured by its own rows.
+ */
+function plannedRun(): ProgressRun {
+  return {
+    runId: 'r-flow-planned',
+    name: '任务团队 · 3 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+      member(3, '执行', '任务 2 · 写文档', undefined, 2),
+      member(4, '执行', '任务 3 · 补测试', 'failed', 3),
+    ],
+    details: [],
+  }
+}
+
+/** 一条腿都没有计划任务号：this leg's rows stay on the step node, as they always did. */
+function plainRun(): ProgressRun {
+  return {
+    runId: 'r-flow-plain',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '执行', 'completed', 1),
+    ],
+    details: [],
+  }
 }
 
 /** 进行中: a task being retried, one call still open. */
@@ -326,20 +384,38 @@ function nodesOf(page: unknown): Element[] {
   return hooksOf(page, 'data-gw-progress-node')
 }
 
-describe('client progress tab: the flow is one column of nodes', () => {
-  it('nests the nodes in one list, and every node in its own item', () => {
+describe('client progress tab: the flow is a lane matrix', () => {
+  it('gives every leg a column, and every column its one step node', () => {
     const page = pageOf(finishedRun())()
-    const list = hookOf(page, 'data-gw-progress-nodes')
+    const list = hookOf(page, 'data-gw-progress-cols')
     expect(list.type).toBe('ol')
-    expect(classesOf(list)).toEqual(['gw-progress-nodes'])
+    expect(classesOf(list)).toEqual(['gw-progress-cols'])
     // The list carries the page's one reader label, and it is the contract's own key.
     expect(attr(list, 'aria-label')).toBe(zh('progress.flow.aria'))
-    const nodes = hooksOf(list, 'data-gw-progress-node')
-    expect(nodes).toHaveLength(6)
-    for (const node of nodes) {
-      expect(node.type).toBe('li')
-      expect(classesOf(node)).toEqual(['gw-progress-node'])
+
+    const columns = hooksOf(list, 'data-gw-progress-col')
+    expect(columns).toHaveLength(6)
+    expect(columns.map((column) => [column.type, classesOf(column)]))
+      .toEqual(columns.map(() => ['li', ['gw-progress-col']]))
+    // A column is a leg: its kind, its state and whether the run is waiting there.
+    expect(columns.map((column) => attr(column, 'data-gw-progress-col')))
+      .toEqual(['start', 'plan', 'execute', 'check', 'summarize', 'end'])
+    expect(columns.map((column) => attr(column, 'data-state')))
+      .toEqual(['done', 'done', 'done', 'done', 'done', 'done'])
+    expect(columns.map((column) => attr(column, 'data-current')))
+      .toEqual(['false', 'false', 'false', 'false', 'false', 'true'])
+    // Each column holds the step node the old page drew: same hook, now a `div` inside the
+    // column's `li`, so the column can carry the tasks that belong to it.
+    for (const [index, column] of columns.entries()) {
+      const nodes = hooksOf(column, 'data-gw-progress-node')
+      expect(nodes, `column ${index} holds one node`).toHaveLength(1)
+      expect(nodes[0]!.type).toBe('div')
+      expect(classesOf(nodes[0]!)).toEqual(['gw-progress-node'])
+      expect(attr(nodes[0]!, 'data-state')).toBe(attr(column, 'data-state'))
+      expect(attr(nodes[0]!, 'data-current')).toBe(attr(column, 'data-current'))
     }
+    // The retired node list is gone: the columns are the list now.
+    expect(hooksOf(page, 'data-gw-progress-nodes')).toHaveLength(0)
   })
 
   it('draws the dot, the leg word, the badge and the toggle, in that order', () => {
@@ -373,15 +449,19 @@ describe('client progress tab: the flow is one column of nodes', () => {
       `${zh('progress.flow.execute')} ${zh('progress.flow.visit', { n: 2 })} ${zh('progress.plan.running')}`,
       `${zh('progress.flow.end')} ${zh('progress.plan.waiting')}`,
     ])
-    // Nothing of that is on the page: the visible words are the legs and the badges.
+    // Nothing of that is on the page: the visible words are the legs, the badges, and —
+    // under a leg that walked plan tasks — those tasks' own titles (both attempts of this
+    // leg ran `任务 1`, so each attempt carries one).
     expect(pageTexts(page)).toEqual([
       '任务团队 · 2 个任务',
       '进行中',
       '起点',
       '规划',
       '执行',
+      '任务 1 · 修复登录',
       '执行',
       '第 2 次',
+      '任务 1 · 修复登录',
       '终点',
       '还剩 1 步 / 共 5 步',
     ])
@@ -398,15 +478,18 @@ describe('client progress tab: the flow is one column of nodes', () => {
     expect(running.map((node) => attr(node, 'data-state'))).toEqual(['done', 'done', 'done', 'doing', 'pending'])
   })
 
-  it('stands the nodes in one column under 720px instead of letting them overflow', () => {
-    const nodes = ruleOf('.gw-progress-nodes')
-    expect(nodes, 'the node list has no rule').toBeDefined()
-    expect(nodes).toContain('display: flex')
-    expect(nodes).toContain('flex-wrap: wrap')
+  it('wraps the columns on a narrow screen instead of letting them overflow', () => {
+    const cols = ruleOf('.gw-progress-cols')
+    expect(cols, 'the column list has no rule').toBeDefined()
+    expect(cols).toContain('display: flex')
+    expect(cols).toContain('flex-wrap: wrap')
+    expect(cols).toContain('gap: 12px')
     const narrow = mediaBlock('max-width: 720px')
     expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
-    expect(narrow).toMatch(/\.gw-progress-nodes \{[^}]*flex-direction: column/)
-    expect(narrow).toMatch(/\.gw-progress-nodes \{[^}]*align-items: stretch/)
+    // Two columns a row under 720px, one under 480px: a column narrows, it never scrolls.
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 calc\(50% - 4px\)/)
+    const tiny = mediaBlock('max-width: 480px')
+    expect(tiny).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 100%/)
     // No width is ever forced on the page: a node shrinks instead of pushing the page wide.
     expect(ruleOf('.gw-progress-node')).toContain('min-width: 0')
     expect(ruleOf('.gw-progress-node')).toContain('max-width: 100%')
@@ -419,7 +502,7 @@ describe('client progress tab: the flow is one column of nodes', () => {
     const order = walk(page)
     const at = (hook: string) => order.indexOf(hookOf(page, hook))
     expect(at('data-gw-progress-bar')).toBeLessThan(at('data-gw-progress-flow'))
-    expect(at('data-gw-progress-nodes')).toBeLessThan(at('data-gw-progress-guardian'))
+    expect(at('data-gw-progress-cols')).toBeLessThan(at('data-gw-progress-guardian'))
     expect(at('data-gw-progress-guardian')).toBeLessThan(at('data-gw-progress-left'))
     expect(at('data-gw-progress-left')).toBeLessThan(at('data-gw-progress-dock'))
     const footer = order.filter((element) => classesOf(element).includes('gw-progress-foot'))
@@ -449,13 +532,16 @@ describe('client progress tab: a node opens its own calls', () => {
     expect(hooksOf(page, 'data-gw-progress-node-calls')).toHaveLength(0)
     expect(hooksOf(page, 'data-gw-progress-log-row')).toHaveLength(0)
     const toggles = hooksOf(page, 'data-gw-progress-node-toggle')
-    // Every middle node has at least one call; the two ends have none, so they get no control.
-    expect(toggles).toHaveLength(4)
+    // A step node's own list is what is left of its rows: the plan and the summary here.
+    // The work legs of this run handed every one of their rows to a sub node, so they have
+    // nothing of their own to open and get no control.
+    expect(toggles.map((toggle) => attr(toggle, 'data-gw-progress-node-toggle')))
+      .toEqual(['flow:0:plan:1', 'flow:3:summarize:1'])
     for (const [index, toggle] of toggles.entries()) {
       expect(toggle.type).toBe('button')
       expect(attr(toggle, 'type')).toBe('button')
       expect(attr(toggle, 'aria-expanded')).toBe('false')
-      expect(attr(toggle, 'aria-controls')).toBe(`gw-progress-node-calls-${index + 1}`)
+      expect(attr(toggle, 'aria-controls')).toBe(`gw-progress-node-calls-${[1, 4][index]}`)
       expect(attr(toggle, 'title')).toBe(zh('progress.task.detail'))
       expect(attr(toggle, 'aria-label')).toBe(zh('progress.task.detail'))
       // The control carries no glyph of its own: the affordance is the CSS chevron.
@@ -464,43 +550,46 @@ describe('client progress tab: a node opens its own calls', () => {
   })
 
   it('opens that node’s calls in `seq` order, and closes it again on a second click', () => {
-    const render = pageOf(finishedRun(), { canOpen: (childId: string) => childId === 'child-2' })
+    const render = pageOf(finishedRun(), { canOpen: (childId: string) => childId === 'child-1' })
     const closed = render()
-    const toggle = hooksOf(closed, 'data-gw-progress-node-toggle')[1]!
+    const toggle = hooksOf(closed, 'data-gw-progress-node-toggle')[0]!
     ;(toggle.props['onClick'] as () => void)()
 
     const page = render()
     const calls = hookOf(page, 'data-gw-progress-node-calls')
     expect(calls.type).toBe('ol')
-    expect(attr(calls, 'id')).toBe('gw-progress-node-calls-2')
-    expect(attr(calls, 'data-gw-progress-node-calls')).toBe(attr(nodesOf(page)[2]!, 'data-gw-progress-node'))
+    expect(attr(calls, 'id')).toBe('gw-progress-node-calls-1')
+    expect(attr(calls, 'data-gw-progress-node-calls')).toBe(attr(nodesOf(page)[1]!, 'data-gw-progress-node'))
     const rows = hooksOf(calls, 'data-gw-progress-log-row')
-    expect(rows.map((row) => row.props['data-gw-progress-log-row'])).toEqual([2])
-    // The gate chip stands in for the role, the task name follows it, and the node above
-    // carries the leg: nothing on this line is said twice.
-    expect(textOf(rows[0]!)).toBe(`${clockAt(BASE + 120_000)} ${zh('progress.chain.execute')} 任务 1 · 修复登录 ${zh('progress.log.done')} ${zh('progress.member.open')}`)
-    expect(hooksOf(rows[0]!, 'data-gw-progress-task-chain')).toHaveLength(1)
+    expect(rows.map((row) => row.props['data-gw-progress-log-row'])).toEqual([1])
+    // The planner's own word names no gate, so the line keeps it and drops the title, which
+    // would only repeat the phase.
+    expect(textOf(rows[0]!)).toBe(`${clockAt(BASE + 60_000)} 规划助手 规划 ${zh('progress.log.done')} ${zh('progress.member.open')}`)
+    expect(hooksOf(rows[0]!, 'data-gw-progress-task-chain')).toHaveLength(0)
     expect(hooksOf(rows[0]!, 'data-gw-progress-open')).toHaveLength(1)
 
-    ;(hooksOf(page, 'data-gw-progress-node-toggle')[1]!.props['onClick'] as () => void)()
+    ;(hooksOf(page, 'data-gw-progress-node-toggle')[0]!.props['onClick'] as () => void)()
     expect(hooksOf(render(), 'data-gw-progress-node-calls')).toHaveLength(0)
   })
 })
 
 describe('client progress tab: the wires are measured, never invented', () => {
-  it('paints the layer behind the nodes, and draws nothing where there is no layout', () => {
+  it('paints the layer behind the columns, and draws nothing where there is no layout', () => {
     const page = pageOf(finishedRun())()
     const svg = hookOf(page, 'data-gw-progress-wires')
     expect(svg.type).toBe('svg')
     expect(classesOf(svg)).toEqual(['gw-progress-wires'])
     expect(attr(svg, 'aria-hidden')).toBe('true')
-    // A stub renderer has no layout, so the measurement returns nothing and nothing is
-    // drawn: no coordinate on this page was guessed.
-    expect((svg.children as unknown[]).flat(Infinity)).toHaveLength(0)
-    // The wire layer sits inside the flow, before the nodes it is painted behind.
+    // A stub renderer has no layout, so the measurement returns nothing and no wire is
+    // drawn: no coordinate on this page was guessed. The one child is the arrow head the
+    // directed lines point with — a definition, not a line.
+    expect(hooksOf(svg, 'marker-end')).toHaveLength(0)
+    const defs = hookOf(svg, 'id')
+    expect(attr(defs, 'id')).toBe('gw-progress-arrow')
+    // The wire layer sits inside the flow, before the columns it is painted behind.
     const order = walk(page)
     expect(order.indexOf(svg)).toBeGreaterThan(order.indexOf(hookOf(page, 'data-gw-progress-flow')))
-    expect(order.indexOf(svg)).toBeLessThan(order.indexOf(hookOf(page, 'data-gw-progress-nodes')))
+    expect(order.indexOf(svg)).toBeLessThan(order.indexOf(hookOf(page, 'data-gw-progress-cols')))
   })
 
   it('ships the measurement, the redraw and the comparison that stops the redraw', () => {
@@ -520,16 +609,26 @@ describe('client progress tab: the wires are measured, never invented', () => {
   /**
    * The wire maths, driven the way the page drives it: boxes in, segments out.
    *
-   * `measureWires` reads nothing but `getBoundingClientRect`, so a stand-in flow is enough
-   * to pin the two shapes a reader is meant to see, and the shapes the page must not claim.
+   * `measureWires` reads nothing but `getBoundingClientRect` and the two hooks, so a
+   * stand-in flow is enough to pin the shapes a reader is meant to see, and the shapes the
+   * page must not claim. Each step node stands in for its own sub nodes: the measurement
+   * asks a node for the children it holds, which is the DOM relationship the page has.
    */
-  function boxes(rects: ReadonlyArray<{ x: number, y: number, w: number, h: number }>): { flow: unknown } {
+  type Box = { x: number, y: number, w: number, h: number, subs?: ReadonlyArray<Box> }
+
+  function rectangle(box: Box) {
+    return { left: box.x, top: box.y, width: box.w, height: box.h, right: box.x + box.w, bottom: box.y + box.h }
+  }
+
+  function boxes(rects: ReadonlyArray<Box>): { flow: unknown } {
     const frame = { left: 0, top: 0, width: 1000, height: 400 }
+    const element = (box: Box) => ({
+      getBoundingClientRect: () => rectangle(box),
+      querySelectorAll: () => (box.subs === undefined ? [] : box.subs.map((sub) => ({ getBoundingClientRect: () => rectangle(sub) }))),
+    })
     return {
       flow: {
-        querySelectorAll: () => rects.map((r) => ({
-          getBoundingClientRect: () => ({ left: r.x, top: r.y, width: r.w, height: r.h, right: r.x + r.w, bottom: r.y + r.h }),
-        })),
+        querySelectorAll: () => rects.map(element),
         getBoundingClientRect: () => ({ ...frame, right: frame.width, bottom: frame.height }),
       },
     }
@@ -558,17 +657,21 @@ describe('client progress tab: the wires are measured, never invented', () => {
     expect(mixed.paths[1]).toEqual([[270, 15], [280, 15]])
   })
 
-  it('draws nothing across a wrap, and one line down a column', () => {
+  it('turns an elbow where a neighbour wrapped, and draws one line down a stacked pair', () => {
     // A wrapped row: two boxes on the first row, one that started the second row at the
-    // container's left edge. The pair that wrapped shares no vertical span, so no line
-    // claims a route the reader cannot follow.
+    // container's left edge. The pair that wrapped shares no span, so the line is drawn as
+    // three straight legs — down into the gap, across, then down onto the target — with
+    // square corners, instead of claiming a diagonal the layout never drew.
     const wrapped = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(boxes([
       { x: 0, y: 0, w: 60, h: 30 },
       { x: 70, y: 0, w: 400, h: 30 },
       { x: 0, y: 40, w: 60, h: 30 },
     ]).flow)
-    expect(wrapped.paths).toHaveLength(1)
+    expect(wrapped.paths).toHaveLength(2)
     expect(wrapped.paths[0]).toEqual([[60, 15], [70, 15]])
+    // Down from the second box's middle, half way to the third, across to the third's
+    // middle, then down onto its top edge.
+    expect(wrapped.paths[1]).toEqual([[270, 30], [270, 35], [30, 35], [30, 40]])
 
     // A single column (the narrow layout): the one pair that stacked gets one line, laid
     // between the boxes at the middle of the span they share.
@@ -580,15 +683,285 @@ describe('client progress tab: the wires are measured, never invented', () => {
     expect(column.paths[0]).toEqual([[150, 30], [150, 40]])
   })
 
+  /**
+   * A lane matrix stand-in: one element per column, holding its head and its task cells.
+   *
+   * The measurement asks a column for the boxes it holds, which is the DOM relationship the
+   * page has; nothing here is derived from a CSS rule.
+   */
+  type Lane = { lane: number, x: number, y: number, w: number, h: number }
+  type Column = { x: number, y: number, w: number, h: number, cells?: ReadonlyArray<Lane> }
+
+  function matrix(columns: ReadonlyArray<Column>): { flow: unknown } {
+    const frame = { left: 0, top: 0, width: 1000, height: 400 }
+    const box = (r: { x: number, y: number, w: number, h: number }) => ({
+      left: r.x,
+      top: r.y,
+      width: r.w,
+      height: r.h,
+      right: r.x + r.w,
+      bottom: r.y + r.h,
+    })
+    const cell = (lane: Lane) => ({
+      getBoundingClientRect: () => box(lane),
+      getAttribute: (name: string) => (name === 'data-lane' ? String(lane.lane) : undefined),
+    })
+    return {
+      flow: {
+        querySelectorAll: () => columns.map((column) => ({
+          getBoundingClientRect: () => box(column),
+          querySelectorAll: (selector: string) => {
+            if (selector.includes('data-gw-progress-node')) {
+              return [{ getBoundingClientRect: () => box({ x: column.x, y: column.y, w: column.w, h: 32 }) }]
+            }
+            return (column.cells ?? []).map(cell)
+          },
+        })),
+        getBoundingClientRect: () => ({ ...frame, right: frame.width, bottom: frame.height }),
+      },
+    }
+  }
+
+  it('chains the same task across two legs, and leaves a gap where a leg skipped it', () => {
+    // Two adjacent columns, both holding task 1; the second also holds task 2, the first
+    // does not. One line per neighbouring pair that really exists — and none across the gap.
+    const measured = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 100, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26 }] },
+      { x: 212, y: 0, w: 200, h: 100, cells: [{ lane: 1, x: 212, y: 38, w: 200, h: 26 }, { lane: 2, x: 212, y: 70, w: 200, h: 26 }] },
+    ]).flow)
+    // head→head, then task 1 → task 1.
+    expect(measured.paths).toHaveLength(2)
+    expect(measured.paths[0]).toEqual([[200, 16], [212, 16]])
+    expect(measured.paths[1]).toEqual([[200, 51], [212, 51]])
+  })
+
+  it('elbows a lane pair that wrapped, and draws nothing on a host without layout', () => {
+    // The second column wrapped onto the next row and sits to the right of the first: the
+    // two cells share neither a row nor a column, so the line is an elbow — down, across,
+    // down — rather than a diagonal nobody drew.
+    const wrapped = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 100, h: 70, cells: [{ lane: 1, x: 0, y: 38, w: 100, h: 26 }] },
+      { x: 300, y: 80, w: 100, h: 70, cells: [{ lane: 1, x: 300, y: 118, w: 100, h: 26 }] },
+    ]).flow)
+    // head→head and task 1 → task 1, both elbowed.
+    expect(wrapped.paths).toHaveLength(2)
+    const lane = wrapped.paths[1]!
+    expect(lane).toHaveLength(4)
+    expect(lane[0]).toEqual([50, 64])
+    expect(lane[1]).toEqual([50, 91])
+    expect(lane[2]).toEqual([350, 91])
+    expect(lane[3]).toEqual([350, 118])
+
+    // A column directly under its neighbour is a plain vertical line, not an elbow.
+    const below = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 70, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26 }] },
+      { x: 0, y: 80, w: 200, h: 70, cells: [{ lane: 1, x: 0, y: 118, w: 200, h: 26 }] },
+    ]).flow)
+    expect(below.paths[1]).toEqual([[100, 64], [100, 118]])
+
+    // Every element present, no box measurable: no wire at all, and no exception.
+    const flat = { querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }) }
+    expect(progress.measureWires(flat).paths).toEqual([])
+    const sized = matrix([{ x: 0, y: 0, w: 0, h: 0, cells: [{ lane: 1, x: 0, y: 0, w: 0, h: 0 }] }])
+    expect(progress.measureWires(sized.flow).paths).toEqual([])
+  })
+
   it('lays the layer over the flow without taking a click', () => {
     const wires = ruleOf('.gw-progress-wires')
     expect(wires).toContain('position: absolute')
     expect(wires).toContain('pointer-events: none')
     expect(wires).toContain('overflow: visible')
-    const drawn = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-wires path {'))
+    const drawn = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-wires > path {'))
     expect(drawn, 'the wires carry no stroke').toBeDefined()
     expect(drawn).toContain('stroke: var(--dsw-alias-border-l2')
     expect(drawn).toContain('fill: none')
+  })
+})
+
+describe('client progress tab: the plan tasks stand in their own lane', () => {
+  it('gives every plan task a cell in its leg, in task order, before anything is clicked', () => {
+    // No click, no state, no effect: the tasks are on the figure the moment it is drawn.
+    const page = pageOf(plannedRun())()
+    const lists = hooksOf(page, 'data-gw-progress-subs')
+    expect(lists).toHaveLength(1)
+    const list = lists[0]!
+    expect(list.type).toBe('ol')
+    expect(classesOf(list)).toEqual(['gw-progress-subs'])
+    expect(attr(list, 'data-gw-progress-subs')).toBe('flow:1:execute:1')
+
+    // It hangs inside the column it belongs to, under that column's step node.
+    const column = hooksOf(page, 'data-gw-progress-col')[2]!
+    expect(attr(column, 'data-gw-progress-col')).toBe('execute')
+    expect(hookOf(column, 'data-gw-progress-subs')).toBe(list)
+    expect(walk(column).indexOf(hookOf(column, 'data-gw-progress-node')))
+      .toBeLessThan(walk(column).indexOf(list))
+
+    const cells = hooksOf(list, 'data-gw-progress-sub')
+    expect(cells.map((cell) => [cell.type, classesOf(cell)]))
+      .toEqual(cells.map(() => ['li', ['gw-progress-sub']]))
+    expect(cells.map((cell) => attr(cell, 'data-gw-progress-sub')))
+      .toEqual(['flow:1:execute:1:t1', 'flow:1:execute:1:t2', 'flow:1:execute:1:t3'])
+    // The task number is written three ways — the contract names all of them — ascending.
+    expect(cells.map((cell) => attr(cell, 'data-task'))).toEqual(['1', '2', '3'])
+    expect(cells.map((cell) => attr(cell, 'data-lane'))).toEqual(['1', '2', '3'])
+    expect(cells.map((cell) => attr(cell, 'data-ordinal'))).toEqual(['1', '2', '3'])
+    // Each task carries its own state, by the same rule the step node uses.
+    expect(cells.map((cell) => attr(cell, 'data-state'))).toEqual(['done', 'doing', 'failed'])
+    for (const cell of cells) {
+      expect(['done', 'doing', 'pending', 'failed', 'blocked', 'cancelled'])
+        .toContain(attr(cell, 'data-state'))
+    }
+
+    // The word is the task's own phase, verbatim — a title, not a sentence about it.
+    const words = cells.map((cell) => hookOf(cell, 'data-gw-progress-sub-word'))
+    expect(words.map((word) => textOf(word))).toEqual(['任务 1 · 修复登录', '任务 2 · 写文档', '任务 3 · 补测试'])
+    expect(words.map((word) => attr(word, 'title'))).toEqual(['任务 1 · 修复登录', '任务 2 · 写文档', '任务 3 · 补测试'])
+    // A reader hears the title and the state word, and nothing else.
+    expect(cells.map((cell) => attr(cell, 'aria-label'))).toEqual([
+      `任务 1 · 修复登录 ${zh('progress.plan.done')}`,
+      `任务 2 · 写文档 ${zh('progress.plan.running')}`,
+      `任务 3 · 补测试 ${zh('progress.plan.failed')}`,
+    ])
+    // The dot is decoration and carries no word.
+    for (const cell of cells) {
+      const dot = walk(cell).find((element) => classesOf(element).includes('gw-progress-sub-dot'))
+      expect(dot, 'the cell has no dot').toBeDefined()
+      expect(attr(dot!, 'aria-hidden')).toBe('true')
+      expect(texts(dot!)).toEqual([])
+    }
+  })
+
+  it('leaves a leg with no task number exactly as it was: no list, no hook', () => {
+    const page = pageOf(plainRun())()
+    expect(hooksOf(page, 'data-gw-progress-subs')).toHaveLength(0)
+    expect(hooksOf(page, 'data-gw-progress-sub')).toHaveLength(0)
+    // The step node keeps its own call list, and its own control, as before.
+    expect(nodesOf(page).map((node) => texts(node))).toEqual([['起点'], ['规划'], ['执行'], ['终点']])
+    expect(hooksOf(page, 'data-gw-progress-node-toggle')).toHaveLength(2)
+  })
+
+  it('hands every numbered row to its task, and leaves the step only what carries no number', () => {
+    // A leg whose rows all name a task has nothing of its own left to open.
+    const planned = nodesOf(pageOf(plannedRun())())
+    expect(hooksOf(planned[2]!, 'data-gw-progress-node-toggle')).toHaveLength(0)
+
+    // A leg with one unnumbered row and one numbered row opens the unnumbered one only:
+    // the task's line is read in the task's own cell.
+    const mixed = pageOf({
+      ...plannedRun(),
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '执行', 'completed', 1),
+        member(3, '执行', '任务 7 · 补测试', 'completed', 2),
+      ],
+    })()
+    const cells = hooksOf(mixed, 'data-gw-progress-sub')
+    expect(cells).toHaveLength(1)
+    expect(attr(cells[0]!, 'data-task')).toBe('7')
+
+    const view = pageOf({
+      ...plannedRun(),
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '执行', 'completed', 1),
+        member(3, '执行', '任务 7 · 补测试', 'completed', 2),
+      ],
+    })
+    const toggle = hooksOf(view(), 'data-gw-progress-node-toggle')
+      .find((element) => attr(element, 'data-gw-progress-node-toggle') === 'flow:1:execute:1')
+    expect(toggle, 'the leg with a leftover row offers to open it').toBeDefined()
+    ;(toggle!.props['onClick'] as () => void)()
+    expect(hooksOf(hookOf(view(), 'data-gw-progress-node-calls'), 'data-gw-progress-log-row')
+      .map((row) => row.props['data-gw-progress-log-row'])).toEqual([2])
+  })
+
+  it('opens one task into its own calls, and closes it again', () => {
+    const render = pageOf(plannedRun(), { canOpen: (childId: string) => childId === 'child-2' })
+    const closed = render()
+    const cell = hooksOf(closed, 'data-gw-progress-sub')[0]!
+    const toggle = hookOf(cell, 'data-gw-progress-sub-toggle')
+    expect(toggle.type).toBe('button')
+    expect(attr(toggle, 'type')).toBe('button')
+    // The cell always says which task it is; the control only adds its own calls.
+    expect(classesOf(toggle)).toEqual(['gw-progress-node-toggle'])
+    expect(attr(toggle, 'aria-expanded')).toBe('false')
+    expect(attr(toggle, 'aria-controls')).toBe('gw-progress-sub-calls-2-1')
+    expect(attr(toggle, 'title')).toBe(zh('progress.task.detail'))
+    expect(texts(toggle)).toEqual([])
+    // Closed, the list the control names does not exist yet (§20.8's disclosure pattern).
+    expect(hooksOf(closed, 'data-gw-progress-sub-calls')).toHaveLength(0)
+
+    ;(toggle.props['onClick'] as () => void)()
+    const opened = render()
+    const calls = hookOf(opened, 'data-gw-progress-sub-calls')
+    expect(calls.type).toBe('ol')
+    expect(classesOf(calls)).toEqual(['gw-progress-sub-calls'])
+    expect(attr(calls, 'id')).toBe('gw-progress-sub-calls-2-1')
+    expect(attr(calls, 'data-gw-progress-sub-calls')).toBe('flow:1:execute:1:t1')
+    expect(attr(hookOf(opened, 'data-gw-progress-sub-toggle'), 'aria-expanded')).toBe('true')
+    // The same line renderer the step node uses: clock, gate, result, capsule.
+    const rows = hooksOf(calls, 'data-gw-progress-log-row')
+    expect(rows.map((row) => row.props['data-gw-progress-log-row'])).toEqual([2])
+    expect(textOf(rows[0]!)).toBe(`${clockAt(BASE + 120_000)} ${zh('progress.chain.execute')} 任务 1 · 修复登录 ${zh('progress.log.done')} ${zh('progress.member.open')}`)
+    expect(hooksOf(rows[0]!, 'data-gw-progress-task-chain')).toHaveLength(1)
+    expect(hooksOf(rows[0]!, 'data-gw-progress-open')).toHaveLength(1)
+    // The step node's own list stays closed: the click opened one task, not the leg.
+    expect(hooksOf(opened, 'data-gw-progress-node-calls')).toHaveLength(0)
+
+    // A second click closes it again.
+    ;(hookOf(hooksOf(render(), 'data-gw-progress-sub')[0]!, 'data-gw-progress-sub-toggle').props['onClick'] as () => void)()
+    expect(hooksOf(render(), 'data-gw-progress-sub-calls')).toHaveLength(0)
+  })
+
+  it('gives no cell to the two ends, the plan or the summary', () => {
+    const page = pageOf(finishedRun())()
+    // finishedRun walks `任务 1` in execute and check only.
+    expect(hooksOf(page, 'data-gw-progress-col').map((column) => hooksOf(column, 'data-gw-progress-subs').length))
+      .toEqual([0, 0, 1, 1, 0, 0])
+  })
+
+  it('adds no copy of its own: the layer is the plan’s titles and the words the page had', () => {
+    // Zero copy (contract 追加 5): the task layer prints the phase the recorder wrote and
+    // speaks a state word the page already used. Nothing explains what a cell is.
+    const page = pageOf(plannedRun())()
+    const allowed = new Set([
+      '任务团队 · 3 个任务',
+      '进行中',
+      zh('progress.flow.start'),
+      zh('progress.flow.plan'),
+      zh('progress.flow.execute'),
+      zh('progress.flow.end'),
+      zh('progress.flow.left', { left: 1, total: 4 }),
+      '任务 1 · 修复登录',
+      '任务 2 · 写文档',
+      '任务 3 · 补测试',
+    ])
+    for (const text of pageTexts(page)) {
+      expect(allowed.has(text), `${text} is copy the task layer added`).toBe(true)
+    }
+    // A cell speaks its title and one of the five words the page already ships; it carries
+    // no sentence of its own in a tooltip or a second label.
+    const stateWords = ['progress.plan.waiting', 'progress.plan.running', 'progress.plan.done', 'progress.plan.failed', 'progress.plan.cancelled']
+      .map((key) => zh(key))
+    for (const cell of hooksOf(page, 'data-gw-progress-sub')) {
+      const title = attr(hookOf(cell, 'data-gw-progress-sub-word'), 'title')!
+      const spoken = attr(cell, 'aria-label')!
+      expect(spoken).toBe(`${title} ${stateWords.find((word) => spoken === `${title} ${word}`) ?? ''}`.trim())
+      expect(attr(cell, 'title')).toBeUndefined()
+    }
+    // Every one of those words is an existing key, not a new one for this layer.
+    for (const key of ['progress.plan.waiting', 'progress.plan.running', 'progress.plan.done', 'progress.plan.failed', 'progress.plan.cancelled']) {
+      expect(Object.keys(bundle.GROK_WORKFLOW_DICT['zh']!)).toContain(key)
+    }
+  })
+
+  it('keeps the typed half untouched: the lanes are a browser-only grouping', () => {
+    // Contract 追加 1: `src/progress-tab.ts` does not grow a `subs` / lane field. The split
+    // lives in this bundle's mirror only, so the typed API and every number stay as they are.
+    const typed = readFileSync(new URL('../src/progress-tab.ts', import.meta.url), 'utf8')
+    expect(typed, 'the typed half grew a task-node type').not.toContain('ProgressFlowSubNode')
+    expect(typed, 'the typed node grew a subs field').not.toMatch(/\bsubs\??:/)
+    expect(typed, 'the typed half grew a task-cell hook').not.toContain('data-gw-progress-sub')
   })
 })
 
@@ -633,5 +1006,166 @@ describe('client progress tab: colour is the state', () => {
     expect(progress.css).toContain('var(--dsw-font-family-sans')
     const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
     for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+  })
+})
+
+describe('client progress tab: the lane matrix, drawn to the contract’s numbers', () => {
+  it('sizes a step node 32px tall with a 10px radius, and the two ends as capsules', () => {
+    const node = ruleOf('.gw-progress-node')
+    expect(node, 'the step node has no rule').toBeDefined()
+    expect(node).toContain('box-sizing: border-box')
+    expect(node).toContain('height: 32px')
+    expect(node).toContain('border-radius: 10px')
+    // A run's two ends are the only pills left: every middle leg is a rounded box, so a
+    // reader can tell where the walk starts and stops without reading a word.
+    const ends = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-node[data-kind="start"],'))
+    expect(ends, 'the two ends carry no capsule rule').toBeDefined()
+    expect(ends).toContain('border-radius: 999px')
+    expect(ends).toContain('.gw-progress-node[data-kind="end"]')
+    // A long leg name is cut with an ellipsis instead of widening the column.
+    expect(ruleOf('.gw-progress-node-word')).toContain('text-overflow: ellipsis')
+  })
+
+  it('stacks the columns at 12px, and the cells at 6px, so one task keeps one row', () => {
+    expect(ruleOf('.gw-progress-cols')).toContain('gap: 12px')
+    const column = ruleOf('.gw-progress-col')
+    expect(column, 'the column has no rule').toBeDefined()
+    expect(column).toContain('display: flex')
+    expect(column).toContain('flex-direction: column')
+    expect(column).toContain('gap: 6px')
+    expect(column).toContain('flex: 1 1 0')
+    expect(column).toContain('min-width: 0')
+
+    const cell = ruleOf('.gw-progress-sub')
+    expect(cell, 'the task cell has no rule').toBeDefined()
+    expect(cell).toContain('display: flex')
+    expect(cell).toContain('height: 26px')
+    expect(cell).toContain('border-radius: 10px')
+    expect(cell).toContain('padding: 3px 8px')
+    expect(cell).toContain('gap: 4px')
+    expect(cell).toContain('font-size: 12px')
+    expect(cell).toContain('border: 1px solid var(--dsw-alias-border-l2')
+    // The list is a plain column of cells, with no marker of its own.
+    const list = ruleOf('.gw-progress-subs')
+    expect(list).toBeDefined()
+    expect(list).toContain('display: flex')
+    expect(list).toContain('flex-direction: column')
+    expect(list).toContain('gap: 6px')
+    expect(list).toContain('list-style: none')
+    // A title that does not fit is cut with an ellipsis, never pushed off the page.
+    const word = ruleOf('.gw-progress-sub-word')
+    expect(word).toBeDefined()
+    expect(word).toContain('min-width: 0')
+    expect(word).toContain('text-overflow: ellipsis')
+    expect(word).toContain('white-space: nowrap')
+    // Only the contract's new names: nothing here reuses the retired task-band prefix.
+    for (const className of ['gw-progress-cols', 'gw-progress-col', 'gw-progress-subs', 'gw-progress-sub', 'gw-progress-sub-dot', 'gw-progress-sub-word', 'gw-progress-sub-calls']) {
+      expect(styledClasses(), `${className} is not styled`).toContain(className)
+      expect(className).not.toContain('gw-progress-task')
+    }
+  })
+
+  it('fills a reached state with one token, from 12% down to 5%, and keeps the idle one flat', () => {
+    const states: Array<[string, string]> = [
+      ['done', '--dsw-alias-state-success-primary'],
+      ['doing', '--dsw-alias-state-business-primary'],
+      ['failed', '--dsw-alias-state-warn-primary'],
+      ['blocked', '--dsw-alias-state-warn-primary'],
+      ['cancelled', '--dsw-alias-state-warn-primary'],
+    ]
+    for (const [state, token] of states) {
+      const node = ruleWith(`.gw-progress-node[data-state="${state}"]`)
+      expect(node, `no node rule for ${state}`).toBeDefined()
+      // One token, one gradient: the same colour at twelve percent, fading to five.
+      expect(node).toContain(`color-mix(in srgb, var(${token}) 12%, transparent)`)
+      expect(node).toContain(`color-mix(in srgb, var(${token}) 5%, transparent)`)
+      expect(node).toContain('linear-gradient(180deg')
+      expect(node).toContain('background-color: transparent')
+      // The dot and the word carry the same token, so colour is never the only signal.
+      expect(ruleOf(`.gw-progress-node[data-state="${state}"] .gw-progress-node-dot`)).toContain(token)
+      expect(ruleOf(`.gw-progress-node[data-state="${state}"] .gw-progress-node-word`)).toContain(token)
+    }
+    // Not yet: the one dashed border, the one hollow dot, and no fill to read as a result.
+    const pending = ruleOf('.gw-progress-node[data-state="pending"]')
+    expect(pending).toContain('border-style: dashed')
+    expect(pending).toContain('background-image: none')
+    expect(ruleOf('.gw-progress-node[data-state="pending"] .gw-progress-node-dot')).toContain('inset 0 0 0 1px')
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+  })
+
+  it('gives a task cell the same five states as the leg above it', () => {
+    const states: Array<[string, string]> = [
+      ['done', '--dsw-alias-state-success-primary'],
+      ['doing', '--dsw-alias-state-business-primary'],
+      ['failed', '--dsw-alias-state-warn-primary'],
+      ['blocked', '--dsw-alias-state-warn-primary'],
+      ['cancelled', '--dsw-alias-state-warn-primary'],
+    ]
+    for (const [state, token] of states) {
+      const cell = ruleWith(`.gw-progress-sub[data-state="${state}"]`)
+      expect(cell, `no cell rule for ${state}`).toBeDefined()
+      expect(cell).toContain(`color-mix(in srgb, var(${token}) 12%, transparent)`)
+      expect(cell).toContain(`color-mix(in srgb, var(${token}) 5%, transparent)`)
+      expect(cell).toContain('linear-gradient(180deg')
+      expect(cell).toContain('background-color: transparent')
+      expect(ruleOf(`.gw-progress-sub[data-state="${state}"] .gw-progress-sub-dot`)).toContain(token)
+      expect(ruleOf(`.gw-progress-sub[data-state="${state}"] .gw-progress-sub-word`)).toContain(token)
+    }
+    const pending = ruleOf('.gw-progress-sub[data-state="pending"]')
+    expect(pending).toContain('border-style: dashed')
+    expect(pending).toContain('background-image: none')
+    expect(ruleOf('.gw-progress-sub[data-state="pending"] .gw-progress-sub-dot')).toContain('inset 0 0 0 1px')
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+  })
+
+  it('floats an opened list over the figure instead of growing the node it belongs to', () => {
+    // Contract 追加 3: opening a step's or a task's calls must not move a single column.
+    for (const selector of ['.gw-progress-node-calls', '.gw-progress-sub-calls']) {
+      const rule = ruleWith(selector)
+      expect(rule, `${selector} has no rule`).toBeDefined()
+      expect(rule).toContain('position: absolute')
+      expect(rule).toContain('top: calc(100%')
+      expect(rule).toContain('z-index')
+    }
+    // The box they float out of is their own reference, and it keeps its height.
+    expect(ruleOf('.gw-progress-node')).toContain('position: relative')
+    expect(ruleOf('.gw-progress-sub')).toContain('position: relative')
+  })
+
+  it('draws directed wires with the one marker, and invents no second animation', () => {
+    // 追加 4: one arrow head definition, pointed at by every wire; its fill is the border
+    // token, because the arrow says "this way", never "this state".
+    expect(progress.css).not.toMatch(/@keyframes\s+(?!gw-progress-breathe|gw-progress-pulse)/)
+    expect(progress.css).toContain('@keyframes gw-progress-breathe')
+    // Wires carry one hairline in the border token — no wire changes colour by state — and
+    // the arrow head, being a definition, is drawn from the same token in the markup.
+    const drawn = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-wires > path {'))
+    expect(drawn).toContain('fill: none')
+    expect(drawn).toContain('stroke: var(--dsw-alias-border-l2')
+
+    // The one marker is drawn with the page, even before a line exists, and its triangle
+    // is the border token: the direction of a wire is structure, never state.
+    const svg = hookOf(pageOf(finishedRun())(), 'data-gw-progress-wires')
+    const marker = hookOf(svg, 'id')
+    expect(attr(marker, 'id')).toBe('gw-progress-arrow')
+    expect(attr(hookOf(marker, 'd'), 'fill')).toBe('var(--dsw-alias-border-l2, currentColor)')
+    // Every wire points at it; the source says so once, for all of them.
+    expect(SOURCE).toContain("'marker-end': 'url(#gw-progress-arrow)'")
+  })
+
+  it('wraps the columns on a narrow screen and still connects them', () => {
+    const narrow = mediaBlock('max-width: 720px')
+    expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
+    // Two columns a row; the elbow lines keep saying which column follows which.
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 calc\(50% - 4px\)/)
+    expect(narrow).not.toMatch(/\.gw-progress-wires \{[^}]*display: none/)
+    // Under 480px a column takes the whole width, and a call line keeps one flexible
+    // column, so nothing scrolls sideways at any width.
+    const tiny = mediaBlock('max-width: 480px')
+    expect(tiny).not.toBe('')
+    expect(tiny).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 100%/)
+    expect(tiny).toMatch(/\.gw-progress-(?:node|sub)-calls \.gw-progress-log-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto/)
+    expect(progress.css).not.toContain('overflow-x')
+    expect(progress.css).not.toContain('scroll-snap')
   })
 })
