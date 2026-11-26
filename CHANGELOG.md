@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.54] - 2026-11-27
+
 ### Changed / 变更
 
 - **The progress tab is one horizontal fork now, with six lights on every task and five on the run / 进度页现在是一张横排分叉图，每张任务卡六盏灯、每轮五盏验** —
