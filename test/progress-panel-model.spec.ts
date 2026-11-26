@@ -824,6 +824,19 @@ describe('the remaining time is measured by level, never invented', () => {
     expect(graphOf(rejectedRun()).headline.eta).toEqual({ ms: 40_000, basis: 3 })
   })
 
+  it('counts the basis in levels, matching the tooltip copy', () => {
+    // Why this assertion exists: `progressPanelEta` counts one basis unit per measured level
+    // span, not per call or task. The tooltip copy must name that same unit ("levels"/"层"),
+    // or the reader is told the number rests on something it was never measured from.
+    const running = graphOf(twoTaskRun())
+    expect(running.nodes.filter((node) => node.state === 'done' && node.calls.length > 0).length)
+      .toBeGreaterThanOrEqual(running.headline.eta?.basis ?? 0)
+    expect(running.headline.eta?.basis).toBe(1)
+    expect(graphOf(rejectedRun()).headline.eta?.basis).toBe(3)
+    expect(zh('progress.panel.etaBasis', { n: 2 })).toBe('按 2 个已完成层的实测耗时推算')
+    expect(en('progress.panel.etaBasis', { n: 2 })).toBe('from the 2 finished levels actually measured')
+  })
+
   it('says nothing when there is nothing left to walk', () => {
     expect(graphOf(finishedRun()).remaining).toBe(0)
     expect(graphOf(finishedRun()).headline.eta).toBeUndefined()

@@ -111,7 +111,7 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   // eleven replace the count line and the flow's label, which are gone.
   ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
-  ['progress.panel.etaBasis', '按 {n} 个已完成步骤的实测耗时推算', 'from the {n} finished steps actually measured'],
+  ['progress.panel.etaBasis', '按 {n} 个已完成层的实测耗时推算', 'from the {n} finished levels actually measured'],
   ['progress.panel.stuck.failed', '卡在 {at}：{role} 第 {n} 遍没过', 'Stuck at {at}: attempt {n} of {role} did not pass'],
   ['progress.panel.stuck.blocked', '卡在 {at}：这一步没有回报', 'Stuck at {at}: this step never reported back'],
   ['progress.panel.stuck.rejected', '卡在 {at}：{n} 稿全被退回', 'Stuck at {at}: every draft was rejected ({n})'],
