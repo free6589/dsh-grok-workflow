@@ -1,3 +1,71 @@
+## 手机重叠修复（`fix/mobile-overlap`，提交 `10c15a0` + `5ba1ca2`，无标签、版本仍 `0.13.53`）：隔离档案两轮真装真跑——第一轮证「摊开的调用不压隔壁卡」（抽屉在 16 张卡之外、相交 0、与 dock 0 / 0），第二轮证「点完当下就看得见」（390 抽屉 `407→512`、360 `385→490`，对输入框上沿 676 / 632 的余量 **164 / 142 px**，完全在视口内、与卡相交 0、无横向滚动）；占位拿掉再放回 dock `delta = 0`；门禁 `8 files / 336 passed`，整仓全量 **`105 files / 2040 passed`**；**`NOT_RUN`：多行抽屉 / 720·721 边界 / `matchMedia` 的 `change` / 两组同开 / 360 上的「收起」/ 读屏 / Firefox·Safari / live 升级** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：进度页那张任务图上，点一颗节点摊开的调用列表原来是从节点下面浮出来的绝对定位块，手机上压住隔壁那张卡、桌面 1500 遮住「检查」的一部分（上一轮的限制，`task-panel` 那份 README 记过）。
+这一块把它**搬出那张图**（`10c15a0`），再让它**点完落在屏幕中间**（`5ba1ca2`，并给面板底部补一段可滚余量，否则居中会被滚到底截断）。
+本条目只记**真机读数、门禁与全量套件**；契约见 `DESIGN-progress-tab.md` §26，裁决见 `D-174`。
+**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮（取证这一侧）一个字节没改**——它只读；记忆那三份文档由另一条线在写，本轮没 stage、没 commit。
+
+**身份（`CONFIRMED`，本轮自己 `git log` / `git describe` / `node -p version` 各读一次）**：HEAD = **`5ba1ca2`**（父 **`10c15a0`**，**不是 amend**）、`git describe` = **`v0.13.53-3-g5ba1ca2`**、`git tag --contains HEAD` 计数 **0**、`package.json` 版本 **`0.13.53`**、基线 `main` 尖端 **`fe6d631`**。
+两颗提交：`10c15a0` = **5 文件 / +585 −26**（`src/client/index.js` 与 `lib/client.js` 各 +176 −11、`test/progress-panel.spec.ts` +221、`test/i18n-parity.spec.ts` +8 −3、`test/client.spec.ts` +4 −1）；
+`5ba1ca2` = **3 文件 / +113 −8**（`src/client/index.js` 与 `lib/client.js` 各 +35 −4、`test/progress-panel.spec.ts` +43，两条新用例）。服务端、`package.json`、版本号一个字节没动。
+
+**包与地址**：第二轮 `dsh-grok-workflow-0.13.53.tgz` = **1 031 079 B** / `sha256 9015b15b3043ae9e53f67d04fdf9213e9ef70cb6c69f4b34947247204aa7c95e` / 164 文件；
+第一轮 = **1 029 904 B** / `sha256 0d2dede5a8ab9e6fc2cfe7abf109d87385ee635eca9281d3aa28a0fb48813b30`。
+浏览器包 `lib/client.js` = `src/client/index.js` = **412 345** B / `sha256 8cd4521122f89631751969cbd469b142b266ba6ce3f3bdd100be3693577bb599`（第一轮是 **410 497** B / `dbcfaf14…`），`cmp` 空输出、重跑 `npm run build` 后 `git status` 不变（构建可复现）；
+`lib/index.js` 仍是 `ac69070e…`（服务端没动）。装进隔离 profile 的那份读回 **`0.13.53`**、两份 sha256 都等于工作树、插件目录内软链 **0** 个、`readlink -f` 落回 clone 自己；`grep -c gw-progress-sheet-room` = **2**（证明装的是第二轮那份，不是 live 里已发布的同名版本）。
+隔离 home **`.tmp/soak-overlap/dsh-home`**（从 `~/.dsh/profiles/web` 克隆：**7753 文件 / 5 链接 / 抹除凭据后 5/5 逐字节相等**、凭据抹除 1 行）、一次性工作区、端口 **3431**（先定 3421，起进程时 `EADDRINUSE`，改号并重新实测空闲，起成后 `ss -ltn` 显示 LISTEN）、Node **v26.8.1** / npm **11.19.0** / dsh **0.2.2-rc.3**。
+
+**两轮各证一件事，不能互相顶替**：第一轮（`10c15a0`，两遍取样）证「列表不压隔壁卡」——抽屉在 **16 张**节点卡**之外**（`callsInsideGraph: false`、`closest('[data-gw-progress-sheet]')` 命中），与每张卡的相交面积 **0**（`overlaps: []`）、与 `[data-gw-progress-dock]` / `-dock-fill` 相交 **0 / 0**、`scrollWidth = clientWidth`（390 / 360）、点第二次抽屉与列表**双双归 0**、「收起」按钮在 390 上把两者归 0；
+它的**第一遍取景**恰好拍下了那个尚未修的缺陷：抽屉停在 **739 → 844**（390）与 **695 → 800**（360），整块躲在宿主输入框后面（`soak/round1-10c15a0/first-pass-framing-*.png`，读数 `first-pass-readings.json`，**不用于验收**）。
+第二轮（`5ba1ca2`）证「点完当下就看得见」。
+
+**第二轮的读数（`soak/readings.json`，每条与它旁边那张图同一刻、在**一次** `page.evaluate` 里读完；`composerTop` = 宿主钉在底部的 `position: sticky` 栏上沿，高 **168 px**，`676 = 844 − 168` / `632 = 800 − 168` 自洽）**
+
+| 读数 | 视口 | 抽屉矩形 | 抽屉底 | 输入框上沿 | 余量 | 完全在视口内 | 与节点卡相交 | 与 dock / fill | 占位 | 滚动宽=客户宽 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `phone-390-as-opened`（**主证据**，点完 900 ms、无手工滚动） | 390×844 | `0,407 → 383,512` | **512** | **676** | **164** | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-calls-dock` | 390×844 | `0,162 → 383,267` | 267 | 676 | 409 | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-bottom` | 390×844 | `0,54 → 383,159` | 159 | 676 | 517 | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-closed` | 390×844 | 无 | — | 676 | — | — | 0 | 0 / 0 | **无** | 390 = 390 |
+| `phone-360-as-opened`（**主证据**） | 360×800 | `0,385 → 353,490` | **490** | **632** | **142** | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-calls-dock` | 360×800 | `0,140 → 353,245` | 245 | 632 | 387 | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-bottom` | 360×800 | `0,25 → 353,130` | 130 | 632 | 502 | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-closed` | 360×800 | 无 | — | 632 | — | — | 0 | 0 / 0 | **无** | 360 = 360 |
+
+- **四项硬指标全部成立**，两个宽度都是：① 抽屉矩形完全落在视口内；② **抽屉底 ≤ 输入框上沿**（余量 164 / 142 px 为正）；③ 与 16 张节点卡相交面积 **0**；④ 与 dock / dock-fill 相交 **0 / 0**。外加 `scrollWidth = clientWidth`、`consoleErrors: []` / `pageErrors: []`（`soak/console.json`）。
+- **抽屉尺寸**：高 **105 px**（两个宽度），上限仍是 `max-height: 240px` + `overflow-y: auto`；里面那份列表 `position: static`；这次抽屉里是 **1 行**调用。
+- **占位那段的决定性实验（`soak/interaction.json`）**：DOM 里排在 dock **之后**（`roomAfterDock: true`）、几何上紧隔 **4 px**（dock 底 730 / room 顶 734）、`aria-hidden="true"`、高度正好 `35vh`（390 时 **295.39** px、360 时 **280** px）、只在摊开时存在；
+  把 room 从 DOM 拿掉再原位放回，dock 的 `dockTop` **`delta = 0`**（680→680 / 658→658）。**要分清的另一半**：抽屉**自己**把 dock 往下推了 **117 px**（内容轨道 1221 → 1338），那是抽屉的高度，不是占位挤的。
+- **底部那段是空白、不是被裁**：滚到内层容器最底（`div.wSkVaW_scrollBody`，`scrollTop` **1087 / 1087**（390）、**1116 / 1116**（360），`atBottom: true`）时，dock `327 → 377`、room `381 → 676`、输入框上沿 **676**——room 下沿正好落在输入框上沿，`收下这版` 完整、下面是纯空白。**页面本身 `window.scrollY` 恒 0**：这个宿主是内层容器滚动。
+- **再点一次**：抽屉、列表、占位**三样都归 0**（两个宽度都验过）；「收起」按钮只在 390 验过（`reopened 1 → afterHide 0`）。
+
+**门禁与全量套件（本轮自己跑，`5ba1ca2` 上）**：`npm run typecheck` → **`exit 0`**（无输出）；`npm run lint` → **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+八份进度 spec → **`8 files / 336 passed`**（`progress-panel` **35**、`client` 153、`progress-panel-model` 31、`progress-tab` 72、`progress-connector` 15、`progress` 14、`progress-hint-absent` 8、`i18n-parity` 8。
+**整仓全量套件（这一块唯一一次全量，`AGENTS.md` §12；不是 `npm run ci`）**：`TMPDIR=$PWD/.tmp npx vitest run` → **`Test Files 105 passed (105)` / `Tests 2040 passed (2040)` / `Duration 106.15s` / `SUITE_EXIT=0`**，转录落在 worktree 的 `.tmp/suite-5ba1ca2.out`（gitignored，不随记忆提交）。
+对照 `main` 尖端 `fe6d631` 的 **105 / 2030**：**文件数不变、用例 +10**，与 `progress-panel` 25 → 35 的 +10 对得上——**没有丢一份、没有丢一条**。
+**`npm run ci` 那五步（含 `verify:lib`）这一轮 `NOT_RUN`**：块内只跑轻门禁，全量 `ci` 跑在发版那一轮（`AGENTS.md` §12）。
+
+**soak 自己犯的两处（照实记，不美化）**：
+1. **白跑一次**：第二轮克隆后第一次引导**忘了装 tgz**，跑的其实是 live 那份已发布的 `0.13.53`（`lib/client.js` 的 `sha256 1fb003f3…`，没有 `gw-progress-sheet-room`）。发现即停，**一条读数都没留用**，`install.txt` 第二部分留了原文。
+2. **量法错一次**：「dock 有没有被挤走」第一遍用 `rect.top + window.scrollY` 算——这个页面是**内层容器滚动**、`window.scrollY` 恒为 0，量出来是假值；「滚到底」那张还用了 `window.scrollTo`（什么也没动，与 dock 那张**同字节**）。
+   改成在滚动容器坐标系里量、显式滚 `div.wSkVaW_scrollBody` 到底后**重拍**，修好后 `soak/verify-readings.mjs` **38 条断言全过**（`verify-readings.txt`）。上面表里用的是修好之后那一遍。
+
+**红线（`redline.txt` 第二部分是原文）**：`~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime 两轮前后**逐字节相同**（连纳秒位：`2026-11-25 23:14:14.025606767` / `2026-11-22 16:59:46.687805286` / `2026-11-26 19:41:49.334856619`）；
+3080 根路径 **401 → 401**；live 那份插件仍读作 **`0.13.53`**（**没升级**）；`bash -c ': > ~/.dsh/.soak-probe'` **四次都是 `Read-only file system`**；
+隔离实例已停、3431 已释放、`.tmp/soak-overlap/`（104 MB 克隆 home、两个 tgz、一次性工作区）全部删除。
+
+**`NOT_RUN`（一条不藏）**：① **多行抽屉（四行那种）**——这一轮的树里所有可摊开节点都只有 **1 行**调用（探了中间往外 5 颗：`check_t2` / `check_t1` / `check_t3` / `execute_t3` / `review_t1` 全是 1 行），**105 px 抽屉的 164 / 142 px 余量是真的，换成约 207 px 会怎样本轮没量**；
+② **> 720 px 那一侧本轮没复测**（这一版声明没改，桌面那处叠压仍故意不修）；③ **720 / 721 断点边界**（只测 390 与 360，没有逐像素找断点）；
+④ **`matchMedia` 的 `change` 监听**（拖窗口从宽到窄、不刷新；两个宽度是同一页面改视口）；⑤ **同时摊开两组节点**（只摊开一颗）；⑥ **「收起」按钮只在 390 验过**（360 上没点）；
+⑦ **421–499 px** 之间的宽度；⑧ **旋转 / 现场改视口**；⑨ **读屏软件**（抽屉的朗读顺序是 `HYPOTHESIS`）；⑩ **Firefox / Safari**（只在 Chromium 里跑过）；⑪ **live 档案升级 / 重载 / 重启**（红线）；⑫ **`npm run ci` 五步**（含 `verify:lib`，留给发版那一轮）；⑬ **第一轮的读数没有重跑**（两轮各自对着自己的提交，没有交叉复测第二轮在 700 px 上的样子）。
+
+**证据：** `.rsi/evidence/mobile-overlap-2026-11-26/`（在主检出里，不在这个 worktree）——`README.md`（两轮对照 + 第二轮的图、读数、结论、`NOT_RUN`）、
+`install.txt`（构建 / 打包 / 安装 / 引导，两部分：第一部分 `10c15a0`、第二部分 `5ba1ca2`，含那次白跑的原文）、`redline.txt`（两部分逐字）、
+`capture-phone.mjs`（取样脚本，`--self-test` 带三份夹具：一份"浮出列表压卡"读出 12 480 px²、一份"抽屉吃掉 dock"读出 15 600 px²——**这把尺子读得出非 0**）、
+`soak/readings.json`（第二轮 12 条读数 + 几何）、`soak/interaction.json`（六项硬指标汇总 + 占位拿掉再放回）、`soak/runs.json`（三次运行归档，`verified 3/3`）、
+`soak/console.json`、`soak/verify-readings.mjs` / `.txt`（38 条断言，本目录可复跑）、六张图 `soak/phone-{390,360}-{as-opened,calls-dock,bottom}.png`、
+`soak/round1-10c15a0/`（第一轮全部证据与它自己的 README，含 21 条断言的自检与两帧取景不合格的记录）。
+
 ## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`45909bb`（`feat(progress): the tab is a task panel …`）把进度页换成任务面板——顶上一句话、中间一张由 Mermaid 文本自己排出来的分支图、底下一句只在卡住时出现。本条目只记**真机读数与门禁**；契约见 `DESIGN-progress-tab.md` §25，裁决见 `D-173`。**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮一个字节没改**（soak 那一路只读），也没 commit / push / tag / bump / publish。

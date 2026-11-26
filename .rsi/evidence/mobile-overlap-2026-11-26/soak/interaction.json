@@ -1,0 +1,159 @@
+{
+ "tabPath": "overflow-menu",
+ "sentAt": "2026-11-26T13:13:08.450Z",
+ "tapped": {
+  "phone-390": {
+   "nodeId": "check_t2",
+   "rows": 1,
+   "openAt": 166.988,
+   "composerTop": 676,
+   "sheetBottom": 512,
+   "gapToComposer": 164,
+   "sheetAboveComposer": true,
+   "sheetFullyInViewport": true,
+   "overlapAreaTotal": 0,
+   "dockContentTopBeforeOpen": 1221,
+   "dockContentTopWhileOpen": 1338,
+   "dockMovedBy": 117,
+   "roomStartsAfterDockBy": 4,
+   "roomRemovalProbe": {
+    "dockTopWithRoom": 680,
+    "dockTopWithoutRoom": 680,
+    "delta": 0
+   },
+   "roomPresent": true,
+   "roomAriaHidden": "true",
+   "roomAfterDock": true,
+   "roomHeight": 295.39,
+   "roomHeightShareOfViewport": 0.35
+  },
+  "phone-360": {
+   "nodeId": "check_t2",
+   "rows": 1,
+   "openAt": 175.134,
+   "composerTop": 632,
+   "sheetBottom": 490,
+   "gapToComposer": 142,
+   "sheetAboveComposer": true,
+   "sheetFullyInViewport": true,
+   "overlapAreaTotal": 0,
+   "dockContentTopBeforeOpen": 1221,
+   "dockContentTopWhileOpen": 1338,
+   "dockMovedBy": 117,
+   "roomStartsAfterDockBy": 4,
+   "roomRemovalProbe": {
+    "dockTopWithRoom": 658,
+    "dockTopWithoutRoom": 658,
+    "delta": 0
+   },
+   "roomPresent": true,
+   "roomAriaHidden": "true",
+   "roomAfterDock": true,
+   "roomHeight": 280,
+   "roomHeightShareOfViewport": 0.35
+  }
+ },
+ "widths": {
+  "phone-390": {
+   "dockShot": "phone-390-calls-dock",
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockInsideViewport": true,
+   "overlapAreaTotal": 0,
+   "listStillOpen": 1,
+   "bottomShot": "phone-390-bottom",
+   "bottom": {
+    "scrollerAtBottom": true,
+    "scroller": {
+     "tag": "div",
+     "className": "wSkVaW_scrollBody",
+     "scrollTop": 1087,
+     "scrollHeight": 1855,
+     "clientHeight": 768,
+     "atBottom": true
+    },
+    "windowScrollY": 0,
+    "roomPresent": true,
+    "roomRect": {
+     "left": 0,
+     "top": 381,
+     "right": 383,
+     "bottom": 676.390625,
+     "width": 383,
+     "height": 295.390625
+    },
+    "dockRect": {
+     "left": 4,
+     "top": 327,
+     "right": 379,
+     "bottom": 377,
+     "width": 375,
+     "height": 50
+    },
+    "dockBelowRoom": true,
+    "roomStartsAfterDockBy": 4,
+    "overlapAreaTotal": 0
+   },
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "roomPresent": false,
+    "overlapAreaTotal": 0
+   },
+   "hideButton": {
+    "reopenedSheetCount": 1,
+    "hideLabel": "收起",
+    "afterHideSheetCount": 0,
+    "afterHideNodeCalls": 0,
+    "afterHideRoomPresent": false
+   }
+  },
+  "phone-360": {
+   "dockShot": "phone-360-calls-dock",
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockInsideViewport": true,
+   "overlapAreaTotal": 0,
+   "listStillOpen": 1,
+   "bottomShot": "phone-360-bottom",
+   "bottom": {
+    "scrollerAtBottom": true,
+    "scroller": {
+     "tag": "div",
+     "className": "wSkVaW_scrollBody",
+     "scrollTop": 1116,
+     "scrollHeight": 1840,
+     "clientHeight": 724,
+     "atBottom": true
+    },
+    "windowScrollY": 0,
+    "roomPresent": true,
+    "roomRect": {
+     "left": 0,
+     "top": 352,
+     "right": 353,
+     "bottom": 632,
+     "width": 353,
+     "height": 280
+    },
+    "dockRect": {
+     "left": 4,
+     "top": 298,
+     "right": 349,
+     "bottom": 348,
+     "width": 345,
+     "height": 50
+    },
+    "dockBelowRoom": true,
+    "roomStartsAfterDockBy": 4,
+    "overlapAreaTotal": 0
+   },
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "roomPresent": false,
+    "overlapAreaTotal": 0
+   }
+  }
+ }
+}

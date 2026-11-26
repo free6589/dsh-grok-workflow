@@ -1,0 +1,39 @@
+ok   390 · 抽屉完全在视口内（点完当下） true
+ok   390 · 抽屉底线在输入框上沿之上 [512,676]
+ok   390 · 两者之间的余量 = 164 164
+ok   390 · 输入框上沿是探针找到的固定栏（不是硬编码选择器） ["sticky","div",168]
+ok   390 · 与每张节点卡相交面积 = 0（摊开） 0
+ok   390 · 与每张节点卡相交面积 = 0（dock 帧） 0
+ok   390 · 抽屉存在、列表在抽屉里、列表不在图里 [1,true,false]
+ok   390 · 再点一次：抽屉、列表、占位都归零 [0,0,false]
+ok   390 · scrollWidth = clientWidth = 视口宽 [390,390]
+ok   390 · 与 dock / dock-fill 相交面积 = 0（两个时刻） [0,0,0,0]
+ok   390 · dock 在 dock 帧里完整可见 true
+ok   390 · 占位在 dock 之后（DOM 顺序） true
+ok   390 · 占位 aria-hidden "true"
+ok   390 · 占位几何上紧跟 dock 之后（4 px） 4
+ok   390 · 占位高度 = 35vh（295.39） 0.35
+ok   390 · 拿掉占位，dock 一像素都不动（决定性实验） {"dockTopWithRoom":680,"dockTopWithoutRoom":680,"delta":0}
+ok   390 · 底部那张图确实滚到底了（滚动容器 atBottom） [1087,1855,768]
+ok   390 · 滚动发生在面板内部，页面本身没滚 0
+ok   390 · 到底时 dock 与占位都在画面里，占位在 dock 之后 [377,381]
+ok   360 · 抽屉完全在视口内（点完当下） true
+ok   360 · 抽屉底线在输入框上沿之上 [490,632]
+ok   360 · 两者之间的余量 = 142 142
+ok   360 · 输入框上沿是探针找到的固定栏（不是硬编码选择器） ["sticky","div",168]
+ok   360 · 与每张节点卡相交面积 = 0（摊开） 0
+ok   360 · 与每张节点卡相交面积 = 0（dock 帧） 0
+ok   360 · 抽屉存在、列表在抽屉里、列表不在图里 [1,true,false]
+ok   360 · 再点一次：抽屉、列表、占位都归零 [0,0,false]
+ok   360 · scrollWidth = clientWidth = 视口宽 [360,360]
+ok   360 · 与 dock / dock-fill 相交面积 = 0（两个时刻） [0,0,0,0]
+ok   360 · dock 在 dock 帧里完整可见 true
+ok   360 · 占位在 dock 之后（DOM 顺序） true
+ok   360 · 占位 aria-hidden "true"
+ok   360 · 占位几何上紧跟 dock 之后（4 px） 4
+ok   360 · 占位高度 = 35vh（280） 0.35
+ok   360 · 拿掉占位，dock 一像素都不动（决定性实验） {"dockTopWithRoom":658,"dockTopWithoutRoom":658,"delta":0}
+ok   360 · 底部那张图确实滚到底了（滚动容器 atBottom） [1116,1840,724]
+ok   360 · 滚动发生在面板内部，页面本身没滚 0
+ok   360 · 到底时 dock 与占位都在画面里，占位在 dock 之后 [348,352]
+ALL 38 CHECKS PASS

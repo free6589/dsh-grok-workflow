@@ -5,6 +5,30 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **On a phone, the calls you open now come out of the figure and stand in a block of their own under it, instead of landing on the card next door / 手机上摊开的调用不再压在隔壁那张卡上，而是落到图下面属于面板自己的一整块里，还能收起来** —
+  Tapping a task node on the progress tab opens the calls that step made. At a phone's width that list used to float up
+  from under the node, straight on top of the card beside it, so one step's numbers were written across another step's
+  name. Now, at phone and tablet widths, the list leaves the figure and becomes one block in the panel's own column,
+  directly under the diagram: it can only push the page down, so it cannot land on a card, and the button at the bottom
+  stays clear of it. It holds exactly what it held before — the same rows, still with their time column even on the
+  narrowest screens, and the name of the card each list belongs to written above it, so it reads correctly after you
+  scroll down to it. It also comes to rest in the middle of the screen rather than against the very bottom edge, so it is
+  in view the moment you tap a card — there is nothing to scroll down to find it. Tapping the node again still closes the
+  list and drops the lit wires, and a "Hide" control in that block puts everything away at once.
+  **On a wide screen nothing changed** — the list still opens from under its node, the way it always has.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; this is only about where that list
+  is placed on a phone.**
+  / 在进度页点一颗任务节点，会摊开这一步调过的调用。手机的宽度下，这个列表原来是从节点下面浮出来的，正好压在旁边
+  那张卡上——一步的数字写在另一步的名字上。现在在手机和平板的宽度下，这个列表从图里搬出来，变成图下面的一整块，落在
+  面板自己的那一列里：它只能把页面往下推，所以压不到任何一张卡，底下那颗按钮也不会被它盖住。它装的东西一件没少——
+  同样的行、最窄的屏幕上照样带着那一列时刻，而且每组开头写着这张列表属于哪张卡，滚下去也读得明白。
+  它还落在屏幕中间，不是贴着最底边——点完抬眼就在，不用再滚一下去找。
+  再点一次那颗节点仍然是收起、并熄灭点亮的线；这一块里还有一个「收起」，一下把所有摊开的都收起来。
+  **宽屏上什么都没变**——列表仍旧从节点下面浮出来，跟以前一样。
+  **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；变的只是手机上这个列表摆在哪儿。**
+
 ## [0.13.53] - 2026-11-26
 
 ### Changed / 变更

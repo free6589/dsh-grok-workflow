@@ -1495,3 +1495,157 @@ p.gw-progress-stuck[data-gw-progress-stuck]                   role="status"
   ③ **未通过 / 已取消 / 出错**三态；④ **421–499 px** 之间的宽度（只探了 420 与 500 两侧）；
   ⑤ **live 档案升级 / 重载 / 重启**（红线：live 里那份插件仍读作 `0.13.48`）；⑥ 读屏软件实测；⑦ Firefox / Safari；
   ⑧ 真 Mermaid 渲染器（这台机器上没有，也不联网——真机核的是「文本与 DOM 数得一样」，不是「渲染出来一样」）。
+
+## 26. 窄屏：摊开的调用从图里搬出来，落到面板自己那一列的一张抽屉里（2026-11-26，`fix/mobile-overlap`）
+
+**§25 仍然成立。** 本节只改**窄屏那一处的渲染位置**：宽度 ≤ 720 px 时，摊开的调用列表**画在哪里、点开之后落在视野的哪里**。
+三区顺序、模型、文案口径、状态词汇、诚实边界、两个交互的语义一个字都没改；窄屏的图仍是 §25.5 那张一卡一行的侧轨树。
+改之前的样子是 §25.9 的第 ② 条限制（浮出的列表压在隔壁那张卡上）。
+
+这一处跨**两颗提交**：`10c15a0` 把列表搬出图、落到抽屉里；`5ba1ca2` 让点开之后抽屉**落在屏幕中间**
+（而不是贴住底边、正好被宿主那块固定输入框挡住），并为居中补了一段可滚的余量。裁决见 `D-174`。
+
+本节 `CONFIRMED` 的部分：源码（`src/client/index.js` 与它的字节副本 `lib/client.js`，各 **412345** 字节、`cmp` 空输出）、
+`test/progress-panel.spec.ts`（25 → **35**）与 `test/i18n-parity.spec.ts`（+8 −3）、`test/client.spec.ts`（+4 −1）里钉住的形状，
+以及**构建包在无头 Chromium 里的矩形读数**（叠压：390 / 360 / 1500；位置：390×844 与 360×780）。
+**真机（隔离档案真装真跑）这一档是 `NOT_RUN`**，见 §26.7。
+
+### 26.1 DOM 与钩子（`CONFIRMED`）
+
+```text
+section.gw-progress
+  header.gw-progress-bar …                                     （§25.2 原样）
+  div.gw-progress-graph …                                      （§25.2 原样；窄屏时它自己不再画列表）
+  div.gw-progress-sheet[data-gw-progress-sheet]                ← 只有 ≤720 px 且确有节点摊开时存在
+    div.gw-progress-sheet-head
+      span.gw-progress-sheet-title                              progress.panel.calls（调用 / Calls），不是按钮
+      button.gw-progress-sheet-hide[data-gw-progress-sheet-hide]  progress.panel.collapse（收起 / Hide）
+    div.gw-progress-sheet-group                                每个摊开的节点一组，按摊开的先后
+      p.gw-progress-sheet-node                                 那张卡自己的名字（= 节点上那个词）
+      ol.gw-progress-node-calls[data-gw-progress-node-calls="<id>"][id="gw-progress-calls-<id>"]
+         › 既有 ProgressLogRow 行（+ 汇总节点的退回行）
+  p.gw-progress-stuck …                                        （只在卡住时存在）
+  div.gw-progress-guardian …  footer.gw-progress-foot › div.gw-progress-dock …
+  div.gw-progress-sheet-room                                   ← 窄屏且确有节点摊开时才有；空、aria-hidden="true"、35vh（见 §26.3）
+```
+
+- **档里那两处记号只加在抽屉自己的头上**：`data-gw-progress-sheet` 给抽屉本身（一个存在性钩子），
+  `data-gw-progress-sheet-hide` 给那颗按钮。**列表的钩子没变**——还是 `data-gw-progress-node-calls="<id>"`，
+  **`id` 还是 `gw-progress-calls-<id>`**，所以节点的 `aria-controls` 那根指针不用改也能指到它。
+- **列表是从节点手里搬走的，不是复制一份**：宽屏由节点画、窄屏由抽屉画，**同一刻只有一份**（`sheet` 为真时节点自己不再渲染那个 `ol`）。
+- **没有节点的抽屉**：没有可开的东西时抽屉**不存在**（不是空盒子），底部那段占位也**不存在**，和图、卡住那句同一个口径。
+- **底部那段占位是 class，不是钩子**：`.gw-progress-sheet-room` 只用 class 找；它 `aria-hidden="true"`、**没有子节点**、
+  **排在 dock 之后**（所以不推任何按钮），`height: 35vh`。它是给页面腾出可滚余量的空盒子，不是内容——
+  收起列表时跟着消失，宽屏从不出现（两条都写在用例里）。
+
+### 26.2 位置（`CONFIRMED`）
+
+| 关 | 值 |
+| --- | --- |
+| 在哪一层 | 面板（`section.gw-progress`）的直接子元素，**图之后** |
+| 与卡住那句 | 在它**之前** |
+| 与 Guardian / dock | 在两者**之前** |
+| 与底部余量 | 余量（§26.1 那个空盒子）在 **dock 之后**，也就是整个 `section` 的最后一项；抽屉在它前面很远 |
+| 能不能离开这一列 | 不能。它在页面正常的流里，没有 `position: absolute` / `fixed` |
+
+- 一句话：**窄屏时它只能把页面往下推**。推下去的包括卡住那句、Guardian、dock——
+  所以它不可能横跨任何一张卡，也不可能盖住 dock 的按钮（实测相交面积 0，见 §26.7）。
+- 顺序有争议时以元素在 `section` 里的先后为准：用例比的是**两处**——sheet 在 `data-gw-progress-graph` **之后**、
+  在 `data-gw-progress-dock` **之前**（源码里卡住那句紧跟在 sheet 后面，用例没有单独比它）。
+
+### 26.3 几何（`CONFIRMED`：样式表与用例；读数见 §26.7）
+
+| 东西 | 值 |
+| --- | --- |
+| 高度上限 | `max-height: min(50vh, 240px)`（**不变**） |
+| 摊开时的位置 | **屏幕中间**（`scrollIntoView({ block: 'center' })`），不是贴住底边 |
+| 滚动 | **抽屉是这一块唯一的滚动盒**（`overflow-y: auto`，纵向）；里面的列表 `position: static`、`max-height: none`、`overflow-y: visible` |
+| 横向 | 抽屉拿整个面板的宽（`min-width: 0`、没有负边距），所以**不需要横向滚动** |
+| 外观 | `1px` 边框（`--dsw-alias-border-l2`）、`12px` 圆角、`12px` 上外边距、`8px 10px` 内边距 |
+| 组间距 | `6px`（抽屉内），组内 `2px`；卡名 `12px` 半粗 |
+| 收起按钮 | 高 `28px`、胶囊形（`border-radius: 999px`）、右边贴角，`focus-visible` 有 `2px` 外框 |
+| 480 px 以下 | 抽屉里的行**保留时刻列**（`40px` 首列），浮出的那份在同样宽度下丢掉时刻列 |
+| 面板底部余量 | 摊开时多出 `.gw-progress-sheet-room`：空、`aria-hidden`、`height: 35vh`、**dock 之后**；dock 位置不变 |
+
+- **两处细节是刻意的**：① 上限同时受视口（`50vh`）和绝对值（`240px`）约束——手机上四张全摊开时抽屉仍留得住页面其余部分
+  （用例钉 `max-height` / `overflow-y: auto` / `min-width: 0` 三条）；② 抽屉带边框与底色，但里面的列表把自己的边框、底色、阴影
+  **全清掉**（`background: none`、`box-shadow: none`），否则会出现「盒子套盒子」的双层边——**这一条只有源码与它的注释，用例没有逐条断言**。
+- **480 px 那一段**：抽屉是整个面板的宽，所以它拿得回被浮层丢掉的那一列；同一档宽度下浮出的那份仍然只有两列。
+- **为什么要那段余量**：一轮跑完的面板常常只比屏幕高一点点，**可滚的距离本来就短**。没有余量时，
+  `scrollIntoView({ block: 'center' })` 会被滚到底截断，列表仍旧停在靠近底边的地方——也就是宿主钉住输入框的位置
+  （390 px 上量到抽屉底 **771**、输入框上沿 **664**，差 **107 px**，`scrollTop == scrollHeight - clientHeight`）。
+  那段 `35vh` 的空白就是把缺的滚动距离补出来；它排在 dock **之后**，所以**没有按钮因为这件事移动**。
+
+### 26.4 交互（`CONFIRMED`）
+
+- **节点上还是同一次点击**：摊开 / 收起这颗节点的调用，同时点亮 / 熄灭与它有关的线（§25.8 的语义一个字没改，
+  只是窄屏时摊开的那个 `ol` 被画到了抽屉里）。
+- **「收起」是第二个入口**：`button[data-gw-progress-sheet-hide]` 一次清掉**所有**摊开的节点 + 清掉点亮——
+  等价于把每一个摊开的节点各点一次。它的用处是给已经滚过那颗卡的读者一条不用回头找的路。
+- **摊开时把抽屉带到屏幕中间**：`progressPanelReveal()` → `scrollIntoView({ block: 'center' })`，
+  触发条件是「摊开的节点数」变化，不是每次渲染；没有盒子、或者盒子没有 `scrollIntoView`（stub 宿主）就直接返回，不抛。
+  - **为什么不是 `nearest`**：宿主把输入框钉在屏幕底部，滚到最近的一边就是把列表停在它后面——
+    390 px 上量到抽屉停在 `739 → 844`（视口高 **844**），读者点了卡，看起来什么都没发生。
+  - **为什么光换成 `center` 也不够**：面板只比屏幕高一点点，可滚距离本来就短，居中会被滚到底截断
+    （同一档量到抽屉底 **771** 对输入框上沿 **664**，**还差 107 px**）。所以居中要配 §26.3 那段底部余量，
+    两件事合起来才是「点完抬眼就在」。
+- **一次点击仍然两个读数**（列表 + 线），**空白处仍然只取消线**（§25.8）。
+- **不写任何东西**：抽屉里没有任何服务调用，dock 仍是唯一会写的地方。
+
+### 26.5 断点从哪来（`CONFIRMED`）
+
+- **JS 里判定**：`matchMedia('(max-width: 720px)')`，初值在渲染时读，`change` 监听跟着窗口变。
+- **样式表里那个数是同一个 720**（图的堆叠判定 `width < 720`、`@media (max-width: 720px)` 那一段）——**一个数，写在两处，值相同**。
+- **为什么不在 CSS 里决定元素归属**：vitest 没有排版引擎，`display: none` 切两份 DOM 的做法测试读不到，
+  「列表现在在哪」就只能靠眼睛验。把决定放进 JS，用例读得到；样式表只负责它长什么样。
+- **正好 720 px**：用抽屉（`max-width` 含等号），而图的排版是**严格小于** 720 才堆成一列——所以这一档是「图还是行、列表在抽屉里」。
+  按「≤ 720 用抽屉」的口径，这是有意的。
+- **没有 `matchMedia` 的宿主**（stub 渲染器、老组合）：读作宽屏，抽屉永不出现，行为与 §25 完全一致。
+
+### 26.6 > 720 px：一个字都没改（`CONFIRMED`）
+
+- 宽屏仍是**节点下面那个绝对定位的浮层**（`.gw-progress-node-calls`：`position: absolute`、`top: calc(100% + 6px)`、
+  `max-height: 240px` 自己滚、带边框与投影）。
+- 因此**桌面那处叠压仍在**：1500 px 展开时遮住「检查」的一部分，改前改后读数都是 2 / 9（一张 2 张、四张 9 张）。
+  **这一轮故意不修**，不在本节范围内。
+- 宽屏的兄弟间距、层间距、侧轨、拐角一像素没动（§25.5 仍然逐条成立）。
+- 宽屏也**不画底部那段余量**（它跟抽屉同生同灭），所以宽屏页面的高度一个像素没变。
+
+### 26.7 验证指针与没验的（`CONFIRMED` / `NOT_RUN`）
+
+- **门禁（本轮自己在 `5ba1ca2` 上重跑，`TMPDIR=$PWD/.tmp`）**：`npm run typecheck` → `TYPECHECK_EXIT=0`；
+  `npm run lint` → **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+  八份进度 spec → **`8 files / 336 passed`**（`progress-panel` **35**、`client` 153、`progress-panel-model` 31、
+  `progress-tab` 72、`progress-connector` 15、`progress` 14、`progress-hint-absent` 8、`i18n-parity` 8）。
+  基线 **326 → 334（`10c15a0`）→ 336（`5ba1ca2`）**（+10 全在 `progress-panel`：25 → 35），**没有一份变少**。
+  两条新用例：一条钉 `revealSheet(box)` 的实参就是 `{ block: 'center' }`、且对 `undefined` / `null` / 没有 `scrollIntoView`
+  的盒子不抛；一条钉那段占位（只在窄屏且摊开时存在、`aria-hidden`、空、dock **之后**、`height: 35vh`、宽屏与收起后都不存在）。
+- **产物**：`cmp lib/client.js src/client/index.js` 空输出，两份都是 **412345** 字节（`sha256 8cd45211…7bb599`）。
+  `npm run build` 的重跑是实现者做的，本轮复核的是**字节相同**与**改动的文件集**（`5ba1ca2` 是 3 文件 / +113 −8），没有自己重建。
+- **真浏览器读数（`CONFIRMED`，无头 Chromium + 构建包 + 替身 React + 真排版引擎）**：
+
+  **叠压（`10c15a0`，改前 / 改后各一次）**
+
+  | 宽度 | 改前（一张 / 四张摊开） | 改后 | 抽屉高度 | 抽屉 ∩ dock |
+  | --- | --- | --- | --- | --- |
+  | 390 | **2 张 / 8 张** | **0 / 0** | 103 px / 240 px 封顶（内容 374 溢出滚动） | **0** |
+  | 360 | **2 张 / 8 张** | **0 / 0** | 同上 | **0** |
+  | 1500 | 2 张 / 9 张 | **2 张 / 9 张（没变）** | —（不走抽屉） | — |
+
+  `scrollWidth == clientWidth` 在 390 / 360 都成立。
+
+  **位置（`5ba1ca2`）**
+
+  | 宽度 × 视口高 | 改前（`nearest`） | 只换 `center` | 加余量后（一张 / 四张） |
+  | --- | --- | --- | --- |
+  | 390 × 844 | 抽屉停在 **739 → 844**，正压在固定输入框上 | 抽屉底 **771** 对输入框上沿 **664**，**差 107 px** | **373 → 476 / 302 → 542** |
+  | 360 × 780 | — | — | **338 → 441 / 270 → 510** |
+  | 1500 | —（没有抽屉） | — | —（没有抽屉） |
+
+  两档手机的全部读数都**完全在视口内、与卡相交 0、与底部固定栏相交 0、页面无横向滚动**；
+  「只换 `center`」那一列的 `scrollTop == scrollHeight - clientHeight`，说明滚动已经到底、被夹住了。
+- **`NOT_RUN`：** ① **隔离档案里的真机 soak**（这一轮只有无头 Chromium 的矩形读数，**不是真机**；
+  第二轮的「点完当下不滚动」真机读数还没到）；② **421–499 px** 之间的宽度（只量了 390 / 360 / 1500）；
+  ③ **旋转 / 现场改视口后的读数**（`change` 监听写在源码里，用例覆盖了判定本身，但没在真机上转过一屏）；
+  ④ **读屏软件**（抽屉的朗读顺序是 `HYPOTHESIS`）；⑤ Firefox / Safari。
+
