@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.52] - 2026-11-26
+
 ### Changed / 变更
 
 - **A block opened by tapping a question card now says so in its record: the approval is kept as `question-reply` instead of
