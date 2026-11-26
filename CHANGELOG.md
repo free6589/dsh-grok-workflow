@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.48] - 2026-11-26
+
 ### Changed / 变更
 
 - **Every plan task is now a cell under the leg that ran it, and a retried task shows how many tries it took / 进度页把每个计划任务画成一格挂在执行/检查/复核下面，失败重试也画出来，第几遍、重看线、还剩几步一目了然** —
