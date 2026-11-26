@@ -1,3 +1,14 @@
+## 0.13.54 合版 BLOCKED（2026-11-27，主代理只读验货 + 记忆落盘，没动手）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 跑命令的工具 | `echo alive`（本会话直探） | **失败**：`cannot start "bash": UNKNOWN: unknown error, write`（与 16/256 轮起连续多轮同错；**120/256 轮曾通一次 `alive` + 工作区，回探又断，系闪断**） |
+| 主检出版本 | `read package.json`（只读） | **`0.13.53`**，没动过 |
+| 横排分叉货况 | `read feat/task-fork HANDOFF.md 头行`（只读） | **未合、未推、未打 tag**，门禁 `8 files / 331 passed`、七张真机齐、四条修完——货在原位 |
+| 合流/门禁/发版 | — | **`NOT_RUN`**（工具没恢复，`release/0.13.54` 没建，零条合流） |
+| 脏树/live | 只读约定 | 没碰 |
+| 文案键审计（111/256 轮只读小工） | `read` 契约 §26.8 + `test/i18n-parity.spec.ts` 全文 | 新增 14 键中英齐平行无缺、删除清单含死键无遗漏；剩耗时依据一句名实不符（说步骤实际数层），合版后修文案时改 |
+
 ## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`45909bb`（`feat(progress): the tab is a task panel …`）把进度页换成任务面板——顶上一句话、中间一张由 Mermaid 文本自己排出来的分支图、底下一句只在卡住时出现。本条目只记**真机读数与门禁**；契约见 `DESIGN-progress-tab.md` §25，裁决见 `D-173`。**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮一个字节没改**（soak 那一路只读），也没 commit / push / tag / bump / publish。

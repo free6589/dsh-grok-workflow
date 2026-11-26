@@ -1,3 +1,11 @@
+Last updated: 2026-11-27 02:20 +08:00（**0.13.54 合版 BLOCKED（工具没恢复，零条合流）；新挖两条合版后修的问题（`CONFIRMED`，契约 §26.8/§26.9 照实记）** —
+① 估算文案说"按步骤推算"实际数的是"层"（字和数对不上）；② 两个步号同时出现（卡住那句说任务层、顶上那句说分支层，都对但不一样，看着晕）。货都在原位：主检出 `0.13.53`、`feat/task-fork` 两提交未合未推、`release/0.13.54` 没建、脏树与 live 没碰。
+以下为上一轮记录，原样保留：
+
+Last updated: 2026-11-27 02:05 +08:00（**0.13.54 合版 BLOCKED：跑命令的工具没恢复，合流零条完成；五条分支货都在原位没丢（`CONFIRMED`，只读验货）** —
+主检出 `package.json` 仍 `0.13.53`（本轮 `read` 直读）；`feat/task-fork` 交卷仍是两提交未合未推（`HANDOFF.md` 头行原样在）；`release/0.13.54` 没建；脏树没碰、live 没动。等工具恢复即重派合版。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-26 19:05 +08:00（**进度页换成了任务面板：一句话 + 一张由 Mermaid 文本自己排出来的分支树 + 只在卡住时出现的一句；这一版在隔离档案里真装真跑了三次（`CONFIRMED`）** —
 分支 **`feat/task-panel`**（worktree `.tmp/wt-task-panel`），产品提交 **`45909bb`**（`feat(progress): the tab is a task panel — one sentence, a Mermaid-shaped tree, and where it is stuck`，
 10 文件 / **+5298 −4986**：`src/client/index.js` 与 `lib/client.js` 各 2020 行、用例 4 改 2 删 2 新），基线是 `main` 尖端 **`e44e26a`**（v0.13.52）。
