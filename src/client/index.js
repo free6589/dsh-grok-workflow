@@ -4797,6 +4797,11 @@ window.__ModuleLoader__.load({
       // In the sheet the list is a column of rows in the page's flow, not a box of its own:
       // the sheet already carries the border, the fill and the one scroll.
       '.gw-progress-sheet .gw-progress-node-calls { position: static; max-height: none; overflow-y: visible; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }',
+      // The room the sheet is scrolled into: the panel is often barely taller than the screen,
+      // so without it the scroll runs out with the list still at the bottom of the column —
+      // which is exactly where the shell pins its composer. It is empty, silent, and there
+      // only while a list is open.
+      '.gw-progress-sheet-room { flex: none; height: 35vh; }',
       // ── a click traces the wires ─────────────────────────────────────────────────
       // The clicked node's own lines step forward and every other line steps back: the
       // figure keeps its structure while the branch a reader asked about reads first.
@@ -5220,6 +5225,25 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Bring the sheet into the reader's view when it opens.
+     *
+     * **Not** `block: 'nearest'`: the shell keeps its composer pinned to the bottom of the
+     * screen, so a list scrolled to the nearest edge comes to rest exactly behind it — the
+     * reader taps a card, the list opens, and nothing looks like it happened. Centring puts
+     * the list in the middle of the column the reader is looking at, which leaves the bottom
+     * of the screen free at any phone height. The sheet is in the page's flow, so this moves
+     * the page and covers nothing.
+     *
+     * A host without layout passes no box, and a page with no sheet (every wide window) never
+     * calls this at all: the guard is what keeps it from being a no-op that still throws.
+     * @param box - the sheet element, when the page drew one.
+     */
+    function progressPanelReveal(box) {
+      if (box === undefined || box === null || typeof box.scrollIntoView !== 'function') return
+      box.scrollIntoView({ block: 'center' })
+    }
+
+    /**
      * The attempt dots of one task node, and the dashed step between a failed try and the
      * one that followed it.
      *
@@ -5630,11 +5654,9 @@ window.__ModuleLoader__.load({
         : null
       // A list that opened below the fold would leave a reader who just tapped a card with
       // nothing to read. The sheet is in the page's flow, so bringing it into view costs no
-      // layout and covers nothing: `nearest` scrolls only as far as the box it lands in.
+      // layout and covers nothing.
       useEffect(() => {
-        const box = sheetRef === undefined || sheetRef === null ? undefined : sheetRef.current
-        if (box === undefined || box === null || typeof box.scrollIntoView !== 'function') return
-        box.scrollIntoView({ block: 'nearest' })
+        progressPanelReveal(sheetRef === undefined || sheetRef === null ? undefined : sheetRef.current)
       }, [sheetNodes.length])
 
       // The dock's button is the only thing the `conversation` service is needed for: with no
@@ -5702,6 +5724,14 @@ window.__ModuleLoader__.load({
                 ? h('p', { className: 'gw-progress-filled', 'data-gw-progress-filled': true, role: 'status', 'aria-live': 'polite' },
                   t('progress.dock.filled'))
                 : null)),
+          // Room to scroll the sheet up into. The shell pins its composer over the bottom of
+          // this column, and a list that opens at the very end of the content can only move
+          // as far as the column can scroll — which, on a run that is barely taller than the
+          // screen, is nothing. This is that missing room, and it exists only while the sheet
+          // does: it sits after the footer, so no button moves to make it.
+          sheet === null
+            ? null
+            : h('div', { className: 'gw-progress-sheet-room', 'aria-hidden': 'true' }),
         ])
     }
 
@@ -7438,6 +7468,7 @@ window.__ModuleLoader__.load({
       panelMermaid,
       parsePanelMermaid,
       layoutPanelGraph,
+      revealSheet: progressPanelReveal,
       detailFor: progressDetailFor,
       detailSources: progressDetailSources,
       detailField: progressDetailField,

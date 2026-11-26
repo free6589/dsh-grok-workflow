@@ -114,6 +114,7 @@ interface Bundle {
       nodes: Array<{ id: string, label: string, shape: string }>
       edges: Array<{ from: string, to: string }>
     }
+    revealSheet: (box?: unknown) => void
   }
 }
 
@@ -1296,6 +1297,7 @@ describe('a narrow screen draws the opened calls under the figure', () => {
       'gw-progress-sheet-hide',
       'gw-progress-sheet-group',
       'gw-progress-sheet-node',
+      'gw-progress-sheet-room',
     ]) expect(styled, name).toContain(name)
   })
 
@@ -1361,6 +1363,47 @@ describe('a narrow screen draws the opened calls under the figure', () => {
       return ends()
     })
     expect(hooksOf(tapped, 'data-gw-progress-sheet')).toHaveLength(0)
+  })
+
+  it('reserves the room the sheet is scrolled into, and only while a list is open', () => {
+    // Measured on a real 390 px host: the panel is barely taller than the screen, so the
+    // scroll runs out with the open list still at the bottom of the column — which is where
+    // the shell pins its composer. The room is what makes centring possible at all; it sits
+    // after the footer, so no button moves to make it, and it is empty and silent.
+    const roomOf = (page: unknown) => withClass(page, 'gw-progress-sheet-room')
+    expect(roomOf(onPhone(() => pageOf(runningRun())))).toHaveLength(0)
+    const opened = onPhone(() => clickNode(mount(runningRun()), 'plan'))
+    const room = roomOf(opened)
+    expect(room).toHaveLength(1)
+    expect(attr(room[0]!, 'aria-hidden')).toBe('true')
+    expect(texts(room[0]!)).toEqual([])
+    // It is the last thing on the page, after the dock it must not push.
+    const order = walk(opened)
+    expect(order.indexOf(room[0]!)).toBeGreaterThan(order.indexOf(hookOf(opened, 'data-gw-progress-dock')))
+    expect(ruleWith('.gw-progress-sheet-room')).toContain('height: 35vh')
+    // A wide page keeps its floating list and reserves nothing.
+    expect(roomOf(withNarrow(false, () => clickNode(mount(runningRun()), 'plan')))).toHaveLength(0)
+    // Closed again: the room goes with the sheet.
+    const view2 = mount(runningRun())
+    clickNode(view2, 'plan')
+    expect(roomOf(onPhone(() => clickNode(view2, 'plan')))).toHaveLength(0)
+  })
+
+  it('brings the sheet to the middle of the view, not against the bottom of the column', () => {
+    // Measured on a real 390 px host: `block: 'nearest'` rested the sheet's last pixel on the
+    // screen's bottom edge (739 → 844), which is exactly where the shell pins its composer —
+    // the list opened and the reader saw nothing. Centring is the whole fix, so it is pinned
+    // here: the parameter is the behaviour.
+    const asked: unknown[] = []
+    const box = { scrollIntoView: (options: unknown) => { asked.push(options) } }
+    progress.revealSheet(box)
+    expect(asked).toEqual([{ block: 'center' }])
+    // Nothing to bring into view is not an error: no sheet yet, a desktop, a host without a
+    // layout engine.
+    progress.revealSheet(undefined)
+    progress.revealSheet(null)
+    progress.revealSheet({})
+    expect(asked).toHaveLength(1)
   })
 
   it('words the sheet in both languages, and keeps its two words out of the wide page', () => {
