@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.49] - 2026-11-26
+
 ### Added / 新增
 
 - **Saying "form a team" now actually splits the work: a hard instruction is appended to that turn, and a turn that still answers alone gets refused once / 你说「开团」它就真的拆活并发执行，不再单条作答** —
@@ -24,6 +26,19 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   开关是 `forceTeamRouting`（默认开）。**如实写一条已知边界**：仓库里没有「回合结束」hook 可以挂最后一班岗，
   所以模型一步答完的回合只吃到那句追加指令——没有第二次门。
   **升级须知：不用准备任何东西——功能默认开，不加键也不改 schema。**
+
+### Upgrade note / 升级须知
+
+- **Nothing to prepare — upgrade whenever you like / 这次升级前不用准备任何东西，想升就升** —
+  This version adds one routing switch, `forceTeamRouting`, and it ships **on**. No key, no setting, no default and no
+  stored record changes: there is nothing to add, delete or reconfigure before upgrading, and no migration step. A profile
+  that already runs 0.13.48 gets the feature the moment it loads this version, with no config edit — a message that asks
+  for a team is routed to a real team from the first turn after the upgrade. If you want the old behaviour back, turn the
+  switch off or use `/grok off`, which disables both halves; either way nothing you had stored is rewritten.
+  / 这个版本只多了一个路由开关 `forceTeamRouting`，而且是**默认开**。没有任何键、设置、默认值或已经存下来的记录发生变化：
+  升级前没有东西要加、要删、要重配，也没有迁移步骤。已经在跑 0.13.48 的档案，装载这个版本的那一刻就有了新功能，不用改任何配置——
+  升级之后第一句要团队的话就会被真的拆成团队。如果你想回到旧行为，把这个开关关掉，或者用 `/grok off` 把两半一起关掉；
+  两种做法都不会改写你已经存下的任何东西。
 
 ## [0.13.48] - 2026-11-26
 
