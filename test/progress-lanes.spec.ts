@@ -377,6 +377,30 @@ function laneRun(): ProgressRun {
   }
 }
 
+/**
+ * 已完成 with three tasks, of which the check leg walked only two.
+ *
+ * The leg that skipped a task is the case the alignment rule exists for: the task numbers,
+ * not the arrival order, decide which row a cell sits on.
+ */
+function skippedLaneRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-skip',
+    name: '任务团队 · 3 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+      member(3, '执行', '任务 2 · 写文档', 'completed', 2),
+      member(4, '执行', '任务 3 · 补测试', 'completed', 3),
+      member(5, '检查', '任务 2 · 写文档', 'completed', 4),
+      member(6, '检查', '任务 3 · 补测试', 'completed', 5),
+    ],
+    details: [],
+    stopReason: 'completed',
+  }
+}
+
 /** The same run with no task numbers anywhere: the lane matrix must not appear. */
 function plainRun(): ProgressRun {
   return {
@@ -619,6 +643,39 @@ describe('lanes: the flow is a matrix of legs and tasks (追加 2)', () => {
       .filter((column) => ['execute', 'check'].includes(attr(column, 'data-gw-progress-col') ?? ''))
       .map((column) => lanesOf(column))
     expect(lanes).toEqual([[1, 2], [1, 2]])
+  })
+
+  it('keeps a task on one line even where a leg skipped it', () => {
+    // 裁决 C: `data-lane` 是任务号，所以行也必须是任务号。This run's execute leg walked
+    // tasks 1/2/3 and its check leg only 2/3; ordering cells by arrival would put the check
+    // leg's task 2 on row 1, right above the execute leg's task 2 on row 2 — one horizontal
+    // line pointing at two different tasks.
+    const page = pageOf(skippedLaneRun())()
+    // The cell list is a grid of task-numbered rows, so the row a leg skipped stays empty.
+    const subs = ruleOf('.gw-progress-subs')
+    expect(subs.body).toContain('grid-template-rows: repeat(var(--gw-lanes')
+    expect(subs.body).toContain('gap: 6px')
+    // The row count is the run's highest task number — not the cell count of any one leg.
+    const inlined = [hookOf(page, 'data-gw-progress-cols'), ...columnsOf(page)]
+      .map((element) => (element.props['style'] as Record<string, string> | undefined)?.['--gw-lanes'])
+      .filter((value): value is string => value !== undefined)
+    expect(inlined.length, 'the lane count is not written inline').toBeGreaterThan(0)
+    expect(inlined.every((value) => value === '3')).toBe(true)
+    // Every cell names its own row, and the rows follow the task numbers.
+    const rowsOf = (kind: string): Array<string | undefined> => {
+      const column = columnsOf(page).find((entry) => attr(entry, 'data-gw-progress-col') === kind)
+      expect(column, `the fixture drew no ${kind} column`).toBeDefined()
+      return cellsOf(column!).map((cell) => {
+        const style = cell.props['style'] as Record<string, string> | undefined
+        return style?.['grid-row'] ?? style?.['gridRow']
+      })
+    }
+    expect(rowsOf('execute')).toEqual(['1', '2', '3'])
+    expect(rowsOf('check')).toEqual(['2', '3'])
+    // …and the check leg's first cell is task 2, not a renumbered task 1. Two cells, no
+    // filler element standing in for the row it never walked.
+    const check = columnsOf(page).find((entry) => attr(entry, 'data-gw-progress-col') === 'check')!
+    expect(cellsOf(check).map((cell) => attr(cell, 'data-task'))).toEqual(['2', '3'])
   })
 
   it('gives the plan, the summary and the two ends no cells, even when their rows carry task numbers', () => {
