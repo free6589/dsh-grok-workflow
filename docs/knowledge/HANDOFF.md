@@ -1,3 +1,48 @@
+## 2026-11-26 — `0.13.48` 已发布收口：泳道矩阵出去了（进度图一条腿一列、一个计划任务一格，重试画出第几遍）；一个发布提交（8 文件 / +22 −20、单父、从 `db3184a` 快进而来）、门禁**先红后绿**（`391e0a6` 上 `GATE_EXIT=0`、`104 files / 2013 tests`）、`main` 尖端 `391e0a6`、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**（live 读 `0.13.47`、那一行还是浮动依赖）、**真机 soak / npm publish `NOT_RUN`**
+
+- **From:** 记忆收口施工者（`agent-206/rel-memory`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**发版收口轮**，产品代码一行没写、门禁没重跑（`AGENTS.md` §12）。三份记忆 + 证据目录索引一次提交。
+  写进本文件的每个数都从 `git` 对象与证据目录里的转录**自己复核过**（`git show --stat`、`rev-list --parents`、
+  `diff --shortstat`、`cat-file -p v0.13.48`、`ls-remote`、`wc -lc`、`grep -c FAIL`），**没有一条是转述口述**；
+  两遍门禁的转录是发布轮留下的，本轮只读、不重跑。远端 run 与 Release 字段本轮**没有跑 `gh`**，
+  照着发布轮的 `publish-391e0a6.txt` 记，远端侧自己用 `git ls-remote` 读到 `refs/heads/main` = `391e0a6`。
+- **身份**：发布提交 **`391e0a694c96d06910bf5b0f6c7c8f35ddf0656b`** `chore(release): prepare v0.13.48`，
+  父提交 **`db3184a82d48e1f985abfa720406c3e8a62a48b4`**（**单父，不是合并**），**8 文件 / +22 −20**；
+  `src/` 与 `lib/` 的唯一改动是 `PLUGIN_VERSION` / `UPDATE_LATEST` 那一对 `'0.13.47'` → `'0.13.48'`，
+  `cmp src/client/index.js lib/client.js` 退出 **0**（逐字节相同），没有一行逻辑改动。
+  **合流是 `--ff-only`**：`feat/flowchart-v2`（尖端 `db3184a`、11 颗提交）从 `main` 尖端 `e772cd6` 折进
+  `release/0.13.48`，**零冲突、没有一处要解**。区间 `e772cd6..391e0a6` = **12 颗提交 / 175 文件 / +15337 −320**。
+  **附注标签 `v0.13.48`** 对象 `d3d98b94026b1017ab1f16e434a8b36599a019f4` → 剥出 `391e0a6`、
+  `tagger` 时刻 **2026-11-26 11:00:28 +0800**（`1795662028 +0800`）。`main` = `origin/main` = 门禁提交 = 标签剥出的提交。
+- **门禁先红后绿（两遍都记，别只抄绿的那遍）**：`2be3c06`（文档还钉 `0.13.47`）上 **`GATE_EXIT=1`**——
+  `Test Files 2 failed | 102 passed (104)`、`Tests 6 failed | 2007 passed (2013)`，六条同一个原因：
+  `test/docs-version.spec.ts` 五条 + `test/docs-config-keys.spec.ts` 一条，都是过期的文档版本钉子。
+  修法：把 13 处钉子（`README.md` 5、`README.zh-CN.md` 5、`docs/LOCAL-TESTING.md` 3）抬到 `0.13.48`，
+  `git commit --amend` 并回**同一颗**发布提交 → `391e0a6`，重跑 **`GATE_EXIT=0`**：`104 files / 2013 tests`、
+  `Duration 107.21s`、lint `Found 15 warnings and 0 errors.`（185 文件 / 96 规则）、
+  `lib/ … (289 files, byte-identical)`、`client bundle: 372480 bytes`。
+  转录在 `.rsi/evidence/release-0.13.48-2026-11-26/`：`gate-2be3c06.out`（533 行 / 30110 字节）、
+  `gate-391e0a694c96.out`（408 行 / 24994 字节）。
+- **下一手最容易踩的三个坑**：① **抬版本时先数文档钉子**——两份 README 各 5 处、`docs/LOCAL-TESTING.md` 3 处，
+  少一处门禁就红，这一轮就是这么红的；② **红在文档钉子上时用 `--amend`，别另起一颗**——发布提交保持单父、
+  `CHANGELOG` 只有一处新节；③ **`2be3c06` 从未到过 `main`**（推送前就被 amend 掉），别把它当「历史里的发布提交」引用。
+- **用户拿到的一件事**：进度图是泳道矩阵——一条腿一列（`起点 / 规划 / 执行 / 检查 / 复核 / 汇总 / 终点`），
+  三条工作腿下面一个计划任务一格（26 px、常显），同一任务在走过它的每一列同一水平线；失败后重试的任务保住痕迹
+  （两颗点先琥珀后绿、`第 2 遍` 角标、一条虚线重看线）；连线带箭头、列折行画三段肘弯、720 px 以下不横向滚。
+  **数据模型一个字没动**：分组只活在浏览器包里，页面的类型侧、会话事件与计数逐字不变（`D-166`、`DESIGN` §23）。
+- **live 档案（`AGENTS.md` §13）仍欠着**：本会话 `workspace-write`、`~/.dsh` 在工作区外，写探测
+  `: > ~/.dsh/.release-probe-0.13.48` 打印 `Read-only file system`；**没写、没重载、没重启**，3080 上的实例全程没碰。
+  只读读到 live 读 **`0.13.47`**、依赖行仍是 `"dsh-grok-workflow": "github:free6589/dsh-grok-workflow"`（浮动、无钉子）。
+  下一个人要做的：把那一行钉到 **`v0.13.48`** 并读回确认——**钉这件事本身就需要本会话没有的档案写权限**。
+- **`NOT_RUN` 三条**：真机 soak（这一版没有新行为可 soak，泳道矩阵的真机读数来自
+  `.rsi/evidence/flowchart-v2-2026-11-26/` 的六态、截图、逐 lane `0.00 px` 对齐与窄屏折行；那里 `verify:lib` 标
+  `BLOCKED` 是因为跑在 `/tmp` 副本上没装 `typescript`，**同一条检查现在在 `391e0a6` 上是绿的**）、
+  npm publish、`gh` 的任何写操作。
+- **清理**：worktree `.tmp/worktrees/flowchart-v2` 干净删掉（没有 `--force`）；本地 `feat/flowchart-v2`
+  与 `release/0.13.48` 都用普通 `git branch -d` 删掉；`git worktree list` 只剩主检出。
+  **刻意留着**：`feat/force-team-routing`（这一版明确不在范围内、**仍开着**，裁决日期留给下一位拍，
+  本轮不替它定日子）、`feat/audit-layer`、四条 `backup/*`、全部标签；远端分支与远端标签一个没删。
+
 ## 2026-11-26 — 泳道矩阵收口（`feat/flowchart-v2`）：从 `e772cd6` 干净复长的九个提交，六次真运行拍全三态 + 重试 / 失败 / 取消，整仓 **104 files / 2013 passed**；`verify:lib` 在本沙箱 **`BLOCKED`**（原文在证据里）；本分支**不含**强制路由
 
 - **From:** 收尾施工者（`agent-202/soak-memory` 的产物，由拆版施工者 `agent-202/split-release` 复长并复核）· **To:** 下一个接手者 / 要合并这条分支的人

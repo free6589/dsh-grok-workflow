@@ -1,0 +1,76 @@
+RELEASE PUBLISH EVIDENCE — dsh-grok-workflow v0.13.48
+written: 2026-11-26 (Asia/Singapore)
+worker: agent-206/rel-publish   repo: /home/fish/projects_mine/dsh-grok-workflow
+
+== 1. pre-push state (CONFIRMED) ==
+git rev-parse HEAD                -> 391e0a694c96d06910bf5b0f6c7c8f35ddf0656b
+git status --short --branch       -> ## release/0.13.48 + ' M .gitignore', '?? .rsi/evidence/progress-now/', '?? .rsi/evidence/release-0.13.48-2026-11-26/'
+git tag --points-at HEAD          -> (no output)
+
+== 2. fast-forward main (CONFIRMED) ==
+git switch main                   -> Switched to branch 'main'
+git merge --ff-only release/0.13.48 -> Updating e772cd6..391e0a6 / Fast-forward / 175 files changed, 15337 insertions(+), 320 deletions(-)
+
+== 3. annotated tag (CONFIRMED) ==
+tag object sha   : d3d98b94026b1017ab1f16e434a8b36599a019f4
+points at commit : 391e0a694c96d06910bf5b0f6c7c8f35ddf0656b
+tagger           : fish <free6589@users.noreply.github.com> 1795662028 +0800
+message          : Grok Workflow for DSH v0.13.48
+
+== 4. push output (CONFIRMED, verbatim) ==
+$ git push origin main
+To https://github.com/free6589/dsh-grok-workflow.git
+   e772cd6..391e0a6  main -> main
+$ git push origin v0.13.48
+To https://github.com/free6589/dsh-grok-workflow.git
+ * [new tag]         v0.13.48 -> v0.13.48
+no --force / no --force-with-lease / no other ref pushed
+
+== 5. workflows (CONFIRMED) ==
+Release run id   : 45746151586
+Release branch   : v0.13.48   sha: 391e0a694c96d06910bf5b0f6c7c8f35ddf0656b
+Release result   : status=completed conclusion=success (observed 03:02:31 UTC, 4 polls)
+Release job      : 'Validate and publish v0.13.48' success, 19 steps, all success
+Release run url  : https://github.com/free6589/dsh-grok-workflow/actions/runs/45746151586
+CI run id        : 45746139472 (headBranch main, headSha 391e0a694c96d06910bf5b0f6c7c8f35ddf0656b)
+CI result        : status=completed conclusion=success (finished before last look)
+CI run url       : https://github.com/free6589/dsh-grok-workflow/actions/runs/45746139472
+
+== 6. published release (CONFIRMED) ==
+tagName          : v0.13.48
+name             : Grok Workflow for DSH v0.13.48
+isDraft          : False    isPrerelease: False
+publishedAt      : 2026-11-26T03:02:10Z
+targetCommitish  : main
+url              : https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.48
+assets (1)       : dsh-grok-workflow-0.13.48.tgz  997062 bytes  contentType=application/x-gtar state=uploaded
+body line count  : 24
+v0.13.47 asset   : dsh-grok-workflow-0.13.47.tgz  990561 bytes
+asset delta      : +6501 bytes (+6.3 KiB, +0.66%)
+
+== 7. remote refs after push (CONFIRMED, verbatim git ls-remote) ==
+391e0a694c96d06910bf5b0f6c7c8f35ddf0656b	refs/heads/main
+ca4a42c618b469a5bfc6db5442c8530c59a79065	refs/tags/v0.13.45
+a1f0f85d85dde0877801f9ac20db28a6163608f4	refs/tags/v0.13.46
+d74e06eedf610cdf2323967970b37345236c379f	refs/tags/v0.13.47
+d3d98b94026b1017ab1f16e434a8b36599a019f4	refs/tags/v0.13.48
+(peeled ^{} lines omitted here; v0.13.48^{} = 391e0a694c96d06910bf5b0f6c7c8f35ddf0656b)
+older tag objects unchanged: v0.13.47=d74e06ee v0.13.46=a1f0f85d v0.13.45=ca4a42c6 — no history rewrite
+
+== 8. cleanup (CONFIRMED) ==
+worktree before: /home/fish/.../.tmp/worktrees/flowchart-v2  db3184a [feat/flowchart-v2], status --short empty (clean)
+git worktree remove <that path>   -> rc=0, no --force
+worktree after : /home/fish/projects_mine/dsh-grok-workflow 391e0a6 [main] (only)
+git branch -d feat/flowchart-v2   -> Deleted branch feat/flowchart-v2 (was db3184a).
+git branch -d release/0.13.48     -> Deleted branch release/0.13.48 (was 391e0a6).
+kept on purpose: feat/force-team-routing, backup/* (4 branches), feat/audit-layer
+no remote branch or tag deleted; no -D used
+
+== final git status --short ==
+ M .gitignore
+?? .rsi/evidence/progress-now/
+?? .rsi/evidence/release-0.13.48-2026-11-26/
+
+== notes ==
+live profile / ~/.dsh NOT touched. No source/test/doc file edited. Nothing committed.
+the pre-existing local edit ' M .gitignore' and the two untracked evidence dirs were left exactly as found.

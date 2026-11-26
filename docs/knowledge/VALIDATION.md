@@ -1,3 +1,46 @@
+## `0.13.48` 发版收口：门禁**先红后绿**——发布提交 `2be3c06` 上 `GATE_EXIT=1`（`2 failed | 102 passed`、`6 failed | 2007 passed`，六条全是过期的 `0.13.47` 文档钉子），13 处钉子抬到 `0.13.48` 并 amend 回同一颗发布提交后 `391e0a6` 上 `GATE_EXIT=0`（`104 files / 2013 passed`、`107.21s`、lint `15 warnings / 0 errors`）；发布身份、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 soak / npm publish `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：发版收口轮，**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）。两遍门禁的转录是发布轮留下的，
+本轮**只读并复核**：行数与字节数、末行 `GATE_EXIT`、`grep -c FAIL`（红 **6** / 绿 **0**）各读一次；
+`git` 侧（发布提交的父与 stat、区间 shortstat、标签对象、`ls-remote`）是收口轮自己读的。
+远端 run 与 Release 字段本轮**没有跑 `gh`**，照发布轮的 `publish-391e0a6.txt` 记；
+远端侧本轮自己用 `git ls-remote` 读到 `refs/heads/main` = `391e0a694c96d06910bf5b0f6c7c8f35ddf0656b`、
+`v0.13.48` 对象 `d3d98b94…` 剥出同一个提交、`v0.13.45` / `v0.13.46` / `v0.13.47` 三个对象逐字未变。
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npm run ci` | 发布树 `2be3c06`（文档还钉 `0.13.47`） | **`GATE_EXIT=1`** · `Test Files 2 failed \| 102 passed (104)` · `Tests 6 failed \| 2007 passed (2013)` · `Duration 96.73s`；lint 与 build 本身都过（`Found 15 warnings and 0 errors.`、`client bundle: 372480 bytes → lib/client.js`、`lib/ at 2be3c06 is the build of src/ at 2be3c06 (289 files, byte-identical)`） | `.rsi/evidence/release-0.13.48-2026-11-26/gate-2be3c06.out`（533 行 / 30110 字节） |
+| 同上，重跑 | 发布树 `391e0a6`（13 处钉子已抬到 `0.13.48`） | **`GATE_EXIT=0`** · `Test Files 104 passed (104)` · `Tests 2013 passed (2013)` · `Duration 107.21s` · `Found 15 warnings and 0 errors.`（`185 files`, `96 rules`）· `lib/ at 391e0a6 is the build of src/ at 391e0a6 (289 files, byte-identical)` · `client bundle: 372480 bytes` | `gate-391e0a694c96.out`（408 行 / 24994 字节） |
+| `git merge --ff-only release/0.13.48` | `main` 尖端 `e772cd6` | `Updating e772cd6..391e0a6` / `Fast-forward` / `175 files changed, 15337 insertions(+), 320 deletions(-)` | `publish-391e0a6.txt` §2；区间 shortstat 本轮自己重读同值 |
+| `git push origin main`、`git push origin v0.13.48` | — | `e772cd6..391e0a6  main -> main` · `* [new tag]         v0.13.48 -> v0.13.48`；没有 `--force` / `--force-with-lease` | `publish-391e0a6.txt` §4 |
+| `gh run view`（两个 run） | Release `headBranch v0.13.48` / CI `main` | Release **`45746151586`** `success`（`391e0a6`、单 job `Validate and publish v0.13.48`、**19 步、没有一步失败**）· CI **`45746139472`** `success`（`391e0a6`） | `publish-391e0a6.txt` §5（本轮 `NOT_RUN`，未跑 `gh`） |
+| `gh release view` | — | 非 draft / 非 prerelease、`publishedAt 2026-11-26T03:02:10Z`、target `main`、正文 **24 行**、唯一资产 `dsh-grok-workflow-0.13.48.tgz` = **997062 字节**、state `uploaded`（上一版 990561 → **+6501**） | `publish-391e0a6.txt` §6（本轮 `NOT_RUN`） |
+| npm publish、真机 soak | — | **`NOT_RUN`** | — |
+
+**红那六条逐条点名（`CONFIRMED`）**：`test/docs-version.spec.ts` 五条——英文的当前版本、中文的当前版本、
+安装示例钉到当前发布标签、散文里只提当前版、已发布标签列表以当前版收尾；`test/docs-config-keys.spec.ts` 一条——
+`docs/LOCAL-TESTING.md` 把打包文件名钉到包版本。根因同一个：发布提交抬了 `package.json` / `package-lock.json` /
+两份客户端文件，**13 处文档钉子还写着 `0.13.47`**（`README.md` 5、`README.zh-CN.md` 5、`docs/LOCAL-TESTING.md` 3）。
+修法是把它们抬到 `0.13.48`，`git commit --amend` 并回**同一颗**发布提交（`2be3c06` → `391e0a6`），
+所以 **`2be3c06` 从未到过 `main`**（`git merge-base --is-ancestor 2be3c06 HEAD` 退出 1），
+远端只存在过 `391e0a6` 这一颗发布提交。红的那一遍里 lint 与 `verify:lib` 都是过的，**红只来自文档**——
+这一条要写清，否则后来的人会以为代码有问题。
+
+**README 自己印的数与绿的那一遍逐字对上（`CONFIRMED`）**：`README.md` 第 355 行读作
+`2013 deterministic tests across 104 files`，门禁读作 `104 passed (104)` / `2013 passed (2013)`；
+两份 README 与 `docs/LOCAL-TESTING.md` 现在各有 5 / 5 / 3 处 `0.13.48`。
+
+**`NOT_RUN` 三条**：① 真机 soak——这一版没有新行为可 soak，泳道矩阵的真机读数来自
+`.rsi/evidence/flowchart-v2-2026-11-26/`：三态 **等你点头 15.07 s / 进行中 15.39 s / 已完成 138.84 s**、
+失败后重试（1 条 `3px,3px` 重看线 + 1 个 `第 2 遍` 角标 + 两颗点 `failed → done`）、整轮失败页（`还剩 6 步 / 共 10 步`、无按钮）、
+取消页（`已取消`）、逐 lane `getBoundingClientRect().top` 极差 **0.00 px**、窄屏 700 / 480 `scrollWidth === clientWidth`、
+`consoleErrors` / `pageErrors` 全空；那里 `verify:lib` 标 **`BLOCKED`**（`Cannot find module '/tmp/verify-lib-*/node_modules/typescript/bin/tsc'`，
+跑在 `/tmp` 副本上没装 `typescript`），**同一条检查现在在 `391e0a6` 上是绿的**（`lib/ … 289 files, byte-identical`）；
+② npm publish；③ `gh` 的任何写操作（只用来读 run 与 release）。
+**`BLOCKED` 一条**：`AGENTS.md` §13 的 live 档案升级——写探测 `: > ~/.dsh/.release-probe-0.13.48` 打印
+`Read-only file system`（本会话 `workspace-write`、`~/.dsh` 在工作区外、审批提示被禁用），**没写、没重载、没重启**；
+只读读到 live 读 **`0.13.47`**、依赖行仍是浮动的 `"dsh-grok-workflow": "github:free6589/dsh-grok-workflow"`。
+
 ## `feat/flowchart-v2` 拆版后的收尾复核：泳道矩阵三态 + 重试 / 失败 / 取消的真机读数，本分支整仓 **`104 files / 2013 passed`**、七份进度 spec `339 passed`、`tsc` 0、`oxlint` 15/0、`npm run build` 零改动；**`verify:lib` `BLOCKED`**（沙箱装不上依赖）— 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`e772cd6..4def2a4` 那条历史把**泳道矩阵**与**强制路由**混在一起。本轮把它拆成两条各自可发版的分支，
