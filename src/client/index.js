@@ -362,8 +362,8 @@ window.__ModuleLoader__.load({
       // How many times one task was tried in one leg (contract 追加 8.4).
       'progress.flow.attempt': 'Attempt {n}',
       // The task panel: the one sentence under the title, the stuck line, the three duration
-      // shapes, and the two labels the graph itself carries (its reader name, and the name of
-      // the control that opens a node's wires).
+      // shapes, the two labels the graph itself carries (its reader name, and the name of the
+      // control that opens a node's wires), and the sheet a narrow screen draws those calls in.
       'progress.panel.step': 'Step {at} of {total}',
       'progress.panel.eta': 'about {time} left',
       'progress.panel.etaBasis': 'from the {n} finished steps actually measured',
@@ -375,6 +375,10 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h}h {m}m',
       'progress.panel.trace': 'Trace its wires',
       'progress.panel.graph': 'Task graph',
+      // The sheet a phone draws an opened list in: what it holds, and the one control that
+      // puts it away.
+      'progress.panel.calls': 'Calls',
+      'progress.panel.collapse': 'Hide',
       // The state words a node speaks and never prints (`aria-label`).
       'progress.plan.waiting': 'Waiting',
       'progress.plan.running': 'Doing',
@@ -610,7 +614,8 @@ window.__ModuleLoader__.load({
       'progress.flow.draft': '第 {n} 稿',
       // 一个任务在一条腿里试了几遍（契约追加 8.4）。
       'progress.flow.attempt': '第 {n} 遍',
-      // 任务面板：标题下那一句、卡住那一句、三种时长写法，以及图自己的读屏名与节点控件的名字。
+      // 任务面板：标题下那一句、卡住那一句、三种时长写法、图自己的读屏名与节点控件的名字，
+      // 以及窄屏把调用摊开时那张抽屉的两个词。
       'progress.panel.step': '第 {at} 步，共 {total} 步',
       'progress.panel.eta': '还剩约 {time}',
       'progress.panel.etaBasis': '按 {n} 个已完成步骤的实测耗时推算',
@@ -622,6 +627,9 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h} 小时 {m} 分',
       'progress.panel.trace': '看线',
       'progress.panel.graph': '任务图',
+      // 手机上摊开调用用的那张抽屉：里面是什么，以及收起来的那一个控件。
+      'progress.panel.calls': '调用',
+      'progress.panel.collapse': '收起',
       // 节点只说、不印的状态词（aria-label）。
       'progress.plan.waiting': '等着',
       'progress.plan.running': '在做',
@@ -3821,6 +3829,37 @@ window.__ModuleLoader__.load({
     /** Below this the graph is one column, whatever the labels measure. */
     const PANEL_STACK_WIDTH = 720
 
+    /**
+     * The one breakpoint the page reads in JS, spelled exactly as the stylesheet spells it.
+     *
+     * The stylesheet's copy is what makes a card wrap; this one decides where an opened
+     * node's calls are **rendered**, which is a different question with a different answer —
+     * inside the card while a column of cards leaves room beside it, in the panel's own
+     * column under the figure when it does not. A render decision has to be readable without
+     * a layout engine, so the number lives here in JS too and the sheet is chosen by it, not
+     * by a `@media` rule that no test could read.
+     */
+    const PANEL_NARROW_QUERY = `(max-width: ${PANEL_STACK_WIDTH}px)`
+
+    /** The narrow query's own listener, or `undefined` where the host has no `matchMedia`. */
+    function panelNarrowMedia() {
+      const media = globalThis.matchMedia
+      if (typeof media !== 'function') return undefined
+      const list = media(PANEL_NARROW_QUERY)
+      return list === null || typeof list !== 'object' ? undefined : list
+    }
+
+    /**
+     * Whether the page is at the narrow width right now.
+     *
+     * A host without `matchMedia` (a stub shell, an older composition) reads as wide, which
+     * is the list this page has always drawn: nothing narrows on a guess.
+     */
+    function panelNarrowNow() {
+      const list = panelNarrowMedia()
+      return list !== undefined && list.matches === true
+    }
+
     /** Sibling gap in a row, and the two vertical gaps a layer change can take. */
     const PANEL_PNODE_GAP_X = 12
     const PANEL_PNODE_GAP_Y = 44
@@ -4729,9 +4768,10 @@ window.__ModuleLoader__.load({
       // The reader's place gets the ring, whatever state it is in: a failure still holds the
       // run, and the page has to say where that is.
       '.gw-progress-pnode[data-current="true"] .gw-progress-pnode-body { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent); }',
-      // The opened calls are rendered by the node control into this list: it floats out from
-      // under its node, absolutely positioned, so not one sibling moves. The inset keeps the
-      // panel inside the figure instead of letting it hang off the right edge.
+      // The opened calls are rendered by the node control into this list: at a wide width it
+      // floats out from under its node, absolutely positioned, so not one sibling moves. The
+      // inset keeps the panel inside the figure instead of letting it hang off the right edge.
+      // A narrow screen does not use that box: the sheet below does (`.gw-progress-sheet`).
       '.gw-progress-node-calls { position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; right: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; max-height: 240px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: var(--dsw-alias-bg-elevated, var(--dsw-alias-bg-l1, transparent)); box-shadow: 0 6px 16px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent); }',
       // The all-rejected verdict rides in that list as plain rows: the summary node has no
       // shipped row to show, so its opened list is where the three facts are read.
@@ -4739,6 +4779,24 @@ window.__ModuleLoader__.load({
       '.gw-progress-node-rejected[data-gw-progress-node-rejected="drafts"] { font-weight: 600; color: var(--dsw-alias-state-warn-primary); }',
       // The slot one call reached: the chain's word, in a capsule of its own.
       '.gw-progress-node-calls [data-gw-progress-task-chain] { flex: none; padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; white-space: nowrap; }',
+      // ── the opened calls on a narrow screen: a sheet under the figure ────────────
+      // Below the breakpoint the floating list lands on the card beside it — the layout
+      // places cards, and a sibling never makes room for another one's popup — so the list
+      // is drawn outside the figure, here, in the panel's own column. Its height is capped
+      // so a phone always keeps the rest of the page in reach, and it is the one box that
+      // scrolls: down, never sideways.
+      '.gw-progress-sheet { box-sizing: border-box; display: flex; flex: none; flex-direction: column; gap: 6px; min-width: 0; max-height: min(50vh, 240px); overflow-y: auto; margin: 12px 0 0; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 12px; background: var(--dsw-alias-bg-elevated, var(--dsw-alias-bg-l1, transparent)); }',
+      '.gw-progress-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }',
+      '.gw-progress-sheet-title { min-width: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--dsw-alias-label-secondary, inherit); }',
+      // The one control: a capsule the thumb can hit, and it answers Enter and Space because
+      // it is a button, not a mark.
+      '.gw-progress-sheet-hide { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }',
+      '.gw-progress-sheet-hide:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }',
+      '.gw-progress-sheet-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }',
+      '.gw-progress-sheet-node { margin: 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }',
+      // In the sheet the list is a column of rows in the page's flow, not a box of its own:
+      // the sheet already carries the border, the fill and the one scroll.
+      '.gw-progress-sheet .gw-progress-node-calls { position: static; max-height: none; overflow-y: visible; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }',
       // ── a click traces the wires ─────────────────────────────────────────────────
       // The clicked node's own lines step forward and every other line steps back: the
       // figure keeps its structure while the branch a reader asked about reads first.
@@ -4818,8 +4876,13 @@ window.__ModuleLoader__.load({
       // column: nothing here scrolls sideways, at any width.
       '@media (max-width: 480px) {',
       '  .gw-progress-dock { flex-direction: column; align-items: stretch; }',
+      // A list that floats inside a card on a phone has no room for a clock column, so that
+      // list drops it. The sheet has the panel's whole width, so it keeps the row it took
+      // from the page — clock, verb and tail — on the same two rules it uses everywhere.
       '  .gw-progress-node-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }',
       '  .gw-progress-node-calls .gw-progress-log-time { display: none; }',
+      '  .gw-progress-sheet .gw-progress-log-row { grid-template-columns: 40px minmax(0, 1fr) auto auto; }',
+      '  .gw-progress-sheet .gw-progress-log-time { display: inline; }',
       '}',
     ].join('\n')
 
@@ -5088,10 +5151,13 @@ window.__ModuleLoader__.load({
     /**
      * One node's opened calls: the rows it declared, then the verdict when it carries one.
      *
-     * The list is rendered inside the node it belongs to and floats out from under it, so
-     * opening a node moves no sibling. A row comes from the page's one log line — the same
-     * `progressStoryLogRow` any other reading of that call would use — and only the row the
-     * gate shipped carries the shipped mark.
+     * The list belongs to the node that opened it, and holds the same rows wherever it is
+     * drawn: at a wide width inside the node, floating out from under it, so opening a node
+     * moves no sibling; at a narrow one in the panel's own column under the figure, because
+     * a floating list over a column of cards lands on the neighbour and the layout will not
+     * move a card out of its way (see {@link ProgressPanelSheet}). A row comes from the
+     * page's one log line — the same `progressStoryLogRow` any other reading of that call
+     * would use — and only the row the gate shipped carries the shipped mark.
      * @param node - one panel node.
      * @param props - translator, the open gate, the opener and the shipped row's `seq`.
      * @returns the list element.
@@ -5111,6 +5177,46 @@ window.__ModuleLoader__.load({
         'data-gw-progress-node-calls': node.id,
         id: progressPanelCallsId(node.id),
       }, [...rows, ...verdict])
+    }
+
+    /**
+     * The opened calls, drawn under the figure instead of on top of it.
+     *
+     * Below the breakpoint a node's list cannot float out from under its own box without
+     * landing on the card beside it: the cards are placed by the layout, one column, and a
+     * sibling never makes room for another one's popup. So the list leaves the figure
+     * altogether and is drawn in the panel's own column, right after the figure — where it
+     * can push the page down but never cross a rectangle it did not draw, and where the
+     * dock's button stays in front of it rather than under it.
+     *
+     * Nothing in the list changes with the box that carries it: the same rows from the same
+     * renderer, the same verdict lines, the same ids the node's `aria-controls` names. Each
+     * opened node is named by the card's own word, because the figure may be out of sight by
+     * the time the list is read, and one control puts the whole thing away — the second way
+     * into the toggle a node click already owns.
+     * @param nodes - the opened nodes that have something to show, in the order they opened.
+     * @param props - translator, the row props and the close handler.
+     * @param sheetRef - the ref the page scrolls into view when the sheet opens.
+     * @returns the sheet element.
+     */
+    function ProgressPanelSheet(nodes, props, sheetRef) {
+      return h('div', {
+        className: 'gw-progress-sheet',
+        'data-gw-progress-sheet': true,
+        ref: sheetRef,
+      },
+      h('div', { key: 'head', className: 'gw-progress-sheet-head' },
+        h('span', { key: 'title', className: 'gw-progress-sheet-title' }, props.t('progress.panel.calls')),
+        h('button', {
+          key: 'hide',
+          type: 'button',
+          className: 'gw-progress-sheet-hide',
+          'data-gw-progress-sheet-hide': true,
+          onClick: props.onSheetClose,
+        }, props.t('progress.panel.collapse'))),
+      nodes.map((node) => h('div', { key: `calls:${node.id}`, className: 'gw-progress-sheet-group' },
+        h('p', { key: 'node', className: 'gw-progress-sheet-node' }, node.label),
+        ProgressPanelCalls(node, props))))
     }
 
     /**
@@ -5157,6 +5263,11 @@ window.__ModuleLoader__.load({
      * readings this page offers: it opens (or closes) the calls, and it lights (or drops) the
      * wires that touch this node. The trace is not a second control, so a node with nothing
      * to open still answers a pointer and gets no button of its own.
+     *
+     * Where the opened list is drawn depends on the width, and only on that: on the node
+     * itself while there is room beside it, in the page's sheet under the figure when there
+     * is not (`props.sheet`). The click that opens it is the same click either way, so the
+     * node's own behaviour does not change with the window.
      * @param node - one panel node.
      * @param box - its laid-out box.
      * @param props - translator, the open and trace state, the handlers and the row props.
@@ -5215,7 +5326,10 @@ window.__ModuleLoader__.load({
           onClick,
         }, parts)
         : h('div', { key: 'body', className: 'gw-progress-pnode-body' }, parts),
-      open ? ProgressPanelCalls(node, props) : null)
+      // At a narrow width the list is not the node's to draw: it is in the sheet under the
+      // figure, where it cannot land on the card beside this one. The node keeps the two
+      // attributes that say what it opened; where that list lives is the page's business.
+      open && props.sheet !== true ? ProgressPanelCalls(node, props) : null)
     }
 
     /**
@@ -5390,6 +5504,8 @@ window.__ModuleLoader__.load({
      *   one sentence — which step the run is on, and, when it can be measured, what is left;
      * - the **graph**: every step, every plan task it walked, and the edges between them,
      *   laid out from the mermaid text the container carries;
+     * - the **opened calls**: on the node that opened them while there is room beside it, in
+     *   a sheet here — after the figure, before the stuck line — when the page is narrow;
      * - the **stuck line**, and only while the run really is stuck;
      * - the **Guardian** card, when the stream recorded liveness monitoring;
      * - the **dock**: one button that fills the input box, or nothing.
@@ -5418,7 +5534,12 @@ window.__ModuleLoader__.load({
       const [opened, setOpened] = useState(EMPTY_PANEL_OPENED)
       const [traced, setTraced] = useState(undefined)
       const graphRef = useRef(null)
+      const sheetRef = useRef(null)
       const [measure, setMeasure] = useState(EMPTY_PANEL_MEASURE)
+      // The one other reading that is not a measurement: whether the page is at the narrow
+      // width, which decides where an opened list is drawn. Read in JS, kept in step with the
+      // window, so a rotation moves the list instead of leaving it in a box that no longer fits.
+      const [narrow, setNarrow] = useState(panelNarrowNow)
       // One draw per render, plus the two things that move the boxes the wires land on: a
       // container resize (a sidebar toggle does not resize the window) and a window resize.
       // An unchanged measurement is not a render, so the observer cannot feed itself.
@@ -5441,6 +5562,17 @@ window.__ModuleLoader__.load({
           if (typeof view.removeEventListener === 'function') view.removeEventListener('resize', draw)
         }
       })
+      // A window that narrows while the tab is open moves the list out of the figure, and one
+      // that widens again moves it back. The initial reading is the render's own, so a host
+      // with no `matchMedia` never gets here and keeps the wide layout it always had.
+      useEffect(() => {
+        const list = panelNarrowMedia()
+        if (list === undefined || typeof list.addEventListener !== 'function') return
+        const onNarrow = () => setNarrow(list.matches === true)
+        list.addEventListener('change', onNarrow)
+        return () => list.removeEventListener('change', onNarrow)
+      })
+
       // The picture is laid out from its own mermaid text, which is why the figure a reader
       // sees and the structure anything else can read cannot disagree. Before the first
       // measurement the default sizes stand in, so a host without layout still renders.
@@ -5461,8 +5593,17 @@ window.__ModuleLoader__.load({
         if (event !== undefined && event !== null && event.target !== event.currentTarget) return
         setTraced(undefined)
       }
+      // The sheet's one control is the same toggle a node answers: every opened list closes
+      // and the trace drops, which is what tapping each of those nodes again would do. A
+      // phone reader who scrolled past the card can still put the list away from here.
+      const onSheetClose = () => {
+        setOpened(EMPTY_PANEL_OPENED)
+        setTraced(undefined)
+      }
       const panelProps = graph === undefined || layout === undefined ? undefined : {
         t,
+        // Where the opened lists are drawn: in the node, or in the sheet under the figure.
+        sheet: narrow,
         canOpen: (childId) => typeof props.canOpen === 'function' && props.canOpen(childId) === true,
         openChild: (childId) => {
           if (typeof props.openChild === 'function') props.openChild(childId)
@@ -5475,7 +5616,27 @@ window.__ModuleLoader__.load({
         tracedEdges: panelTraceEdges(graph, traced),
         onNodeClick,
         onBackgroundClick,
+        onSheetClose,
       }
+      // Only what a reader could open is carried into the sheet: a node that declares nothing
+      // has no list, so tapping one asks for lines that do not exist and the sheet stays away.
+      const sheetNodes = graph === undefined
+        ? []
+        : opened
+          .map((id) => graph.nodes.find((node) => node.id === id && node.openable))
+          .filter((node) => node !== undefined)
+      const sheet = narrow && panelProps !== undefined && sheetNodes.length > 0
+        ? ProgressPanelSheet(sheetNodes, panelProps, sheetRef)
+        : null
+      // A list that opened below the fold would leave a reader who just tapped a card with
+      // nothing to read. The sheet is in the page's flow, so bringing it into view costs no
+      // layout and covers nothing: `nearest` scrolls only as far as the box it lands in.
+      useEffect(() => {
+        const box = sheetRef === undefined || sheetRef === null ? undefined : sheetRef.current
+        if (box === undefined || box === null || typeof box.scrollIntoView !== 'function') return
+        box.scrollIntoView({ block: 'nearest' })
+      }, [sheetNodes.length])
+
       // The dock's button is the only thing the `conversation` service is needed for: with no
       // way to write the box, the page offers no button instead of one that would do nothing
       // (§19.4). A run that is still working asks for no click, so it gets no button either.
@@ -5521,6 +5682,10 @@ window.__ModuleLoader__.load({
         : [
           header,
           ProgressPanelGraph(graph, layout, graphRef, panelProps),
+          // On a narrow screen the opened calls come out of the figure and stand here, in the
+          // panel's own column: after the figure, so they can only push the page down — never
+          // across a card, and never over the dock's button, which follows them.
+          sheet,
           // The sentence exists only while something is stuck: an empty box under the graph
           // would say "there is something here" about nothing.
           stuck === undefined

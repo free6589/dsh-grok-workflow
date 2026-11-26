@@ -1155,3 +1155,224 @@ describe('the page stays honest', () => {
     expect(hooksOf(page, 'data-gw-progress-css')).toHaveLength(1)
   })
 })
+
+/**
+ * The narrow width: the opened calls leave the figure.
+ *
+ * Below the breakpoint the cards are one column, and a list that floats out from under one of
+ * them lands on the card beside it — the same overlap the phone soak photographed. Making the
+ * list `position: static` would not help: the cards are placed by the layout and no sibling
+ * moves for another one's popup. So the list is drawn **outside** the figure, in the panel's
+ * own column under it, where it can only push the page down.
+ *
+ * Where the list is drawn is a render decision, not a paint one, so the page reads the
+ * breakpoint in JS: `matchMedia` is the whole seam, and a test gets a phone by standing in for
+ * it. No layout engine is involved anywhere below.
+ */
+
+/** The listener face a real `MediaQueryList` has, as far as the page uses it. */
+type MediaFace = { media: string, matches: boolean, addEventListener: () => void, removeEventListener: () => void }
+
+/**
+ * Render with a stand-in `matchMedia` that answers one width, and report what it was asked.
+ *
+ * The stub answers the query it is handed, so the exact string the page builds is readable
+ * afterwards — which is how the JS breakpoint is compared with the stylesheet's one.
+ */
+function withNarrow<T>(matches: boolean, render: () => T, queries: string[] = []): T {
+  const record = globalThis as unknown as { matchMedia?: (query: string) => MediaFace }
+  const previous = record.matchMedia
+  record.matchMedia = (query: string): MediaFace => {
+    queries.push(query)
+    return { media: query, matches, addEventListener: () => undefined, removeEventListener: () => undefined }
+  }
+  try {
+    return render()
+  } finally {
+    if (previous === undefined) delete record.matchMedia
+    else record.matchMedia = previous
+  }
+}
+
+/** A phone's page: every render in this sequence reads the narrow width. */
+function onPhone<T>(render: () => T): T {
+  return withNarrow(true, render)
+}
+
+/** The list one node opened, wherever it was drawn. */
+function callsOf(page: unknown): Element {
+  return hookOf(page, 'data-gw-progress-node-calls')
+}
+
+/** Every node of one page the page has lit. */
+function litNodes(page: unknown): Element[] {
+  return nodesOf(page).filter((node) => attr(node, 'data-trace') === 'active')
+}
+
+describe('a narrow screen draws the opened calls under the figure', () => {
+  it('moves the list out of the card on a phone and leaves it there on a desktop', () => {
+    // The desktop reading is the one that shipped: the list is the node's own child.
+    const wide = withNarrow(false, () => clickNode(mount(runningRun()), 'execute_t1'))
+    expect(hooksOf(wide, 'data-gw-progress-sheet')).toHaveLength(0)
+    const wideNode = nodesOf(wide).find((node) => attr(node, 'data-gw-progress-pnode') === 'execute_t1')!
+    expect(hooksOf(wideNode, 'data-gw-progress-node-calls')).toHaveLength(1)
+    const wideRows = hooksOf(callsOf(wide), 'data-gw-progress-log-row').map(textOf)
+
+    // The phone reading: the same node, the same click, and the list is not in the card.
+    const phone = onPhone(() => clickNode(mount(runningRun()), 'execute_t1'))
+    const sheet = hookOf(phone, 'data-gw-progress-sheet')
+    expect(classesOf(sheet)).toEqual(['gw-progress-sheet'])
+    const list = callsOf(phone)
+    expect(hooksOf(hookOf(phone, 'data-gw-progress-graph'), 'data-gw-progress-sheet')).toHaveLength(0)
+    for (const node of nodesOf(phone)) expect(hooksOf(node, 'data-gw-progress-node-calls')).toHaveLength(0)
+    // Same list, same id, same rows — only the box that carries them changed.
+    expect(hooksOf(sheet, 'data-gw-progress-node-calls')).toEqual([list])
+    expect(attr(list, 'id')).toBe('gw-progress-calls-execute_t1')
+    expect(attr(list, 'data-gw-progress-node-calls')).toBe('execute_t1')
+    expect(hooksOf(list, 'data-gw-progress-log-row').map(textOf)).toEqual(wideRows)
+    expect(wideRows).toHaveLength(2)
+    // And the card it came from says what it opened, in the same two attributes.
+    const body = bodyOf(phone, 'execute_t1')
+    expect(body.type).toBe('button')
+    expect(attr(body, 'aria-expanded')).toBe('true')
+    expect(attr(body, 'aria-controls')).toBe(attr(list, 'id'))
+  })
+
+  it('stands the sheet after the figure and before the dock, so it cannot be in the way', () => {
+    const page = onPhone(() => clickNode(mount(runningRun()), 'plan'))
+    const order = walk(page)
+    const at = (element: Element) => order.indexOf(element)
+    // Nothing the sheet draws is inside the figure, and nothing in the figure is inside it.
+    expect(hooksOf(hookOf(page, 'data-gw-progress-graph'), 'data-gw-progress-sheet')).toHaveLength(0)
+    expect(hooksOf(hookOf(page, 'data-gw-progress-sheet'), 'data-gw-progress-pnode')).toHaveLength(0)
+    // It follows the figure and it precedes the dock: the button a reader hands the draft to
+    // is never underneath the list, and no card ever moves for it — the sheet is in the page's
+    // own flow, so the dock is pushed down rather than covered.
+    expect(at(hookOf(page, 'data-gw-progress-sheet'))).toBeGreaterThan(at(hookOf(page, 'data-gw-progress-graph')))
+    expect(at(hookOf(page, 'data-gw-progress-dock'))).toBeGreaterThan(at(hookOf(page, 'data-gw-progress-sheet')))
+    // Only the flow decides, so the list carries no absolute position of its own in there.
+    expect(ruleWith('.gw-progress-sheet .gw-progress-node-calls')).toContain('position: static')
+  })
+
+  it('reads the breakpoint in JS, at the one number the stylesheet uses', () => {
+    const queries: string[] = []
+    withNarrow(true, () => pageOf(runningRun()), queries)
+    expect(queries).toContain('(max-width: 720px)')
+    // The same number, written twice, on purpose: the stylesheet wraps the cards and the page
+    // decides where the list lives. A drift between them is a phone whose list is drawn in a
+    // box that no longer fits.
+    expect(mediaBlock('max-width: 720px')).not.toBe('')
+    const narrow = ruleWith('.gw-progress-sheet')!
+    expect(narrow).toContain('max-height: min(50vh, 240px)')
+    expect(narrow).toContain('overflow-y: auto')
+    // …and the only scroll box on the page still scrolls one way.
+    expect(progress.css).not.toContain('overflow-x')
+  })
+
+  it('caps the sheet and gives it the page’s one scroll, so a phone never scrolls sideways', () => {
+    const sheet = ruleWith('.gw-progress-sheet')!
+    expect(sheet).toContain('max-height')
+    expect(sheet).toContain('overflow-y: auto')
+    expect(sheet).toContain('min-width: 0')
+    // Inside the sheet the list is a column of rows in the page's flow: the sheet owns the
+    // border, the fill and the scroll, so the list may not open a second one.
+    const list = ruleWith('.gw-progress-sheet .gw-progress-node-calls')!
+    expect(list).toContain('position: static')
+    expect(list).toContain('max-height: none')
+    expect(list).toContain('overflow-y: visible')
+    // Every word that can be long wraps instead of pushing the box wider.
+    expect(ruleWith('.gw-progress-sheet-node')).toContain('overflow-wrap: anywhere')
+    // A floating list inside a card has no room for a clock column on a phone, so it drops
+    // one. The sheet has the panel's whole width, so the row keeps the clock it has
+    // everywhere else — the sheet holds the same line, not a cut-down one.
+    const small = mediaBlock('max-width: 480px')
+    expect(small).toMatch(/\.gw-progress-sheet \.gw-progress-log-row \{[^}]*grid-template-columns: 40px minmax\(0, 1fr\) auto auto/)
+    expect(small).toMatch(/\.gw-progress-sheet \.gw-progress-log-time \{[^}]*display: inline/)
+    const styled = styledClasses()
+    for (const name of [
+      'gw-progress-sheet',
+      'gw-progress-sheet-head',
+      'gw-progress-sheet-title',
+      'gw-progress-sheet-hide',
+      'gw-progress-sheet-group',
+      'gw-progress-sheet-node',
+    ]) expect(styled, name).toContain(name)
+  })
+
+  it('keeps the node’s one click: open, close, and open again — and the sheet follows it', () => {
+    const view = mount(looseRun())
+    const closed = onPhone(() => view())
+    expect(hooksOf(closed, 'data-gw-progress-sheet')).toHaveLength(0)
+    expect(attr(bodyOf(closed, 'execute'), 'aria-expanded')).toBe('false')
+
+    const opened = onPhone(() => clickNode(view, 'execute'))
+    expect(hooksOf(opened, 'data-gw-progress-sheet')).toHaveLength(1)
+    expect(attr(bodyOf(opened, 'execute'), 'aria-expanded')).toBe('true')
+    // The wire reading is the same click's second half, on either width.
+    expect(litNodes(opened)).toHaveLength(3)
+
+    const closedAgain = onPhone(() => clickNode(view, 'execute'))
+    expect(hooksOf(closedAgain, 'data-gw-progress-sheet')).toHaveLength(0)
+    expect(attr(bodyOf(closedAgain, 'execute'), 'aria-expanded')).toBe('false')
+    expect(litNodes(closedAgain)).toHaveLength(0)
+
+    const third = onPhone(() => clickNode(view, 'execute'))
+    expect(hooksOf(third, 'data-gw-progress-sheet')).toHaveLength(1)
+    expect(litNodes(third)).toHaveLength(3)
+  })
+
+  it('puts the sheet away from the sheet’s own control, on the same channel', () => {
+    const view = mount(looseRun())
+    const opened = onPhone(() => clickNode(view, 'execute'))
+    expect(litNodes(opened)).toHaveLength(3)
+    const hide = hookOf(opened, 'data-gw-progress-sheet-hide')
+    expect(hide.type).toBe('button')
+    expect(attr(hide, 'type')).toBe('button')
+    expect(textOf(hide)).toBe(zh('progress.panel.collapse'))
+    expect(textOf(hookOf(opened, 'data-gw-progress-sheet'))).toContain(zh('progress.panel.calls'))
+    ;(hide.props['onClick'] as () => void)()
+    const closed = onPhone(() => view())
+    // The same two things a second tap on the node does: the list closes, the wires go dark.
+    expect(hooksOf(closed, 'data-gw-progress-sheet')).toHaveLength(0)
+    expect(hooksOf(closed, 'data-gw-progress-node-calls')).toHaveLength(0)
+    expect(litNodes(closed)).toHaveLength(0)
+    expect(attr(bodyOf(closed, 'execute'), 'aria-expanded')).toBe('false')
+  })
+
+  it('carries the verdict lines too, and asks nothing of a node with nothing to show', () => {
+    const view = mount(rejectedRun())
+    const opened = onPhone(() => clickNode(view, 'summarize'))
+    const list = callsOf(opened)
+    expect(hooksOf(hookOf(opened, 'data-gw-progress-sheet'), 'data-gw-progress-node-calls')).toEqual([list])
+    expect(attr(list, 'data-gw-progress-node-calls')).toBe('summarize')
+    expect(hooksOf(list, 'data-gw-progress-log-row')).toHaveLength(0)
+    expect(hooksOf(list, 'data-gw-progress-node-rejected').map((row) => attr(row, 'data-gw-progress-node-rejected')))
+      .toEqual(['drafts', 'stage', 'reason'])
+    expect(hooksOf(list, 'data-gw-progress-node-rejected').map(textOf))
+      .toEqual(['第 2 稿全被退回', '卡在复核', `最后不过：${REJECTED_REASON}`])
+
+    // A node that declares nothing has no list to move: tapping one asks for lines that do
+    // not exist, and no empty sheet stands over the figure.
+    const ends = mount(runningRun())
+    const tapped = onPhone(() => {
+      const page = ends()
+      const start = nodesOf(page).find((node) => attr(node, 'data-gw-progress-pnode') === 'start')!
+      ;(start.props['onClick'] as () => void)()
+      return ends()
+    })
+    expect(hooksOf(tapped, 'data-gw-progress-sheet')).toHaveLength(0)
+  })
+
+  it('words the sheet in both languages, and keeps its two words out of the wide page', () => {
+    expect(zh('progress.panel.calls')).toBe('调用')
+    expect(en('progress.panel.calls')).toBe('Calls')
+    expect(zh('progress.panel.collapse')).toBe('收起')
+    expect(en('progress.panel.collapse')).toBe('Hide')
+    // On a desktop neither word is on the page at all: the sheet only exists at a narrow width.
+    expect(pageTexts(pageOf(runningRun(), { fillDraft: () => true }))).not.toContain(zh('progress.panel.calls'))
+    const phone = onPhone(() => clickNode(mount(runningRun()), 'plan'))
+    const copy = pageTexts(phone)
+    expect(copy).toContain(zh('progress.panel.calls'))
+    expect(copy).toContain(zh('progress.panel.collapse'))
+  })
+})

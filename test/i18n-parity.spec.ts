@@ -87,10 +87,11 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.flow.visit', '第 {n} 次', 'Visit {n}'],
   ['progress.flow.draft', '第 {n} 稿', 'Draft {n}'],
   ['progress.flow.attempt', '第 {n} 遍', 'Attempt {n}'],
-  // The task panel's own eleven keys (the operator's panel brief, §21 → the panel): the one
+  // The task panel's own keys (the operator's panel brief, §21 → the panel): the one
   // sentence under the title, the estimate and what it rests on, the three stuck verdicts,
-  // the three durations that spell the estimate, the trace's one word and the figure's
-  // reader label. They replace the count line and the flow's label, which are gone.
+  // the three durations that spell the estimate, the trace's one word, the figure's
+  // reader label, and the two words of the sheet a narrow screen opens a list in. The first
+  // eleven replace the count line and the flow's label, which are gone.
   ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
   ['progress.panel.etaBasis', '按 {n} 个已完成步骤的实测耗时推算', 'from the {n} finished steps actually measured'],
@@ -102,6 +103,10 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.panel.durationHour', '{h} 小时 {m} 分', '{h}h {m}m'],
   ['progress.panel.trace', '看线', 'Trace its wires'],
   ['progress.panel.graph', '任务图', 'Task graph'],
+  // The sheet a narrow screen draws an opened list in: what it holds, and the one control
+  // that puts it away. Wide pages print neither word.
+  ['progress.panel.calls', '调用', 'Calls'],
+  ['progress.panel.collapse', '收起', 'Hide'],
   // The state words a node speaks and never prints (`aria-label`).
   ['progress.plan.waiting', '等着', 'Waiting'],
   ['progress.plan.running', '在做', 'Doing'],

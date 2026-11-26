@@ -2281,8 +2281,11 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(zh['progress.flow.attempt']).toBe('第 {n} 遍')
     expect(en['progress.flow.attempt']).toBe('Attempt {n}')
     // The step sentence, its estimate, its basis, the three stuck verdicts, the three
-    // durations, the trace's one word and the figure's reader label.
+    // durations, the trace's one word, the figure's reader label, and the two words of the
+    // sheet a narrow screen draws an opened list in.
     expect(Object.keys(zh).filter((key) => key.startsWith('progress.panel.')).sort()).toEqual([
+      'progress.panel.calls',
+      'progress.panel.collapse',
       'progress.panel.durationHour',
       'progress.panel.durationMin',
       'progress.panel.durationSec',
