@@ -66,7 +66,7 @@
   git status --short --branch                                # ## release/0.13.49；只有一处别人的 .gitignore 改动与未跟踪的证据目录
   git log --oneline -5                                       # 记忆提交 / 0bc617f / e7ecfab / c5e2bba / 772ac32
   git rev-parse main origin/main                             # 两颗都是 a5dfc755…（0.13.49 没有推进 main）
-  cat .session-stage/cut/vitest-full.txt | tail -4            # 105 passed (105) / 2034 passed (2034) / 66.90s
+  cat .rsi/evidence/force-team-cut-2026-11-26/gate/vitest-full.txt | tail -4            # 105 passed (105) / 2034 passed (2034) / 66.90s
   ```
 - **两个坑照实记（上一轮记过，本轮仍然成立）**：① `dsh web --profile web-clone …` 起不来（`dsh web` 本身就是
   `dsh --profile web`，报 `select a profile only once`），可用的是 `dsh --profile web-clone --port 3392 --host 127.0.0.1 --no-open`；
