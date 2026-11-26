@@ -231,6 +231,18 @@ function cardAnswerText(raw: string): string {
 }
 
 /**
+ * One message the user authored after the preview: their words, and how they said them.
+ *
+ * The kind travels with the text because the ledger records *how* the nod arrived. A
+ * card answer and a typed yes carry the same quote, so once the row is written the
+ * words cannot tell them apart; the message they came from still can (D-172).
+ */
+interface UserMessageAfterPreview {
+  text: string
+  kind: 'user' | 'question-reply'
+}
+
+/**
  * The user-authored messages this session received after a preview was created.
  *
  * `startBlock` matches the approval quote against these, so they must be the
@@ -246,11 +258,11 @@ function cardAnswerText(raw: string): string {
  * @param session - the calling session.
  * @param sinceMs - the preview's creation time (epoch ms).
  */
-function userMessagesSince(session: Session | undefined, sinceMs: number): string[] {
+function userMessagesSince(session: Session | undefined, sinceMs: number): UserMessageAfterPreview[] {
   if (session === undefined || typeof session.ownEvents !== 'function') return []
   const events = session.ownEvents() as unknown as readonly { type: string, time?: unknown, data?: unknown }[]
   const askedAfter = askedCallIdsSince(events, sinceMs)
-  const out: string[] = []
+  const out: UserMessageAfterPreview[] = []
   for (const event of events) {
     if (event.type !== 'user/message') continue
     if (typeof event.time === 'number' && event.time <= sinceMs) continue
@@ -260,16 +272,19 @@ function userMessagesSince(session: Session | undefined, sinceMs: number): strin
     // extra restrictions, and anything else in the log is not the user talking.
     if (!isUserAuthoredSource(source)) continue
     let text: string
+    let kind: UserMessageAfterPreview['kind']
     if (startsTurn(source)) {
       text = textOf(message).trim()
+      kind = 'user'
     } else if (isQuestionReplySource(source)) {
       const callId = typeof source?.callId === 'string' ? source.callId.trim() : ''
       if (callId === '' || !askedAfter.has(callId)) continue
       text = cardAnswerText(textOf(message)).trim()
+      kind = 'question-reply'
     } else {
       continue
     }
-    if (text !== '') out.push(text)
+    if (text !== '') out.push({ text, kind })
   }
   return out
 }
@@ -452,7 +467,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
         additionalProperties: false as const,
         description: 'Start only: where the approval came from and the user\'s exact words.',
         properties: {
-          kind: { type: 'string' as const, required: true as const, description: 'preview | user | request | operator | policy.' },
+          kind: { type: 'string' as const, required: true as const, description: 'preview | user | question-reply | request | operator | policy. A card answer is recorded as question-reply even when the caller declares user.' },
           quote: { type: 'string' as const, required: true as const, description: 'The user\'s approving words, verbatim; they must appear in a message sent after the preview.' },
           sourceMessageId: { type: 'string' as const, description: 'Optional id of the message the quote came from.' },
         },
@@ -511,6 +526,13 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       const preview = previewById(previewId)
       const since = preview?.createdAtMs ?? 0
       const messagesAfterPreview = userMessagesSince(agent.session as Session | undefined, since)
+      // The row records how the nod arrived, not only what it said: a card answer is its
+      // own kind, a typed turn stays `user`, and a caller that declared another source
+      // keeps it. The kind follows the first message the quote was found in, so an
+      // earlier typed yes is not relabelled by a card that repeats the same word.
+      const declaredKind = String(approval.kind ?? 'user')
+      const matched = quote === '' ? undefined : messagesAfterPreview.find(message => message.text.includes(quote))
+      const kind = declaredKind === 'user' && matched?.kind === 'question-reply' ? 'question-reply' : declaredKind
       // Repeated here on purpose: this is the branch that commissions work (it writes
       // the approved split and hands back the dispatch envelope), so M3.2 will read the
       // rule at the moment work is ordered, not only when the tool was entered.
@@ -521,11 +543,11 @@ export function registerBlockTools(deps: BlockToolDeps): void {
           previewId,
           splitHash,
           approval: {
-            kind: String(approval.kind ?? 'user') as never,
+            kind: kind as never,
             quote,
             ...typeof approval.sourceMessageId === 'string' ? { sourceMessageId: approval.sourceMessageId } : {},
           },
-          messagesAfterPreview,
+          messagesAfterPreview: messagesAfterPreview.map(message => message.text),
           // The approval is the user's own words, read the same way everywhere: a bare
           // "确认"/"开始"/"yes" is a yes; "先别" is not, however it is phrased around it.
           approved: isApproveAnswer(quote),

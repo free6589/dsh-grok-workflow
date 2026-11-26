@@ -225,6 +225,9 @@ function ask(live: Session, callId: string, question = '这一单可以开工吗
   })
 }
 
+/** One answer item as the Host's answer batch carries it. */
+interface CardAnswerItem { id: string, selected: string[], custom?: string }
+
 /**
  * Log a question-card answer, payload and all.
  *
@@ -232,7 +235,7 @@ function ask(live: Session, callId: string, question = '这一单可以开工吗
  * included — under `source.kind: 'user-question-reply'`; only `selected` /
  * `custom` are the user's own words.
  */
-function cardAnswer(live: Session, callId: string, selected: string[], question = '这一单可以开工吗？'): void {
+function cardAnswerBatch(live: Session, callId: string, answers: CardAnswerItem[], question = '这一单可以开工吗？'): void {
   const message = createUserMessage({
     content: [{
       type: 'text',
@@ -241,12 +244,17 @@ function cardAnswer(live: Session, callId: string, selected: string[], question 
         tool: 'ask_user_question',
         callId,
         questions: [{ id: 'q1', question, options: [{ label: '确认' }, { label: '再看看' }] }],
-        answers: [{ id: 'q1', selected }],
+        answers,
       }),
     }],
     source: { kind: 'user-question-reply', callId, outcome: 'answered' } as never,
   }) as UserMessage
   live.append('user/message', message, { surfaceOp: 'append' })
+}
+
+/** The common shape: one question, the labels the user ticked. */
+function cardAnswer(live: Session, callId: string, selected: string[], question = '这一单可以开工吗？'): void {
+  cardAnswerBatch(live, callId, [{ id: 'q1', selected }], question)
 }
 
 /** The `exec` a tool call receives. */
@@ -564,6 +572,61 @@ describe('grok_open_block: preview writes nothing and start records the approved
     await expect(call(mounted, BLOCK_TOOL_NAMES.open, startArgs(quotedPreview), quoted))
       .rejects.toMatchObject({ code: 'approval-required' })
     expect(ledgerLines()).toHaveLength(1)
+  })
+
+  it('records a card nod as question-reply and a typed yes as user, with the user\'s own words either way', async () => {
+    const mounted = await mount()
+    const startArgs = (previewed: Record<string, unknown>, kind = 'user'): Record<string, unknown> => ({
+      mode: 'start',
+      preview_id: previewed['preview_id'],
+      split_hash: previewed['split_hash'],
+      approval: { kind, quote: '确认' },
+    })
+    const rowAt = (index: number): { approval: { kind: string, quote: string } } =>
+      JSON.parse(ledgerLines()[index] ?? '{}') as { approval: { kind: string, quote: string } }
+
+    // A card answer that carried both a ticked label and typed text: the row says how the
+    // nod arrived, and the quote stays the user's label — never the Host's JSON batch.
+    const carded = headed('sess-kind-card')
+    const cardedPreview = await preview(mounted, carded)
+    await delay(5)
+    ask(carded, 'call-kind-card')
+    cardAnswerBatch(carded, 'call-kind-card', [{ id: 'q1', selected: ['确认'], custom: '就按这个来' }])
+    const fromCard = await call(mounted, BLOCK_TOOL_NAMES.open, startArgs(cardedPreview), carded)
+    expect(rowAt(0).approval).toMatchObject({ kind: 'question-reply', quote: '确认' })
+    expect(rowAt(0).approval.quote).not.toContain('answer_to_pending_question')
+
+    // The row survives a restart read: no live previews, and the status tool reads the
+    // kind back off disk rather than out of the process's memory.
+    resetPreviews()
+    const readBack = await call(mounted, BLOCK_TOOL_NAMES.status, { block_id: fromCard['block_id'] }, carded)
+    expect(readBack['approval']).toMatchObject({ kind: 'question-reply', quote: '确认' })
+
+    // A typed turn is not a card nod, and keeps the kind it always had.
+    const typed = headed('sess-kind-typed')
+    const typedPreview = await preview(mounted, typed)
+    await approveAfterPreview(typed)
+    await call(mounted, BLOCK_TOOL_NAMES.open, startArgs(typedPreview), typed)
+    expect(rowAt(1).approval).toMatchObject({ kind: 'user', quote: '确认' })
+
+    // A real-shaped answer with nothing ticked and the yes typed instead is still the
+    // user's own words, and still a question-reply.
+    const typedCard = headed('sess-kind-card-custom')
+    const typedCardPreview = await preview(mounted, typedCard)
+    await delay(5)
+    ask(typedCard, 'call-kind-card-custom')
+    cardAnswerBatch(typedCard, 'call-kind-card-custom', [{ id: 'q1', selected: [], custom: '确认' }])
+    await call(mounted, BLOCK_TOOL_NAMES.open, startArgs(typedCardPreview), typedCard)
+    expect(rowAt(2).approval).toMatchObject({ kind: 'question-reply', quote: '确认' })
+
+    // A caller that declared another source keeps it, even over a card answer.
+    const declared = headed('sess-kind-declared')
+    const declaredPreview = await preview(mounted, declared)
+    await delay(5)
+    ask(declared, 'call-kind-declared')
+    cardAnswer(declared, 'call-kind-declared', ['确认'])
+    await call(mounted, BLOCK_TOOL_NAMES.open, startArgs(declaredPreview, 'operator'), declared)
+    expect(rowAt(3).approval).toMatchObject({ kind: 'operator', quote: '确认' })
   })
 })
 

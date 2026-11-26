@@ -61,8 +61,13 @@ export const BLOCK_INTAKE_LIMITS = {
  * The distinction is kept because "the user said it in this session" and "a
  * policy allowed it" are different facts about the same row, and a later audit
  * has to be able to tell them apart.
+ *
+ * `question-reply` is the user's own words too — an answered question card — but
+ * it is written as its own kind so a row says how the nod arrived: a card the
+ * Host logged under `user-question-reply` is not a typed turn, and after the fact
+ * the quote alone cannot tell the two apart (D-172).
  */
-export type ApprovalKind = 'preview' | 'user' | 'request' | 'operator' | 'policy'
+export type ApprovalKind = 'preview' | 'user' | 'question-reply' | 'request' | 'operator' | 'policy'
 
 /** One recorded approval: who/what, the verbatim words, and when. */
 export interface BlockApproval {

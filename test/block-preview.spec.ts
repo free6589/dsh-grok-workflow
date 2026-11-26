@@ -503,6 +503,42 @@ describe('startBlock 落块', () => {
     expect(await readBlockRows({ dir })).toHaveLength(2)
   })
 
+  it('question-reply 是合法的审批来源，落盘后读得回来；旧行里的 user 照读不误', async () => {
+    const replyDir = freshDir()
+    const fromCard = await startBlock(
+      startInput(previewBlocks(previewInput()), { approval: { kind: 'question-reply', quote: '确认' } }),
+      { dir: replyDir },
+    )
+    const replyRows = await readBlockRows({ dir: replyDir })
+    expect(replyRows.skipped).toHaveLength(0)
+    expect(replyRows).toHaveLength(1)
+    expect(replyRows[0]?.id).toBe(fromCard.blockId)
+    expect(replyRows[0]?.approval).toEqual({
+      kind: 'question-reply',
+      quote: '确认',
+      at: new Date(T0 + 1_000).toISOString(),
+    })
+
+    // The kind a row was written with before this one existed still validates and reads:
+    // no migration, and the row's own bytes are not rewritten to mention the new kind.
+    const olderDir = freshDir()
+    await startBlock(startInput(previewBlocks(previewInput())), { dir: olderDir })
+    const olderRows = await readBlockRows({ dir: olderDir })
+    expect(olderRows.skipped).toHaveLength(0)
+    expect(olderRows[0]?.approval.kind).toBe('user')
+  })
+
+  it('不认识的审批来源仍被拒（合法集合是白名单，不是「非空即可」）', async () => {
+    const dir = freshDir()
+    const preview = previewBlocks(previewInput())
+    const error = await intakeError(startBlock(
+      startInput(preview, { approval: { kind: 'questionreply' as never, quote: '确认' } }),
+      { dir },
+    ))
+    expect(error.code).toBe('invalid')
+    expect(await readBlockRows({ dir })).toHaveLength(0)
+  })
+
   it('dispatchEnvelope 是一行，含块数、每块执行方式、写范围与依赖', async () => {
     const dir = freshDir()
     const preview = previewBlocks(

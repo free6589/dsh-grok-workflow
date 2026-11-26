@@ -150,7 +150,7 @@ export interface StoredPreview {
   root?: string
 }
 
-const APPROVAL_KINDS = new Set<string>(['preview', 'user', 'request', 'operator', 'policy'])
+const APPROVAL_KINDS = new Set<string>(['preview', 'user', 'question-reply', 'request', 'operator', 'policy'])
 const EXECUTIONS = new Set<string>(['foreman', 'workflow'])
 
 /** Live previews, keyed by preview id; insertion order is oldest-first. */
