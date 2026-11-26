@@ -1,0 +1,25 @@
+# Red lines for this block — read before and after the soak
+
+## live home mtimes (read-only; the soak must not change them)
+2026-11-25 23:14:14.025606767 +0800 /home/fish/.dsh
+2026-11-22 16:59:46.687805286 +0800 /home/fish/.dsh/profiles
+2026-11-26 07:18:22.452884311 +0800 /home/fish/.dsh/profiles/web
+2026-11-25 23:04:40.804802112 +0800 /home/fish/.dsh/profiles/web/cordis.patch.yml
+2026-11-14 22:47:23.697798095 +0800 /home/fish/.dsh/.credentials.yaml
+
+## write probe against the live home
+bash: line 1: /home/fish/.dsh/.failure-states-probe: Read-only file system
+
+## live instance on 3080 (before/after both 401)
+HTTP 401
+
+## plugin version installed in the live profile (read-only)
+0.13.46
+
+## scratch instance ports (all 127.0.0.1, all scratch profiles)
+LISTEN 0      511                                 127.0.0.1:18190      0.0.0.0:*
+LISTEN 0      511                                 127.0.0.1:18191      0.0.0.0:*
+LISTEN 0      511                                 127.0.0.1:3522       0.0.0.0:*
+LISTEN 0      511                                 127.0.0.1:3523       0.0.0.0:*
+LISTEN 0      511                                 127.0.0.1:3521       0.0.0.0:*
+LISTEN 0      511                                 127.0.0.1:3524       0.0.0.0:*

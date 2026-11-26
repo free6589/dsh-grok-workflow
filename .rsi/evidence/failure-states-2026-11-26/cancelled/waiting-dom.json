@@ -1,0 +1,36 @@
+{
+  "mounted": true,
+  "chipText": "等你点头",
+  "chipState": "waiting",
+  "left": "还剩 1 步 / 共 2 步",
+  "nodes": [
+    {
+      "key": "flow:start",
+      "kind": "start",
+      "ordinal": "0",
+      "state": "done",
+      "current": "true",
+      "aria": "起点 过了",
+      "word": "起点",
+      "badge": "",
+      "toggle": false
+    },
+    {
+      "key": "flow:end",
+      "kind": "end",
+      "ordinal": "0",
+      "state": "pending",
+      "current": "false",
+      "aria": "终点 等着",
+      "word": "终点",
+      "badge": "",
+      "toggle": false
+    }
+  ],
+  "logRows": 0,
+  "guardianBlocks": 4,
+  "dockState": "start",
+  "dockText": "开工",
+  "dockButton": "开工",
+  "text": "任务团队\n等你点头\n起点\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 2 步\n\n开工"
+}

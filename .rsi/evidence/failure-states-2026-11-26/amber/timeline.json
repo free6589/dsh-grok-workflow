@@ -1,0 +1,107 @@
+{
+ "url": "http://127.0.0.1:3521/?token=<redacted>",
+ "scenario": "amber",
+ "sentAt": 1795651185693,
+ "timeline": [
+  {
+   "t": 465,
+   "chip": "",
+   "nodes": [],
+   "logRows": 0
+  },
+  {
+   "t": 8676,
+   "chip": "等你点头",
+   "nodes": [
+    "起点:done",
+    "终点:pending"
+   ],
+   "logRows": 0
+  },
+  {
+   "t": 9356,
+   "chip": "进行中",
+   "nodes": [
+    "起点:done",
+    "规划:doing",
+    "终点:pending"
+   ],
+   "logRows": 0
+  },
+  {
+   "t": 156633,
+   "chip": "已完成",
+   "nodes": [
+    "起点:done",
+    "规划:done",
+    "执行:done",
+    "检查:done",
+    "复核:done",
+    "规划:done",
+    "执行:done",
+    "检查:done",
+    "复核:done",
+    "汇总:done",
+    "汇总:done",
+    "汇总:failed",
+    "终点:done"
+   ],
+   "logRows": 0
+  }
+ ],
+ "saved": {
+  "waiting": {
+   "atSec": 9.356,
+   "nodes": 2
+  },
+  "dockStart": {
+   "button": "开工",
+   "composer": "确认",
+   "filled": ""
+  },
+  "running": {
+   "atSec": 9.47,
+   "nodes": 3
+  },
+  "done": {
+   "atSec": 158.217,
+   "chip": "已完成",
+   "nodes": 13,
+   "dock": "accept"
+  },
+  "summary": {
+   "state": "failed",
+   "aria": "汇总 第 3 稿 没过",
+   "expanded": "true",
+   "callsText": "8:01\n汇总·第3稿\n汇总\n做完\n打开子会话\n第 3 稿全被退回\n卡在检查\n最后不过：the polish uses a list instead of plain prose",
+   "rows": [
+    "8:01\n汇总·第3稿\n汇总\n做完\n打开子会话",
+    "第 3 稿全被退回",
+    "卡在检查",
+    "最后不过：the polish uses a list instead of plain prose"
+   ],
+   "rejected": [
+    {
+     "fact": "drafts",
+     "text": "第 3 稿全被退回"
+    },
+    {
+     "fact": "stage",
+     "text": "卡在检查"
+    },
+    {
+     "fact": "reason",
+     "text": "最后不过：the polish uses a list instead of plain prose"
+    }
+   ]
+  },
+  "dockAccept": {
+   "button": "收下这版",
+   "composer": {
+    "found": true,
+    "text": "确认"
+   }
+  }
+ },
+ "stopCandidates": null
+}

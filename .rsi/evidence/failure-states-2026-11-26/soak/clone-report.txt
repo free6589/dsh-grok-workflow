@@ -1,0 +1,132 @@
+{
+  "ok": true,
+  "failures": [],
+  "source": {
+    "dir": "/home/fish/.dsh/profiles/web",
+    "files": 7739,
+    "links": 5
+  },
+  "target": {
+    "dir": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-failure-states/.tmp/soak/dsh-home/profiles/web-clone",
+    "home": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-failure-states/.tmp/soak/dsh-home",
+    "files": 7739,
+    "links": 5,
+    "bytes": 88580334
+  },
+  "parity": [
+    {
+      "file": "cordis.yml",
+      "sourceSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "expectedSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "targetSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "equal": true
+    },
+    {
+      "file": "cordis.patch.yml",
+      "sourceSha256": "369ebd07bbe1387e36b8edff142e91d0f7ccb1e9014ab10bd275936c981491cb",
+      "expectedSha256": "39fb18910befbec1bc56576fdf7f985d5230a936705987dd3efeba6f1abfa9bb",
+      "targetSha256": "39fb18910befbec1bc56576fdf7f985d5230a936705987dd3efeba6f1abfa9bb",
+      "equal": true
+    },
+    {
+      "file": "package.json",
+      "sourceSha256": "08ecbf45daa22b8846c0f010d8462562011e9f20c502aa292346f952a7c2a0da",
+      "expectedSha256": "08ecbf45daa22b8846c0f010d8462562011e9f20c502aa292346f952a7c2a0da",
+      "targetSha256": "08ecbf45daa22b8846c0f010d8462562011e9f20c502aa292346f952a7c2a0da",
+      "equal": true
+    },
+    {
+      "file": "pnpm-workspace.yaml",
+      "sourceSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "expectedSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "targetSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "equal": true
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "sourceSha256": "f2d6d2e079ab9c8296a54fd945656a1c4bc13a7503571693e3cf373b4171ea8a",
+      "expectedSha256": "f2d6d2e079ab9c8296a54fd945656a1c4bc13a7503571693e3cf373b4171ea8a",
+      "targetSha256": "f2d6d2e079ab9c8296a54fd945656a1c4bc13a7503571693e3cf373b4171ea8a",
+      "equal": true
+    }
+  ],
+  "links": [
+    {
+      "path": "node_modules/.bin/dsh-agent-teams-doctor",
+      "sourceTarget": "../@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+      "target": "../@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+      "sourceResolves": true,
+      "repaired": false,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/.bin/js-yaml",
+      "sourceTarget": "../js-yaml/bin/js-yaml.js",
+      "target": "../js-yaml/bin/js-yaml.js",
+      "sourceResolves": true,
+      "repaired": false,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/dsh-system-prompt-design",
+      "sourceTarget": "../../../../projects_mine/dsh-system-md",
+      "target": "../../../../../../../../../dsh-system-md",
+      "sourceResolves": true,
+      "repaired": true,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/dsh-token-usage",
+      "sourceTarget": "../../../../projects_mine/dsh-token-usage",
+      "target": "../../../../../../../../../dsh-token-usage",
+      "sourceResolves": true,
+      "repaired": true,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/git",
+      "sourceTarget": "../github.com:free6589/dsh-grok-workflow.git",
+      "target": "../github.com:free6589/dsh-grok-workflow.git",
+      "sourceResolves": false,
+      "repaired": false,
+      "resolvesAfterRepair": false
+    }
+  ],
+  "redactions": [
+    {
+      "file": "cordis.patch.yml",
+      "lines": [
+        379
+      ],
+      "patterns": [
+        "openai-style-key"
+      ],
+      "redacted": true
+    }
+  ],
+  "vendoredSecretHits": [
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-endpoint-inventory.mjs",
+      "lines": 1
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-image-embed.mjs",
+      "lines": 1
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-openai-embed.mjs",
+      "lines": 2
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/verify_adapters.mjs",
+      "lines": 1
+    }
+  ],
+  "declared": {
+    "dependencies": 17,
+    "bundles": 21,
+    "installationBundles": 8,
+    "unresolved": []
+  },
+  "secretHits": 1
+}
