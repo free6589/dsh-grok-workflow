@@ -5,6 +5,34 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.47] - 2026-11-26
+
+### Changed / 变更
+
+- **The three failure states are photographed on a real machine, and both dock buttons only fill the composer / 三种失败页面在真机上拍了照，两颗按钮也确实只把字填进输入框** —
+  Three page states that only component tests and CSS had ever covered now have real-machine captures: the amber summary node
+  a run shows when every summary draft was refused, the whole-run `未通过` page, and the `已取消` page. In the first, the capsule
+  still reads `已完成` — the run finished and the draft it handed in was refused — while the third summary node is amber with
+  `aria-label="汇总 第 3 稿 没过"`, expanding to `第 3 稿全被退回` / `卡在检查` / `最后不过：the polish uses a list instead of plain prose`; the
+  two earlier nodes stay green `过了`, so the node to read is the one carrying the verdict, not the first. The failed page reads
+  `未通过` with `检查` and `终点` amber and no buttons; the cancelled page reads `已取消` with `规划 没做` and `终点 没做` amber. Both dock
+  buttons — `开工` and `收下这版` — fill `确认` into the composer and never send it, and the accept button's status line reads
+  `已填进输入框，按发送`; `开工`'s own status line was not readable, since that window closes in under a second, so only the text it
+  filled is recorded. Every state ships a 1500-wide screenshot plus the verbatim text and hook readings taken at that moment,
+  and `rig/` replays all three against a local proxy, so a reader can re-run the captures instead of trusting the prose.
+  Reading the three states found no product defect, so no plugin behaviour changed: this release lands evidence.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 一直只有组件用例和 CSS 保着的三张页面，现在有真机读数了：一次运行的汇总稿全被闸门退回时那颗琥珀汇总节点、整轮的 `未通过` 页、
+  以及 `已取消` 页。第一张里胶囊仍读 `已完成`——整轮是跑完的，被退的是它交上去的那一稿——第三颗汇总节点是琥珀色，
+  `aria-label="汇总 第 3 稿 没过"`，展开三行读作 `第 3 稿全被退回` / `卡在检查` /
+  `最后不过：the polish uses a list instead of plain prose`；前两颗仍是绿的 `过了`，所以要读的是带判词那颗，不是第一颗。
+  失败页胶囊读 `未通过`，`检查` 与 `终点` 是琥珀色，没有按钮；被取消页胶囊读 `已取消`，`规划 没做` 与 `终点 没做` 是琥珀色，
+  同样没有按钮。两颗按钮——`开工` 与 `收下这版`——都只把 `确认` 填进输入框、从不代发，收下那颗的状态行读作
+  `已填进输入框，按发送`；`开工` 自己那行状态字没读到，因为那个窗口活不到一秒，所以只记下了它填进去的字。三态各自带一张
+  1500 宽的截图，加当时逐字的文本与钩子读数；`rig/` 能让三张页面对着本机小代理重放，读者可以自己重跑，不必只信文字。
+  三态逐字读下来没有发现产品缺陷，所以插件行为没有变化，这一版只把证据收进仓库。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.46] - 2026-11-26
 
 ### Fixed / 修复
