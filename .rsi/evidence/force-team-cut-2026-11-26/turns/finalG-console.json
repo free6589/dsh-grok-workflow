@@ -1,0 +1,18 @@
+{
+  "consoleErrors": [],
+  "step1": {
+    "why": "stable",
+    "sawBusy": false,
+    "elapsed": 4
+  },
+  "step2": {
+    "why": "stable",
+    "sawBusy": true,
+    "elapsed": 28
+  },
+  "step3": {
+    "why": "stable",
+    "sawBusy": true,
+    "elapsed": 160
+  }
+}

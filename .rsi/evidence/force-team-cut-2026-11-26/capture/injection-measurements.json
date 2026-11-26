@@ -1,0 +1,133 @@
+{
+  "zhBlockBytes": 480,
+  "perPrompt": [
+    {
+      "tag": "A-obey",
+      "promptBytes": 87,
+      "hits": 7,
+      "first": {
+        "file": "req-001.json",
+        "blockKind": "input_text",
+        "contentBlocks": 5,
+        "requestBytes": 135249,
+        "modelTextBytes": 567,
+        "userWordsBytes": 87,
+        "remainderBytes": 480,
+        "remainderEqualsZh": true,
+        "remainderEqualsEn": false,
+        "remainderHead": "【强制：这一轮走团队模式】\n这一轮不许单条作答。按顺序做完这三步：\n1. 先拆活",
+        "zhBlockBytes": 480,
+        "carriesBlock": true
+      }
+    },
+    {
+      "tag": "B-ignore",
+      "promptBytes": 25,
+      "hits": 2,
+      "first": {
+        "file": "req-010.json",
+        "blockKind": "input_text",
+        "contentBlocks": 5,
+        "requestBytes": 135187,
+        "modelTextBytes": 505,
+        "userWordsBytes": 25,
+        "remainderBytes": 480,
+        "remainderEqualsZh": true,
+        "remainderEqualsEn": false,
+        "remainderHead": "【强制：这一轮走团队模式】\n这一轮不许单条作答。按顺序做完这三步：\n1. 先拆活",
+        "zhBlockBytes": 480,
+        "carriesBlock": true
+      }
+    },
+    {
+      "tag": "C-olddeath",
+      "promptBytes": 139,
+      "hits": 2,
+      "first": {
+        "file": "req-013.json",
+        "blockKind": "input_text",
+        "contentBlocks": 5,
+        "requestBytes": 135301,
+        "modelTextBytes": 619,
+        "userWordsBytes": 139,
+        "remainderBytes": 480,
+        "remainderEqualsZh": true,
+        "remainderEqualsEn": false,
+        "remainderHead": "【强制：这一轮走团队模式】\n这一轮不许单条作答。按顺序做完这三步：\n1. 先拆活",
+        "zhBlockBytes": 480,
+        "carriesBlock": true
+      }
+    },
+    {
+      "tag": "D-control",
+      "promptBytes": 130,
+      "hits": 10,
+      "first": {
+        "file": "req-016.json",
+        "blockKind": "input_text",
+        "contentBlocks": 5,
+        "requestBytes": 134807,
+        "modelTextBytes": 130,
+        "userWordsBytes": 130,
+        "remainderBytes": 0,
+        "remainderEqualsZh": false,
+        "remainderEqualsEn": false,
+        "remainderHead": "",
+        "zhBlockBytes": 480,
+        "carriesBlock": false
+      }
+    },
+    {
+      "tag": "E-extra",
+      "promptBytes": 166,
+      "hits": 2,
+      "first": {
+        "file": "req-027.json",
+        "blockKind": "input_text",
+        "contentBlocks": 5,
+        "requestBytes": 135328,
+        "modelTextBytes": 646,
+        "userWordsBytes": 166,
+        "remainderBytes": 480,
+        "remainderEqualsZh": true,
+        "remainderEqualsEn": false,
+        "remainderHead": "【强制：这一轮走团队模式】\n这一轮不许单条作答。按顺序做完这三步：\n1. 先拆活",
+        "zhBlockBytes": 480,
+        "carriesBlock": true
+      }
+    }
+  ],
+  "bodiesCarryingBlock": [
+    "req-001.json",
+    "req-002.json",
+    "req-003.json",
+    "req-004.json",
+    "req-005.json",
+    "req-006.json",
+    "req-007.json",
+    "req-008.json",
+    "req-009.json",
+    "req-010.json",
+    "req-011.json",
+    "req-012.json",
+    "req-013.json",
+    "req-014.json",
+    "req-015.json",
+    "req-027.json",
+    "req-028.json",
+    "req-029.json"
+  ],
+  "bodiesWithoutBlock": [
+    "req-016.json",
+    "req-017.json",
+    "req-018.json",
+    "req-019.json",
+    "req-020.json",
+    "req-021.json",
+    "req-022.json",
+    "req-023.json",
+    "req-024.json",
+    "req-025.json",
+    "req-026.json"
+  ]
+}

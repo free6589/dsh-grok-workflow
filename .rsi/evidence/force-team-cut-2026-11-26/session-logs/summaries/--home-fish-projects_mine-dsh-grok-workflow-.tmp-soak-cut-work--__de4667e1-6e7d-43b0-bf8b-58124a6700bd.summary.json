@@ -1,0 +1,33 @@
+{
+  "session": "--home-fish-projects_mine-dsh-grok-workflow-.tmp-soak-cut-work--__de4667e1-6e7d-43b0-bf8b-58124a6700bd",
+  "turns": 1,
+  "turnEnds": [
+    {
+      "turn": 1,
+      "reason": "completed"
+    }
+  ],
+  "stepCount": 1,
+  "steps": [
+    "1.1"
+  ],
+  "toolCalls": [
+    "1.1:structured_output"
+  ],
+  "toolNames": [
+    "structured_output"
+  ],
+  "workflowEventCount": 0,
+  "workflowEventTypes": [],
+  "refusalRows": 0,
+  "forceTeamRows": 0,
+  "userRowKinds": [
+    "user",
+    "agent-instructions",
+    "runtime-context",
+    "skill-catalog",
+    "time-context"
+  ],
+  "injectedUserRows": 0,
+  "assistantTail": "判验收是否被交接原话覆盖——正在逐条核对。"
+}

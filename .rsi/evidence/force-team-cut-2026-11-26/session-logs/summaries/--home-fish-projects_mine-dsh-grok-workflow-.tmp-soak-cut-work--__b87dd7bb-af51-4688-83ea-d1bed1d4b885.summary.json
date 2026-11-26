@@ -1,0 +1,33 @@
+{
+  "session": "--home-fish-projects_mine-dsh-grok-workflow-.tmp-soak-cut-work--__b87dd7bb-af51-4688-83ea-d1bed1d4b885",
+  "turns": 1,
+  "turnEnds": [
+    {
+      "turn": 1,
+      "reason": "completed"
+    }
+  ],
+  "stepCount": 1,
+  "steps": [
+    "1.1"
+  ],
+  "toolCalls": [
+    "1.1:structured_output"
+  ],
+  "toolNames": [
+    "structured_output"
+  ],
+  "workflowEventCount": 0,
+  "workflowEventTypes": [],
+  "refusalRows": 0,
+  "forceTeamRows": 0,
+  "userRowKinds": [
+    "user",
+    "agent-instructions",
+    "runtime-context",
+    "skill-catalog",
+    "time-context"
+  ],
+  "injectedUserRows": 0,
+  "assistantTail": "判读三条验收已完成，正在按逐字引用规则组装裁决。"
+}

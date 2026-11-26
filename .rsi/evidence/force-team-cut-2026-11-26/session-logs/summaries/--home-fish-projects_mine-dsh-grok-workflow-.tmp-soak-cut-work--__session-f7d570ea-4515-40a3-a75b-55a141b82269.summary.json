@@ -1,0 +1,16 @@
+{
+  "session": "--home-fish-projects_mine-dsh-grok-workflow-.tmp-soak-cut-work--__session-f7d570ea-4515-40a3-a75b-55a141b82269",
+  "turns": 0,
+  "turnEnds": [],
+  "stepCount": 0,
+  "steps": [],
+  "toolCalls": [],
+  "toolNames": [],
+  "workflowEventCount": 0,
+  "workflowEventTypes": [],
+  "refusalRows": 0,
+  "forceTeamRows": 0,
+  "userRowKinds": [],
+  "injectedUserRows": 0,
+  "assistantTail": ""
+}

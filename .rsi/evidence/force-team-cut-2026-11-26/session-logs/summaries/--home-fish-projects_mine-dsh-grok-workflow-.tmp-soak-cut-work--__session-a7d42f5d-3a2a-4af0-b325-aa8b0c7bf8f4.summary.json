@@ -1,0 +1,35 @@
+{
+  "session": "--home-fish-projects_mine-dsh-grok-workflow-.tmp-soak-cut-work--__session-a7d42f5d-3a2a-4af0-b325-aa8b0c7bf8f4",
+  "turns": 0,
+  "turnEnds": [],
+  "stepCount": 2,
+  "steps": [
+    "1.1",
+    "1.2"
+  ],
+  "toolCalls": [
+    "1.1:list_agents",
+    "1.1:get_goal",
+    "1.1:working_directory",
+    "1.2:ask_user_question"
+  ],
+  "toolNames": [
+    "list_agents",
+    "get_goal",
+    "working_directory",
+    "ask_user_question"
+  ],
+  "workflowEventCount": 0,
+  "workflowEventTypes": [],
+  "refusalRows": 0,
+  "forceTeamRows": 0,
+  "userRowKinds": [
+    "user",
+    "agent-instructions",
+    "runtime-context",
+    "skill-catalog",
+    "time-context"
+  ],
+  "injectedUserRows": 0,
+  "assistantTail": ""
+}

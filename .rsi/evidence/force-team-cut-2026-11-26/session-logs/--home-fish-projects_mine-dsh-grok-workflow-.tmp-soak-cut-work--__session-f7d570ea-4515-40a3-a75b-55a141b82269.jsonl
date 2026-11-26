@@ -1,0 +1,5 @@
+{"type":"session","version":4,"id":"session-f7d570ea-4515-40a3-a75b-55a141b82269","createdAt":1795668507539,"cwd":"/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-cut/work","isSeeded":false,"delegationDepth":0,"agentPreset":"standard"}
+{"type":"permission/preset","seq":0,"time":1795668507545,"data":{"preset":"workspace-write"}}
+{"type":"sandbox/mode","seq":1,"time":1795668507545,"data":{"mode":"workspace-write"}}
+{"type":"approval/policy","seq":2,"time":1795668507546,"data":{"policy":"ask"}}
+{"type":"subagent/model-selection-policy","seq":3,"time":1795668507546,"data":{"allowedModels":[{"provider":"agent2api","model":"deepseek-v4.1-flash"},{"provider":"agent2api","model":"scnet"},{"provider":"agent2api","model":"glm-5.3-flash"}]}}
