@@ -1228,3 +1228,62 @@ div.gw-progress-flow[data-gw-progress-flow]                坐标原点（既有
 - **不取代**：§21.2 的状态词与 `at` 口径、§21.5 的腿词 / 角标 / 计数文案、§21.6 的宽度与「无字面色值」，
   §21.8 的按钮机制（只填框、不代发）、§22 的汇总结论链与其界面出口（汇总节点的琥珀 + 展开行）。
 - **文案增量只有一个键**：`progress.flow.attempt`（键数 54 → 55）；`test/progress-hint-absent.spec.ts` 一字未改。
+
+## 24. 手机：矩阵变成分支树（2026-11-26，`fix/flowchart-mobile-tree`）
+
+读者一句话：「手机排版难看」。手机上（真浏览器渲染的 390 / 360 模拟屏）6 条腿并排挤成一条条窄缝，任务名一律被省略号切断——**这一轮没有真手机读数**，见 `STATE.md` 同日的 `BLOCKED` 那一格。矩阵（§23）
+在桌面上是**行 = 任务、列 = 腿**，这个口径手机放不下，所以 ≤720px 换个画法，**不是缩一版矩阵**。
+
+### 24.1 断点与结构（`CONFIRMED`，断言口径）
+
+- `@media (max-width: 720px)` 内三条：`.gw-progress-cols` 改 `flex-direction: column`（一条腿一整行、整宽）；
+  `.gw-progress-col` 改 `flex: 0 0 auto; width: 100%`；`.gw-progress-subs` 改**两轨网格**
+  `grid-template-columns: repeat(2, minmax(0, 1fr))`、`grid-template-rows: none`、`column-gap: 8px`、`row-gap: 24px`。
+- **格子的行不再是任务号**：桌面靠内联 `grid-row`（= 任务号）对齐，手机靠轨道排布，所以这条规则里用
+  `grid-row: auto !important` 把内联值压掉 —— 内联样式只有 `!important` 能盖，理由与 `PageStyle()` 里那条一样。
+- **轨道由钩子决定，不由 `nth-child` 决定**：`data-gw-progress-branch-side` = `left` / `right` / `none`，
+  位置偶数（0、2、4…）走左轨、奇数走右轨，**一条腿只有一格时是 `none`，跨两轨**。属性在每个宽度都写在
+  `li.gw-progress-sub` 上，桌面读都不用读（那里是矩阵）。
+- **24px 的空档是画线的地方，不是留白**：腿卡 → 任务卡、任务卡 → 下一张腿卡，两条横杆都落在这 24px 里，
+  所以空档比 8px 的列间距大。480px 断点**不再重排一次流程**（只留 dock 与调用行的时刻列），
+  因为第二次重排正是「树丢掉分支」的地方。
+
+### 24.2 线：分叉（叉出去）与收回（收回下一腿）（`CONFIRMED`，效果图 `.tmp/mock/mobile-tree.html` + 真页面 `.rsi/evidence/mobile-tree-2026-11-26/soak/20-running.json` 的 `wirePaths`）
+
+- **分叉**：腿卡底边中点 → 12px 竖茎 → 横杆（最左分支中心到最右分支中心）→ 每张分支卡**顶边中点**各落一根竖茎，
+  箭头停在卡片顶边（不压边框）。只有一张分支卡时是**一根直竖线**，不做横杆。
+- **收回**：每张分支卡底边中点 → 12px 竖茎 → 横杆 → 一根竖茎进下一张腿卡**顶边中点**。
+- 横杆的纵坐标**不是固定偏移**：它落在**自己那个目标上方那段空档的中点**——`band = (上一张框的底 + 目标顶) / 2`
+  （`progressWireBranch()` 量的是矩形，不猜）。24px 的空档里就是离两端各 12px，与上面两条「12px 竖茎」的读法一致
+  （模拟屏 390px、三任务并行那一跑的量测：腿头底 `92` → 分叉杆 `104`；最后一张卡底 `246` → 收回杆 `258` → 下一张腿头顶 `270`，
+  连线层坐标）。同一条空档里同时有分叉杆和收回杆时，**两根共用不了同一条横杆**：分叉的目标是这一腿自己的任务卡、
+  收回的目标是下一张腿卡，两段空档不在同一高度——那一跑里分叉杆在 `104` 与 `181`、收回杆在 `258`，
+  三个 y 互不相同；两条轨道中间的 8px 缝就是主干的位置，所以竖线永远不穿卡。效果图里那对 8px / 16px 是
+  **效果图自己的取法**，不是产物的形状。
+- 线仍是 `stroke: --dsw-alias-border-l2`、1.5px、实线；≤720px 加 `stroke-linecap/linejoin: round`（树的拐角）。
+  重试仍是 `data-gw-progress-retry` 的 `3 3` 虚线，画在同一层里。
+
+### 24.3 不截字（`CONFIRMED`）
+
+- ≤720px：`.gw-progress-sub` 与 `.gw-progress-node` 都是 `height: auto; min-height: 34px; white-space: normal;
+  overflow-wrap: anywhere; text-overflow: clip`；`.gw-progress-sub-word` / `.gw-progress-node-word` 停止
+  `nowrap` + 省略号（`overflow: visible`、`white-space: normal`）。长名字**把卡撑高并折行**，不再截。
+- 格子内部改成两行：第一行「尝试点（+ 重试虚线）+ `第 N 遍` 角标 + 明细箭头」，第二行任务名**独占整宽**
+  （`grid-template-areas: "dots badge toggle" "word word word"`）。名字不与角标抢同一行，这是被挤断的直接原因。
+- **真机（真浏览器渲染的 390 / 360 模拟屏）量到的数**（`.rsi/evidence/mobile-tree-2026-11-26/` 的 `soak/*.json`）：
+  390px 下两轨各 **183.5px**、流程宽 **383**；360px 下两轨各 **168.5px**、流程宽 **353**；两档
+  `scrollWidth - clientWidth` 都是 **0**、被截的卡与腿词都是 **0**、穿过卡片内部的线都是 **0 条**，
+  所以 360px **不需要**降成单轨。
+- 效果图那一套另有自己的数（`.tmp/mock/README.md`，`mobile-tree.html` 量到 360px 任务名可用 **145px**、
+  390px **160px**、412px **171px**；同一份说明里 `verify.html` 用真 CSS + 真 DOM 量到 **138 / 153 / 164px**）——
+  那是**效果图**的读数，不是产物在真页面上的读数，别混用。
+
+### 24.4 桌面不变，与 §23 的关系（`CONFIRMED`）
+
+- **>720px 一个字节没动**：`flex` 行、等宽列、`--gw-lanes` 的 `grid-template-rows`、每格内联 `grid-row` 全部原样；
+  新规则只写在 media query 里，`data-gw-progress-branch-side` 在桌面上是死属性。
+- **取代**：§23.3「两列一行的窄屏」→ 一条腿一行的树；§23.4 的「列头相邻对 + 同号格对」连线形状在手机上
+  → 分叉/收回两组线（测量仍读矩形，桌面口径不变）。
+- **不取代**：§23.2 的 DOM 顺序（`flow > wires + cols > col > (node, subs > sub)`）与全部钩子、
+  §23.5 的尝试点与 `第 N 遍`、§23.6 的三种终态、§23.7 的文案增量。DOM 里**没有**新增元素，
+  只多了一个属性，所以文案键数仍是 55。

@@ -1,0 +1,38 @@
+[
+ {
+  "name": "10-waiting",
+  "chip": "等你点头",
+  "subs": 0,
+  "wires": 0,
+  "cardsCut": 0,
+  "crossings": 0,
+  "scroll": [
+   390,
+   390
+  ]
+ },
+ {
+  "name": "20-running",
+  "chip": "进行中",
+  "subs": 3,
+  "wires": 6,
+  "cardsCut": 0,
+  "crossings": 0,
+  "scroll": [
+   390,
+   390
+  ]
+ },
+ {
+  "name": "30-done",
+  "chip": "已完成",
+  "subs": 9,
+  "wires": 20,
+  "cardsCut": 0,
+  "crossings": 0,
+  "scroll": [
+   390,
+   390
+  ]
+ }
+]

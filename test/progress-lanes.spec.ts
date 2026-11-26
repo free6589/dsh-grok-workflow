@@ -1041,6 +1041,79 @@ describe('lanes: the wires are directed and bend at a wrap (追加 4)', () => {
   })
 })
 
+describe('lanes: a stacked leg is a tree (追加 4)', () => {
+  type Card = { lane: number, x: number, y: number, w: number, h: number, side?: string }
+
+  /**
+   * A phone-width figure: one leg a row, its cards, and the next leg's head under them.
+   *
+   * The cards are the leg's tasks; `side` writes the branch side a host may put on a cell
+   * (left, right or none), and the measurement is meant to read the boxes, not that word.
+   */
+  function stacked(cards: ReadonlyArray<Card>): unknown {
+    const frame = { left: 0, top: 0, width: 320, height: 400 }
+    const box = (r: { x: number, y: number, w: number, h: number }) => ({
+      left: r.x,
+      top: r.y,
+      width: r.w,
+      height: r.h,
+      right: r.x + r.w,
+      bottom: r.y + r.h,
+    })
+    const cell = (one: Card) => ({
+      getBoundingClientRect: () => box(one),
+      getAttribute: (name: string) => (name === 'data-lane' ? String(one.lane)
+        : name === 'data-gw-progress-branch-side' ? one.side
+          : undefined),
+      querySelectorAll: () => [],
+    })
+    const columns: ReadonlyArray<{ rect: { x: number, y: number, w: number, h: number }, cards: ReadonlyArray<Card> }> = [
+      { rect: { x: 4, y: 0, w: 312, h: 96 }, cards },
+      { rect: { x: 4, y: 104, w: 312, h: 32 }, cards: [] },
+    ]
+    return {
+      querySelectorAll: () => columns.map((column) => ({
+        getBoundingClientRect: () => box(column.rect),
+        querySelectorAll: (selector: string) => (selector.includes('data-gw-progress-node')
+          ? [{ getBoundingClientRect: () => box({ x: column.rect.x, y: column.rect.y, w: column.rect.w, h: 32 }) }]
+          : column.cards.map(cell)),
+      })),
+      getBoundingClientRect: () => ({ ...frame, right: frame.width, bottom: frame.height }),
+    }
+  }
+
+  const branches: ReadonlyArray<Card> = [
+    { lane: 1, x: 4, y: 38, w: 96, h: 26 },
+    { lane: 2, x: 112, y: 38, w: 96, h: 26 },
+    { lane: 3, x: 220, y: 38, w: 96, h: 26 },
+  ]
+
+  it('fans a leg into its branches and rejoins them on the next leg', () => {
+    const tree = progress.measureWires(stacked(branches))
+    // Six wires: three leave the head's bottom centre for a card's top centre, three leave a
+    // card's bottom centre for the next head's top centre. A chain would be one of each.
+    expect(tree.paths).toHaveLength(6)
+    const forks = tree.paths.filter((points) => points[0]![0] === 160 && points[0]![1] === 32)
+    const merges = tree.paths.filter((points) => points[points.length - 1]![0] === 160 && points[points.length - 1]![1] === 104)
+    expect(forks).toHaveLength(3)
+    expect(merges).toHaveLength(3)
+    // Every card is arrived at once and left once: no branch is summarised away.
+    for (const card of branches) {
+      const centre = card.x + card.w / 2
+      expect(tree.paths.filter((points) => points[points.length - 1]![0] === centre && points[points.length - 1]![1] === card.y)).toHaveLength(1)
+      expect(tree.paths.filter((points) => points[0]![0] === centre && points[0]![1] === card.y + card.h)).toHaveLength(1)
+    }
+  })
+
+  it('reads the boxes, not the branch side a host may or may not write', () => {
+    // The side is the layout's business: the same cards measured with no such attribute and
+    // with one on every card give the same tree, point for point.
+    const bare = progress.measureWires(stacked(branches))
+    const sided = progress.measureWires(stacked(branches.map((card, index) => ({ ...card, side: index === 1 ? 'right' : 'left' }))))
+    expect(sided).toEqual(bare)
+  })
+})
+
 describe('lanes: no new words (追加 5)', () => {
   it('adds no dictionary key beyond the one a retry needs, in either language', () => {
     const keys = progressKeys('zh')

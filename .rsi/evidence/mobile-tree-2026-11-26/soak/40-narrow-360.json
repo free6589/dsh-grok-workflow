@@ -1,0 +1,218 @@
+{
+ "viewport": {
+  "width": 360,
+  "height": 844
+ },
+ "mounted": true,
+ "chip": "已完成",
+ "chipState": "done",
+ "count": "还剩 0 步 / 共 7 步",
+ "nodes": 7,
+ "cols": 7,
+ "subs": 9,
+ "cards": [
+  {
+   "key": "flow:0:execute:1:t1",
+   "task": "1",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 254,
+   "right": 172.5,
+   "bottom": 307,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:0:execute:1:t2",
+   "task": "2",
+   "side": "right",
+   "state": "done",
+   "column": "2",
+   "height": 53,
+   "left": 180.5,
+   "top": 254,
+   "right": 349,
+   "bottom": 307,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:0:execute:1:t3",
+   "task": "3",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 331,
+   "right": 172.5,
+   "bottom": 384,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:1:check:1:t1",
+   "task": "1",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 466,
+   "right": 172.5,
+   "bottom": 519,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:1:check:1:t2",
+   "task": "2",
+   "side": "right",
+   "state": "done",
+   "column": "2",
+   "height": 53,
+   "left": 180.5,
+   "top": 466,
+   "right": 349,
+   "bottom": 519,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:1:check:1:t3",
+   "task": "3",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 543,
+   "right": 172.5,
+   "bottom": 596,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:2:review:1:t1",
+   "task": "1",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 678,
+   "right": 172.5,
+   "bottom": 731,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:2:review:1:t2",
+   "task": "2",
+   "side": "right",
+   "state": "done",
+   "column": "2",
+   "height": 53,
+   "left": 180.5,
+   "top": 678,
+   "right": 349,
+   "bottom": 731,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:2:review:1:t3",
+   "task": "3",
+   "side": "left",
+   "state": "done",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 755,
+   "right": 172.5,
+   "bottom": 808,
+   "wordCut": false,
+   "lines": 1
+  }
+ ],
+ "heads": [
+  {
+   "kind": "start",
+   "state": "done",
+   "top": 138,
+   "bottom": 172
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "top": 196,
+   "bottom": 230
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "top": 408,
+   "bottom": 442
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "top": 620,
+   "bottom": 654
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "top": 832,
+   "bottom": 866
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "top": 890,
+   "bottom": 924
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "top": 948,
+   "bottom": 982
+  }
+ ],
+ "headCuts": 0,
+ "cardsCut": 0,
+ "wires": 20,
+ "wirePaths": [
+  "M177 34 L177 58",
+  "M177 92 L177 104 L88 104 L88 116",
+  "M177 92 L177 104 L265 104 L265 116",
+  "M177 92 L177 181 L88 181 L88 193",
+  "M88 169 L88 181 L175 181 L175 258 L177 258 L177 270",
+  "M265 169 L265 258 L177 258 L177 270",
+  "M88 246 L88 258 L177 258 L177 270",
+  "M177 304 L177 316 L88 316 L88 328",
+  "M177 304 L177 316 L265 316 L265 328",
+  "M177 304 L177 393 L88 393 L88 405",
+  "M88 381 L88 393 L175 393 L175 470 L177 470 L177 482",
+  "M265 381 L265 470 L177 470 L177 482",
+  "M88 458 L88 470 L177 470 L177 482",
+  "M177 516 L177 528 L88 528 L88 540",
+  "M177 516 L177 528 L265 528 L265 540",
+  "M177 516 L177 605 L88 605 L88 617",
+  "M88 593 L88 605 L175 605 L175 682 L177 682 L177 694",
+  "M265 593 L265 682 L177 682 L177 694",
+  "M88 670 L88 682 L177 682 L177 694",
+  "M177 728 L177 752",
+  "M177 786 L177 810"
+ ],
+ "retries": 0,
+ "crossings": [],
+ "scrollWidth": 360,
+ "clientWidth": 360,
+ "flowWidth": 353,
+ "subsColumns": "168.5px 168.5px",
+ "colsDirection": "column"
+}

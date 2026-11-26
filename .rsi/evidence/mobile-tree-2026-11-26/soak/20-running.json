@@ -1,0 +1,98 @@
+{
+ "at": "2026-11-26T06:44:40.236Z",
+ "elapsed": "11.65",
+ "viewport": {
+  "width": 390,
+  "height": 844
+ },
+ "mounted": true,
+ "chip": "进行中",
+ "chipState": "running",
+ "count": "还剩 1 步 / 共 3 步",
+ "nodes": 3,
+ "cols": 3,
+ "subs": 3,
+ "cards": [
+  {
+   "key": "flow:0:execute:1:t1",
+   "task": "1",
+   "side": "left",
+   "state": "doing",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 254,
+   "right": 187.5,
+   "bottom": 307,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:0:execute:1:t2",
+   "task": "2",
+   "side": "right",
+   "state": "doing",
+   "column": "2",
+   "height": 53,
+   "left": 195.5,
+   "top": 254,
+   "right": 379,
+   "bottom": 307,
+   "wordCut": false,
+   "lines": 1
+  },
+  {
+   "key": "flow:0:execute:1:t3",
+   "task": "3",
+   "side": "left",
+   "state": "doing",
+   "column": "1",
+   "height": 53,
+   "left": 4,
+   "top": 331,
+   "right": 187.5,
+   "bottom": 384,
+   "wordCut": false,
+   "lines": 1
+  }
+ ],
+ "heads": [
+  {
+   "kind": "start",
+   "state": "done",
+   "top": 138,
+   "bottom": 172
+  },
+  {
+   "kind": "execute",
+   "state": "doing",
+   "top": 196,
+   "bottom": 230
+  },
+  {
+   "kind": "end",
+   "state": "pending",
+   "top": 408,
+   "bottom": 442
+  }
+ ],
+ "headCuts": 0,
+ "cardsCut": 0,
+ "wires": 6,
+ "wirePaths": [
+  "M192 34 L192 58",
+  "M192 92 L192 104 L96 104 L96 116",
+  "M192 92 L192 104 L287 104 L287 116",
+  "M192 92 L192 181 L96 181 L96 193",
+  "M96 169 L96 181 L190 181 L190 258 L192 258 L192 270",
+  "M287 169 L287 258 L192 258 L192 270",
+  "M96 246 L96 258 L192 258 L192 270"
+ ],
+ "retries": 0,
+ "crossings": [],
+ "scrollWidth": 390,
+ "clientWidth": 390,
+ "flowWidth": 383,
+ "subsColumns": "183.5px 183.5px",
+ "colsDirection": "column"
+}

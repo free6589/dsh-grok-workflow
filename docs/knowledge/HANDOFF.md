@@ -1,3 +1,48 @@
+## 2026-11-26 — **进度页手机排版换成树**（分支 `fix/flowchart-mobile-tree`，基点 `33c170b`，全部改动**还在工作树里、一颗提交都没提**）：`lib/client.js` 是同一块里重建的、必须跟源码**一次提交**；分支 24 小时内合或删；手机读数是**模拟屏**，真机没跑
+
+- **From:** 记忆施工者（`agent-210/memory`）· **To:** 合并这条分支的人 / 下一个接手进度页的人
+- **这条分支现在是什么**：从 `main` 的尖端 `33c170b` 长出，**自己零提交**；工作树里 7 个文件、`src` / `lib` 各 **+258 −20**：
+  `src/client/index.js`（`@media (max-width: 720px)` 与 `data-gw-progress-branch-side`、`measureProgressFlowWires()` 前九个几何助手）、
+  `lib/client.js`（构建产物）、四份浏览器 spec（`progress-connector` +135 / `progress-lanes` +73 / `progress-flow` +157 −45 /
+  `client.spec` +20 −5）、`docs/knowledge/DESIGN-progress-tab.md` 的 §24。用户看到的一件事：**窄于 720px 时进度页是一条腿一行的树**
+  （任务挂两条轨、名字折行不被截、线画出叉与收回），**宽于 720px 一个字没变**。
+- **合的时候一条硬要求**：`lib/client.js` 与 `src/client/index.js` **必须同一次提交**，而且必须是**同一次构建的产物**——
+  本块两者**同哈希** `586c24c2…dab223`、各 **386534** 字节（本轮自己 `sha256sum` / `wc -c` 读过）。
+  只提源码不提产物会让 `test/client.spec.ts` 里那条 `ships lib/client.js byte-identical to the source` 变红——
+  **这条红本块真的见过一次**（重建前定向那组 `1 failed | 340 passed (341)`），转绿就是 `npm run build` 之后。
+- **分支存活期**：**24 小时内合或删**（`AGENTS.md` §5）。别把它留成 litter，也别在这个分支上顺手抬版本——
+  本块**没 bump、没 push、没打 tag、没 publish**，`package.json` 仍是 `0.13.49`；版本抬升与发版是另一块的事。
+- **合之前值得知道的四件事**：
+  1. **桌面那半不需要重跑读数**：>720px 的矩阵、`--gw-lanes` 的 `grid-template-rows`、每格内联 `grid-row` 全没动，
+     1400px 上逐 lane `top` 仍是 `176/176/176`、`208/208/208`、`240/240/240`（极差 0 px）。
+  2. **手机那半的契约是「样式表文本 + 一个属性」**：`test/progress-connector.spec.ts` 直接读样式表字符串里那几行
+     （`height: auto`、`min-height: 34px`、`white-space: normal`、`overflow-wrap: anywhere`、`grid-row: auto !important`），
+     改文案式的东西会让它红——那是故意的。
+  3. **`DESIGN-progress-tab.md` §24 本轮按代码校正过两处**：横杆的纵坐标是「自己那个目标上方空档的**中点**」
+     （不是固定 8px / 16px，真机 24px 空档上是 12/12），以及「任务名可用 145/160/171px」那一组是**效果图**的读数、
+     不是真页面的读数（真页面 360px 两轨各 168.5px、390px 各 183.5px）。写记忆时别把这两条改回去。
+  4. **连线数量读 `wirePaths`，不要读 `wires`**：装置报的 `wires` 是 `paths.length - 1`，少算「起点进第一条腿」那一根，
+     所以三张屏的真实条数是 **1 / 7 / 21**（报告里写成 `0 / 6 / 20`）。
+- **一次性 scratch，可整棵删**：`.tmp/soak/`（**109M**：克隆出来的 `dsh-home`、那个 tgz、驱动脚本、两份 server 日志、`work/`）
+  与 `.tmp/mock/`（效果图与它的截图）。两者都在 `.tmp/` 下、被 `.gitignore` 挡住；**删掉不影响证据**——
+  `soak/*.png`、`soak/*.json` 与 `mock/` 里那三张已经复制进 `.rsi/evidence/mobile-tree-2026-11-26/`，每条读数都能回指到它们。
+  隔离实例（端口 **3402**）收尾时已经关掉，`curl` 读 `000`。
+- **一处必须记住的界面缺口（不是这一块的缺陷，但读者会撞上）**：390px 下宿主机把 `对话 / 轨迹 / 进度` 三个页签收进 `···`
+  溢出菜单，所以这三张手机读数的是**在 1100px 打开「进度」页签、再把窗口缩到 390** 拍下来的。缩完之后页面**就是**手机页
+  （断点纯 CSS、连线层在 resize 上重测），但「一个手机用户在 390px 下用手指点到这个页签」这条路径本轮**没走通**——
+  谁要接着做，得先动宿主那一层的溢出菜单，那是另一块的事。
+- **真机没跑，是操作者拍的**：原话「永远不用真手机，电脑模拟手机屏（360/390 CSS px 真浏览器渲染）即可」。
+  `100.111.111.120:5555` 那台 adb 连得上，但它停在安全锁屏（先防误触遮罩、再 PIN 页），截图只能拿到锁屏，
+  所以真机那一格是 **`NOT_RUN` / 截图 `BLOCKED`**；本轮**没有一句是真机读数**，别读成「真机也验过」。
+- **没做的两件事照实说**：`npm run ci`（整份门禁）与 `npm run verify:lib` 都是 **`NOT_RUN`**——`AGENTS.md` §12 规定
+  整份门禁只在发布提交上跑一次，本块只跑了 typecheck + lint + 碰到的 spec；那四份的转录已经随证据入库
+  （`.rsi/evidence/mobile-tree-2026-11-26/gate-tsc.out` / `gate-lint.out` / `gate-specs.out` / `gate-full.out`，
+  末行分别是 `TSC_EXIT=0` / `LINT_EXIT=0` / `SPECS_EXIT=0` / `FULL_EXIT=0`），所以
+  `105 files / 2045 passed` 与 `15 warnings / 0 errors` 都能按行回指，不需要重跑才能信。
+- **证据在哪儿**：`.rsi/evidence/mobile-tree-2026-11-26/`——`README.md` 是逐条读数、口径、留白与红线；
+  `soak/`（三张 390 手机屏 + 360 + 1400 + `console.json` + `shots.json`）；`mock/`（效果图三张 + 它自己的 `README.md`）。
+  设计契约 `docs/knowledge/DESIGN-progress-tab.md` §24，产品决定 `D-170`。
+
 ## 2026-11-26 — **`0.13.49` 已发布并收口**（发布提交 `88adda8`、`main` = `origin/main` = `88adda8`、附注标签 `v0.13.49`、Release 已出；门禁 `GATE_EXIT=0`、两个远端 run success）：**只剩一件事没做——live 档案钉到 `v0.13.49`**，本会话写不进去（`BLOCKED`）
 
 - **From:** 记忆施工者（`agent-209/memory`）· **To:** 本机能写 `~/.dsh` 的人（live 钉版本）

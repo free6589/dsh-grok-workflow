@@ -1,0 +1,208 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-mobile-tree
+
+ ✓ test/timeout.spec.ts (22 tests) 12148ms
+     ✓ settles a hung call as a timeout and retries the task instead of failing the run  1062ms
+     ✓ extends a stalled call once the guardian says wait, and the child still wins  2505ms
+     ✓ kills the stalled call when the guardian says kill, and the task still retries  1004ms
+     ✓ stops granting waits at the run deadline without asking the guardian again (rule B)  3004ms
+     ✓ broadcasts a rescue line when the guardian says rescue, and grants the slice  2505ms
+     ✓ fails a stalled call straight to retry when no guardian is configured  1005ms
+     ✓ settles a hung call within budget in a realm with no timer at all  1010ms
+ ✓ test/taskboard.spec.ts (26 tests) 7161ms
+     ✓ creates a pending unowned row at version 1 and persists status/owner/deps/version  408ms
+     ✓ walks the full state machine, including blocked requeue to pending  586ms
+     ✓ applies only on a matching expectedVersion and reports both versions on conflict  395ms
+     ✓ concurrent claims on different rows keep both rows (no lost update)  536ms
+     ✓ reopening the same directory recovers status/owner/dependencies/version  435ms
+     ✓ blocks claim while a predecessor is unfinished and releases it when done  484ms
+     ✓ assign and setDependencies re-check the wiring  405ms
+     ✓ an interrupted write leaves the last committed store authoritative and its temp file inert  303ms
+     ✓ recovers a real board after a writer process is SIGKILLed mid-mutation  1055ms
+ ✓ test/block-ledger.spec.ts (20 tests) 2424ms
+     ✓ 同一 id 写到第 20 版后，第 21 版报 version-limit 且账本仍是 20 行  1199ms
+ ✓ test/block-tools.spec.ts (23 tests) 3262ms
+     ✓ vetoes a three-line handoff without spending a model call  316ms
+     ✓ passes a complete handoff through the judge and accepts the block  318ms
+     ✓ returns the same verdict for the same evidence instead of a second line  506ms
+     ✓ judges by default when the row carries no switch at all  339ms
+     ✓ refuses a dispatcher block and names the way to reach it  306ms
+(node:105) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/planner-resubmit.spec.ts (12 tests) 3278ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1008ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1024ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1020ms
+ ✓ test/checkpoint-schema.spec.ts (38 tests) 1956ms
+     ✓ reads back a payload the writer accepted above the row-count ceiling  303ms
+     ✓ bounds the payload by the file bound minus the integrity record  802ms
+(node:133) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/dead-routes.spec.ts (24 tests) 2233ms
+     ✓ counts a call that hung, even though a hang does not switch models  2022ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 1983ms
+     ✓ SIGKILLs a run mid-task, then restarts from disk with exactly-once completion and preserved evidence  1566ms
+ ✓ test/checkpoint-wiring.spec.ts (44 tests) 2215ms
+ ✓ test/checkpoint-bound.spec.ts (5 tests) 1638ms
+     ✓ measures the integrity record and derives the payload ceiling from it  659ms
+     ✓ writes at the payload ceiling and reads the file back intact  407ms
+     ✓ refuses one payload byte above the ceiling as too large  553ms
+ ✓ test/plugin-lifecycle.spec.ts (19 tests) 1809ms
+ ✓ test/block-supervisor.spec.ts (20 tests) 1979ms
+ ✓ test/dispatcher.spec.ts (19 tests) 1668ms
+     ✓ resume restores the persisted board from disk  623ms
+ ✓ test/delivery-human-block.spec.ts (46 tests) 1203ms
+     ✓ stays inside the cap for every knob, in both language orders  576ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 1753ms
+     ✓ records what it cancelled before it cancels it  405ms
+     ✓ keeps a process-wide backstop and names the sessions holding it  300ms
+ ✓ test/unload-drain.spec.ts (5 tests) 989ms
+     ✓ settles the child call already running before it cancels the run  388ms
+(node:260) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run with no extra child calls from the resume scan
+[smoke] status=completed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-mobile-tree/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-ffc42c7a-a17d-45e8-bee7-b50b57f2d1ca-ed1c3131.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-mobile-tree/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-ead62e7a-1d21-4733-b794-7ed6c461a055-e64c652f.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (6 tests) 1833ms
+     ✓ records a verified run with no extra child calls from the resume scan  443ms
+     ✓ carries this session's cancelled checkpoint into the next run  304ms
+     ✓ starts fresh when the leftover may still be live  303ms
+     ✓ does not inherit another session's crash  308ms
+     ✓ lets an explicit caller carry-over outrank the leftover  302ms
+ ✓ test/m3-intake.spec.ts (19 tests) 816ms
+ ✓ test/block-preview.spec.ts (93 tests) 839ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 1147ms
+(node:310) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:310) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:310) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/block-flag.spec.ts (11 tests) 641ms
+(node:321) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (20 tests) 734ms
+ ✓ test/timeout-config.spec.ts (12 tests) 832ms
+     ✓ fires a configured 3600000 ms deadline with a Timeout report naming the bound  338ms
+ ✓ test/dispatcher-board.spec.ts (4 tests) 922ms
+     ✓ keeps a mark-blocked reason across a reload via the board detail  310ms
+ ✓ test/heartbeat-guard.spec.ts (15 tests) 811ms
+ ✓ test/objective-limit.spec.ts (12 tests) 1053ms
+ ✓ test/board-reader.spec.ts (2 tests) 407ms
+     ✓ maps in_progress→running and failed→blocked with the detail as blockedReason  374ms
+(node:954) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/replan.spec.ts (25 tests) 622ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ✓ test/client.spec.ts (153 tests) 454ms
+(node:974) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/experience-pack.spec.ts (26 tests) 514ms
+ ✓ test/profile-clone.spec.ts (6 tests) 375ms
+ ✓ test/guardian.spec.ts (29 tests) 648ms
+ ✓ test/reliability.spec.ts (19 tests) 432ms
+(node:1071) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 1188ms
+     ✓ records run-start, one row per subagent, then run-end  400ms
+ ✓ test/issue-watch.spec.ts (2 tests) 313ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 256ms
+ ✓ test/config-limits-repair.spec.ts (28 tests) 251ms
+(node:1290) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/naming-sequence.spec.ts (6 tests) 249ms
+ ✓ test/waves.spec.ts (28 tests) 252ms
+ ✓ test/iterate-plan.spec.ts (21 tests) 355ms
+ ✓ test/steering-inbox.spec.ts (14 tests) 475ms
+     ✓ hands the message from the inbox to the boundary pull, and closes with the run  303ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 286ms
+ ✓ test/orchestrator.spec.ts (26 tests) 223ms
+(node:1431) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/null-collapse.spec.ts (29 tests) 229ms
+(node:1453) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/summary-outcome.spec.ts (16 tests) 208ms
+ ✓ test/command.spec.ts (27 tests) 202ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 197ms
+ ✓ test/paths.spec.ts (18 tests) 186ms
+ ✓ test/update-entry.spec.ts (20 tests) 162ms
+ ✓ test/routing.spec.ts (25 tests) 162ms
+ ✓ test/synthesis-guardrails.spec.ts (18 tests) 156ms
+ ✓ test/loader.spec.ts (3 tests) 148ms
+(node:1518) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 147ms
+(node:1526) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 141ms
+ ✓ test/wave4-acceptance.spec.ts (8 tests) 140ms
+ ✓ test/report-audit.spec.ts (13 tests) 130ms
+ ✓ test/inheritance.spec.ts (16 tests) 134ms
+ ✓ test/final-answer-rewrite.spec.ts (12 tests) 127ms
+ ✓ test/block-flag-baseline.spec.ts (14 tests) 130ms
+ ✓ test/carryover.spec.ts (22 tests) 127ms
+ ✓ test/config.spec.ts (50 tests) 115ms
+ ✓ test/redact.spec.ts (47 tests) 108ms
+ ✓ test/captain-memory.spec.ts (8 tests) 103ms
+ ✓ test/loop-surface.spec.ts (21 tests) 102ms
+ ✓ test/judge-leg-retry.spec.ts (9 tests) 91ms
+ ✓ test/verifier-resubmit.spec.ts (8 tests) 92ms
+ ✓ test/naming.spec.ts (18 tests) 85ms
+(node:1639) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 88ms
+ ✓ test/mode-surface.spec.ts (25 tests) 81ms
+ ✓ test/loop.spec.ts (35 tests) 73ms
+ ✓ test/loop-brakes.spec.ts (33 tests) 69ms
+ ✓ test/update-surface.spec.ts (29 tests) 67ms
+ ✓ test/compact-step-pairing.spec.ts (7 tests) 61ms
+ ✓ test/records-redaction.spec.ts (3 tests) 57ms
+ ✓ test/progress-flow.spec.ts (45 tests) 53ms
+(node:1698) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1698) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:1698) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/composition.spec.ts (8 tests) 49ms
+ ✓ test/progress-tab.spec.ts (72 tests) 44ms
+ ✓ test/progress-connector.spec.ts (17 tests) 44ms
+ ✓ test/progress-lanes.spec.ts (40 tests) 35ms
+ ✓ test/delivery.spec.ts (15 tests) 29ms
+ ✓ test/report.spec.ts (45 tests) 27ms
+ ✓ test/force-team.spec.ts (21 tests) 26ms
+ ✓ test/heartbeat-identity.spec.ts (16 tests) 23ms
+ ✓ test/settings-projection.spec.ts (4 tests) 108ms
+ ✓ test/config-removed-keys.spec.ts (7 tests) 21ms
+ ✓ test/docs-config-keys.spec.ts (14 tests) 17ms
+ ✓ test/report-ledger-parity.spec.ts (8 tests) 16ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 16ms
+ ✓ test/resume-validator.spec.ts (20 tests) 14ms
+ ✓ test/progress-hint-absent.spec.ts (7 tests) 14ms
+ ✓ test/panel-links.spec.ts (16 tests) 13ms
+ ✓ test/docs-version.spec.ts (8 tests) 13ms
+ ✓ test/mode.spec.ts (16 tests) 12ms
+ ✓ test/handoff.spec.ts (15 tests) 12ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+ ✓ test/i18n-parity.spec.ts (8 tests) 11ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 9ms
+ ✓ test/iterate.spec.ts (9 tests) 11ms
+ ✓ test/config-notices-route.spec.ts (8 tests) 8ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/child-evidence.spec.ts (15 tests) 7ms
+ ✓ test/upstream.spec.ts (8 tests) 6ms
+ ✓ test/intake.spec.ts (9 tests) 6ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+
+ Test Files  105 passed (105)
+      Tests  2045 passed (2045)
+   Start at  15:04:39
+   Duration  89.53s (transform 2.50s, setup 0ms, import 8.44s, tests 69.22s, environment 11ms)
+
+FULL_EXIT=0

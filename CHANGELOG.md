@@ -5,6 +5,33 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **On a phone the progress figure is a tree now: one leg per line, its tasks on two rails, and names wrap instead of being cut / 手机上进度图变成一棵树：一条腿一整行，任务挂在两条轨上，任务名折行而不是被截断** —
+  Below 720 px the progress page stops squeezing the lane matrix into a phone: each leg takes a full-width line of its own, and
+  the plan tasks that leg walked hang under it on two rails — left for the first, third, fifth, right for the second, fourth,
+  and one task alone under its head spans both. Task cards grow and wrap (`height: auto`, `white-space: normal`,
+  `overflow-wrap: anywhere`), and the task name gets a whole line of its own under the row that holds the attempt dots, the
+  `第 N 遍` badge and the expand control, so a name is never chewed by a badge again (measured at 360 px: no card cut, no leg
+  word cut, `scrollWidth === clientWidth`). The wires draw the topology instead of a chain: a leg's head forks once into each
+  of its own cards and every card merges once into the next leg's head, so three parallel tasks read as three branches that
+  come back together rather than one stroke down the middle; a leg that walked no task keeps its one straight line, and a
+  wire that could only reach its target through a card is left out rather than drawn over it. **Above 720 px nothing changes**:
+  the matrix (one column per leg, one row per task number) is the same figure it was, down to the measured row alignment.
+  **Nothing in the data model changed** — no session event, no counter, no typed API; the phone layout is a media query plus
+  one attribute that the desktop matrix never reads.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 窄于 720 px 时，进度页不再把泳道矩阵硬塞进手机：一条腿占一整行，这条腿走过的计划任务挂在它下面**两条轨**上——
+  第一、三、五个走左轨，第二、四、六个走右轨，腿下只有一张卡时那张卡跨两轨。任务卡会长高并折行
+  （`height: auto`、`white-space: normal`、`overflow-wrap: anywhere`），任务名独占整行，排在「尝试点 + `第 N 遍` 角标 +
+  展开箭头」那一行下面，所以名字不再被角标啃掉（360 px 实测：被截的卡 0 张、被截的腿词 0 个、`scrollWidth === clientWidth`）。
+  连线画的是**拓扑**而不是一条链：腿头分叉出去、每张卡各收回一次到下一张腿头，所以三个并行任务读起来是三条分支再汇合，
+  而不是中间一根竖线；没有走过任务的腿保留它那一根直线，一根只能穿过卡片才够得着目标的线**不画**，而不是压在卡上画。
+  **宽于 720 px 一个字没变**：矩阵（一列一条腿、一行一个任务号）还是原来那张图，连逐行对齐的实测极差都一样。
+  **数据模型没动**：没有新的会话事件、没有新的计数、类型侧一个 API 都没改；手机排版就是一段 media query
+  加一个桌面矩阵从不读的属性。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.49] - 2026-11-26
 
 ### Added / 新增

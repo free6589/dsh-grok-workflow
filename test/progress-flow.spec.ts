@@ -19,7 +19,10 @@ import { describe, expect, it } from 'vitest'
  *    clock, the gate chip, the word and the capsule. The two hooks are per node.
  * 4. **Measured wires, never invented.** `svg.gw-progress-wires` is `aria-hidden`, painted
  *    behind the nodes, and drawn from positions measured after layout: a host with no
- *    layout (this stub) gets an empty layer instead of coordinates nobody saw.
+ *    layout (this stub) gets an empty layer instead of coordinates nobody saw. The layout a
+ *    reader is looking at decides the figure — legs side by side keep the matrix's chain,
+ *    and a leg stacked under another is a tree: its head fans into the cards it walked and
+ *    those cards rejoin the next leg.
  * 5. **Colour is the state.** Each state has exactly one `--dsw-alias-*` token, the
  *    unreached node is the only dashed one, the current one is the only one that moves, and
  *    no rule on the page carries a literal colour, an error token or a sideways scroller.
@@ -77,7 +80,7 @@ interface Bundle {
     measureWires: (flow: unknown) => {
       width: number
       height: number
-      /** Wires between neighbouring columns and between one task's cells. */
+      /** Wires between neighbouring columns, between one task's cells, and around the branches of a stacked leg. */
       paths: Array<Array<[number, number]>>
       /** The dashed steps between two attempts of one task, drawn in the same layer. */
       retries: Array<Array<[number, number]>>
@@ -561,7 +564,7 @@ describe('client progress tab: the flow is a lane matrix', () => {
     expect(running.map((node) => attr(node, 'data-state'))).toEqual(['done', 'done', 'done', 'doing', 'pending'])
   })
 
-  it('wraps the columns on a narrow screen instead of letting them overflow', () => {
+  it('stacks the legs into a tree on a narrow screen instead of letting them overflow', () => {
     const cols = ruleOf('.gw-progress-cols')
     expect(cols, 'the column list has no rule').toBeDefined()
     expect(cols).toContain('display: flex')
@@ -569,10 +572,23 @@ describe('client progress tab: the flow is a lane matrix', () => {
     expect(cols).toContain('gap: 12px')
     const narrow = mediaBlock('max-width: 720px')
     expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
-    // Two columns a row under 720px, one under 480px: a column narrows, it never scrolls.
-    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 calc\(50% - 4px\)/)
+    // One leg a line at full width under 720px: a column narrows instead of squeezing the
+    // six of them into slivers, and its tasks hang under it on two rails.
+    expect(narrow).toMatch(/\.gw-progress-cols \{[^}]*flex-direction: column/)
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*width: 100%/)
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    for (const [side, column] of [['left', '1'], ['right', '2'], ['none', '1 / -1']]) {
+      expect(narrow, `no rail rule for ${side}`)
+        .toContain(`.gw-progress-sub[data-gw-progress-branch-side="${side}"] { grid-column: ${column}; }`)
+    }
+    // And no word is cut there: the cell grows in height and its name wraps.
+    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*height: auto/)
+    expect(narrow).toMatch(/\.gw-progress-sub-word \{[^}]*white-space: normal/)
+    // The narrower breakpoint keeps the same tree: it only stacks the dock and drops a call
+    // line's clock column, so 480px never re-lays the flow a second time.
     const tiny = mediaBlock('max-width: 480px')
-    expect(tiny).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 100%/)
+    expect(tiny).not.toMatch(/\.gw-progress-col \{/)
+    expect(tiny).not.toMatch(/\.gw-progress-subs \{/)
     // No width is ever forced on the page: a node shrinks instead of pushing the page wide.
     expect(ruleOf('.gw-progress-node')).toContain('min-width: 0')
     expect(ruleOf('.gw-progress-node')).toContain('max-width: 100%')
@@ -776,8 +792,8 @@ describe('client progress tab: the wires are measured, never invented', () => {
   type Lane = { lane: number, x: number, y: number, w: number, h: number, dots?: ReadonlyArray<Dot> }
   type Column = { x: number, y: number, w: number, h: number, cells?: ReadonlyArray<Lane> }
 
-  function matrix(columns: ReadonlyArray<Column>): { flow: unknown } {
-    const frame = { left: 0, top: 0, width: 1000, height: 400 }
+  function matrix(columns: ReadonlyArray<Column>, width = 1000): { flow: unknown } {
+    const frame = { left: 0, top: 0, width, height: 400 }
     const box = (r: { x: number, y: number, w: number, h: number }) => ({
       left: r.x,
       top: r.y,
@@ -880,45 +896,132 @@ describe('client progress tab: the wires are measured, never invented', () => {
     ])
   })
 
-  it('elbows a lane pair that wrapped, and draws nothing on a host without layout', () => {
-    // The second column wrapped onto the next row and sits to the right of the first: the
-    // two cells share neither a row nor a column, so the line is an elbow — down, across,
-    // down — rather than a diagonal nobody drew.
-    const wrapped = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
-      { x: 0, y: 0, w: 100, h: 70, cells: [{ lane: 1, x: 0, y: 38, w: 100, h: 26 }] },
-      { x: 300, y: 80, w: 100, h: 70, cells: [{ lane: 1, x: 300, y: 118, w: 100, h: 26 }] },
-    ]).flow)
-    // head→head and task 1 → task 1, both elbowed.
-    expect(wrapped.paths).toHaveLength(2)
-    const lane = wrapped.paths[1]!
-    expect(lane).toHaveLength(4)
-    expect(lane[0]).toEqual([50, 64])
-    expect(lane[1]).toEqual([50, 91])
-    expect(lane[2]).toEqual([350, 91])
-    expect(lane[3]).toEqual([350, 118])
+  /** Whether one wire's own legs run through a card: the fan a reader cannot follow. */
+  function crosses(path: ReadonlyArray<readonly [number, number]>, card: { x: number, y: number, w: number, h: number }): boolean {
+    for (let index = 0; index + 1 < path.length; index += 1) {
+      const from = path[index]!
+      const to = path[index + 1]!
+      if (from[0] === to[0]) {
+        if (from[0] > card.x + 0.5 && from[0] < card.x + card.w - 0.5
+          && Math.min(from[1], to[1]) < card.y + card.h - 0.5
+          && Math.max(from[1], to[1]) > card.y + 0.5) return true
+        continue
+      }
+      if (from[1] > card.y + 0.5 && from[1] < card.y + card.h - 0.5
+        && Math.min(from[0], to[0]) < card.x + card.w - 0.5
+        && Math.max(from[0], to[0]) > card.x + 0.5) return true
+    }
+    return false
+  }
 
-    // Two tasks in both columns, one column wrapped below and to the right: each elbow lands
-    // on the cell with the same number, not on the cell that happens to be first.
-    const twoLanes = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
-      { x: 0, y: 0, w: 100, h: 102, cells: [{ lane: 1, x: 0, y: 38, w: 100, h: 26 }, { lane: 2, x: 0, y: 70, w: 100, h: 26 }] },
-      { x: 300, y: 100, w: 100, h: 102, cells: [{ lane: 1, x: 300, y: 138, w: 100, h: 26 }, { lane: 2, x: 300, y: 170, w: 100, h: 26 }] },
-    ]).flow)
-    expect(twoLanes.paths).toHaveLength(3)
-    expect(twoLanes.paths[1]).toEqual([[50, 64], [50, 101], [350, 101], [350, 138]])
-    expect(twoLanes.paths[2]).toEqual([[50, 96], [50, 133], [350, 133], [350, 170]])
+  it('draws a stacked leg as a tree: a wire into every branch, a wire out of every branch', () => {
+    // The phone's figure: one leg a row, so the next leg's head starts below this leg's last
+    // card. The leg walked three tasks, drawn side by side across its own band.
+    const cards = [
+      { lane: 1, x: 4, y: 38, w: 96, h: 26 },
+      { lane: 2, x: 112, y: 38, w: 96, h: 26 },
+      { lane: 3, x: 220, y: 38, w: 96, h: 26 },
+    ]
+    const tree = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 4, y: 0, w: 312, h: 64, cells: cards },
+      { x: 4, y: 72, w: 312, h: 32, cells: [] },
+    ], 320).flow)
+    // Six wires, and never one stroke down the middle: three leave the head's bottom centre
+    // (160, 32) for a card's top centre, three leave a card's bottom centre for the next
+    // head's top centre (160, 72).
+    expect(tree.paths).toHaveLength(6)
+    expect(tree.paths.every((points) => points.length === 2 || points.length === 4)).toBe(true)
+    const forks = tree.paths.filter((points) => points[0]![0] === 160 && points[0]![1] === 32)
+    const merges = tree.paths.filter((points) => points[points.length - 1]![0] === 160 && points[points.length - 1]![1] === 72)
+    expect(forks).toHaveLength(3)
+    expect(merges).toHaveLength(3)
+    // Every card is arrived at once from above and left once from below, so the three
+    // branches stay three parallel wires instead of collapsing into one.
+    for (const card of cards) {
+      const centre = card.x + card.w / 2
+      expect(forks.filter((points) => points[points.length - 1]![0] === centre && points[points.length - 1]![1] === card.y)).toHaveLength(1)
+      expect(merges.filter((points) => points[0]![0] === centre && points[0]![1] === card.y + card.h)).toHaveLength(1)
+    }
+    // The elbow is "down, across, down": out of the head, across inside the gap the head
+    // leaves over the cards, and down onto the card's own top.
+    expect(forks).toContainEqual([[160, 32], [160, 35], [52, 35], [52, 38]])
+    for (const path of tree.paths) {
+      for (const card of cards) expect(crosses(path, card), `a wire runs through the card at ${card.x}`).toBe(false)
+    }
+  })
 
-    // A column directly under its neighbour is a plain vertical line, not an elbow.
-    const below = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
-      { x: 0, y: 0, w: 200, h: 70, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26 }] },
-      { x: 0, y: 80, w: 200, h: 70, cells: [{ lane: 1, x: 0, y: 118, w: 200, h: 26 }] },
-    ]).flow)
-    expect(below.paths[1]).toEqual([[100, 64], [100, 118]])
+  it('routes a branch beside the cards when they stack, instead of through a card', () => {
+    // Two cards side by side and a third under them: a straight drop from the head would run
+    // over the first two, so the wire leaves by the figure's own padding and comes back in
+    // over the third card's band. Still a fork of three and a merge of three.
+    const cards = [
+      { lane: 1, x: 4, y: 38, w: 150, h: 26 },
+      { lane: 2, x: 166, y: 38, w: 150, h: 26 },
+      { lane: 3, x: 4, y: 70, w: 312, h: 26 },
+    ]
+    const tree = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 4, y: 0, w: 312, h: 96, cells: cards },
+      { x: 4, y: 104, w: 312, h: 32, cells: [] },
+    ], 320).flow)
+    expect(tree.paths).toHaveLength(6)
+    for (const path of tree.paths) {
+      for (const card of cards) expect(crosses(path, card), `a wire runs through the card at ${card.x}, ${card.y}`).toBe(false)
+    }
+    // The first two cards cannot drop straight to the next head: the third card is under
+    // them. They leave by the figure's own padding and travel down it together, so the merge
+    // is one bus that two branches feed, not two strokes drawn through a card.
+    const bypassed = tree.paths.filter((points) => points.some((point) => point[0] === 2))
+    expect(bypassed).toHaveLength(2)
+    // Each of the three cards is still reached from above and left from below.
+    expect(tree.paths.filter((points) => [38, 70].includes(points[points.length - 1]![1]))).toHaveLength(3)
+  })
 
+  it('drops one line down a lone card, and hands a leg with no cards straight on', () => {
+    // One card under its own head is a branch of one: straight down the centre, with no
+    // sideways elbow that would claim there were others.
+    const lone = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 4, y: 0, w: 312, h: 64, cells: [{ lane: 1, x: 4, y: 38, w: 312, h: 26 }] },
+      { x: 4, y: 72, w: 312, h: 32, cells: [] },
+    ], 320).flow)
+    expect(lone.paths).toEqual([[[160, 32], [160, 38]], [[160, 64], [160, 72]]])
+    // A leg with no cards has nothing to fan into: one line, head to head, no invented fork.
+    const empty = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 4, y: 0, w: 312, h: 32, cells: [] },
+      { x: 4, y: 40, w: 312, h: 32, cells: [] },
+    ], 320).flow)
+    expect(empty.paths).toEqual([[[160, 32], [160, 40]]])
+  })
+
+  it('reads the layout off the boxes: the same two legs on one row are still a chain', () => {
+    // The layout decides, not a width: two legs side by side keep the chain the desktop
+    // matrix draws — head to head, then task to task — and only a leg that starts below its
+    // predecessor is read as a branch.
+    const row = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 100, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26 }] },
+      { x: 212, y: 0, w: 200, h: 100, cells: [{ lane: 1, x: 212, y: 38, w: 200, h: 26 }] },
+    ]).flow)
+    expect(row.paths).toEqual([[[200, 16], [212, 16]], [[200, 51], [212, 51]]])
+    // The same boxes with the second leg moved under the first: a fork and a merge.
+    const stacked = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 64, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26 }] },
+      { x: 0, y: 72, w: 200, h: 100, cells: [{ lane: 1, x: 0, y: 110, w: 200, h: 26 }] },
+    ]).flow)
+    expect(stacked.paths).toEqual([[[100, 32], [100, 38]], [[100, 64], [100, 72]]])
+  })
+
+  it('draws nothing on a host without layout, and does not throw', () => {
     // Every element present, no box measurable: no wire at all, and no exception.
     const flat = { querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }) }
     expect(progress.measureWires(flat).paths).toEqual([])
     const sized = matrix([{ x: 0, y: 0, w: 0, h: 0, cells: [{ lane: 1, x: 0, y: 0, w: 0, h: 0 }] }])
     expect(progress.measureWires(sized.flow).paths).toEqual([])
+    // A stacked leg whose card measures nothing is a leg with no cards: the one line, and no
+    // fork invented to cover the gap where a card's box would have been.
+    const blind = matrix([
+      { x: 4, y: 0, w: 312, h: 32, cells: [{ lane: 1, x: 4, y: 38, w: 0, h: 0 }] },
+      { x: 4, y: 40, w: 312, h: 32, cells: [] },
+    ], 320)
+    expect(progress.measureWires(blind.flow).paths).toEqual([[[160, 32], [160, 40]]])
   })
 
   it('lays the layer over the flow without taking a click', () => {
@@ -1496,17 +1599,26 @@ describe('client progress tab: the lane matrix, drawn to the contract’s number
     expect(progress.css).not.toContain('overflow-x')
   })
 
-  it('wraps the columns on a narrow screen and still connects them', () => {
+  it('stacks the legs on a narrow screen and still connects them', () => {
     const narrow = mediaBlock('max-width: 720px')
     expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
-    // Two columns a row; the elbow lines keep saying which column follows which.
-    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 calc\(50% - 4px\)/)
+    // One leg a line, its tasks on two rails: the fork and merge wires are drawn from the
+    // boxes this lays out, so the tree is what keeps them saying which leg follows which.
+    expect(narrow).toMatch(/\.gw-progress-cols \{[^}]*flex-direction: column/)
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*width: 100%/)
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    for (const [side, column] of [['left', '1'], ['right', '2'], ['none', '1 / -1']]) {
+      expect(narrow, `no rail rule for ${side}`)
+        .toContain(`.gw-progress-sub[data-gw-progress-branch-side="${side}"] { grid-column: ${column}; }`)
+    }
+    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*height: auto/)
     expect(narrow).not.toMatch(/\.gw-progress-wires \{[^}]*display: none/)
-    // Under 480px a column takes the whole width, and a call line keeps one flexible
-    // column, so nothing scrolls sideways at any width.
+    // Under 480px the tree is untouched and a call line keeps one flexible column, so
+    // nothing scrolls sideways at any width.
     const tiny = mediaBlock('max-width: 480px')
     expect(tiny).not.toBe('')
-    expect(tiny).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 100%/)
+    expect(tiny).not.toMatch(/\.gw-progress-col \{/)
+    expect(tiny).not.toMatch(/\.gw-progress-subs \{/)
     expect(tiny).toMatch(/\.gw-progress-(?:node|sub)-calls \.gw-progress-log-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto/)
     expect(progress.css).not.toContain('overflow-x')
     expect(progress.css).not.toContain('scroll-snap')

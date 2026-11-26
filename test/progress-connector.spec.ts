@@ -406,3 +406,138 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
     expect(progress.css).toContain('var(--dsw-font-family-sans')
   })
 })
+
+/* ------------------------------------------------------ the phone is a tree -- */
+
+/**
+ * The matrix is a wall of columns; a phone cannot hold that wall.
+ *
+ * Six legs side by side squeezed each one to a sliver and every task name was cut to an
+ * ellipsis — that is the shape the reader complained about. Under 720px the flow therefore
+ * stops being a row of columns and becomes a tree: one leg per line at full width, and the
+ * tasks that leg walked hang under it on two rails. The desktop matrix is untouched, and
+ * these cases hold both halves of that: what the breakpoint must say, and what it must not
+ * take away from the page above it.
+ *
+ * The rail is written as `data-gw-progress-branch-side` on every cell at every width. The
+ * phone layout is one reader of it and the wire measurement is the other, so it is pinned
+ * here rather than left to whichever of them happens to run.
+ */
+describe('client progress tab: under 720px the matrix becomes a tree', () => {
+  /** Whether one element carries a hook of its own (a `false` value still counts). */
+  function carries(element: Element, hook: string): boolean {
+    return Object.prototype.hasOwnProperty.call(element.props, hook)
+  }
+
+  /** One cell's rail, as the page wrote it. */
+  function sideOf(cell: Element): unknown {
+    return cell.props['data-gw-progress-branch-side']
+  }
+
+  /** The task cells of one leg, in reading order. */
+  function cellsOf(run: ProgressRun, kind: string): Element[] {
+    const column = walk(renderRun(run))
+      .find((element) => element.props['data-gw-progress-col'] === kind)
+    expect(column, `the fixture drew no ${kind} column`).toBeDefined()
+    return walk(column!).filter((element) => carries(element, 'data-gw-progress-sub'))
+  }
+
+  /** A run whose execute leg walked three tasks and whose check leg walked two. */
+  const threeThenTwo: ProgressRun = {
+    runId: 'run-rails',
+    name: '任务团队 · 3 个任务',
+    anchorSeq: 1,
+    members: [
+      { seq: 1, label: '执行', childId: 'child-1', order: 0, phase: '任务 1 · 读代码', outcome: 'completed' },
+      { seq: 2, label: '执行', childId: 'child-2', order: 1, phase: '任务 2 · 改代码', outcome: 'completed' },
+      { seq: 3, label: '执行', childId: 'child-3', order: 2, phase: '任务 3 · 补测试', outcome: 'completed' },
+      { seq: 4, label: '检查', childId: 'child-4', order: 3, phase: '任务 1 · 读代码', outcome: 'completed' },
+      { seq: 5, label: '检查', childId: 'child-5', order: 4, phase: '任务 2 · 改代码' },
+    ],
+  }
+
+  it('puts every cell on a rail by its position, and a lone task on both', () => {
+    // 1 左、2 右、3 左：the tree alternates, so two rows of a leg read as one fan-out.
+    expect(cellsOf(threeThenTwo, 'execute').map(sideOf)).toEqual(['left', 'right', 'left'])
+    expect(cellsOf(threeThenTwo, 'check').map(sideOf)).toEqual(['left', 'right'])
+    // A leg that walked one task is one card across the whole width, not a card on a rail.
+    expect(cellsOf(run, 'execute').map(sideOf)).toEqual(['none'])
+    expect(cellsOf(run, 'check').map(sideOf)).toEqual(['none'])
+    // Every cell has one, and it is always one of the three — the wire measurement reads it
+    // on every host, including the desktop one where it means nothing.
+    for (const cell of [...cellsOf(threeThenTwo, 'execute'), ...cellsOf(run, 'execute')]) {
+      expect(['left', 'right', 'none']).toContain(sideOf(cell))
+    }
+  })
+
+  it('leaves the desktop matrix exactly as it was, inline task-number row and all', () => {
+    // Above 720px the cell's row is the task number, written inline: that is what makes one
+    // task sit on one line across every leg. The rail must not disturb it.
+    const rows = cellsOf(threeThenTwo, 'execute')
+      .map((cell) => (cell.props['style'] as Record<string, string> | undefined)?.['gridRow'])
+    expect(rows).toEqual(['1', '2', '3'])
+    const at = progress.css.indexOf('@media (max-width: 720px)')
+    expect(at, 'the 720px breakpoint is gone').toBeGreaterThan(0)
+    const wide = progress.css.slice(0, at)
+    // The attribute is inert up there: no rule outside the breakpoint may read it…
+    expect(wide).not.toContain('data-gw-progress-branch-side')
+    // …and the matrix keeps its own geometry: a wrapped row of columns with equal widths,
+    // and a cell list whose rows are the run's task numbers.
+    expect(wide).toMatch(/\.gw-progress-cols \{[^}]*flex-wrap: wrap/)
+    expect(wide).toMatch(/\.gw-progress-subs \{[^}]*grid-template-rows: repeat\(var\(--gw-lanes/)
+    expect(wide).toMatch(/\.gw-progress-sub \{[^}]*height: 26px/)
+  })
+
+  it('stacks one leg a line and hangs its tasks on two rails', () => {
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
+    // One leg per line, full width: nothing is squeezed down to a sliver.
+    expect(narrow).toMatch(/\.gw-progress-cols \{[^}]*flex-direction: column/)
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*width: 100%/)
+    // The cell list becomes the two rails, one row per pair of tasks.
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-rows: none/)
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*column-gap: 8px/)
+    // Each cell stands on the rail the attribute names, and a lone one spans both.
+    for (const [side, column] of [['left', '1'], ['right', '2'], ['none', '1 / -1']]) {
+      expect(narrow, `no rail rule for ${side}`)
+        .toContain(`.gw-progress-sub[data-gw-progress-branch-side="${side}"] { grid-column: ${column}; }`)
+    }
+    // The inline task-number row is the matrix's, not the tree's: it is overruled here.
+    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*grid-row: auto !important/)
+  })
+
+  it('lets the cards grow instead of cutting the words', () => {
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
+    for (const rule of ['.gw-progress-sub', '.gw-progress-node']) {
+      const line = narrow.split('\n').find((entry) => entry.trim().startsWith(`${rule} {`))
+      expect(line, `${rule} has no phone rule`).toBeDefined()
+      expect(line, `${rule} still fixes its height`).toContain('height: auto')
+      expect(line, `${rule} keeps a readable floor`).toContain('min-height: 34px')
+      expect(line, `${rule} still cuts its text`).toContain('text-overflow: clip')
+      expect(line, `${rule} still refuses to wrap`).toContain('white-space: normal')
+      expect(line, `${rule} still cannot break a long word`).toContain('overflow-wrap: anywhere')
+    }
+    // The word element is where the ellipsis lived, so that is what has to stop nowrap-ing.
+    for (const rule of ['.gw-progress-sub-word', '.gw-progress-node-word']) {
+      const line = narrow.split('\n').find((entry) => entry.trim().startsWith(`${rule} {`))
+      expect(line, `${rule} has no phone rule`).toBeDefined()
+      expect(line).toContain('white-space: normal')
+      expect(line).toContain('text-overflow: clip')
+    }
+    // A cell's name takes a line of its own: sharing one with the attempt count is what
+    // chewed the words in the first place.
+    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*grid-template-areas: "dots badge toggle" "word word word"/)
+    expect(narrow).toMatch(/\.gw-progress-sub-word \{[^}]*grid-area: word/)
+  })
+
+  it('keeps the tree at 480px instead of reflowing it a second time', () => {
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
+    const small = narrow.slice(narrow.indexOf('@media (max-width: 480px)'))
+    expect(small, 'the 480px breakpoint is gone').not.toBe('')
+    // The narrower breakpoint is about the dock and a call line's clock column: it may not
+    // re-lay the flow, because a second reflow is how a tree loses its branches.
+    expect(small).not.toMatch(/\.gw-progress-col \{/)
+    expect(small).not.toMatch(/\.gw-progress-subs \{/)
+    expect(small).toMatch(/\.gw-progress-dock \{[^}]*flex-direction: column/)
+  })
+})

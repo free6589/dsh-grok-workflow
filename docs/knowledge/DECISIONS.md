@@ -4967,3 +4967,61 @@ spine 为空，pre-fix 形状会进脊柱。
   5. **顺带消失的还有一处旧的措辞债务**：`intake.ts` 里 `limit?: number` 的注释原来要解释「不是尺寸类拒绝」的那个特例，现在把那半句删了，只留通用说法。
   6. **没有新增任何清理任务**：`teamStartedInTurn` 没有第二个读者，`src/` 里也没有别处引用 `'no-team'`（两者删除后 `npx tsc --noEmit` 仍是 0）。
 - **Evidence:** 提交身份（`git rev-list --parents` / `git show --stat` 自己读）：`c5e2bba`（被扣住的 `0.13.49` 那次记忆提交，父 `772ac32`）→ **`e7ecfab`**（`fix(force-team): the turn gate is gone — a keyword buys the instruction and nothing else`，**26 文件 / +324 −1019**）→ **`0bc617f`**（`docs(README): the routing table stops promising a refusal`，**2 文件 / +2 −2**）。符号计数用 `git grep -F -o <符号> <rev> -- src | wc -l` 在两个 rev 上各数一次，就是上面 Context / Decision 里那些数字。用例算术：`test/force-team.spec.ts` 的 `it(` **36 → 21**（−15，删掉的正是闸门与 `writeRefusal` 的那批例），整仓 `2049 → 2034` 也正好是同一条算术（上一轮门禁在 `772ac32` 上读 `2049`，本轮整仓转录读 `2034`），两份 README 印的数在 `e7ecfab` 里同步改成 `2034`。**块内门禁（读数来自 `.rsi/evidence/force-team-cut-2026-11-26/gate/` 的转录，本轮逐行读过）**：`npx tsc -p tsconfig.json --noEmit` → 转录 `tsc.txt` / `tsc2.txt` **0 字节**（无诊断），本轮自己重跑一次读到 **`TSC_EXIT=0`**；`npx oxlint src test` → `Found 15 warnings and 0 errors.` / `Finished in 42ms on 187 files with 96 rules using 6 threads.`；定向 7 份 spec → **`7 files / 119 passed`**（含 `test/force-team.spec.ts (21 tests)`）、`Duration 2.10s`；改完 README 之后三份文档守卫 → **`3 files / 25 passed`**；整仓 `npx vitest run` → **`Test Files 105 passed (105)` / `Tests 2034 passed (2034)` / `Duration 66.90s`**（转录里两处 `failed` 字样都不是失败：一行是 `[smoke] status=failed` 的日志、一行是一条用例标题）；`npm run build` → `client bundle: 372480 bytes → lib/client.js`；`npm run verify:lib` → 在基线 `c5e2bba` 上 `lib/ at c5e2bba is the build of src/ at c5e2bba (293 files, byte-identical)`、在 **`e7ecfab`** 上 `lib/ at e7ecfab is the build of src/ at e7ecfab (293 files, byte-identical)`（`verify-lib.txt` / `verify-lib2.txt` 各一次）。**真机 soak（`.rsi/evidence/force-team-cut-2026-11-26/`，证据提交 **`995161f`**，97 文件 / 7.0M；克隆 live web、`DSH_HOME=.tmp/soak-cut/dsh-home`、端口 3392、抓包 18190→18088、真模型 `bifrost-responses / opencode-go/muse-spark-1.3-contributor`）**：装进去的那份 tgz `sha256 5d95ee7ed9575a02e7b752250ad445bdc53f6a3f554bccac837ceeb566f5e7f7` / **1009997 字节** / 164 条目，版本读回 **`0.13.49`**，`lib/force-team.js` 在**提交里 / tgz 里 / 装进克隆后**三处同哈希 **`8bcce19505cff1f5b03bafd5dfc0aeff91f61ab522884ac6b79508f58b5d5fbe`** / **15358 字节**（三处本轮各自 `sha256sum` 读过）；装进去那份里 `started no team` **0** 次、`【强制：这一轮走团队模式】` **1** 次。**哪儿都不拒**：第一轮 7 个会话逐字（`session-logs/*.jsonl`）后 `grok-workflow-force-team` 行 **0** 条、`turn/end` 的 reason **`completed` × 6**（第 7 个是装置点「新会话」留下的空壳，无 `turn/end`）、`blocked` **0** 条，每会话 `forceTeamRows` 全 0。**旧的死法没再出现**：同一形状跑 5 次——A1 走到**第 5 步**（第 2–4 步全是非团队工具）、A2 / B / C / E 各 2 步——全部 `completed` 且都有答案；干净对照 D 走 10 步、不注入、答对两行。**注入仍在**：`zhBlockBytes 480`，A / B / C / E 四轮余下部分与 `TEAM_INSTRUCTION_ZH` 字节全等（`remainderEqualsZh: true`）、用户原话是 `startsWith` 成立的字节前缀、对照轮 D 余下 **0 字节**；29 次模型请求里 **23 次 200 / 6 次 400**（6 次都是标题请求）。**页面**：`【强制：这一轮走团队模式】` 在 5 个关键词回合的页面各 **1** 次、对照轮 **0** 次，重开会话后仍在；旧拒绝文案 `这一轮要的是团队` 在 **15** 个 `turns/*.txt` 页面逐字与 **12** 个 `*-transcript.json` / `*-console.json` 里 **0** 次；侧边栏读到 `开团：1+1 等于几？ 【强制：`。**服从路径走通了（`CONFIRMED`，补记 G）**：同一页面、同一档案、同一实例、**同一个会话、中途不重启**——主会话 `session-518372ad-665d-4abf-b025-c891fc46adf1`：回合 1 发关键词提示词，模型 `grok_open_block` 走 `preview` 给出接单预览（`preview_id bp-062389ed-2897-43a8-8eb5-60c045325303`、`split_hash 3f4ca240…`）；回合 2 只说 `确认`，`grok_open_block`（`mode:start` + `approval {kind:user, quote:"确认"}`）把块认领下来（`block_id 456899bb-5509-4c1e-a18d-b32c1e1864b1`），两块被接单（`plan-30d80f25` 数 README.md、`plan-1840af41` 数 CHANGELOG.md），两个子代理真派出并跑完，两块都过 `grok_close_block`（README 那块**先两次 `veto`**——第一次是三条验收都「没有任何任务」认领、第二次是验收 3 在交接里找不到原话——第 3 次才 `pass`；CHANGELOG 那块一次 `pass`），最后汇总答出 **README.md 397 行 / CHANGELOG.md 4476 行**，与 `wc -l` 两个数逐字相同。该会话 **15 步 / 14 次工具调用**，两个回合的 `turn/end` 都是 `completed`，**0 条拒绝行**。**团队走的是「块 + 子代理」这条路，不是 workflow 引擎**：这个会话里 `run-start` / `run-end` / `agent-start` / `agent-end` / `tool-workflow/*` **全部 0**——本仓库第二次量到「块这条路不写 `tool-workflow/*`」：上一次是同批 soak 第 1 轮记的 F3（`grok_open_block` 只写接单台自己的磁盘台账 `src/block/store.ts`，一条会话事件都不写，见 `.rsi/evidence/force-team-soak-2026-11-26/`）。**一处照实留白的**：拿 A2 那条已存会话去「确认」这条路线不成立（补记 F：隔离档案里运行时把 `storages/workspace.json` 的 `sessionIds` 改写成新会话 id，恢复进去的 `session-b6a3f106-…` 被丢掉、侧边栏里根本没有它），那一格仍是 `NOT_RUN`；走通的是补记 G 这条「在同一个活着的会话里说确认」。**全轮合计**：**14 个会话**（第 1 轮 7 + 补记 F 1 + 补记 G 6），`grok-workflow-force-team` 行 **0**、`blocked` **0**、**13 条 `turn/end` 全是 `completed`**（含 5 个子会话各 1 条；另两个会话没有 `turn/end`：一个空壳、一个停在 `ask_user_question`）。**已发版**：附注标签 `v0.13.49` 对象 `639c6c8cb6d4ec0651bc4f57a0e7752e693b96ee` → 剥出发布提交 **`88adda8`**，`git rev-parse main origin/main` 同值 `88adda8`；发布门禁在 `88adda8` 的干净树上跑过一次 **`GATE_EXIT=0`**（`Test Files 105 passed (105)` / `Tests 2034 passed (2034)` / `Duration 97.57s`，转录 `.rsi/evidence/release-0.13.49-2026-11-26/gate-88adda8.out`）——块内那一遍仍是 `NOT_RUN`（`AGENTS.md` §12），两次不是同一次。
+
+## D-170 · 手机排版换成树、桌面矩阵不动；线的形状由**量出来的几何**决定，不猜断点（2026-11-26，未发版：`fix/flowchart-mobile-tree` 上的改动还在工作树里，一颗提交都没提）
+
+- **Date:** 2026-11-26
+- **Context:** §23 的泳道矩阵是「行 = 任务、列 = 腿」，在桌面上成立、在手机上不成立：真浏览器渲染的 390 / 360 模拟屏上
+  六条腿并排挤成一条条窄缝，任务名一律被省略号切断——读者的原话是「手机排版难看」。能走的路只有两条：
+  把矩阵缩一版，或者换一种画法。
+- **Decision:**
+  1. **只在 `@media (max-width: 720px)` 里换画法**：一条腿一整行（`.gw-progress-cols` 改 `column`），这条腿走过的任务
+     挂在它下面**两条轨**上（`data-gw-progress-branch-side` = `left` / `right` / `none`，位置偶数走左、奇数走右、
+     一条腿只有一格时 `none` 跨两轨），卡**折行不截字**（`height: auto; min-height: 34px; white-space: normal;
+     overflow-wrap: anywhere`），任务名独占第二行、第一行留给尝试点 / `第 N 遍` 角标 / 明细箭头。
+  2. **>720px 一个字节没动**：矩阵、`--gw-lanes` 的 `grid-template-rows`、每格内联 `grid-row`、逐 lane 对齐全原样；
+     新规则只活在 media query 里，那个属性在桌面上是死属性（写下来了，但没有一处读它）。
+  3. **线的形状由几何决定，不由断点决定**：`progressLegsStacked()` 判「下一张腿头在这一腿最后一个框之下」= 堆叠；
+     堆叠腿的腿头**叉进它自己每张卡**、**每张卡收回下一张腿头**；没走过任务的腿留一根直线；腿头正下方只有一张卡时
+     是一根直落；只能穿过一张卡才够得着的线**丢掉不画**；需要绕行时走卡片旁那条自由竖带。
+     代码里因此没有第二个地方写 `720`。
+  4. **线的视觉不变**：仍是 `--dsw-alias-border-l2`、1.5px、实线，≤720px 只加 `stroke-linecap/linejoin: round`；
+     **没有任何状态由线承载**——状态在点上、在卡自己的颜色上、在说出口的状态词上。
+- **Alternatives rejected:**
+  - **留着两列一格的窄屏（§23.3 的「列折行」），只把格子放宽。** 折行之后同一 lane 本来就不再同高（700px 极差 136、
+    480px 极差 272，那是折行的必然，不是缺陷）；再往下挤，两格并排只剩一百多像素，任务名仍然要被省略号吃掉——
+    读者抱怨的那件事原样留着。更要紧的是它不改变「两条并行分支被画成一条链」这件事，而那才是手机上最误导人的地方：
+    三个并行任务看起来像一个接一个。
+  - **桌面也换成树。** 桌面有横向空间，矩阵最值钱的性质正是「同一个任务号落在同一条水平线上」（1500px 逐 lane 极差
+    0.00 px）；换成树等于用纵深滚动换掉一次扫视。这一块的目标是手机，动桌面是无理由的回退，还会把桌面那批读数作废。
+  - **按断点猜形状**（例如用 `matchMedia('(max-width: 720px)')` 决定画叉还是画链）。断点是样式表里的一件事，
+    形状是量出来的另一件事：同一个 720px 以下，宿主可以把列排成两列一格、可以排成一列一条腿、也可能因为侧栏挤压排成别的；
+    猜错的产物是「画了一条不存在的相邻关系」或者「该画的什么都没画」。改成读矩形之后，两列一格的老布局、一列一条腿的新布局、
+    以及桌面的矩阵共用同一份判断；将来再加一档宽度，线不需要跟着改。
+  - **线穿过卡片也照画（保证每条分支都有线）。** 一根压在卡上的线，读者会读成「这张卡被划掉」或者「线从这里穿过」，
+    两种都不是页面要说的事；宁可少一根，也不画一根说不清的。
+- **Consequences / 已知边界（照实记）：**
+  1. **排版由测量决定，所以没有布局的宿主什么都画不出来**：`measureProgressFlowWires()` 在 flow 不存在、
+     `width` 或 `height` 不大于 1、或元素没有 `getBoundingClientRect` 时直接返回 `EMPTY_PROGRESS_WIRES`。
+     stub 渲染器下的页面读作「没有线」，而不是「猜出来的线」。这是这条决定的代价，也是它的安全边界。
+  2. **一条收回路径带 2px 的横错位**：自由竖带取的是缝**内侧 2px**（实测 `187.5–195.5` 的缝 → `190`），
+     而主干是腿头自己的中心（`192`），于是有 `M96 169 L96 181 L190 181 L190 258 L192 258 L192 270` 这样一段。
+     100% 缩放下看不见，不损任何判读，没有修。
+  3. **「不截字」那几条是媒体查询的断言，不是测量结果**：`test/progress-connector.spec.ts` 直接读样式表文本里那几行来钉
+     （`height: auto`、`min-height: 34px`、`white-space: normal`、`overflow-wrap: anywhere`、`grid-row: auto !important`），
+     真页面上的「被截的卡 0 张」是另一份读数（`soak/40-narrow-360.json` 的 `cardsCut` / `headCuts`）。
+  4. **720px 以上没有新读数可比**：这一块只在 1400 量了一次，逐 lane `top` 仍是 `176/176/176`、`208/208/208`、`240/240/240`
+     （极差 0 px），与 §23 记的那三条同值；列数、折行位置没有逐个复核。
+  5. **真手机没验**（操作者拍：只用电脑模拟手机屏做真浏览器渲染）；390px 下「用手指点进度页签」这一动作也没走通，
+     因为宿主机把这个页签收进了 `···` 溢出菜单——装置是 1100px 打开它再缩到 390 的。
+- **Evidence:** 效果图先行（`.tmp/mock/mobile-tree.html` 与 `verify.html`：后者按宿主的方式加载浏览器包、用真组件渲染一次运行、
+  把 stub 树套进线上样式表，iframe 视口就是 360 / 390 / 412）。真页面三状态 + 两个宽度在
+  `.rsi/evidence/mobile-tree-2026-11-26/`：390px 下等你点头 **11.13 s**（2 节点 / 0 张卡 / 1 根直线）、
+  进行中 **11.65 s**（3 张卡、`wirePaths` **7 条** = 起点进腿 1 + **3 叉 + 3 收**）、已完成 **151.93 s**
+  （**7 腿 / 9 张卡 / 21 条路径**、每卡 `done`）；360px 下 `scrollWidth === clientWidth`、两轨 `168.5px 168.5px`、
+  被截的卡 0、被截的腿词 0、穿过卡片内部的线 0；1400px 下 `flex-direction: row`、泳道 `26px 26px 26px`、
+  11 条连线、逐 lane 极差 0 px；整轮 `consoleErrors: []` / `pageErrors: []`。
+  门禁（转录 `gate-*.out`，本轮同树重跑）：`tsc` `TSC_EXIT=0`、`oxlint src test` `15 warnings / 0 errors`（187 文件）、定向六份 spec 重建前
+  `1 failed | 340 passed (341)`（唯一的红是「包没重建」那一句）、重建后整仓 `105 files / 2045 passed`、
+  `client bundle: 386534 bytes`（`lib/client.js` 与 `src/client/index.js` 同哈希）。契约见 `DESIGN-progress-tab.md` §24，
+  本决定另在 `STATE.md` / `VALIDATION.md` / `HANDOFF.md` 三处留了同一天的记录。

@@ -1,3 +1,39 @@
+## 进度页手机排版换成树（`fix/flowchart-mobile-tree`，基点 `33c170b`）：门禁六格 + 真页面三状态两宽度；**`npm run ci` 与 `verify:lib` 是 `NOT_RUN`**、**真手机是 `NOT_RUN` / 锁屏截图 `BLOCKED`**；门禁四份转录随证据入库（`gate-tsc` / `gate-lint` / `gate-specs` / `gate-full` 各带自己的 `*_EXIT=0`）— 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：只动浏览器包——`src/client/index.js` 加一段 `@media (max-width: 720px)`（一条腿一行、两轨、卡折行不截字）
+与一个属性 `data-gw-progress-branch-side`，`measureProgressFlowWires()` 前插入九个几何助手（判堆叠、叉与收、自由竖带、丢线），
+`lib/client.js` 在同一块里由 `npm run build` 重建；四份浏览器 spec 跟着改（`progress-connector` +135 / 5 条新用例、
+`progress-lanes` +73 / 一个 `describe` 2 条、`progress-flow` +157 −45、`client.spec` +20 −5 换掉过期的断点钉子）。
+定向那一组重建前是 **`341`** 条（`340 passed` + 那一条「包没重建」），整仓 `105 files / 2045 passed`。
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | worktree `.tmp/wt-mobile-tree` | **`TSC_EXIT=0`** | `gate-tsc.out`（1 行 / 11 字节，只有这一行） |
+| `npx oxlint src test` | 同上 | **`Found 15 warnings and 0 errors.`**（187 文件 / 96 条规则）、`LINT_EXIT=0` | `gate-lint.out`（152 行 / 7785 字节） |
+| `npx vitest run` 六份进度 spec（**重建之前**） | 同上 | **`1 failed \| 340 passed (341)`**，唯一的红是 `ships lib/client.js byte-identical to the source`——就是「包还没重建」那一句，不是产品红了 | 这一格没有转录；`gate-specs.out` 是**重建之后**同一组六份 spec 的 `6 passed (6)` / **`341 passed (341)`** / `SPECS_EXIT=0` |
+| `npm run build` → `client bundle: 386534 bytes`；再 `npx vitest run test/client.spec.ts` | 同上 | **`153 passed`**（红转绿）；`sha256(lib/client.js) == sha256(src/client/index.js)` = **`586c24c2…dab223`**、各 **386534** 字节（**本轮自己 `sha256sum` / `wc -c` 各读一次**） | 本轮自查 |
+| `TMPDIR=$PWD/.tmp npx vitest run` | 同上 | **`105 files / 2045 passed`**、`EXIT=0`、`85.95s`（转录 `gate-full.out` 是同树另一次：`105 passed (105)` / `2045 passed (2045)` / `89.53s` / **`FULL_EXIT=0`**，`grep -c FAIL` = 0） | `gate-full.out`（208 行 / 14658 字节） |
+| `npm run build` 之后的 `git status --short` | 同上 | 只有本块该动的 7 个文件（`src/client/index.js`、`lib/client.js`、四份 spec、`DESIGN-progress-tab.md`），无 `*.log` / `*.tgz` / `*.bak` 遗留 | 本轮自查 |
+| `npm pack` | 同上 | `dsh-grok-workflow-0.13.49.tgz` = **1013839** 字节、`sha256 0747fb569714b7bc73d988e5c10e603846c3456598bab0cb000e7bb6012b6b2c`（**本轮自己 `sha256sum` 读的**，包还在 scratch 里） | 本轮自查 |
+| 真页面：隔离克隆 + 打包安装 + 真模型 | `web-clone`（克隆 live web）、`DSH_HOME=.tmp/soak/dsh-home`、端口 **3402**、Playwright 390×844 @3x | 装进去的那份读回 **`0.13.49`**、`lib/client.js` 与工作树**同哈希**；三状态全拍到：等你点头 **11.13 s**（0 张卡 / 1 根直线）、进行中 **11.65 s**（3 卡、`wirePaths` **7** = 1 + 3 叉 + 3 收、两轨 `183.5px 183.5px`）、已完成 **151.93 s**（**7 腿 / 9 卡 / 21 条路径**）；缩到 360：`scrollWidth === clientWidth`、两轨 `168.5px 168.5px`、被截的卡 0、被截的腿词 0、穿卡内部的线 0；1400：泳道 `26px 26px 26px`、逐 lane `top` 极差 **0 px**、11 条连线；`consoleErrors: []` / `pageErrors: []` | `.rsi/evidence/mobile-tree-2026-11-26/soak/`（`15` 个文件：**9** 张 PNG——五组，其中四组各多一张 `-full`——+ **4** 份几何 JSON + `console.json` + `shots.json`） |
+| 效果图先行 | `.tmp/mock/mobile-tree.html`（自绘）+ `verify.html`（真 CSS + 真 DOM，iframe 视口 360/390/412） | 390px：效果图任务名可用 160px、真 CSS 那版 153px；三档 `scrollWidth - clientWidth` 都是 0 | `mock/README.md`、`.rsi/evidence/mobile-tree-2026-11-26/mock/` 三张 PNG |
+| 红线 | `stat` / `curl` 只读 | `~/.dsh` mtime **`2026-11-25 23:14:14`**、`~/.dsh/profiles` **`2026-11-22 16:59:46`**（都早于本块开工）；3080 根路径 **401**；隔离端口 3402 收尾已关（**`000`**）；未 commit / 未 push / 未 tag / 未 bump / 未 publish | 本轮自查 |
+| `npm run ci`（整份门禁） | — | **`NOT_RUN`**（`AGENTS.md` §12：整份门禁在发布提交上跑一次） | — |
+| `npm run verify:lib` | — | **`NOT_RUN`** | — |
+| 真手机（真设备） | `100.111.111.120:5555` | **`NOT_RUN`**——操作者拍的：「永远不用真手机，电脑模拟手机屏（360/390 CSS px 真浏览器渲染）即可」。adb 上是连得上的，但设备停在安全锁屏（先防误触遮罩、再 PIN 页），**截图只能拿到锁屏，标 `BLOCKED`**；本轮**没有一句是真机读数** | 派单记录 |
+
+**三条口径要说准**：① 页面上真正画出的连线是 `wirePaths` 的长度（**1 / 7 / 21**），装置报的 `wires` 列是
+`paths.length - 1`（`capture.mjs` 里就是这一行），少算的正好是「起点进第一条腿」那一根——别把 `6` 读成「只画了 6 根」；
+② **1400 那一格只留了一张 PNG、没有 JSON**，不可逐字段复核；③ 门禁四份转录随证据入库：`gate-tsc.out`（`TSC_EXIT=0`）/ `gate-lint.out`（`LINT_EXIT=0`）/ `gate-specs.out`（`SPECS_EXIT=0`）/ `gate-full.out`（`FULL_EXIT=0`），
+每份的末行就是它的退出码，`2045 passed` 与 `15 warnings / 0 errors` 都能按行回指。
+
+**一处诚实的缺口（没有冒充成读数）**：390px 下宿主机把 `对话 / 轨迹 / 进度` 三个页签收进 `···` 溢出菜单，
+所以装置是**在 1100px 打开「进度」页签、再把窗口缩到 390** 的。缩完之后页面**就是**手机页（断点是纯 CSS，
+连线层在 resize 上重测），但「在 390px 用手指点到这个页签」这个动作本轮没走通——它属于宿主溢出菜单那一层，不在本块范围。
+
+**证据：** `.rsi/evidence/mobile-tree-2026-11-26/`（`README.md` 是逐条读数、口径、留白与红线；
+`soak/` 是 390 三态 + 360 + 1400 与两份 console/摘要 JSON，`mock/` 是效果图三张 + 它自己的说明）。
+
 ## `0.13.49` **发出去并收口**：发布提交 `88adda8`、`main` 从 `a5dfc75` 快进、附注标签 `v0.13.49` 对象 `639c6c8c…`、两个远端 run 都 success、Release 资产 **1009915** 字节；发布门禁在 `88adda8` 的干净树上 **`GATE_EXIT=0`**（`105 files / 2034 passed` / `97.57s`）；**live 档案升级 `BLOCKED`**（`~/.dsh` 在工作区外、本会话 `workspace-write`），**step 级 run 日志与 npm publish `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版 + 收口轮。**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）：发布提交就是这块最后一颗记忆提交 **`88adda8`**（`docs(memory): the obey path ran a real team — D-169 corrected`，单父 `995161f`，4 文件 / +22 −14），它前面是 `e7ecfab`（删闸门，26 文件 / +324 −1019）与 `0bc617f`（两份 README 改口，2 文件 / +2 −2）。本轮**自己重读**的是 `git` 与 `gh` 侧：标签对象、剥离结果、`tagger` 时刻、远端 refs、两个 run 的 id / 结论 / head sha、Release 的字段与资产；门禁那份转录与上一轮的记忆条目是**只读复核**（`wc -lc` + `sha256sum` + 逐行 `grep`），**没有重跑门禁**。派单口述的推送输出两行本轮**无法自己回读**（推送当场没留转录），所以下表把「远端现在是什么」与「推送时打印了什么」分开写：前者是本轮 `git ls-remote` 读到的，后者按派单记录。

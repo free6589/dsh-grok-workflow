@@ -4089,16 +4089,47 @@ window.__ModuleLoader__.load({
       '  .gw-progress-node[data-state="doing"] .gw-progress-node-dot, .gw-progress-chip[data-state="running"] .gw-progress-chip-dot, .gw-progress-sub[data-state="doing"] .gw-progress-sub-dot { animation: none; }',
       '  .gw-progress-sub .gw-progress-sub-dot[data-state="doing"] { animation: none; }',
       '}',
-      // Below 720px the matrix reflows: two columns a row, and the measured lines follow
-      // them with an elbow. Nothing is hidden, because the wires are the topology.
+      // Below 720px the matrix becomes a tree. A phone cannot hold a row of columns: six
+      // legs side by side squeezed each one to a sliver and every task name was cut to an
+      // ellipsis, which is the state the reader complained about. So one leg per line at
+      // full width, and the tasks that leg walked hang under it on two rails — left for an
+      // even position, right for an odd one, both for a leg that walked a single task
+      // (`data-gw-progress-branch-side`, written at every width and inert above this one).
+      //
+      // The gaps are wires, not decoration: 24px of air between a leg and its tasks, and
+      // between one task row and the next, is where the fork bar and the merge bar are
+      // drawn. Nothing is truncated here either — a card grows in height and wraps, because
+      // a task name on a phone is worth more than a fixed row pitch.
       '@media (max-width: 720px) {',
-      '  .gw-progress-cols { gap: 8px; }',
-      '  .gw-progress-col { flex: 1 1 calc(50% - 4px); max-width: calc(50% - 4px); }',
+      '  .gw-progress-cols { flex-direction: column; align-items: stretch; gap: 24px; }',
+      '  .gw-progress-col { flex: 0 0 auto; width: 100%; max-width: 100%; gap: 24px; }',
+      // The inline task-number row is the *matrix's*: it is what holds "row = task" above
+      // 720px. On the rails the rows are the tree's own, so the inline value has to be
+      // overruled — an inline style is only ever beaten by an `!important` rule.
+      '  .gw-progress-sub { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "dots badge toggle" "word word word"; grid-row: auto !important; height: auto; min-height: 34px; padding: 6px 8px; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }',
+      '  .gw-progress-subs { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; column-gap: 8px; row-gap: 24px; }',
+      '  .gw-progress-sub[data-gw-progress-branch-side="left"] { grid-column: 1; }',
+      '  .gw-progress-sub[data-gw-progress-branch-side="right"] { grid-column: 2; }',
+      '  .gw-progress-sub[data-gw-progress-branch-side="none"] { grid-column: 1 / -1; }',
+      // What was tried says itself on the first line (dots, attempt count, the control) and
+      // the task's own name takes the whole second line: a name never shares a line with a
+      // badge, so it keeps the card's full width instead of being chewed by it.
+      '  .gw-progress-sub-dots { grid-area: dots; }',
+      '  .gw-progress-sub-badge { grid-area: badge; justify-self: end; }',
+      '  .gw-progress-sub .gw-progress-node-toggle { grid-area: toggle; }',
+      '  .gw-progress-sub-word { grid-area: word; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }',
+      // A leg node keeps its single line: it already has the page's whole width, so its word
+      // and its badge are not competing for anything — but the word wraps too, so a long leg
+      // grows the card instead of ending in an ellipsis.
+      '  .gw-progress-node { height: auto; min-height: 34px; padding: 6px 10px; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }',
+      '  .gw-progress-node-word { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }',
+      '  .gw-progress-run { white-space: normal; overflow-wrap: anywhere; }',
+      // A tree is drawn with corners, so its joints are round at this width.
+      '  .gw-progress-wires > path { stroke-linecap: round; stroke-linejoin: round; }',
       '}',
       // Under 480px the dock keeps one full-width button and a call line drops its clock
       // column: nothing here scrolls sideways, at any width.
       '@media (max-width: 480px) {',
-      '  .gw-progress-col { flex: 1 1 100%; max-width: 100%; }',
       '  .gw-progress-dock { flex-direction: column; align-items: stretch; }',
       '  .gw-progress-node-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }',
       '  .gw-progress-sub-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }',
@@ -4218,18 +4249,198 @@ window.__ModuleLoader__.load({
     /** A flow with no measured wires: what a host without layout renders. */
     const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, paths: [], retries: [] }
 
+    /** One measured box in the wire layer's own pixels, which is the space a route is drawn in. */
+    function progressWireBox(rect, frame) {
+      return {
+        left: rect.left - frame.left,
+        top: rect.top - frame.top,
+        right: rect.right - frame.left,
+        bottom: rect.bottom - frame.top,
+      }
+    }
+
+    /** The x a box's own centre falls on. */
+    function progressWireCentreX(box) {
+      return Math.round((box.left + box.right) / 2)
+    }
+
     /**
-     * Measure the wires between neighbouring columns and between the tasks of one lane.
+     * Whether one straight leg of a wire runs through a box.
+     *
+     * Only the interior counts. Every wire starts and ends on an edge, so a leg that touches
+     * a box's top or bottom is landing where it was aimed; a leg that enters the box is the
+     * stroke a reader would read as passing through the card.
+     */
+    function progressWireCutsBox(from, to, box) {
+      if (from[0] === to[0]) {
+        if (!(box.left + 0.5 < from[0] && from[0] < box.right - 0.5)) return false
+        return Math.min(from[1], to[1]) < box.bottom - 0.5 && Math.max(from[1], to[1]) > box.top + 0.5
+      }
+      if (from[1] === to[1]) {
+        if (!(box.top + 0.5 < from[1] && from[1] < box.bottom - 0.5)) return false
+        return Math.min(from[0], to[0]) < box.right - 0.5 && Math.max(from[0], to[0]) > box.left + 0.5
+      }
+      return false
+    }
+
+    /** Whether a whole route stays out of every box it was measured around. */
+    function progressWireClear(points, boxes) {
+      for (let index = 0; index + 1 < points.length; index += 1) {
+        for (const box of boxes) {
+          if (progressWireCutsBox(points[index], points[index + 1], box)) return false
+        }
+      }
+      return true
+    }
+
+    /** A route as points, with every corner that landed on the one before it dropped. */
+    function progressWireRoute(steps) {
+      const points = []
+      for (const step of steps) {
+        const last = points[points.length - 1]
+        if (last === undefined || last[0] !== step[0] || last[1] !== step[1]) points.push([step[0], step[1]])
+      }
+      return points
+    }
+
+    /**
+     * The free vertical strip beside a leg's cards, when the leg leaves one.
+     *
+     * A leg whose cards sit one under another has no free lane of its own: every column of
+     * its width is a card for part of the height. The strips the cards leave are the only
+     * lines that run past the whole stack — the figure's own side padding, or the gutter
+     * between two cards drawn side by side. They are measured rather than assumed, and the
+     * strip is taken two pixels in from the cards' side, so a leg whose cards fill its width
+     * is joined along its own edge and not along a gutter far off in the figure. A leg whose
+     * cards fill the width outright gets no strip at all.
+     * @param boxes - the leg's own cards, in the wire layer's pixels.
+     * @param width - the figure's own width, in the same pixels.
+     * @returns the x of the strip beside the cards, or `undefined` when they leave none.
+     */
+    function progressWireCorridor(boxes, width) {
+      const spans = boxes.map((box) => [box.left, box.right]).sort((one, other) => one[0] - other[0])
+      if (spans.length === 0) return undefined
+      const gaps = []
+      let reach = 0
+      for (const span of spans) {
+        if (span[0] - reach >= 4) gaps.push([reach, span[0]])
+        reach = Math.max(reach, span[1])
+      }
+      if (width - reach >= 4) gaps.push([reach, width])
+      let widest
+      for (const gap of gaps) {
+        if (widest === undefined || gap[1] - gap[0] > widest[1] - widest[0]) widest = gap
+      }
+      if (widest === undefined) return undefined
+      return Math.round(widest[1] <= spans[0][0] ? widest[1] - 2 : widest[0] + 2)
+    }
+
+    /**
+     * One wire from an edge's centre onto a box's top edge.
+     *
+     * The shape is "down, across, down": out of the source, across in the free band the
+     * target has over it, down onto the target's own top. A card sitting under its own head
+     * is one branch and not a sideways detour, so the two ends being on one x is drawn as a
+     * straight drop. A leg whose cards stack puts another card in the way of that drop; the
+     * wire then leaves by the leg's free strip (`corridor`) and comes back in over its own
+     * target's band. A wire that cannot reach its target without crossing a box is dropped:
+     * the figure never draws a route it could not draw honestly.
+     * @param fromX - the x of the source edge's centre.
+     * @param fromY - the y of the source edge.
+     * @param toX - the x of the target edge's centre.
+     * @param toY - the y of the target edge.
+     * @param boxes - every box the wire has to stay out of, in the layer's pixels.
+     * @param corridor - the free strip's x, when the leg leaves one.
+     * @returns the route's vertices, or `undefined` when there is no honest route.
+     */
+    function progressWireBranch(fromX, fromY, toX, toY, boxes, corridor) {
+      if (!(toY > fromY)) return undefined
+      // The free band a target has over it: half way between it and whatever box ends above.
+      let bandTop = fromY
+      for (const box of boxes) {
+        if (box.bottom <= toY && box.bottom > bandTop) bandTop = box.bottom
+      }
+      const band = Math.round((bandTop + toY) / 2)
+      const direct = progressWireRoute(fromX === toX
+        ? [[fromX, fromY], [toX, toY]]
+        : [[fromX, fromY], [fromX, band], [toX, band], [toX, toY]])
+      if (progressWireClear(direct, boxes)) return direct
+      if (corridor === undefined) return undefined
+      // Out of the source into its own gap first, then down the strip past every card.
+      let exit = toY
+      for (const box of boxes) {
+        if (box.top >= fromY && box.top < exit) exit = box.top
+      }
+      const out = Math.round((fromY + exit) / 2)
+      const viaStrip = progressWireRoute([
+        [fromX, fromY], [fromX, out], [corridor, out], [corridor, band], [toX, band], [toX, toY],
+      ])
+      return progressWireClear(viaStrip, boxes) ? viaStrip : undefined
+    }
+
+    /**
+     * Whether two legs stacked instead of sitting side by side.
+     *
+     * The matrix is one row of columns until the page narrows, and then the columns go one
+     * under another — the phone's two-up grid first, a whole leg per row under that. Which
+     * one a reader is looking at is a layout result, not a breakpoint this file could guess
+     * at, so it is measured: the next leg's head starts below this leg's last box.
+     */
+    function progressLegsStacked(leg, neighbour) {
+      return neighbour.head.top >= leg.bottom - 0.5
+    }
+
+    /**
+     * The tree of one stacked leg: the head fans out, the cards rejoin the next leg.
+     *
+     * A leg read on a phone is a branch: its head splits into the tasks it walked, and those
+     * tasks come back together on the next leg's head. Drawing that as the one line the
+     * matrix draws would flatten a branch into a chain nobody walked, so every card gets its
+     * own wire in and its own wire out — parallel branches stay parallel, and the merge is
+     * the arrow into the next leg.
+     * @param points - the layer's vertex lists, appended to in reading order.
+     * @param leg - this leg: its head, its cards, and where its last box ends.
+     * @param neighbour - the leg that follows it.
+     * @param frame - the figure's own box, which is the space the wires live in.
+     */
+    function appendProgressLegTree(points, leg, neighbour, frame) {
+      const head = progressWireBox(leg.head, frame)
+      const nextHead = progressWireBox(neighbour.head, frame)
+      const cards = leg.cards.map((card) => progressWireBox(card, frame))
+      const corridor = progressWireCorridor(cards, frame.width)
+      const headX = progressWireCentreX(head)
+      for (const card of cards) {
+        const branch = progressWireBranch(headX, head.bottom, progressWireCentreX(card), card.top, cards, corridor)
+        if (branch !== undefined) points.push(branch)
+      }
+      const nextX = progressWireCentreX(nextHead)
+      for (const card of cards) {
+        const rejoin = progressWireBranch(progressWireCentreX(card), card.bottom, nextX, nextHead.top, cards, corridor)
+        if (rejoin !== undefined) points.push(rejoin)
+      }
+    }
+
+    /**
+     * Measure the wires between neighbouring columns, between the tasks of one lane, and
+     * between a stacked leg and the branches it walked.
      *
      * The page is a matrix: one column per leg, one cell per plan task inside a work leg.
      * Where each column sits is a layout result, not a number anything can derive, so the
-     * wires are read off the rendered boxes:
+     * wires are read off the rendered boxes, and the layout a reader sees decides the figure
+     * they are owed:
      *
-     * - two neighbouring columns, or two cells of the same task number in neighbouring
-     *   columns, are joined by one line — horizontal when they share a row, vertical when
-     *   they stacked, and an elbow (down, across, down) when the row wrapped between them;
+     * - side by side (the matrix, and the phone's two-up grid): two neighbouring columns, or
+     *   two cells of the same task number in neighbouring columns, are joined by one line —
+     *   horizontal when they share a row, vertical when they stacked, and an elbow (down,
+     *   across, down) when the row wrapped between them;
+     * - stacked one under another (the phone, where a leg is its own row): the leg is a tree.
+     *   Its head fans out into each of its own cards, and every card rejoins the next leg's
+     *   head, so a leg that walked three tasks shows a fork of three and a merge of three
+     *   instead of one stroke down the middle. A leg with no cards hands its one line
+     *   straight on, and a leg with a single card under its own head drops straight down it;
      * - a pair that does not touch at all, or a cell whose number the neighbour does not
-     *   hold, gets no line: the figure never claims a route it did not draw.
+     *   hold, gets no line: the figure never claims a route it did not draw, and a branch
+     *   that could only be drawn through a card is dropped rather than drawn over it.
      *
      * Every line is directed: the renderer puts the one arrow head on each path's end.
      * A host without layout (a stub renderer, a zero-width column) measures nothing and
@@ -4277,11 +4488,15 @@ window.__ModuleLoader__.load({
         const head = measure(heads.length === 0 ? column : heads[0])
         if (head === undefined) continue
         const lanes = new Map()
+        // The leg's own cards in document order, which is the order a reader meets them:
+        // the fan and the merge are drawn along it, so a branch keeps its place on the page.
+        const cards = []
         const cells = inside(column, '[data-gw-progress-sub]')
         for (let index = 0; index < cells.length; index += 1) {
           const cell = measure(cells[index])
           if (cell === undefined) continue
           lanes.set(laneOf(cells[index], index), cell)
+          cards.push(cell)
           // The dots of one cell are its attempts, left to right. A retry is a real
           // adjacency: the attempt that failed and the one that followed it.
           const dots = inside(cells[index], '[data-attempt]')
@@ -4290,13 +4505,16 @@ window.__ModuleLoader__.load({
             .filter((entry) => entry.rect !== undefined)
           if (marks.length > 1) attempts.push(marks)
         }
-        columns.push({ head, lanes })
+        // Where the leg's last box ends: that is what tells a neighbour stacked under it from
+        // one sitting beside it, and it is the bottom a merge line leaves from.
+        const bottom = cards.reduce((low, card) => Math.max(low, card.bottom), head.bottom)
+        columns.push({ head, lanes, cards, bottom })
       }
       if (columns.length === 0) {
         // The flat shape: a host that hands back the step nodes and nothing else.
         for (const node of Array.from(flow.querySelectorAll('[data-gw-progress-node]'))) {
           const head = measure(node)
-          if (head !== undefined) columns.push({ head, lanes: new Map() })
+          if (head !== undefined) columns.push({ head, lanes: new Map(), cards: [], bottom: head.bottom })
         }
       }
       // A host that reports the dots but not the cells they sit in still says which attempts
@@ -4360,11 +4578,19 @@ window.__ModuleLoader__.load({
         }
       }
       for (let index = 0; index + 1 < columns.length; index += 1) {
-        join(columns[index].head, columns[index + 1].head)
+        const leg = columns[index]
+        const neighbour = columns[index + 1]
+        // A stacked leg with cards of its own is a branch, not a chain: it fans out and
+        // rejoins. A leg with no cards has nothing to fan into, so it keeps the one line.
+        if (leg.cards.length > 0 && progressLegsStacked(leg, neighbour)) {
+          appendProgressLegTree(points, leg, neighbour, frame)
+          continue
+        }
+        join(leg.head, neighbour.head)
         // The same task in the two neighbouring legs: the line that says "this task was
         // checked". Only pairs that really exist are joined.
-        for (const [lane, rect] of columns[index].lanes) {
-          const next = columns[index + 1].lanes.get(lane)
+        for (const [lane, rect] of leg.lanes) {
+          const next = neighbour.lanes.get(lane)
           if (next !== undefined) join(rect, next)
         }
       }
@@ -4478,18 +4704,27 @@ window.__ModuleLoader__.load({
      *
      * The cell is always drawn — a reader must not have to open a leg to learn which tasks
      * it walked. Opening it adds only that task's own calls, which are the same one-line
-     * renderer the step node uses. Its text is the phase the recorder wrote, cut with an
-     * ellipsis when it does not fit; its state is the colour, and the state word is spoken.
+     * renderer the step node uses. Its text is the phase the recorder wrote; on a phone it
+     * wraps instead of being cut, because the branch a task hangs on is too narrow to cut
+     * anything and still say what the task was. Its state is the colour, and the state word
+     * is spoken.
      * @param sub - one task node of a work leg.
      * @param column - the index of the column this cell stands in, 0-based.
      * @param props - translator, the open cells, the open gate and callback.
+     * @param position - its place among this leg's cells, 0-based, which is its rail.
+     * @param count - how many cells this leg drew, which decides whether it has a rail at all.
      * @returns the cell element.
      */
-    function ProgressFlowSubCell(sub, column, props) {
+    function ProgressFlowSubCell(sub, column, props, position, count) {
       const t = props.t
       const stateWord = t(PROGRESS_PLAN_KEY[sub.state] === undefined ? 'progress.plan.waiting' : PROGRESS_PLAN_KEY[sub.state])
       const open = props.openSubs !== undefined && props.openSubs[sub.key] === true
       const callsId = `gw-progress-sub-calls-${column}-${sub.taskNumber}`
+      // The rail this cell stands on where the matrix becomes a tree: even positions left,
+      // odd right, and a leg with one cell spans both rails. The attribute is written at
+      // every width and read by the phone layout and by the wire measurement — the desktop
+      // matrix does not look at it (there the row is the task number, not the rail).
+      const branchSide = count === 1 ? 'none' : position % 2 === 0 ? 'left' : 'right'
       return h('li', {
         key: sub.key,
         className: 'gw-progress-sub',
@@ -4498,6 +4733,7 @@ window.__ModuleLoader__.load({
         'data-lane': String(sub.taskNumber),
         'data-ordinal': String(sub.taskNumber),
         'data-state': sub.state,
+        'data-gw-progress-branch-side': branchSide,
         // The row is the task number: this is what makes "row = task" hold across the legs
         // of one run (the list's `--gw-lanes` fixes how many rows there are).
         style: { gridRow: String(sub.taskNumber) },
@@ -4628,6 +4864,8 @@ window.__ModuleLoader__.load({
      * The column is the row's unit: every column's head is the same height and every task
      * cell the same height, so one task number lands on the same line in every leg that
      * walked it — the "row = task" half of the matrix needs no measuring, just equal cells.
+     * The cell's place among its own leg's cells is what names its rail under 720px, so the
+     * leg passes both down rather than letting the cell count its own siblings.
      * @param node - one flow node.
      * @param index - its place in `flow.nodes`, 0-based.
      * @param props - translator, the open nodes and cells, the flow's `at`, the callbacks.
@@ -4650,7 +4888,7 @@ window.__ModuleLoader__.load({
           key: 'subs',
           className: 'gw-progress-subs',
           'data-gw-progress-subs': node.key,
-        }, subs.map((sub) => ProgressFlowSubCell(sub, index, props))))
+        }, subs.map((sub, position) => ProgressFlowSubCell(sub, index, props, position, subs.length))))
     }
 
     /**

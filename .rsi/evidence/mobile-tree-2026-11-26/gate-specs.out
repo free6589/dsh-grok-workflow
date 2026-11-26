@@ -1,0 +1,24 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-mobile-tree
+
+(node:101) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 302ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ✓ test/client.spec.ts (153 tests) 447ms
+ ✓ test/progress-flow.spec.ts (45 tests) 55ms
+ ✓ test/progress-tab.spec.ts (72 tests) 44ms
+ ✓ test/progress-connector.spec.ts (17 tests) 44ms
+ ✓ test/progress-lanes.spec.ts (40 tests) 35ms
+
+ Test Files  6 passed (6)
+      Tests  341 passed (341)
+   Start at  15:03:44
+   Duration  3.03s (transform 836ms, setup 0ms, import 1.14s, tests 925ms, environment 1ms)
+
+SPECS_EXIT=0

@@ -3518,7 +3518,7 @@ describe('client progress tab: nodes, calls and the wire layer', () => {
     expect(texts(lines[0]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 任务 1 · 修复登录 做完`)
   })
 
-  it('carries the flow geometry in the stylesheet: equal columns, wrapped when narrow', () => {
+  it('carries the flow geometry: equal columns wide, one tree per leg on a phone', () => {
     const cols = ruleOf('.gw-progress-cols')
     expect(cols, 'the column list has no rule').toBeDefined()
     expect(cols).toContain('display: flex')
@@ -3535,16 +3535,31 @@ describe('client progress tab: nodes, calls and the wire layer', () => {
     const drawn = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-wires > path {'))
     expect(drawn, 'the wires carry no stroke').toBeDefined()
     expect(drawn).toContain('stroke: var(--dsw-alias-border-l2')
-    // Under 720px the columns wrap two a row; the measured wires keep connecting them.
+    // Under 720px the matrix becomes a tree: one leg a line at full width, its tasks on two
+    // rails, and the measured wires keep connecting them.
     const narrow = mediaBlock('max-width: 720px')
     expect(narrow, 'the 720px breakpoint is gone').not.toBe('')
-    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 calc\(50% - 4px\)/)
-    // Under 480px the dock stacks and the call rows drop their clock column.
+    expect(narrow).toMatch(/\.gw-progress-cols \{[^}]*flex-direction: column/)
+    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*width: 100%/)
+    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    // Every cell says which rail it stands on, and the sheet is what puts it there.
+    for (const [side, column] of [['left', '1'], ['right', '2'], ['none', '1 / -1']]) {
+      expect(narrow, `no rail rule for ${side}`)
+        .toContain(`.gw-progress-sub[data-gw-progress-branch-side="${side}"] { grid-column: ${column}; }`)
+    }
+    // Nothing on the phone cuts a word: the card grows in height and the name wraps.
+    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*height: auto/)
+    expect(narrow).toMatch(/\.gw-progress-sub-word \{[^}]*white-space: normal/)
+    expect(narrow.split('\n').find((line) => line.trim().startsWith('.gw-progress-sub-word {')))
+      .not.toContain('ellipsis')
+    // Under 480px the dock stacks and the call rows drop their clock column — and the tree
+    // above stays exactly as it is, because a second reflow is how a tree loses its branches.
     const small = mediaBlock('max-width: 480px')
     expect(small, 'the 480px breakpoint is gone').not.toBe('')
     expect(small).toMatch(/\.gw-progress-dock \{[^}]*flex-direction: column/)
     expect(small).toMatch(/\.gw-progress-node-calls \.gw-progress-log-time \{[^}]*display: none/)
-    expect(small).toMatch(/\.gw-progress-col \{[^}]*flex: 1 1 100%/)
+    expect(small).not.toMatch(/\.gw-progress-col \{/)
+    expect(small).not.toMatch(/\.gw-progress-subs \{/)
     // Nothing on this page scrolls sideways at any width.
     expect(progress.css).not.toContain('overflow-x')
     expect(progress.css).not.toContain('scroll-snap')

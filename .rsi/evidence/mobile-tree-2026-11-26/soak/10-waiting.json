@@ -1,0 +1,43 @@
+{
+ "at": "2026-11-26T06:44:39.718Z",
+ "elapsed": "11.13",
+ "viewport": {
+  "width": 390,
+  "height": 844
+ },
+ "mounted": true,
+ "chip": "等你点头",
+ "chipState": "waiting",
+ "count": "还剩 1 步 / 共 2 步",
+ "nodes": 2,
+ "cols": 2,
+ "subs": 0,
+ "cards": [],
+ "heads": [
+  {
+   "kind": "start",
+   "state": "done",
+   "top": 138,
+   "bottom": 172
+  },
+  {
+   "kind": "end",
+   "state": "pending",
+   "top": 196,
+   "bottom": 230
+  }
+ ],
+ "headCuts": 0,
+ "cardsCut": 0,
+ "wires": 0,
+ "wirePaths": [
+  "M192 34 L192 58"
+ ],
+ "retries": 0,
+ "crossings": [],
+ "scrollWidth": 390,
+ "clientWidth": 390,
+ "flowWidth": 383,
+ "subsColumns": null,
+ "colsDirection": "column"
+}
