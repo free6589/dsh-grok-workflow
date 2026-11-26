@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The progress tab is one horizontal fork now, with six lights on every task and five on the run / 进度页现在是一张横排分叉图，每张任务卡六盏灯、每轮五盏验** —
+  The picture reads left to right: start, the plan, one card per plan task, one branch per call that task made, the
+  summary, the acceptance, the end — seven columns in that order, whether the run is still waiting, still moving or
+  already over (a column with nothing recorded simply draws no box). Every card carries the six stages — plan,
+  execute, check, review, accept, summarize — and the acceptance column carries the five verifications — remote
+  machine, model review, isolated real machine, human review, ledger reconciliation. **The lights are folds of what
+  the run actually reported**: a failure a later retry replaced is green, and a verification nobody ran stays dark —
+  the page never ticks a check the stream did not report. The figure is derived from the run's own event rows on
+  every render, so a replanned run gains the task it really walked, its branches and their wires, and changes
+  nothing else. The Mermaid text the page lays itself out from is now a `flowchart LR`.
+  **Removed:** the vertical step tree, its per-visit badges, the retry dots on a card, and the "accept this version"
+  button in the dock — the acceptance is a place on the figure now, so there is nothing left to click. The dock keeps
+  its one "start" button, and its only other words are the filled-in-box line.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; only the way this tab is drawn.**
+  / 这张图从左往右读：起点、规划、每张计划任务一张卡、那张任务调过的每一次各成一条分支、汇合、验收、终点——
+  七列按这个顺序都在，不管你这一轮还在等着点头、还在跑、还是已经收工（没有记录的那一列就不画盒子）。每张卡带六盏灯（规划、执行、检查、复核、验收、
+  汇总），验收那一列带五盏验（机器远端、模型复核、真机隔离、人验、对账）。**灯只照着这一轮真报过的事折**：
+  后来重试补上的那次失败是绿的，没人跑过的验是暗的——页面不会替事件流勾选任何一道验。
+  图是每次渲染都从这一轮自己的事件行推出来的，所以重规划之后，图自己长出它真走过的那张任务、那几条分支和线，
+  别的什么都不变。页面据以自排的 Mermaid 文本改成 `flowchart LR`。
+  **退场的**：竖排步骤树、每颗节点上的访问号角标、卡片上那排重试圆点，以及底下那颗「收下这版」——
+  验收现在只是图上的一个地方，没有要点的东西了。dock 只留「开工」那一颗，另一句依旧是「已填进输入框」。
+  **升级提示：什么都不用准备——没有设置、存档格式或默认值变化，只是这一页画法变了。**
+
 ## [0.13.53] - 2026-11-26
 
 ### Changed / 变更

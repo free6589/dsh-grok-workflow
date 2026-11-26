@@ -5211,3 +5211,89 @@ spine 为空，pre-fix 形状会进脊柱。
   **本条最初写「真机 soak 与本条记忆并行、读数另一次落」是不准确的，按第二遍的实测订正**。
   **`NOT_RUN` 照实记：** 「等你点头 / 未通过 / 已取消」三态、卡住那句在真机上的文字、421–499 px 之间的宽度、
   live 档案升级与重载、读屏软件、Firefox / Safari、以及真 Mermaid 渲染器（这台机器上没有，也不联网）。
+
+## D-175 · 进度页改成**横排分叉**：七层、每张任务卡六环、一轮五验；文本改 `flowchart LR`，用户点「收下这版」那个接受动作整个删掉（2026-11-26，`feat/task-fork`，worktree `.agents/worktrees/feat-task-fork`，基线 `main` 尖端 **`fe6d631`**；**未合、未推、未打 tag、版本仍是 `0.13.53`**）
+
+- **Date:** 2026-11-26
+- **Context:** 操作者这一轮的板换掉了 `D-173`（§25）那张竖排步骤树，改画一张**横排**的分叉：
+  起点在左、终点在右，中间「规划(分叉) → 任务 1 / 任务 2 … → 每条任务的子任务(横排分支) → 汇合 → 验收」。
+  竖排树的问题是它把「一步一节点」当主语，计划任务只是挂在腿下面的小枝；操作者要的是**任务当主语**：
+  一张任务卡自己带六盏灯（规划 / 执行 / 检查 / 复核 / 验收 / 汇总），一轮运行再带五盏验
+  （机器远端 / 模型复核 / 真机隔离 / 人验 / 对账）。同时一句话：**「收下这版」那颗按钮不要了**——
+  验收既然成了图上的一个地方，就不该还要用户在底部点一下才算收工。
+- **Decision:**
+  1. **模型改为七层固定**：0 `start`、1 `plan`、2 任务卡（`t<号>`，无号的合成一组 `u1`）、3 分支（`<任务id>_s<seq>`）、
+     4 `sum`、5 `accept`、6 `end`。七层永远都在；`total` 恒 7，`at` = 读者站的那一盒的层 + 1。
+     导出名与签名不变（`derivePanelGraph(run, t)`），渲染那一半按这个名字调。
+  2. **任务卡是唯一带名字的一层**：卡上写 recorder 写的 phase **原文**，不缩、不译、不改写；
+     它拥有这个任务**所有**非 Guardian 的行（`calls`），每一行再各成一条分支（层 3）。
+  3. **每一行恰好落在一个归属盒**：归属只有 `plan` / 某张任务卡 / `sum` 三种，分支是任务卡的再分。
+     认腿的行跟腿走；不认腿的行留在原位（第一条工作行之前归 plan、最后一条之后归 sum、夹在两条之间归前面那条的卡）。
+  4. **六环**：`plan` 与 `summarize` 读的是那两个盒子的状态（每张卡同一个事实），`execute`/`check`/`review`
+     折本卡自己的行（**只看标签，相位不绑腿**，且扣掉已被替代的失败），`accept` 由 check 与 review 合成
+     （坏门优先 → 两门都过才绿 → 任一门在做 → 否则暗）。
+  5. **五验**：`machine` = 检查腿的行、`model` = 复核腿的行，其余三盏由标签或相位里的词点亮
+     （`真机`/`隔离`/`soak`/`isolated`、`人验`/`人工`/`human`、`对账`/`核对`/`reconcil`）。
+     **只有记录能点灯**：一轮没跑真机，那一盏就是暗的，页面从不替事件流勾选任何一道验。
+  6. **文本改 `flowchart LR`**：`start`/`plan`/`sum`/`accept`/`end` 是 stadium、任务卡 round、分支 rect，
+     终点仍写 `finish`，六环与五验**不进文本**（文本仍是结构来源，页面排的是解析回来的那份图）。
+  7. **用户接受那个动作删掉**：`progress.dock.accept` 从两本字典删除，dock 只剩「开工」那一颗
+     （等你点头时那一颗，照旧）。
+- **Alternatives rejected:**
+  - **留着竖排树、只加六环**：操作者要的是「任务当主语」，竖排树的主语是腿；把灯塞进挂枝的卡，读者仍要先找到腿再找任务。
+  - **让六环各自成节点**（每个任务一条 6 格的细带）：那一层会是 6 × 任务数 个盒子，横排会宽到读不动，
+    而六盏灯本来就是**同一条事实的六个读数**，不是六步。
+  - **五验从「这一轮跑没跑」推**：这就是 `D-173` 已经否掉的「编数字」的另一种写法。验收必须是记录，不是推断。
+  - **保留「收下这版」但改成不写输入框**：那颗按钮唯一的用处就是把接受词填进框里请用户发送；
+    验收成了图上的地方之后，它既没有数据可写也没有动作可做。
+- **Consequences / 已知边界（照实记）：**
+  1. **`at` 与「卡在哪」可能说两个不同的数**：读者位置落在分支上（层 3 → `at` 4），而卡住那句说的是任务卡（层 2 → 3）。
+     两个数各自都对：一个是「这一轮走到第几层」，一个是「哪张卡没过」。照实记，不强行统一。
+  2. **没有任何任务卡时补一条 `plan → sum`（`chain`）**：等你点头的一轮、或者只有规划/汇总行的一轮，
+     两个地方之间本来什么都没有，不补这条边图就是两个连通块——「起点 → 规划」跟「汇总 → 验收 → 终点」两半分着飘，
+     读者会把它读成两张图。有了任务卡，那道缺口由图的分叉自己接上，这条边一条都不发，所以
+     「不许有别的边」仍然成立。**每一种状态都是一张连通的图**，`test/progress-panel-model.spec.ts` 两种情形都钉住了。
+  3. **`subtask.taskNumber` 只在有号时出现**：`u1` 那一组没有号，页面也就没有 `data-task` 可读。
+  4. **估算按层量，`progress.panel.etaBasis` 的文案没改**：它仍说「按 {n} 个已完成步骤的实测耗时推算」，
+     而 `basis` 现在数是**层**。这一块没有改文案的授权，留给后续裁决。
+  5. **`lib/client.js` 是浏览器包的一份字节副本**（收尾 **422 685** 字节 / `sha256 c6387e1b…be0186`，
+     与 `src/client/index.js` 同哈希、`cmp` 空输出），改源码必须重建它。
+  6. **四条缺陷是真机截图抓到的，不是套件先抓到的**：① 「汇总」那颗盒子被裁成只剩「汇」；② 展开的调用行被挤成一字一行；
+     ③ 邻居卡片盖住展开的列表；④ 列表透出背景。四条都在同一分支修掉并各自补了守卫（`D-175` 的 Evidence 里逐条写），
+     **挡住它们的是补上的守卫**——这一点要照实说：套件在修之前是绿的。
+- **Evidence:** 分支 `feat/task-fork`（worktree `.agents/worktrees/feat-task-fork`，基线 `main` 尖端 **`fe6d631`**；
+  `git describe --tags --always` = **`v0.13.53-1-gfe6d631`**、`git tag --contains HEAD` 计数 **0**、版本 **`0.13.53`**）：
+  `src/client/index.js` 的 i18n 两张表 + 面板模型区（`progressPanelSpan`/`progressPanelEta`、`panelRows`/`panelBoxRows`/
+  `panelRings`/`panelChecks`、`derivePanelGraph`、`panelMermaid*`）、`lib/client.js`（字节副本，**422 685** 字节 /
+  `sha256 c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186`；`lib/index.js` **27 956** 字节 /
+  `sha256 ac69070e…dfa2c32`，本块没碰它）、`test/progress-panel-model.spec.ts`（重写）、`test/i18n-parity.spec.ts`
+  （`progress.*` 那几行）、`test/progress-panel.spec.ts` 与 `test/progress-connector.spec.ts`（排版那一半）、
+  `DESIGN-progress-tab.md` §26、本条、`CHANGELOG.md` 的 `[Unreleased]`。
+  **本块没有合、没有推、没有打 tag、没有抬版本**（仍是 `0.13.53`），也没有碰 `~/.dsh` 与在跑的实例。
+  门禁（本树实测）：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`npx oxlint src test`
+  **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；八份进度相关 spec **`8 files / 331 passed`**
+  （client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 +
+  i18n-parity 8 + progress-tab 72 + progress 14）；整仓套件与 `npm run ci` **`NOT_RUN`**（`AGENTS.md` §12）。
+  `progress.*` 键 **64 → 77**（+14 −1：删 `progress.dock.accept`，加 `progress.flow.accept`、六颗 `progress.ring.*`、
+  五颗 `progress.verify.*`、两颗 `progress.panel.rings/checks`）。契约见 `DESIGN-progress-tab.md` §26。
+  **真机 soak（`CONFIRMED`，隔离档案：克隆 live `web` 档案、`DSH_HOME` 走 scratch、端口 **3412**、真模型、三个任务的真实工作流，
+  收尾已拆）**：装进去的是 `file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz`（**1 033 214** 字节 /
+  `sha256 b5b7d208345b0dfc6e1928b11ea05cff288340bd5fe2f6fc5089b132841f3c46` / **164** 文件），读回 **`0.13.53`**、
+  装好的 `lib/client.js` sha **`c6387e1b…`** 与工作树相同、软链 **0** 个。**七张读数**：桌面 1500 进行中 **11 节点 / 12 边**、
+  完成态 **17 / 24**、点开一颗节点 17 / 24（调用列表 **1** 行、亮线 **9** / 暗 **20**）；手机 390 三张同计数；外加一张 native-390
+  完成态 17 / 24。**18 盏环 = 3 张任务卡 × 6**、验收卡 **5 盏验**（`machine=done, model=done, isolated/human/ledger=pending`）、
+  完成态 dock 里 `dock-fill` **0** 颗、卡住那句每张都没有、顶上那句进行中 `第 3 步，共 7 步 · 还剩约 …` / 完成态 `第 7 步，共 7 步`；
+  `-source` 首行 `flowchart LR`、节点行/线行数与 DOM 每张相等、**一个连通块**、终点写作 `finish`；
+  `document.scrollWidth === clientWidth` 两档成立、390 下图在自己内部横向滚（1078 / 383）；控制台 **0** / 页面异常 **0**；
+  这轮真的写出 `notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**。证据目录 `.rsi/evidence/task-fork-2026-11-26/`（soak 那一轮落盘）。
+  **四条缺陷（真机截图抓到，修在同一分支，各带一条守卫）：** ①「汇总」被裁成只剩「汇」；② 展开的调用行塌成一字一行；
+  ③ 邻居卡片盖住展开的列表（开卡补 `z-index`）；④ 列表透出背景（主题 token 死了，改成
+  `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测算出来 `rgb(255,255,255)`）。
+  **红线（照实记）**：`~/.dsh/profiles` **未变**（`2026-11-22 16:59:46`）；`~/.dsh` 变成 `2026-11-27 00:22:48`、
+  `~/.dsh/profiles/web` 变成 `2026-11-27 01:01:27`——**都在本块进行期间变过，但不是本块的写**：每一条会改文件的命令都带
+  `DSH_HOME=<clone>`，变动的那些孩子是 live 档案自己的设置写入加上另一个块的插件作业
+  （`pnpm-lock.yaml` / `node_modules` / `.plugin-manager` 00:14:34、`package.json` 00:19:54、`cordis.yml` 00:20:53、
+  `cordis.patch.yml` 00:41:08 与 01:01:27）；3080 根路径 **401 → 401**；live 里那份载荷的 sha 是 `1fb003f3…`
+  **不是本块的**，live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有升级**）；隔离实例已停、scratch 全部删掉。
+  **`NOT_RUN` 照实记：** 原生手机上的进行中截图、等你点头态（`开工`）在真机上、分支上的 `· 第 n 遍`（三个任务都一次过）、
+  深色主题、320 px、读屏软件、Firefox / Safari、真 Mermaid 渲染器、live 档案升级与重载 / 重启、整仓测试与 `npm run ci`。

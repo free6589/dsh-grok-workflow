@@ -179,11 +179,12 @@ describe('client progress tab: the retired drawings are gone, not hidden', () =>
     'gw-progress-dock-hint',
     'gw-progress-quiet',
     'gw-progress-quiet-dot',
-    // the spine (0.12.19, `progress-tab-two-track`)
+    // the spine (0.12.19, `progress-tab-two-track`). `gw-progress-ring` is not here: the panel
+    // revives the name on purpose for a task's six ring lights, which are not the spine's
+    // segment ring — see the class list at the bottom of this file.
     'gw-progress-flow',
     'gw-progress-track',
     'gw-progress-seg',
-    'gw-progress-ring',
     'gw-progress-glyph',
     'gw-progress-link',
     'gw-progress-wire',
@@ -221,6 +222,11 @@ describe('client progress tab: the retired drawings are gone, not hidden', () =>
     'gw-progress-sub-calls',
     'gw-progress-sub-toggle',
     'gw-progress-left',
+    // the attempt dots of the panel this one replaced: a retry is a branch of its own now, and
+    // its label says which try it was
+    'gw-progress-pnode-attempt',
+    'gw-progress-pnode-retry',
+    'gw-progress-pnode-dots',
   ] as const
 
   /**
@@ -276,6 +282,7 @@ describe('client progress tab: the retired drawings are gone, not hidden', () =>
     'data-gw-progress-sub-calls',
     'data-gw-progress-branch-side',
     'data-gw-progress-left',
+    'data-gw-progress-attempt',
   ] as const
 
   /** Whether one retired hook appears as a whole attribute name, on a page or in the source. */
@@ -339,6 +346,11 @@ describe('client progress tab: the retired drawings are gone, not hidden', () =>
       'measureProgressFlowWires',
       'sameProgressWires',
       'progressWireLine',
+      // the two routers of the vertical tree: a fork now turns in a column gap, so neither the
+      // stacked-layer rails nor the top-to-bottom smoothstep has anything left to draw
+      'panelRailPath',
+      'panelSmoothStep',
+      'PANEL_RAIL_INSET',
     ]) {
       expect(SOURCE, `${gone} is still shipped`).not.toContain(gone)
     }
@@ -353,7 +365,8 @@ describe('client progress tab: the panel draws one figure and one sentence', () 
       .filter((hook): hook is string => hook !== undefined && hook !== 'data-gw-progress-css')
     const at = (hook: string) => hooks.indexOf(hook)
     expect(at('data-gw-progress-bar')).toBeGreaterThanOrEqual(0)
-    expect(at('data-gw-progress-graph')).toBeGreaterThan(at('data-gw-progress-bar'))
+    expect(at('data-gw-progress-figure')).toBeGreaterThan(at('data-gw-progress-bar'))
+    expect(at('data-gw-progress-graph')).toBeGreaterThan(at('data-gw-progress-figure'))
     expect(at('data-gw-progress-wires')).toBeGreaterThan(at('data-gw-progress-graph'))
     expect(at('data-gw-progress-pnodes')).toBeGreaterThan(at('data-gw-progress-wires'))
     expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-pnodes'))
@@ -369,22 +382,27 @@ describe('client progress tab: the panel draws one figure and one sentence', () 
     expect(count('data-gw-progress-css')).toBe(1)
     expect(count('data-gw-progress-bar')).toBe(1)
     expect(count('data-gw-progress-line')).toBe(1)
+    expect(count('data-gw-progress-figure')).toBe(1)
     expect(count('data-gw-progress-graph')).toBe(1)
     expect(count('data-gw-progress-source')).toBe(1)
     expect(count('data-gw-progress-wires')).toBe(1)
     expect(count('data-gw-progress-pnodes')).toBe(1)
     expect(count('data-gw-progress-dock')).toBe(1)
-    // start + execute + its task + check + its task + end: both legs walked `任务 1`, so both
-    // rows hang in a task node and each leg keeps nothing of its own.
-    expect(count('data-gw-progress-pnode')).toBe(6)
-    expect(count('data-gw-progress-pnode-word')).toBe(6)
-    // The body is a class, not a hook: it is the box the word and the dot sit in.
-    expect(elements.filter((element) => classesOf(element).includes('gw-progress-pnode-body'))).toHaveLength(6)
-    // Only a node with something to open is a control; the two legs here handed every row to
-    // a task, and the two ends declare nothing.
-    expect(count('data-gw-progress-pnode-open')).toBe(2)
-    // One wire per edge of the text the figure carries: two legs, two tasks, one end.
-    expect(count('data-gw-progress-edge')).toBe(5)
+    // Seven levels, and both calls name `任务 1`, so one task card carries two branches:
+    // start, plan, task, two branches, summary, acceptance, end.
+    expect(count('data-gw-progress-pnode')).toBe(8)
+    expect(count('data-gw-progress-pnode-word')).toBe(8)
+    // The body is a class, not a hook: it is the box the word and the lights sit in.
+    expect(elements.filter((element) => classesOf(element).includes('gw-progress-pnode-body'))).toHaveLength(8)
+    // One row of six rings on the task card, one row of five checks on 验收, and nothing else.
+    expect(count('data-gw-progress-ring')).toBe(6)
+    expect(count('data-gw-progress-check')).toBe(5)
+    expect(count('data-gw-progress-pnode-lights')).toBe(2)
+    // Only a card with something to open is a control: the task and its two branches. This
+    // fixture records no plan call, and the two ends and the two gates declare nothing.
+    expect(count('data-gw-progress-pnode-open')).toBe(3)
+    // One wire per edge of the text the figure carries: seven levels, one fork, two branches.
+    expect(count('data-gw-progress-edge')).toBe(8)
     // The calls are closed, so no list and no line is drawn.
     expect(count('data-gw-progress-node-calls')).toBe(0)
     expect(count('data-gw-progress-log-row')).toBe(0)
@@ -425,7 +443,11 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
   it('scopes every rule to the tab, and never scrolls sideways', () => {
     const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
     for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
-    expect(progress.css).not.toContain('overflow-x')
+    // The figure is the one box that scrolls sideways, because the run is left to right at
+    // every width: the page itself never does, and nothing snaps.
+    const sideways = progress.css.split('\n').filter((line) => line.includes('overflow-x'))
+    expect(sideways).toHaveLength(1)
+    expect(sideways[0]!.trim().startsWith('.gw-progress-figure')).toBe(true)
     expect(progress.css).not.toContain('scroll-snap-type')
     expect(progress.css).not.toContain('scroll-snap')
     // The one scroll box is a node's own opened list, and it scrolls down.
@@ -469,9 +491,11 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
       'gw-progress-pnode-dot',
       'gw-progress-pnode-word',
       'gw-progress-pnode-badge',
-      'gw-progress-pnode-dots',
-      'gw-progress-pnode-attempt',
-      'gw-progress-pnode-retry',
+      'gw-progress-figure',
+      'gw-progress-pnode-main',
+      'gw-progress-pnode-lights',
+      'gw-progress-ring',
+      'gw-progress-check',
       'gw-progress-node-calls',
       'gw-progress-node-rejected',
       'gw-progress-log-row',
@@ -507,5 +531,8 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
     expect(body).toContain('font: inherit')
     expect(body).toContain('text-align: left')
     expect(body).toContain('background-color: transparent')
+    // A card is a column of at most two rows — the word, then the lights — so the box is the
+    // same box whatever the card carries.
+    expect(body).toContain('flex-direction: column')
   })
 })
