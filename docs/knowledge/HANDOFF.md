@@ -1,3 +1,50 @@
+## 2026-11-26 — `0.13.49` 的回合闸门**已删、只留注入**（分支 `release/0.13.49` 尖端 `0bc617f`，`main` 仍 `a5dfc75`）：操作者的决定已经下了并施工完毕，**剩下的是发版五步 + 一次 live 钉版本**；`npm run ci`、tag、push、Release run、live 升级**一步都还没跑**
+
+- **From:** 记忆施工者（`agent-209/memory`）· **To:** 派单层（发版五步）/ 本机能写 `~/.dsh` 的人（live 钉版本）
+- **这一轮做完的**：
+  1. **拒绝那一半删干净了**：**`e7ecfab`** `fix(force-team): the turn gate is gone — a keyword buys the instruction and nothing else`
+     （**26 文件 / +324 −1019**，父 `c5e2bba`）——`TEAM_STARTING_TOOLS`、`teamStartedInTurn`、`teamGateVerdict`、`TeamFlag`、
+     `writeRefusal`、`FORCE_TEAM_SOURCE_KIND`、每会话一张的 flag 表、`PreStepDecision` 的 `reject` 分支、
+     `intake` 的 `refuseNonTeamTurn` / `'no-team'` 全部不在 `src/` 里了（`git grep -F -o` 在两个 rev 上各数一次）。
+     注入一个字没改。
+  2. **两份 README 的说法改对了**：**`0bc617f`** `docs(README): the routing table stops promising a refusal`（**2 文件 / +2 −2**）。
+  3. **块内门禁绿**：`tsc` **`TSC_EXIT=0`**（转录 0 字节，本轮重跑补的）、`oxlint` **15 warnings / 0 errors**（187 文件 / 96 规则）、
+     定向 7 份 spec **119 passed**、整仓 **`105 files / 2034 passed`** / `66.90s`、`client bundle: 372480 bytes`、
+     `verify:lib` 在 `e7ecfab` 上 `293 files, byte-identical`。
+  4. **真机 soak 跑完并留证**（克隆 live web、`DSH_HOME=.tmp/soak-cut/dsh-home`、端口 3392、抓包 18190→18088、真模型）：
+     **7 个会话、拒绝行 0 条、`blocked` 0 条**、旧的死法没再出现（A1 走到第 5 步）；注入仍在（480 字节、原话是字节前缀、对照轮 0）。
+     原件在 `.rsi/evidence/force-team-cut-2026-11-26/`（259 行 `README.md`）。
+  5. 记录写完：`DECISIONS.md` 的 **`D-169`**（`D-167` 第 2 条与 `D-168` 从此失效，两条原样留作历史）、`VALIDATION.md` 与 `STATE.md` 各新一条。
+- **没做到的（照实说，别升级成「验过」）**：**「开团 → 真团队 → 给出数字」这半没有证到**——5 个关键词回合都只到
+  `grok_open_block` 的接单预览（A2 `bp-6bd71c12-…`、E `bp-a7edd454-…`），`grok_workflow` 一次没调、`tool-workflow/*` 0 条、
+  没有任何块被认领。续轮（回一句「确认」看团队真跑起来）装置做不到，`NOT_RUN`。
+- **下一件事，一条一件，照顺序做**：
+  1. **发版第 1 步 —— 跑整份门禁**：在**发布提交**的干净树上跑一次 `TMPDIR=$PWD/.tmp npm run ci`，必须 `GATE_EXIT=0`。
+     本轮 `NOT_RUN`（`AGENTS.md` §12：块内只跑 `typecheck + lint + 碰到的 spec`）。
+  2. **发版第 2 步 —— 打附注标签**：`git tag -a v0.13.49 -m "Grok Workflow for DSH v0.13.49" <发布提交>`。
+     现在 `v0.13.49` **不存在**（`git tag --points-at HEAD` 为空，最新是 `v0.13.48`）。
+  3. **发版第 3 步 —— 推 `main` 与标签**：`main` 还停在 **`a5dfc75`**（`origin/main` 同值），`0bc617f` 是它的后代，
+     可以快进：`git push origin release/0.13.49:main` 然后 `git push origin v0.13.49`。**没有 `--force`、没有移动任何已发布标签。**
+  4. **发版第 4 步 —— 盯远端 Release run 到 success**：`gh run watch --exit-status`，然后核对 Release 的 target、正文与资产。
+  5. **`AGENTS.md` §13 的 live 钉版本 —— `BLOCKED`，本会话做不了**：`~/.dsh` 在工作区外、本会话是 `workspace-write`、
+     审批提示被禁用，**写不进去**；**没写、没重载、没重启**，3080 前后各读一次都是 **401**。
+     要有写权限的人来做：把那条插件行钉到**确切的标签 `v0.13.49`**（绝不用浮动范围、`latest` 或分支名），读回版本，
+     读不回就回滚那一行。
+- **恢复现场（逐步，都在工作区里）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow              # 分支 release/0.13.49
+  git status --short --branch                                # ## release/0.13.49；只有一处别人的 .gitignore 改动与未跟踪的证据目录
+  git log --oneline -5                                       # 记忆提交 / 0bc617f / e7ecfab / c5e2bba / 772ac32
+  git rev-parse main origin/main                             # 两颗都是 a5dfc755…（0.13.49 没有推进 main）
+  cat .session-stage/cut/vitest-full.txt | tail -4            # 105 passed (105) / 2034 passed (2034) / 66.90s
+  ```
+- **两个坑照实记（上一轮记过，本轮仍然成立）**：① `dsh web --profile web-clone …` 起不来（`dsh web` 本身就是
+  `dsh --profile web`，报 `select a profile only once`），可用的是 `dsh --profile web-clone --port 3392 --host 127.0.0.1 --no-open`；
+  ② `~/.npm` 不可写，`npm pack` 以 `EROFS … _cacache` 失败，先把 `npm_config_cache` 指到工作区内。
+- **一处对账提醒**：`~/.dsh/profiles/web` 的 mtime 是 **2026-11-26 11:22:40**，那是**另一个施工者**装的 `0.13.48`
+  （不含 `lib/force-team.js`），不是本会话；live 上跑的是「没有强制路由」的那一版，与 `release/0.13.49` 无关。
+
 ## 2026-11-26 — `0.13.49` **备好、门禁绿、故意没发**（分支 `release/0.13.49`，尖端 `772ac32`）：真机两轮把这一版要说出去的两句话各否掉一次——注入块进了用户气泡、`开团` 那轮仍可能被拒且拒绝看不见；**下一个接手的人要先拿到操作者的一个决定**，`main` 仍 `a5dfc75`、没有 tag
 
 - **From:** 记忆收口施工者（`agent-207/scribe`）· **To:** 操作者 / 下一个接手这条分支的人
