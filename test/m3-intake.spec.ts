@@ -383,7 +383,7 @@ describe('3. the narrow listener is the only brake owner', () => {
     // because the front desk and the routing key it read were deleted.
     expect(resolveConfig({}).blockIntake).toBe(true)
     const ctx = await mount()
-    expect(listenerCount(ctx), 'the narrow listener plus the intake observer').toBe(2)
+    expect(listenerCount(ctx), 'the narrow listener, the forced-team route and the intake observer').toBe(3)
   })
 
   it('answers a stopped beat with reject, opens no turn, stops the loop once, and records the code', async () => {
@@ -509,7 +509,7 @@ describe('4. two files, one writer each', () => {
 describe('5. registration', () => {
   it('registers no intake listener and no block tool when the intake is off — and the narrow listener still exists', async () => {
     const ctx = await mount({ blockIntake: false })
-    expect(listenerCount(ctx), 'the narrow listener is not part of the intake branch').toBe(1)
+    expect(listenerCount(ctx), 'the narrow listener is not part of the intake branch').toBe(2)
     for (const name of Object.values(BLOCK_TOOL_NAMES)) {
       expect(ctx.tools.get(name), `${name} must not be registered`).toBeUndefined()
     }

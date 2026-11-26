@@ -44,7 +44,7 @@ export const INTAKE_LIMITS = {
 } as const
 
 /** Why a prompt was refused at intake. */
-export type IntakeRefusalCode = 'empty' | 'oversize' | 'command-prompt'
+export type IntakeRefusalCode = 'empty' | 'oversize' | 'command-prompt' | 'no-team'
 
 /** A refusal with everything the message-repair action needs, in both languages. */
 export interface IntakeRefusal {
@@ -52,8 +52,14 @@ export interface IntakeRefusal {
   code: IntakeRefusalCode
   /** Characters measured in the refused text. */
   chars: number
-  /** The limit that was applied, echoed so the text can be checked against the code. */
-  limit: number
+  /**
+   * The limit that was applied, echoed so the text can be checked against the code.
+   *
+   * Absent for a refusal that is not about a size (the forced-team turn gate): there
+   * is no budget to quote, and inventing one would put a number in the text that
+   * nothing measured.
+   */
+  limit?: number
   /** The refusal, English first then Simplified Chinese. */
   text: string
 }
@@ -138,6 +144,32 @@ export function refuseDiscardedCommandPrompt(arg: string): IntakeRefusal {
       `用法：/grok [on|off]。这段文字没有作为提示词发出：/grok 只接受 on 或 off，其后的 ${chars} 个字符已被丢弃，没有任何步骤执行。`,
       'remove the leading /grok and send the text again as its own message',
       '去掉开头的 /grok，把这段文字另作一条消息重新发送',
+    ),
+  }
+}
+
+/**
+ * Refusal for a turn that asked for a team and then answered alone.
+ *
+ * The forced-team listener (`src/force-team.ts`) refuses the continuation step of a
+ * turn whose own log shows no `tool-workflow/*` event. This is the same four-line
+ * bilingual shape the intake refusals use — measured count, then the one action that
+ * fixes it — because the reader is in the same position: something they asked for did
+ * not happen, and they need to know what to do rather than who to apologise to.
+ *
+ * The count is the length of the message that matched, so the line names something
+ * the reader wrote instead of the plugin's own accounting.
+ * @param chars - characters measured in the message that asked for the team.
+ */
+export function refuseNonTeamTurn(chars: number): IntakeRefusal {
+  return {
+    code: 'no-team',
+    chars,
+    text: bilingual(
+      `this turn asked for a team but started no team: no workflow ran inside it, so one model was about to answer alone (the message that asked was ${chars} characters long)`,
+      `这一轮要的是团队，但没有任何团队起来：回合内没有工作流运行，等于一个模型准备单独作答（提出要求的那条消息 ${chars} 字符）`,
+      'send it again so it runs as a team: split the work, run the tasks concurrently, then summarise',
+      '重新发一次，让它按团队方式执行：先拆活、再并发执行、最后汇总',
     ),
   }
 }

@@ -304,9 +304,10 @@ describe('a load that omits blockIntake is the same load as blockIntake: true', 
   it('installs the same listeners', async () => {
     const absent = await mount('absent')
     const explicit = await mount('true')
-    // The narrow heartbeat listener plus the intake's own observer: the default load
-    // carries both, and the explicit opt-in adds nothing on top.
-    expect(listenerCount(absent.ctx)).toBe(2)
+    // The narrow heartbeat listener, the forced-team route and the intake's own
+    // observer: the default load carries all three, and the explicit opt-in adds
+    // nothing on top.
+    expect(listenerCount(absent.ctx)).toBe(3)
     expect(listenerCount(explicit.ctx), 'the key must not change the chain').toBe(listenerCount(absent.ctx))
   })
 
@@ -336,9 +337,10 @@ describe('blockIntake: false removes the intake and nothing else', () => {
   it('installs no intake observer but keeps the narrow heartbeat listener', async () => {
     try { rmSync(join(ledger, HEARTBEATS_LISTEN_FILE), { force: true }) } catch { /* nothing to remove */ }
     const off = await mount('false')
-    // One listener: the narrow heartbeat listener every load carries. The intake's own
-    // observer would be the second, and "off" is the claim that it is absent.
-    expect(listenerCount(off.ctx), 'off must not add a listener to the chain').toBe(1)
+    // Two listeners: the narrow heartbeat listener and the forced-team route every
+    // default load carries. The intake's own observer would be the third, and "off"
+    // is the claim that it is absent.
+    expect(listenerCount(off.ctx), 'off must not add a listener to the chain').toBe(2)
     expect(listenerCount(off.ctx)).toBe(listenerCount((await mount('absent')).ctx) - 1)
 
     // And the narrow listener is not merely counted: it still records the beat.
@@ -442,9 +444,10 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     const off = await mount('false')
     const offDecision = await dispatch(off, new FakeAgent(headed(sessionId)), messages)
     const on = await mount('true')
-    // Two listeners, never a replacement: the narrow heartbeat listener that decides
-    // the beat, and the intake's observer that records what it did.
-    expect(listenerCount(on.ctx), 'on adds one listener, never replaces one').toBe(2)
+    // Three listeners, never a replacement: the narrow heartbeat listener that decides
+    // the beat, the forced-team route, and the intake's observer that records what it
+    // did.
+    expect(listenerCount(on.ctx), 'on adds one listener, never replaces one').toBe(3)
     const onDecision = await dispatch(on, new FakeAgent(headed(sessionId)), messages)
 
     // The decision is the same object shape and the same bytes: the observer passes the
