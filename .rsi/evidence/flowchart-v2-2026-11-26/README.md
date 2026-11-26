@@ -42,6 +42,18 @@
 - **最终构建那一包**里也有 `lib/force-team.js`（强制路由的服务端文件），它的构建产物由提交 **`bc5bc65`**
   `chore(build): rebuild lib/ for the force-team routing intake` 一并入库（20 个文件 / +805 −28）。
 
+## 0.1 第三趟：方块格子（主验意见）— `ef9b474`
+
+主验说「格子太圆，像药丸」，圆角 `10px → 6px`。第三趟只为拍这一件事，读数在 `soak3-cells/README.md`：
+
+- **身份**：提交 **`ef9b474`**、`sha256(lib/client.js)` **`e51daa66…3cff`** / **372480 字节**、
+  包 **`dfc25f24…29bb`** / 997049 字节；另一条分支 `feat/force-team-routing` 没装也没测。
+- **三条读数**：computed `border-radius` = **`6px`**、`height` = **`26px`**、4 倍放大图首行 inset = **13 设备像素 = 3.25 css px**
+  （占高度 **12.5%**）。**结论：读作方块**，不是药丸（老值 13px 半高会内收约 45 设备像素）。
+- **一张图**：`soak3-cells/cell-zoom-4x.png`（4 倍、1420×168，一格含圆角与边框）；
+  另有 `cells-done-wide.png`（已完成页宽屏，六格全绿）、`cells-done-narrow-700.png`（700 px 折行、`700 = 700` 无横滚）。
+- `consoleErrors` / `pageErrors` 全空。
+
 ## 1. 环境与装置（`CONFIRMED`）
 
 Node **v26.8.1** / npm **11.19.0** / DSH **0.2.2-rc.3**；隔离 home `.tmp/soak-lanes/dsh-home`，

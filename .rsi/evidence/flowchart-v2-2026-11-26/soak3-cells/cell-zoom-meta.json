@@ -1,0 +1,18 @@
+{
+ "info": {
+  "state": "done",
+  "task": "1",
+  "radius": "6px",
+  "height": "26px",
+  "width": "339px",
+  "cloneW": 1356,
+  "cloneH": 104,
+  "label": "任务 1 · 计算12乘12",
+  "text": "任务 1 · 计算12乘12"
+ },
+ "hostBox": {
+  "w": 1420,
+  "h": 168,
+  "dpr": 1
+ }
+}

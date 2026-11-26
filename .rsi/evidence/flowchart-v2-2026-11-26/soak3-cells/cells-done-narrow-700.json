@@ -1,0 +1,107 @@
+{
+ "headerText": "任务团队\n已完成",
+ "counts": {
+  "cols": 13,
+  "subs": 6,
+  "cells": 6,
+  "paths": 17
+ },
+ "cells": [
+  {
+   "task": "1",
+   "lane": "1",
+   "state": "done",
+   "col": "execute",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 216
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "state": "done",
+   "col": "check",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 216
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "state": "done",
+   "col": "review",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 320
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "state": "done",
+   "col": "execute",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 456
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "state": "done",
+   "col": "check",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 456
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "state": "done",
+   "col": "review",
+   "radius": "6px",
+   "height": "26px",
+   "width": "339px",
+   "border": "1px solid color(srgb 0.133333 0.772549 0.368627 / 0.45)",
+   "background": "linear-gradient(color(srgb 0.133333 0.772549 0.368627 / 0.12), color(srgb 0.133333 0.77254",
+   "top": 560
+  }
+ ],
+ "nodeRadius": "999px",
+ "startEndRadius": [
+  "999px",
+  "999px"
+ ],
+ "footer": "还剩 0 步 / 共 13 步",
+ "panelText": "任务团队\n已完成\n起点\n规划\n执行\n任务 1 · 计算12乘12\n检查\n任务 1 · 计算12乘12\n复核\n任务 1 · 计算12乘12\n规划\n第 2 次\n执行\n任务 2 · 在第一步结果上加1\n检查\n任务 2 · 在第一步结果上加1\n复核\n任务 2 · 在第一步结果上加1\n汇总\n第 1 稿\n汇总\n第 2 稿\n汇总\n第 3 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 13 步\n\n收下这版",
+ "scroll": {
+  "scrollWidth": 700,
+  "clientWidth": 700
+ },
+ "viewport": {
+  "w": 700,
+  "h": 1400
+ },
+ "colRowTops": [
+  138,
+  178,
+  282,
+  386,
+  490,
+  594,
+  634
+ ]
+}
