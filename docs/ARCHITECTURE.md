@@ -376,15 +376,24 @@ What a user message meets on that chain:
 - **the narrow heartbeat listener** (`src/heartbeat-listen.ts`): it acts only on a
   `source.kind === 'schedule'` delivery that also carries the Loop marker, and every other
   batch goes straight to `next()`;
+- **the forced-team route** (`src/force-team.ts`), the one listener that does change a user
+  batch, and only when the message asks for a team (开团 / 组队 / 分工, or the English
+  `form a team` / `split the work` / `delegate` as whole words) in a session whose grok mode
+  is on: it appends one fixed instruction block to the model-facing text — the user's own
+  words stay a byte-identical prefix and the message keeps its identity — and it refuses, once
+  per turn, a continuation step of that turn whose log shows no `tool-workflow/*` event. Off
+  (`forceTeamRouting: false`) registers no listener at all;
 - **the intake's own observer** (`installHeartbeatBrakes`), which records a beat *after* the
   decision and never changes it.
 
-So a user message is never claimed, refused, shortened, annotated or routed: it reaches the
-model exactly as the loop claimed it. The gate's over-long and empty-text refusals went with
-it, and the 32,000-character bound now applies only where work is actually commissioned. The
-pass-through is pinned as bytes: `test/block-flag-baseline.spec.ts` dumps the decision for
-eight payload shapes from a default load, including a 32,001-character prompt that must arrive
-unchanged and with no notice appended.
+So a user message is never claimed, refusals are never spent on its length, and no notice is
+ever appended to it: it reaches the model exactly as the loop claimed it, with one exception —
+a message that asks for a team carries the instructed block described above. The gate's
+over-long and empty-text refusals went with it, and the 32,000-character bound now applies
+only where work is actually commissioned. The pass-through is pinned as bytes:
+`test/block-flag-baseline.spec.ts` dumps the decision for eight payload shapes from a default
+load, including a 32,001-character prompt that must arrive unchanged and with no notice
+appended (none of the eight carries a team keyword, and the load's grok mode is off).
 
 A workflow starts only from an explicit `grok_workflow` call (the model's, or the intake's).
 That is the whole entry surface.

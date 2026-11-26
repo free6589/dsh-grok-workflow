@@ -40,15 +40,21 @@ export declare const INTAKE_LIMITS: {
     readonly commandPromptChars: 200;
 };
 /** Why a prompt was refused at intake. */
-export type IntakeRefusalCode = 'empty' | 'oversize' | 'command-prompt';
+export type IntakeRefusalCode = 'empty' | 'oversize' | 'command-prompt' | 'no-team';
 /** A refusal with everything the message-repair action needs, in both languages. */
 export interface IntakeRefusal {
     /** Stable code; recorded as the delivery outcome. */
     code: IntakeRefusalCode;
     /** Characters measured in the refused text. */
     chars: number;
-    /** The limit that was applied, echoed so the text can be checked against the code. */
-    limit: number;
+    /**
+     * The limit that was applied, echoed so the text can be checked against the code.
+     *
+     * Absent for a refusal that is not about a size (the forced-team turn gate): there
+     * is no budget to quote, and inventing one would put a number in the text that
+     * nothing measured.
+     */
+    limit?: number;
     /** The refusal, English first then Simplified Chinese. */
     text: string;
 }
@@ -89,6 +95,20 @@ export declare function refuseOversizePrompt(chars: number, limit?: 32000): Inta
  * @param arg - the argument the command was given, i.e. everything after `/grok`.
  */
 export declare function refuseDiscardedCommandPrompt(arg: string): IntakeRefusal;
+/**
+ * Refusal for a turn that asked for a team and then answered alone.
+ *
+ * The forced-team listener (`src/force-team.ts`) refuses the continuation step of a
+ * turn whose own log shows no `tool-workflow/*` event. This is the same four-line
+ * bilingual shape the intake refusals use — measured count, then the one action that
+ * fixes it — because the reader is in the same position: something they asked for did
+ * not happen, and they need to know what to do rather than who to apologise to.
+ *
+ * The count is the length of the message that matched, so the line names something
+ * the reader wrote instead of the plugin's own accounting.
+ * @param chars - characters measured in the message that asked for the team.
+ */
+export declare function refuseNonTeamTurn(chars: number): IntakeRefusal;
 /**
  * True when a non-toggle command argument is a prompt rather than a typo.
  *

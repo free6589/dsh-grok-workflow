@@ -234,9 +234,10 @@ describe('composed pre-step waterfall', () => {
       'dsh-time-context',
       'dsh-tmux-context',
     ]))
-    // The plugin's own two: the narrow heartbeat listener and the intake observer.
-    // Counted on a real context, so "the chain carries them" is the shipped wiring.
-    expect(listenerCount(harness().ctx)).toBe(listeners.length + 2)
+    // The plugin's own three: the narrow heartbeat listener, the forced-team route and
+    // the intake observer. Counted on a real context, so "the chain carries them" is
+    // the shipped wiring.
+    expect(listenerCount(harness().ctx)).toBe(listeners.length + 3)
     expect(listenerCount(harness({ withPlugin: false }).ctx)).toBe(listeners.length)
   })
 

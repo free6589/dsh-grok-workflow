@@ -90,6 +90,44 @@ grep 服务端强制路由的模块名与开关名 → **无命中**（`grep` �
 `lib/` 与 `src/` 的逐字一致**本轮没有用这条脚本证明**，能证明的是 `npm run build` 在尖端上 `EXIT=0` 且
 `git status --short` 为空（即已提交的 `lib/` 就是 `src/` 的构建产物）。
 
+## `feat/force-team-routing` 拆版后的收尾复核：强制团队路由这一半，本分支整仓 **`104 files / 1976 passed`**、`tsc` 0、`oxlint` 15/0、`npm run build` 产出的 `lib/` 已提交且工作树干净；**真机 soak `NOT_RUN`**、**`verify:lib` `BLOCKED`**（沙箱装不上依赖）— 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`e772cd6..4def2a4` 那条历史把**泳道矩阵**与**强制路由**混在一起。本轮把它拆成两条各自可发版的分支，
+本文件这一条是**强制路由那一半**：`feat/force-team-routing` = `e772cd6` + `2f56f8b`（`0412a23` 的复长）+ 构建提交 `e90ba2f`。
+混合尖端原样保留为 `backup/flowchart-v2-mixed-2026-11-26`（`4def2a4`）。`npm run ci` 整份 **`NOT_RUN`**（`AGENTS.md` §12）。
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | 本分支尖端 `e90ba2f` | **`EXIT=0`** | 本轮自己跑的 |
+| `npx oxlint src test` | 同上 | `Found 15 warnings and 0 errors.` · `186 files` · **`EXIT=0`** | 本轮自己跑的 |
+| `TMPDIR=$PWD/.tmp npx vitest run`（整仓） | 同上 | **`104 files / 1976 passed`** · `Duration 92.69s` · `EXIT=0` | 本轮自己跑的 |
+| `npm run build` | 同上 | `lib/force-team.*` 新增（`lib/force-team.js` 21096 字节 · `sha256 23a4ab3e…040b`）、`config` / `intake` / `index` / `settings` / `types` 重编译、`lib/client.js` **未变**；随后 `git status --short` 空 | 提交 `e90ba2f` |
+| `node scripts/verify-lib.mjs` | 同上 | **`BLOCKED`**：`Error: Cannot find module '/tmp/verify-lib-kWkfnx/node_modules/typescript/bin/tsc'` · `EXIT=1` | — |
+| `npm run ci`（整份） | — | **`NOT_RUN`** | — |
+| 真机 soak | — | **`NOT_RUN`**：没有隔离档案 + 真模型跑过「命中→注入→兜底拒一次」这条链 | — |
+
+**用例算术（`CONFIRMED`）**：基线 `e772cd6` = `103 files / 1948 passed`；本分支 = **`104 files / 1976 passed`**。
+**+1 文件 / +28 条**正好是 `test/force-team.spec.ts`（执行方先红后绿的那 28 条）。这三条分支的关系是：
+混合尖端 `4def2a4` = `105 files / 2041 passed` = 基线 1948 + 进度页那一半 65 条 + 这一半 28 条。
+
+**这一半是什么（`CONFIRMED`，读源码与 spec）**：中文 `开团` / `组队` / `分工`（子串）或英文 `form a team` / `split the work` /
+`delegate`（整词，`delegated` / `delegating` 不命中）命中且 grok 为开时，往该回合用户文本尾部**追加**一段固定硬指令
+（不改原文、不写会话事件、不进 UI）；同一回合**第二个及以后**的 `agent/pre-step` 上，若本回合没有任何 `tool-workflow/*` 事件，
+按 intake 的四行双语形状**拒一次**（每回合最多一次、不循环、跨回合标记丢弃）。开关 `forceTeamRouting` 默认 `true`，
+`/grok off` 时两半都关，子代理会话不碰。**已知上限**：仓库里没有「回合结束」hook（`agent/pre-step` 是唯一 waterfall，
+`turn/end` 不可应答），所以**模型一步答完的回合没有第二次门机会**——那一轮只剩注入这一根杠杆（`D-167`）。
+
+**本分支「必须没有」的反证（`CONFIRMED`，本轮跑过）**：`grep -R "data-gw-progress-sub\|gw-progress-lanes\|progress.flow.attempt" src test`
+→ **无命中**（`grep` 退出 1）。进度页那一半（泳道列、`--gw-lanes` 网格、每行一颗点与 `第 {n} 遍` 角标、`3px,3px` 虚线重看线）
+连同 `test/progress-lanes.spec.ts`、`D-166` 与 `DESIGN` §23 都不在本分支上——它们留在 `feat/flowchart-v2` 上。
+
+**没做到的（`NOT_RUN`，别升级成「验过」）**：**真机 soak 一条都没跑**（这一半的 28 条是组件/单元级），
+整轮 `npm run ci`。**`BLOCKED` 一条**：`scripts/verify-lib.mjs` 在 `/tmp/verify-lib-*` 里装依赖时失败，本沙箱无法完成；`lib/` 与 `src/` 的逐字一致**本轮没有用这条脚本证明**，能证明的是 `npm run build` 在尖端上 `EXIT=0` 且
+`git status --short` 为空（即已提交的 `lib/` 就是 `src/` 的构建产物）。
+
+（合并补记 2026-11-26：这一半已在 `release/0.13.49` 上与 `main` 的 `a5dfc75` 合并（`--no-ff`）；上面每一格读数
+——包括 `verify:lib` 那条 `BLOCKED`——都是合并前本分支尖端 `e90ba2f` 上的读数，合流后的读数见本轮记录。）
+
 ## `0.13.47` 发版收口：唯一一份门禁（发布树 `63d039b`）`GATE_EXIT=0`（`103 files / 1948 tests`、转录 381 行 / 22779 字节），发布身份、两个远端 run、Release 与资产都复核过；这一版**只发证据**（三种失败页面的真机读数）、**没有行为变化**；**live 档案升级 `BLOCKED`**、**真机 soak / npm / `gh` 全 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.47` 已经出去（tag 推了、Release 建了、资产在），

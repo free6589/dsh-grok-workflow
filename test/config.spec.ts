@@ -119,17 +119,17 @@ describe('configuration surface', () => {
   })
 
   it('ignores every removed key and hands the load path its name (D-155)', () => {
-    // The surface keeps exactly 19 keys (nine plus childTimeoutMs, the mid-run
+    // The surface keeps exactly 20 keys (nine plus childTimeoutMs, the mid-run
     // replan switch, the four repeat-run keys, the two self-iteration keys, the
-    // Q8 guardianModel single route and the block-intake switch); the other 25
-    // are removed now, including the two M3.3 deleted the front desk's routing
-    // with (`mode`, `legacyGate`).
+    // Q8 guardianModel single route, the block-intake switch and the forced-team
+    // route switch); the other 25 are removed now, including the two M3.3 deleted
+    // the front desk's routing with (`mode`, `legacyGate`).
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate', 'blockIntake',
-      'configVersion',
+      'forceTeamRouting', 'configVersion',
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(25)
     for (const key of REMOVED_CONFIG_KEYS) {

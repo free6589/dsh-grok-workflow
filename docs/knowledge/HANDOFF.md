@@ -88,6 +88,40 @@
   没重载没重启。live 里装的仍是 `0.13.47`。
 - **scratch**：`.tmp/soak-lanes/` 与本次拆版用的第二个工作树（在 `.tmp/worktrees/` 下，按另一条分支命名）收尾都整棵删除。
 
+## 2026-11-26 — 强制团队路由收口（`feat/force-team-routing`）：从 `e772cd6` 干净复长的 `0412a23` + 一次构建提交，整仓 **104 files / 1976 passed**；**真机 soak `NOT_RUN`**；`verify:lib` 在本沙箱 `BLOCKED`；本分支**不含**进度页那一半
+
+- **From:** 拆版施工者（`agent-202/split-release`）· **To:** 下一个接手者 / 要合并这条分支的人
+- **这一轮是什么**：`e772cd6..4def2a4` 那条历史把**泳道矩阵**与**强制路由**混在一起。本轮把它拆成两条各自可发版的分支，
+  本文件这一条是**强制路由那一半**：`feat/force-team-routing` = `e772cd6` + `2f56f8b`（`0412a23` 的复长）+ 构建提交 `e90ba2f`。
+  混合尖端原样保留为 `backup/flowchart-v2-mixed-2026-11-26`（`4def2a4`，**不许删**）。
+- **身份**：尖端 **`e90ba2f`**。`lib/force-team.js` **21096 字节**、`sha256 23a4ab3e…040b`；
+  `lib/client.js` 与基线**逐字相同**（`20c04ff6…73c8`）——浏览器包不在这一半里，这是两条分支互不相干的直接证据。
+  版本号仍 `0.13.47`（没 bump），认身份用 `lib/force-team.js` 的哈希。
+- **门禁（本分支自己跑的）**：`tsc -p tsconfig.json --noEmit` **`EXIT=0`**、`oxlint src test` **`15 warnings / 0 errors`**（186 文件）、
+  整仓 `npx vitest run` **`104 files / 1976 passed`**（`EXIT=0`，92.69 s）；`npm run build` 之后 `git status --short` 空。
+  基线 `e772cd6` 是 `103 files / 1948 passed`，**+1 文件 / +28 条**正好是 `test/force-team.spec.ts`。
+  **`node scripts/verify-lib.mjs` 是 `BLOCKED`，不是通过**：它复制树到 `/tmp/verify-lib-*` 再装依赖，沙箱装不上，
+  原文 `Error: Cannot find module '/tmp/verify-lib-kWkfnx/node_modules/typescript/bin/tsc'`。`npm run ci` 整份 `NOT_RUN`（§12）。
+- **真机 `NOT_RUN`**（照实说）：这一半**没有**真机读数。「命中→注入→兜底拒一次」这条链只在 `test/force-team.spec.ts`
+  的 28 条里被钉住（含注入文案、命中面、只拒一次、`/grok off` 两半都关、子代理不碰），**没有**在隔离档案 + 真模型上跑过。
+  别把它当成「验过」。
+- **这一半是什么**：中文 `开团` / `组队` / `分工`（子串）或英文 `form a team` / `split the work` / `delegate`（整词，
+  `delegated` / `delegating` 不命中）命中且 grok 为开时，往该回合用户文本尾部追加一段固定硬指令；同一回合第二个及以后的
+  `agent/pre-step` 上若本回合没有任何 `tool-workflow/*` 事件，再按 intake 的行双语形状**拒一次**。开关 `forceTeamRouting`
+  默认 `true`、`/grok off` 时两半都关、子代理会话不碰。**已知上限**：仓库里没有「回合结束」hook，模型一步答完的回合只剩注入。
+- **下一手最容易踩的三个坑**：
+  1. **别把 `lib/client.js` 当成这一半的产物**：它跟基线逐字相同，改动它说明碰了另一条分支的文件。
+  2. **`forceTeamRouting` 是载入期开关**：设成 `false` 时一个监听都不注册，所以设置页里看不到它（不投影），
+     别照 `blockIntake` 之外的直觉去找开关行。
+  3. **`test/force-team.spec.ts` 里那 28 条用的是双语的固定文案**：改 refusal 文案要连带改 spec，两侧不许各说各话。
+- **分支判定**：若在 **2026-12-03** 前没有合并进 `main`，按 `AGENTS.md` §5 处理——合并、rebase 或删除，三者选一。
+  本轮没合并、没推送、没打 tag、没发版。
+- **live 档案**：仍然**没动**（`~/.dsh` 与 `~/.dsh/profiles` 的 mtime 都在本会话开始之前），3080 上的实例前后都是 401。
+- **scratch**：本次拆版用的第二个工作树 `.tmp/worktrees/force-team-routing` 验完即 `git worktree remove`，只留分支。
+- **合并补记（2026-11-26）：** 这一半已在 `release/0.13.49` 上与 `main` 的 `a5dfc75` 合并（`--no-ff`），
+  所以本条里「版本号仍 `0.13.47`」「本轮没合并、没推送、没打 tag、没发版」只描述合并之前；
+  合流后的 `npm run ci` 读数与合并提交见本轮记忆，版本抬升与发版由后续块负责。
+
 ## 2026-11-26 — `0.13.47` 已发布收口：一个发布提交（8 文件 / +48 −20、单父）、一份门禁 `GATE_EXIT=0`（`103 files / 1948 tests`）、`main` 尖端 `63d039b`、附注标签、两个远端 run 与 Release 资产都在；这一版**只发证据**（三种失败页面的真机读数）、**没有行为变化**；**live 档案升级仍 `BLOCKED`**（live 里装的仍读 `0.13.46`，且那一行还是浮动依赖）、**真机 soak `NOT_RUN`**
 
 - **From:** 包工头（`agent-200`；收口这几份记忆由 `agent-200/memdocs-47` 写）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

@@ -217,6 +217,16 @@ export declare const DEFAULT_LOOP_ENABLED = false;
  * `configVersion` are plain for the same reason.
  */
 export declare const DEFAULT_BLOCK_INTAKE = true;
+/**
+ * Forced team routing switch (`src/force-team.ts`), on by default.
+ *
+ * A load-time switch like `blockIntake`: off registers no `agent/pre-step` listener
+ * at all, so a profile that turns it off keeps the pre-feature chain. On by default
+ * because the feature exists to stop the one behaviour the operator called
+ * unacceptable — a turn that asked for a team and got a single-model answer — and a
+ * switch that ships off would ship the behaviour it was built to stop.
+ */
+export declare const DEFAULT_FORCE_TEAM_ROUTING = true;
 export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
 export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
 /**
@@ -306,15 +316,15 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Nineteen keys in the accepted surface; sixteen of them reach the settings
- * page (`toolName`, `blockIntake` and `configVersion` are plain, not
- * volatile, so the runtime projection drops them — pinned in
+ * Twenty keys in the accepted surface; sixteen of them reach the settings
+ * page (`toolName`, `blockIntake`, `forceTeamRouting` and `configVersion` are
+ * plain, not volatile, so the runtime projection drops them — pinned in
  * `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "forceTeamRouting", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -407,6 +417,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
+    forceTeamRouting: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -525,6 +536,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
+    forceTeamRouting: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
