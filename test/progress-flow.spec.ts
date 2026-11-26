@@ -1336,7 +1336,9 @@ describe('client progress tab: the lane matrix, drawn to the contract’s number
     expect(cell, 'the task cell has no rule').toBeDefined()
     expect(cell).toContain('display: flex')
     expect(cell).toContain('height: 26px')
-    expect(cell).toContain('border-radius: 10px')
+    // A 26px box cannot carry the node's 10px radius: that is 77% of its half-height and
+    // reads as a pill. The cell is a box, so its radius is 6px (the node keeps 10px).
+    expect(cell).toContain('border-radius: 6px')
     expect(cell).toContain('padding: 3px 8px')
     expect(cell).toContain('gap: 4px')
     expect(cell).toContain('font-size: 12px')
