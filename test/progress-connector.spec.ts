@@ -1,16 +1,17 @@
 /**
- * The progress page's shape and its colours: what the flowchart kept, and what it retired.
+ * The progress page's shape and its colours: what the task panel kept, and what it retired.
  *
- * Before this page the tab was four zones — a "现在" headline, an equal segment per step, a
- * step list, a history log with its own fold, a "交卷" card and a two-column body — and
- * before *that* it was a fixed six-segment spine with a ring per segment, a measured wire
- * layer per stage and a vertical task band. `.tmp/flowchart-contract.md` replaces all of it
- * with one flowchart, so this file is where the retirement is pinned: a half-deleted
- * structure would keep re-asserting a template nobody wants on screen any more.
+ * Before this page the tab was, in turn, four zones (a "现在" headline, an equal segment per
+ * step, a step list, a history log, a 交卷 card, a two-column body), a fixed six-segment spine
+ * with a ring per segment, a flowchart of leg nodes, and finally a lane matrix of legs × plan
+ * tasks with a cell list, a count line and two families of toggle hooks. The operator retired
+ * the matrix for one branch-tree figure with two readings on it, so this file is where the
+ * retirement is pinned: a half-deleted structure would keep re-asserting a template nobody
+ * wants on screen any more.
  *
- * The text of the three screens is `test/client.spec.ts`'s job and the geometry is
- * `test/progress-flow.spec.ts`'s. This file reads the stylesheet plus the rendered tree,
- * because both are hand-written JavaScript the host serves verbatim and neither can be
+ * The words and the interactions are `test/progress-panel.spec.ts`'s job and the model is
+ * `test/progress-panel-model.spec.ts`'s. This file reads the stylesheet plus the rendered
+ * tree, because both are hand-written JavaScript the host serves verbatim and neither can be
  * type-checked.
  */
 import { readFileSync } from 'node:fs'
@@ -126,7 +127,7 @@ function renderRun(run: ProgressRun): unknown {
   })
 }
 
-/** The run every structural case renders: two legs, one still open. */
+/** The run every structural case renders: two legs, one still open, one plan task each. */
 const run: ProgressRun = {
   runId: 'run-shape',
   name: '任务团队 · 2 个任务',
@@ -137,26 +138,21 @@ const run: ProgressRun = {
   ],
 }
 
-describe('client progress tab: the retired geometry is gone, not hidden', () => {
+describe('client progress tab: the retired drawings are gone, not hidden', () => {
   /**
-   * Every part of the two retired drawings, by the name it used.
+   * Every part of the four drawings this page replaced, by the name it used.
    *
    * The list is spelled out rather than derived from one prefix, because the halves are
-   * unrelated: the four-zone page's own names, and the spine's names under them. A survivor
-   * in any of them means part of a retired template is still being built — except the two
-   * the contract revives on purpose (`gw-progress-flow` is the flowchart's own container,
-   * and `gw-progress-wires` is its measured layer).
+   * unrelated: the four-zone page's names, the spine's, the first flowchart's, and the lane
+   * matrix's. A survivor in any of them means part of a retired template is still being
+   * built — except the two the panel revives on purpose (`gw-progress-graph` is the figure's
+   * own container, and `gw-progress-wires` is its drawn layer).
    */
   const RETIRED_CLASSES = [
     // the four-zone page (2026-11-25, `feat/progress-redesign`)
     'gw-progress-now',
     'gw-progress-eyebrow',
     'gw-progress-headline',
-    // `gw-progress-sub` (the four-zone subtitle) and `gw-progress-subs` (the spine's
-    // sub-list) were retired with those pages, then re-issued by the matrix contract for a
-    // plan task's cell and the cells' list (追加 2). They are live names again, and
-    // `progress-flow.spec.ts` pins what they mean; `gw-progress-task` below still may not
-    // appear anywhere.
     'gw-progress-actor',
     'gw-progress-sep',
     'gw-progress-steps',
@@ -184,6 +180,7 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'gw-progress-quiet',
     'gw-progress-quiet-dot',
     // the spine (0.12.19, `progress-tab-two-track`)
+    'gw-progress-flow',
     'gw-progress-track',
     'gw-progress-seg',
     'gw-progress-ring',
@@ -200,22 +197,38 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'gw-progress-badge',
     'gw-progress-dur',
     'gw-progress-meta',
-    // …and the flowchart's own node list, which the lane matrix replaced (matrix §追加 2):
-    // `gw-progress-subs` / `gw-progress-sub` used to sit in this list as the four-zone page's
-    // subtitle and the spine's sub-list; the matrix contract re-issues both names for the
-    // task cells, so they are live vocabulary again and are pinned by `progress-flow.spec.ts`.
+    // the first flowchart (`feat/progress-flowchart`) and its node list
     'gw-progress-nodes',
+    'gw-progress-node',
+    'gw-progress-node-body',
+    'gw-progress-node-dot',
+    'gw-progress-node-word',
+    'gw-progress-node-badge',
+    'gw-progress-node-toggle',
+    'gw-progress-node-ord',
     'gw-progress-percent',
     '--gw-zoom',
     '--gw-wire-depth',
+    // the lane matrix (`feat/flowchart-v2`): columns of legs, cells of tasks, a count line
+    'gw-progress-cols',
+    'gw-progress-col',
+    'gw-progress-subs',
+    'gw-progress-sub',
+    'gw-progress-sub-dots',
+    'gw-progress-sub-dot',
+    'gw-progress-sub-word',
+    'gw-progress-sub-badge',
+    'gw-progress-sub-calls',
+    'gw-progress-sub-toggle',
+    'gw-progress-left',
   ] as const
 
   /**
    * Every retired hook, with the boundary rule that makes the check honest.
    *
-   * `data-gw-progress-log` is the *list*; `data-gw-progress-log-row` is a line inside a
-   * node's calls and stays. A plain substring test would confuse the two, so each name is
-   * matched only when nothing can continue it.
+   * `data-gw-progress-node` is the first flowchart's node; `data-gw-progress-node-calls` is
+   * the panel's opened list and stays. A plain substring test would confuse the two, so each
+   * name is matched only when nothing can continue it.
    */
   const RETIRED_HOOKS = [
     'data-gw-progress-now',
@@ -243,10 +256,26 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     'data-gw-progress-failbadge',
     'data-gw-progress-dur',
     'data-gw-progress-meta',
-    'data-gw-progress-nodes',
     'data-gw-progress-label',
     'data-progress-percent',
     'data-progress-zoom',
+    // the first flowchart's own list and nodes…
+    'data-gw-progress-nodes',
+    'data-gw-progress-flow',
+    'data-gw-progress-node',
+    'data-gw-progress-node-word',
+    'data-gw-progress-node-badge',
+    'data-gw-progress-node-ord',
+    'data-gw-progress-node-toggle',
+    // …and the matrix's columns, cells, toggles and count line.
+    'data-gw-progress-cols',
+    'data-gw-progress-col',
+    'data-gw-progress-subs',
+    'data-gw-progress-sub',
+    'data-gw-progress-sub-toggle',
+    'data-gw-progress-sub-calls',
+    'data-gw-progress-branch-side',
+    'data-gw-progress-left',
   ] as const
 
   /** Whether one retired hook appears as a whole attribute name, on a page or in the source. */
@@ -277,16 +306,18 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
       }
       expect(carriesHook(SOURCE, hook), `${hook} is still shipped`).toBe(false)
     }
-    // The matcher can fail both ways: it finds a retired name where one is spelled out,
-    // and it does not confuse the retired list with the line hook that survives beside it.
+    // The matcher can fail both ways: it finds a retired name where one is spelled out, it
+    // does not confuse the retired list with the line hook that survives beside it, and it
+    // does not eat the panel's own opened-calls hook.
     expect(carriesHook('{"data-gw-progress-log": true}', 'data-gw-progress-log')).toBe(true)
     expect(carriesHook('{"data-gw-progress-log-row": 3}', 'data-gw-progress-log')).toBe(false)
     expect(carriesHook(SOURCE, 'data-gw-progress-log-row')).toBe(true)
+    expect(carriesHook('{"data-gw-progress-node-calls": "plan"}', 'data-gw-progress-node')).toBe(false)
   })
 
   it('keeps no new class name built on the retired task-band prefix', () => {
     // `gw-progress-task` was the spine's card. A new class may not hide the old structure
-    // behind the same word — the flow's own vocabulary is nodes, calls and wires.
+    // behind the same word — the panel's own vocabulary is nodes, calls and wires.
     for (const token of styledClasses()) {
       expect(token, `${token} carries the retired prefix`).not.toContain('gw-progress-task')
     }
@@ -297,77 +328,78 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     }
   })
 
-  it('styles the matrix vocabulary, and nothing older than it', () => {
-    // The matrix's own names, in one place: an extra class on the page would be a mark
-    // nobody agreed to, and the retry round added exactly two (`gw-progress-sub-dots` and
-    // `gw-progress-sub-badge`).
-    const styled = styledClasses()
-    for (const className of [
-      'gw-progress-cols',
-      'gw-progress-col',
-      'gw-progress-subs',
-      'gw-progress-sub',
-      'gw-progress-sub-dots',
-      'gw-progress-sub-dot',
-      'gw-progress-sub-badge',
-      'gw-progress-sub-word',
-      'gw-progress-sub-calls',
-    ]) {
-      expect(styled, `${className} is not styled`).toContain(className)
-    }
-    // …and the retired task-band prefix still may not hide inside any of them.
-    for (const token of styled) expect(token).not.toContain('gw-progress-task')
-  })
-
   it('keeps no measurement, no zoom factor and no settle arithmetic in the source', () => {
-    // The spine's own geometry helpers are code facts, not just DOM facts: a leftover would
-    // keep reading a structure that is gone.
-    for (const gone of ['progressSettleParts', 'PROGRESS_STATE_GLYPH', 'progressZoom', 'PROGRESS_ZOOM']) {
+    // The retired drawings' own geometry helpers are code facts, not just DOM facts: a
+    // leftover would keep reading a structure that is gone.
+    for (const gone of [
+      'progressSettleParts',
+      'PROGRESS_STATE_GLYPH',
+      'progressZoom',
+      'PROGRESS_ZOOM',
+      'measureProgressFlowWires',
+      'sameProgressWires',
+      'progressWireLine',
+    ]) {
       expect(SOURCE, `${gone} is still shipped`).not.toContain(gone)
     }
   })
 })
 
-describe('client progress tab: the flowchart is one flow, read top to bottom', () => {
-  it('draws the header, the flow, the guardian, the count and the dock, in that order', () => {
+describe('client progress tab: the panel draws one figure and one sentence', () => {
+  it('draws the header, the figure, the Guardian and the dock, in that order', () => {
     const elements = walk(renderRun(run))
     const hooks = elements
       .map((element) => Object.keys(element.props).find((key) => key.startsWith('data-gw-progress-')))
       .filter((hook): hook is string => hook !== undefined && hook !== 'data-gw-progress-css')
     const at = (hook: string) => hooks.indexOf(hook)
     expect(at('data-gw-progress-bar')).toBeGreaterThanOrEqual(0)
-    expect(at('data-gw-progress-flow')).toBeGreaterThan(at('data-gw-progress-bar'))
-    expect(at('data-gw-progress-cols')).toBeGreaterThan(at('data-gw-progress-wires'))
-    expect(at('data-gw-progress-left')).toBeGreaterThan(at('data-gw-progress-cols'))
-    expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-left'))
-    // The retired two-zone body has no wrapper left to sit in.
+    expect(at('data-gw-progress-graph')).toBeGreaterThan(at('data-gw-progress-bar'))
+    expect(at('data-gw-progress-wires')).toBeGreaterThan(at('data-gw-progress-graph'))
+    expect(at('data-gw-progress-pnodes')).toBeGreaterThan(at('data-gw-progress-wires'))
+    expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-pnodes'))
+    // The retired two-zone body and the count line have no wrapper left to sit in.
     expect(hooks).not.toContain('data-gw-progress-columns')
+    expect(hooks).not.toContain('data-gw-progress-left')
   })
 
-  it('keeps one hook per column, one per node, one per task, and one count line', () => {
+  it('keeps one hook per zone, one per node, and one control per node that has calls', () => {
     const elements = walk(renderRun(run))
     const count = (hook: string) => elements.filter((element) => Object.prototype.hasOwnProperty.call(element.props, hook)).length
     expect(count('data-gw-progress')).toBe(1)
+    expect(count('data-gw-progress-css')).toBe(1)
     expect(count('data-gw-progress-bar')).toBe(1)
-    expect(count('data-gw-progress-flow')).toBe(1)
+    expect(count('data-gw-progress-line')).toBe(1)
+    expect(count('data-gw-progress-graph')).toBe(1)
+    expect(count('data-gw-progress-source')).toBe(1)
     expect(count('data-gw-progress-wires')).toBe(1)
-    expect(count('data-gw-progress-cols')).toBe(1)
-    // start + execute + check + end: the two legs, with the ends around them, one column each.
-    expect(count('data-gw-progress-col')).toBe(4)
-    expect(count('data-gw-progress-node')).toBe(4)
-    expect(count('data-gw-progress-node-word')).toBe(4)
-    // Both work legs walked `任务 1 · 读代码`, so both rows hang in a task cell: two cells,
-    // and no step node left with a row of its own to open.
-    expect(count('data-gw-progress-subs')).toBe(2)
-    expect(count('data-gw-progress-sub')).toBe(2)
-    expect(count('data-gw-progress-sub-word')).toBe(2)
-    expect(count('data-gw-progress-node-toggle')).toBe(0)
-    expect(count('data-gw-progress-sub-toggle')).toBe(2)
-    expect(count('data-gw-progress-left')).toBe(1)
-    // The calls are closed, so no line is drawn — and no retired list holds one.
+    expect(count('data-gw-progress-pnodes')).toBe(1)
+    expect(count('data-gw-progress-dock')).toBe(1)
+    // start + execute + its task + check + its task + end: both legs walked `任务 1`, so both
+    // rows hang in a task node and each leg keeps nothing of its own.
+    expect(count('data-gw-progress-pnode')).toBe(6)
+    expect(count('data-gw-progress-pnode-word')).toBe(6)
+    // The body is a class, not a hook: it is the box the word and the dot sit in.
+    expect(elements.filter((element) => classesOf(element).includes('gw-progress-pnode-body'))).toHaveLength(6)
+    // Only a node with something to open is a control; the two legs here handed every row to
+    // a task, and the two ends declare nothing.
+    expect(count('data-gw-progress-pnode-open')).toBe(2)
+    // One wire per edge of the text the figure carries: two legs, two tasks, one end.
+    expect(count('data-gw-progress-edge')).toBe(5)
+    // The calls are closed, so no list and no line is drawn.
     expect(count('data-gw-progress-node-calls')).toBe(0)
-    expect(count('data-gw-progress-sub-calls')).toBe(0)
     expect(count('data-gw-progress-log-row')).toBe(0)
+  })
+
+  it('names each opened list after the node that opens it, and only then', () => {
+    // The contract between the two: `aria-controls` on the button is the list's own id, which
+    // is why the hook and the id are both derived from the node id and nothing else.
+    for (const element of walk(renderRun(run))) {
+      if (!Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-pnode-open')) continue
+      const id = String(element.props['data-gw-progress-pnode-open'])
+      expect(element.type).toBe('button')
+      expect(element.props['aria-controls']).toBe(`gw-progress-calls-${id}`)
+      expect(element.props['aria-expanded']).toBe(false)
+    }
   })
 
   it('exports the six stages the phase binding reads, without drawing them', () => {
@@ -381,11 +413,23 @@ describe('client progress tab: the flowchart is one flow, read top to bottom', (
 })
 
 describe('client progress tab: the stylesheet keeps its own rules', () => {
+  /** One rule of the sheet, by a selector of its own, whether it stands alone or in a group. */
+  function ruleOf(selector: string): string | undefined {
+    return progress.css.split('\n').find((line) => {
+      const at = line.indexOf('{')
+      if (at === -1) return false
+      return line.slice(0, at).split(',').map((part) => part.trim()).includes(selector)
+    })
+  }
+
   it('scopes every rule to the tab, and never scrolls sideways', () => {
     const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
     for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
     expect(progress.css).not.toContain('overflow-x')
     expect(progress.css).not.toContain('scroll-snap-type')
+    expect(progress.css).not.toContain('scroll-snap')
+    // The one scroll box is a node's own opened list, and it scrolls down.
+    expect(ruleOf('.gw-progress-node-calls')).toContain('overflow-y: auto')
   })
 
   it('carries the five-state chip and the breathing current node, and no other motion', () => {
@@ -396,6 +440,10 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
     expect(progress.css).toContain('@keyframes gw-progress-pulse')
     // The flowing sweep belonged to the retired segment bar.
     expect(progress.css).not.toContain('@keyframes gw-progress-sweep')
+    // …and a reader who asked for less motion loses only the decoration.
+    const reduced = progress.css.slice(progress.css.indexOf('@media (prefers-reduced-motion: reduce)'))
+    expect(reduced).toContain('animation: none')
+    expect(reduced).toContain('.gw-progress-pnode')
   })
 
   it('carries no literal colour and no error token', () => {
@@ -405,139 +453,59 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
     expect(progress.css).not.toMatch(/\bhsla?\(/)
     expect(progress.css).toContain('var(--dsw-font-family-sans')
   })
-})
 
-/* ------------------------------------------------------ the phone is a tree -- */
-
-/**
- * The matrix is a wall of columns; a phone cannot hold that wall.
- *
- * Six legs side by side squeezed each one to a sliver and every task name was cut to an
- * ellipsis — that is the shape the reader complained about. Under 720px the flow therefore
- * stops being a row of columns and becomes a tree: one leg per line at full width, and the
- * tasks that leg walked hang under it on two rails. The desktop matrix is untouched, and
- * these cases hold both halves of that: what the breakpoint must say, and what it must not
- * take away from the page above it.
- *
- * The rail is written as `data-gw-progress-branch-side` on every cell at every width. The
- * phone layout is one reader of it and the wire measurement is the other, so it is pinned
- * here rather than left to whichever of them happens to run.
- */
-describe('client progress tab: under 720px the matrix becomes a tree', () => {
-  /** Whether one element carries a hook of its own (a `false` value still counts). */
-  function carries(element: Element, hook: string): boolean {
-    return Object.prototype.hasOwnProperty.call(element.props, hook)
-  }
-
-  /** One cell's rail, as the page wrote it. */
-  function sideOf(cell: Element): unknown {
-    return cell.props['data-gw-progress-branch-side']
-  }
-
-  /** The task cells of one leg, in reading order. */
-  function cellsOf(run: ProgressRun, kind: string): Element[] {
-    const column = walk(renderRun(run))
-      .find((element) => element.props['data-gw-progress-col'] === kind)
-    expect(column, `the fixture drew no ${kind} column`).toBeDefined()
-    return walk(column!).filter((element) => carries(element, 'data-gw-progress-sub'))
-  }
-
-  /** A run whose execute leg walked three tasks and whose check leg walked two. */
-  const threeThenTwo: ProgressRun = {
-    runId: 'run-rails',
-    name: '任务团队 · 3 个任务',
-    anchorSeq: 1,
-    members: [
-      { seq: 1, label: '执行', childId: 'child-1', order: 0, phase: '任务 1 · 读代码', outcome: 'completed' },
-      { seq: 2, label: '执行', childId: 'child-2', order: 1, phase: '任务 2 · 改代码', outcome: 'completed' },
-      { seq: 3, label: '执行', childId: 'child-3', order: 2, phase: '任务 3 · 补测试', outcome: 'completed' },
-      { seq: 4, label: '检查', childId: 'child-4', order: 3, phase: '任务 1 · 读代码', outcome: 'completed' },
-      { seq: 5, label: '检查', childId: 'child-5', order: 4, phase: '任务 2 · 改代码' },
-    ],
-  }
-
-  it('puts every cell on a rail by its position, and a lone task on both', () => {
-    // 1 左、2 右、3 左：the tree alternates, so two rows of a leg read as one fan-out.
-    expect(cellsOf(threeThenTwo, 'execute').map(sideOf)).toEqual(['left', 'right', 'left'])
-    expect(cellsOf(threeThenTwo, 'check').map(sideOf)).toEqual(['left', 'right'])
-    // A leg that walked one task is one card across the whole width, not a card on a rail.
-    expect(cellsOf(run, 'execute').map(sideOf)).toEqual(['none'])
-    expect(cellsOf(run, 'check').map(sideOf)).toEqual(['none'])
-    // Every cell has one, and it is always one of the three — the wire measurement reads it
-    // on every host, including the desktop one where it means nothing.
-    for (const cell of [...cellsOf(threeThenTwo, 'execute'), ...cellsOf(run, 'execute')]) {
-      expect(['left', 'right', 'none']).toContain(sideOf(cell))
+  it('styles the panel’s own classes, and none of the ones it replaced', () => {
+    const styled = styledClasses()
+    for (const className of [
+      'gw-progress-bar',
+      'gw-progress-run',
+      'gw-progress-chip',
+      'gw-progress-line',
+      'gw-progress-graph',
+      'gw-progress-wires',
+      'gw-progress-pnodes',
+      'gw-progress-pnode',
+      'gw-progress-pnode-body',
+      'gw-progress-pnode-dot',
+      'gw-progress-pnode-word',
+      'gw-progress-pnode-badge',
+      'gw-progress-pnode-dots',
+      'gw-progress-pnode-attempt',
+      'gw-progress-pnode-retry',
+      'gw-progress-node-calls',
+      'gw-progress-node-rejected',
+      'gw-progress-log-row',
+      'gw-progress-log-time',
+      'gw-progress-log-line',
+      'gw-progress-stuck',
+      'gw-progress-foot',
+      'gw-progress-dock',
+      'gw-progress-dock-fill',
+      'gw-progress-guardian',
+      'gw-progress-empty',
+    ]) {
+      expect(styled, `${className} is not styled`).toContain(className)
     }
   })
 
-  it('leaves the desktop matrix exactly as it was, inline task-number row and all', () => {
-    // Above 720px the cell's row is the task number, written inline: that is what makes one
-    // task sit on one line across every leg. The rail must not disturb it.
-    const rows = cellsOf(threeThenTwo, 'execute')
-      .map((cell) => (cell.props['style'] as Record<string, string> | undefined)?.['gridRow'])
-    expect(rows).toEqual(['1', '2', '3'])
-    const at = progress.css.indexOf('@media (max-width: 720px)')
-    expect(at, 'the 720px breakpoint is gone').toBeGreaterThan(0)
-    const wide = progress.css.slice(0, at)
-    // The attribute is inert up there: no rule outside the breakpoint may read it…
-    expect(wide).not.toContain('data-gw-progress-branch-side')
-    // …and the matrix keeps its own geometry: a wrapped row of columns with equal widths,
-    // and a cell list whose rows are the run's task numbers.
-    expect(wide).toMatch(/\.gw-progress-cols \{[^}]*flex-wrap: wrap/)
-    expect(wide).toMatch(/\.gw-progress-subs \{[^}]*grid-template-rows: repeat\(var\(--gw-lanes/)
-    expect(wide).toMatch(/\.gw-progress-sub \{[^}]*height: 26px/)
+  it('draws the trace with two rules and no new colour', () => {
+    // The clicked node's wires step forward, every other wire steps back: the figure keeps
+    // its structure while the branch a reader asked about reads first.
+    expect(ruleOf('.gw-progress-wires > path[data-trace="active"]')).toContain('--dsw-alias-state-business-primary')
+    expect(ruleOf('.gw-progress-wires > path[data-trace="active"]')).toContain('stroke-width: 2')
+    expect(ruleOf('.gw-progress-wires > path[data-trace="dim"]')).toContain('opacity')
+    expect(ruleOf('.gw-progress-pnode[data-trace="active"] .gw-progress-pnode-body'))
+      .toContain('--dsw-alias-state-business-primary')
   })
 
-  it('stacks one leg a line and hangs its tasks on two rails', () => {
-    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
-    // One leg per line, full width: nothing is squeezed down to a sliver.
-    expect(narrow).toMatch(/\.gw-progress-cols \{[^}]*flex-direction: column/)
-    expect(narrow).toMatch(/\.gw-progress-col \{[^}]*width: 100%/)
-    // The cell list becomes the two rails, one row per pair of tasks.
-    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
-    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*grid-template-rows: none/)
-    expect(narrow).toMatch(/\.gw-progress-subs \{[^}]*column-gap: 8px/)
-    // Each cell stands on the rail the attribute names, and a lone one spans both.
-    for (const [side, column] of [['left', '1'], ['right', '2'], ['none', '1 / -1']]) {
-      expect(narrow, `no rail rule for ${side}`)
-        .toContain(`.gw-progress-sub[data-gw-progress-branch-side="${side}"] { grid-column: ${column}; }`)
-    }
-    // The inline task-number row is the matrix's, not the tree's: it is overruled here.
-    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*grid-row: auto !important/)
-  })
-
-  it('lets the cards grow instead of cutting the words', () => {
-    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
-    for (const rule of ['.gw-progress-sub', '.gw-progress-node']) {
-      const line = narrow.split('\n').find((entry) => entry.trim().startsWith(`${rule} {`))
-      expect(line, `${rule} has no phone rule`).toBeDefined()
-      expect(line, `${rule} still fixes its height`).toContain('height: auto')
-      expect(line, `${rule} keeps a readable floor`).toContain('min-height: 34px')
-      expect(line, `${rule} still cuts its text`).toContain('text-overflow: clip')
-      expect(line, `${rule} still refuses to wrap`).toContain('white-space: normal')
-      expect(line, `${rule} still cannot break a long word`).toContain('overflow-wrap: anywhere')
-    }
-    // The word element is where the ellipsis lived, so that is what has to stop nowrap-ing.
-    for (const rule of ['.gw-progress-sub-word', '.gw-progress-node-word']) {
-      const line = narrow.split('\n').find((entry) => entry.trim().startsWith(`${rule} {`))
-      expect(line, `${rule} has no phone rule`).toBeDefined()
-      expect(line).toContain('white-space: normal')
-      expect(line).toContain('text-overflow: clip')
-    }
-    // A cell's name takes a line of its own: sharing one with the attempt count is what
-    // chewed the words in the first place.
-    expect(narrow).toMatch(/\.gw-progress-sub \{[^}]*grid-template-areas: "dots badge toggle" "word word word"/)
-    expect(narrow).toMatch(/\.gw-progress-sub-word \{[^}]*grid-area: word/)
-  })
-
-  it('keeps the tree at 480px instead of reflowing it a second time', () => {
-    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
-    const small = narrow.slice(narrow.indexOf('@media (max-width: 480px)'))
-    expect(small, 'the 480px breakpoint is gone').not.toBe('')
-    // The narrower breakpoint is about the dock and a call line's clock column: it may not
-    // re-lay the flow, because a second reflow is how a tree loses its branches.
-    expect(small).not.toMatch(/\.gw-progress-col \{/)
-    expect(small).not.toMatch(/\.gw-progress-subs \{/)
-    expect(small).toMatch(/\.gw-progress-dock \{[^}]*flex-direction: column/)
+  it('makes the node that opens a real button, with a focus ring of its own', () => {
+    // A div is not focusable, so the body that carries a control must say it is one — and it
+    // must keep the box it had, so the figure does not change shape with the interaction.
+    expect(ruleOf('.gw-progress-pnode-body[type="button"]')).toContain('cursor: pointer')
+    expect(ruleOf('.gw-progress-pnode-body:focus-visible')).toContain('outline')
+    const body = ruleOf('.gw-progress-pnode-body')
+    expect(body).toContain('font: inherit')
+    expect(body).toContain('text-align: left')
+    expect(body).toContain('background-color: transparent')
   })
 })

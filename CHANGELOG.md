@@ -5,6 +5,39 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The progress tab is one task panel now: a sentence on top, a branch tree in the middle, and a sentence at the bottom only while the run is really held up / 进度页现在是一块任务面板：上面一句话，中间一张分支树，底下一句只在真的卡住时才出现** —
+  The top line says which step the run is on and how many steps there are, and adds how much time is left when that can be measured
+  from the run's own timings. The middle draws the whole run as one flow chart: every step, and under each step the plan tasks it
+  walked, each as a branch of its own — one dot per attempt, and a failed try joined to the next one by a short dashed line. The
+  bottom line appears only while the run really is held up: a try that has not passed, a step that never reported back, or a gate that
+  turned every draft back. When nothing is holding the run, nothing is drawn there.
+  **Click a node** and it opens the calls it made; **click a branch** and its wires light up while the rest of the figure steps back;
+  a second click, or a click on the empty background, clears that.
+  **No number is invented.** There is no percentage and no pass rate anywhere on the page. The one estimate — the "about X left"
+  clause — is the mean of the steps that already finished, multiplied by the steps still ahead, and its tooltip says exactly that;
+  with nothing measured yet, the clause is simply absent.
+  **The diagram is generated from standard Mermaid text**: an ordinary `flowchart TD` document, carried on the page instead of shown as
+  a block, so the picture and the text cannot disagree — and it can be copied into any Mermaid renderer as it stands. No drawing
+  library was added; the page lays that text out itself.
+  **Removed with the old layout:** the equal-width step strip, the phone two-column grid, the round "open" chevrons on the steps, and
+  the "N steps left" line — the one sentence on top replaces that line.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; only the way this tab is drawn.**
+  / 最上面那一句说这一轮走到第几步、一共几步；当这一轮自己的耗时量得出来时，再补一句还剩多久。中间把整轮画成一张流程图：
+  每一步一颗节点，每一步下面挂着它走过的那些计划任务，各自成一条分支——每一次尝试一颗小圆点，没过的那一次和下一次之间
+  连一小段虚线。最下面那一句只在真的卡住时出现：有一次没过、有一步一直没回报、或者守门把所有稿子都退回来了。
+  没有卡住的时候，那里什么都不画。
+  **点一颗节点**，它会摊开这一步调过谁；**点一条分支**，跟它有关的线亮起来、其余退到后面；再点一次、或者点图上的空白处，
+  就取消掉。
+  **一个数字都不编。** 页面上没有百分比，也没有通过率。唯一的估算——「还剩约……那半句」——是已经跑完的步骤的平均耗时
+  乘上还剩几步，它的悬停提示就是这么写的；一步都还没量到的时候，这半句干脆不出现。
+  **这张图是从标准 Mermaid 文本生成的**：就是一份普通的 `flowchart TD` 文档，带在页面上而不是摊成一块可见内容，
+  所以图和文字不会各说各话；这份文本原样贴进任何 Mermaid 渲染器都能画。**没有为此新增画图库**，页面自己把这行文本排出来。
+  **跟着旧版一起退场的**：等宽步骤条、手机上的两列网格、步骤上那个圆形的「展开」小箭头，以及「还剩 N 步」那一行——
+  这一行由顶上那一句话接替。
+  **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；变的只是这个页签怎么画。**
+
 ## [0.13.52] - 2026-11-26
 
 ### Changed / 变更

@@ -1,0 +1,82 @@
+# Red lines, measured — task panel block, 2026-11-26
+
+Everything below was run in this session. Nothing in `~/.dsh` was written, the live instance on
+3080 was never restarted, reloaded or reconfigured, and no tag, push or publish happened.
+
+## 1. The write probe (must fail read-only)
+
+```
+$ ( : > ~/.dsh/.soak-probe )
+bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+$ ls ~/.dsh/.soak-probe
+ls: cannot access '/home/fish/.dsh/.soak-probe': No such file or directory
+```
+
+Run twice: once before any work (18:25) and once at teardown (18:56). Both failed the same way.
+The live home is mounted read-only for this session, so a mistake cannot land there.
+
+## 2. `~/.dsh` and `~/.dsh/profiles` mtimes, before and after
+
+```
+                        BEFORE (18:25:33)            AFTER (18:56)
+~/.dsh                  2026-11-25 23:14:14.025     2026-11-25 23:14:14.025
+~/.dsh/profiles         2026-11-22 16:59:46.687     2026-11-22 16:59:46.687
+~/.dsh/profiles/web     2026-11-26 11:22:40.166     2026-11-26 11:22:40.166
+```
+
+Byte-identical timestamps. The live profile was read (cloned from) and never written.
+
+## 3. The live instance on 3080
+
+```
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/     # before
+401
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/     # after
+401
+$ node -p "require('~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json').version"
+0.13.48        (unchanged: this round did not upgrade the live plugin)
+```
+
+No restart, no reload, no settings write, no request other than the two status probes above.
+
+## 4. One honest incident: `dsh web --help` tried to write the live profile
+
+While finding out why `--profile` was rejected, one command was run from this session without
+`DSH_HOME` pointing at the clone:
+
+```
+$ dsh web --help
+Error: EROFS: read-only file system, open '/home/fish/.dsh/profiles/web/cordis.yml'
+    at prepareProfile (.../profile-boot-QhDEDXsF.js:221:2)
+```
+
+It **failed** on the read-only mount before writing anything, and the mtimes above prove the file
+was not touched. The cause: this session's shell already exports `DSH_HOME=~/.dsh` and
+`DSH_PROFILE=web`. Every later invocation passed `env -u DSH_PROFILE -u DSH_PROFILE_DIR
+DSH_HOME=<clone>`. Recorded here rather than left out, because a command was run that was not
+scoped to the clone.
+
+## 5. The isolated instance
+
+```
+$ ss -ltn | grep 3411        during the soak: LISTEN 127.0.0.1:3411
+$ ss -ltn | grep 3411        at teardown:     (nothing — the process was stopped)
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3411/
+401          (the isolated instance's own token gate)
+```
+
+Port 3411 was free when the block started, so no fallback to 3412 was needed.
+
+## 6. What was written, and where
+
+| Path | What |
+| --- | --- |
+| `.tmp/soak-panel/**` | clone home, tgz, npm cache, the three capture scripts, boot log — deleted at teardown |
+| `.tmp/gate-tmp/**` | TMPDIR for the gate run — deleted at teardown |
+| `.rsi/evidence/task-panel-2026-11-26/**` | this evidence directory (the only thing left behind) |
+
+Product code, tests, `docs/`, `package.json`, `package-lock.json` and `CHANGELOG.md`: not
+written by this block. `git status` at teardown shows the evidence directory plus three
+documentation files that a **concurrent block** edited at 18:32–18:36 (CHANGELOG.md,
+docs/knowledge/DECISIONS.md, docs/knowledge/DESIGN-progress-tab.md). Those are not this block's
+writes; their mtimes are listed in the README.

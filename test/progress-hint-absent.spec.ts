@@ -230,6 +230,22 @@ const FAMILY: ReadonlyArray<{ form: string, pattern: RegExp }> = [
     form: 'a derived state explained instead of shown',
     pattern: /状态是推导出来的|推导出来的，不是事件里写的|按阻塞显示|the state is derived|shown as blocked/iu,
   },
+  // The count line the task panel replaced (§21 → the operator's panel brief). Its sentence
+  // counted *steps left*, and a step is a place in the figure, not a quantity a reader can
+  // spend: the panel says which step the run is on, and the only remainder it prints is the
+  // measured time. The `共 N 步` half stays legal — it is the sentence the panel kept.
+  {
+    form: 'the retired count line',
+    pattern: /还剩\s*\d+\s*步|\d+\s*步\s*(?:未走|没走|待走)|steps? (?:are )?left|remaining steps/iu,
+  },
+  // Placeholder copy: a slot that was never filled, or a box that says it is waiting for a
+  // value. The panel has no such surface — an unknown step is a grey node, and a run with no
+  // progress is one sentence of its own, not a dash in a field.
+  {
+    form: 'a placeholder standing in for a value',
+    // `暂无处置记录` is allowed and stays: it *names* an absence the Guardian really had.
+    pattern: /待补充|待填|待定|未知数据|加载中|正在加载|undefined|N\/A|\bTBD\b|\bTODO\b|\bXX+\b|\.\.\.$/u,
+  },
 ]
 
 /** Every family form one string matches. */
@@ -309,8 +325,14 @@ describe('progress page: the change explanation stays deleted', () => {
   function openedPage(run: ProgressRun): unknown {
     const render = clickablePage(run)
     let page = render()
-    for (const toggle of walk(page).filter((element) => element.props['data-gw-progress-node-toggle'] !== undefined)) {
-      ;(toggle.props['onClick'] as () => void)()
+    // A node that has calls is a real button; opening it is the page's own click.
+    for (;;) {
+      const closed = walk(page).filter((element) =>
+        element.type === 'button'
+        && element.props['data-gw-progress-pnode-open'] !== undefined
+        && element.props['aria-expanded'] !== true)
+      if (closed.length === 0) break
+      ;(closed[0]!.props['onClick'] as () => void)()
       page = render()
     }
     return page
@@ -331,6 +353,20 @@ describe('progress page: the change explanation stays deleted', () => {
       findings: [{ seq: 2, label: '执行 · 任务 1 · 搭建', signal: 'timeout', action: 'rescue', reason: '子任务心跳停了', atMs: 60_000 }],
     })
   }
+
+  it('can catch the copy it bans, and lets the panel’s own sentence through', () => {
+    // A guard nobody has seen fail is a guard that might compare nothing: the two families
+    // this round added must fire on the wording they name…
+    expect(forms('还剩 1 步 / 共 2 步')).toContain('the retired count line')
+    expect(forms('2 steps left / 6 total')).toContain('the retired count line')
+    expect(forms('3 步未走')).toContain('the retired count line')
+    expect(forms('待补充')).toContain('a placeholder standing in for a value')
+    expect(forms('加载中…')).toContain('a placeholder standing in for a value')
+    // …and must not fire on what the panel really says, or on a name for a real absence.
+    expect(forms('第 3 步，共 4 步')).toEqual([])
+    expect(forms('第 3 步，共 4 步 · 还剩约 20 秒')).toEqual([])
+    expect(forms('暂无处置记录')).toEqual([])
+  })
 
   it('ships no copy in either language that promises a later repaint', () => {
     const tables: Array<{ table: string, dict: Dict }> = [

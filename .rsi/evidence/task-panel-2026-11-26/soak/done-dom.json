@@ -1,0 +1,11 @@
+{
+ "chip": "已完成",
+ "line": "第 7 步，共 7 步",
+ "run": "任务团队 · 3 个任务",
+ "stuck": null,
+ "dock": "收下这版",
+ "pnodes": 16,
+ "edges": 21,
+ "source": "<see mermaid-done.txt>",
+ "aria": "任务图"
+}

@@ -1,0 +1,38 @@
+flowchart TD
+  start(["起点"])
+  execute["执行"]
+  execute_t1("任务 1 · 写 notes.md")
+  execute_t2("任务 2 · 写 test.txt")
+  execute_t3("任务 3 · 写 third.txt")
+  check["检查"]
+  check_t1("任务 1 · 写 notes.md")
+  check_t2("任务 2 · 写 test.txt")
+  check_t3("任务 3 · 写 third.txt")
+  review["复核"]
+  review_t1("任务 1 · 写 notes.md")
+  review_t2("任务 2 · 写 test.txt")
+  review_t3("任务 3 · 写 third.txt")
+  summarize["汇总"]
+  summarize_2["汇总"]
+  finish(["终点"])
+  start --> execute
+  execute --> execute_t1
+  execute_t1 --> check
+  execute --> execute_t2
+  execute_t2 --> check
+  execute --> execute_t3
+  execute_t3 --> check
+  check --> check_t1
+  check_t1 --> review
+  check --> check_t2
+  check_t2 --> review
+  check --> check_t3
+  check_t3 --> review
+  review --> review_t1
+  review_t1 --> summarize
+  review --> review_t2
+  review_t2 --> summarize
+  review --> review_t3
+  review_t3 --> summarize
+  summarize --> summarize_2
+  summarize_2 --> finish

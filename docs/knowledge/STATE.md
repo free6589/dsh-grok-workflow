@@ -1,3 +1,42 @@
+Last updated: 2026-11-26 19:05 +08:00（**进度页换成了任务面板：一句话 + 一张由 Mermaid 文本自己排出来的分支树 + 只在卡住时出现的一句；这一版在隔离档案里真装真跑了三次（`CONFIRMED`）** —
+分支 **`feat/task-panel`**（worktree `.tmp/wt-task-panel`），产品提交 **`45909bb`**（`feat(progress): the tab is a task panel — one sentence, a Mermaid-shaped tree, and where it is stuck`，
+10 文件 / **+5298 −4986**：`src/client/index.js` 与 `lib/client.js` 各 2020 行、用例 4 改 2 删 2 新），基线是 `main` 尖端 **`e44e26a`**（v0.13.52）。
+本轮自己读的身份：`git describe --tags --always` = **`v0.13.52-2-g45909bb`**、`git tag --contains HEAD | wc -l` = **0**（这颗提交上没有任何标签）、
+`package.json` 版本 **`0.13.52`**——**没有合、没有推、没有打 tag、没有发版、没有抬版本**。
+**操作者看到的是三块**：① 顶上**一句话**（运行名 + 五态胶囊 + `第 N 步，共 M 步`，能量出来时再接 ` · 还剩约 …`）；
+② 中间**一张分支树**（每一步一颗节点，这一步走过的计划任务各成一条分支，每次尝试一颗点、没过的那次与下一次之间有段虚线，边指方向）；
+③ 底下**一句只在真卡住时才有的话**（有一次没过 / 有一步没回报 / 守门把所有稿都退回）——不卡住就**没有这个元素、也不留空位**。
+点一颗节点摊开它调过的调用、同时把它两头的线点亮（其余退到 30%），**再点一次连列表一起收起**；点图的空白处只取消线、摊开的列表留着。
+**这一版一个数字都不编**：没有百分比、没有通过率；唯一的估算「还剩约」= 已跑完步骤的实测平均跨度 × 还剩几步，只在该量得出来时打印，且只有悬停说明依据。
+**图上那份结构就是一份标准 Mermaid `flowchart TD` 文本**（挂在 `data-gw-progress-source` 上，页面把它读回来自己排版，所以图和文字不会各说各话；终点写作 `finish` 因为 `end` 是保留字），**没有为此引任何画图库**。
+跟着旧版退场的是等宽步骤条、手机两列网格、步骤上那个圆形展开箭头，以及「还剩 N 步」那一行（由顶上那句话接替）；`progress.flow.left` / `progress.flow.aria` 两颗键删掉，`progress.panel.*` 加十一颗（`progress.*` 键 **55 → 64**）。
+**门禁（本轮自己实测）**：`tsc -p tsconfig.json --noEmit` **`EXIT=0`**、`oxlint src test` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）、
+八份进度相关 spec **`8 files / 326 passed`**（`gate-45909bb.out`：client 153 + progress-panel 25 + progress-panel-model 31 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14）、
+整仓 `TMPDIR=$PWD/.tmp npx vitest run` **`105 files / 2030 passed`**（转录 `.rsi/evidence/task-panel-2026-11-26/suite-45909bb.out`，本轮自己跑并落盘）；
+用例份数账：退役 **−85**（`progress-flow` 45 + `progress-lanes` 40）、新增 **+56**（25 + 31）、connector **17→15**、hint-absent **7→8**，净 **−30**（2060 → 2030）。
+**真机 soak 的身份（`CONFIRMED`，`install.txt` 逐字）**：`dsh-grok-workflow-0.13.52.tgz` **1 025 655** 字节 / `sha256 1554571b…eac3d`；
+浏览器包 **399 448** 字节 / `sha256 4f873072…f0eeb1`，`lib/client.js` 与 `src/client/index.js` **逐字节相同**、重跑 `npm run build` 后 `git status` 仍为空（构建可复现）；
+装进隔离 profile 的那份读回 **`0.13.52`**、两个 sha256 与工作树相同、软链 **0** 个；隔离 home `.tmp/soak-panel/dsh-home`（克隆 live `web`：**7745 文件 / 5 链接 / 抹除凭据后 5/5 相等**）、
+工作区 `.tmp/soak-panel/work`、端口 **3411**、Node **v26.8.1** / npm **11.19.0** / dsh **0.2.2-rc.3**。**跑了三次，只有一套能当证据**：A 桌面 1500×1600 **129.8 s**；B 390 px 中途掐掉（这个宽度标签条没有「进度」）；
+C 390 px **149.3 s**，从标签条的**更多会话视图**菜单进去。三个任务真的并行跑完、三个文件真的写出来了（`notes.md` **90 B** / `test.txt` **6 B** / `third.txt` **4 B**）。
+**12 条读数（`soak/readings.json`）**：`scrollWidth == clientWidth` **每一行都成立**（1500 / 700 / 390 / 360 四档）、`[data-current="true"]` **每一态都是 1**、
+三次浏览器会话 `consoleErrors: []` / `pageErrors: []`；完成态 **16 节点 / 21 条线**；桌面进行中 16 / 21 且那行字是 `第 6 步，共 7 步 · 还剩约 25 秒`、手机进行中 6 / 7 且**没有**「还剩约」（那时还没有一步能量完）；完成态那行字是 `第 7 步，共 7 步`；
+**卡住那句在每一态每一宽度都不存在**（这一轮一路顺利，按设计它就不该出现）；底部按钮完成态 `收下这版`、进行中为空。
+**页面自己的真值核对每行都对**：`-source` 首行 **`flowchart TD`**、以 **`end` 开头的行 0 条**、解析出的节点/线数与 DOM **相等**（6=6 / 7=7、16=16 / 21=21），完成态那份源文本 38 行存在 `soak/mermaid-done.txt`。
+**两个交互量到了**：点第一颗任务节点 → 调用列表 0→**1**、`[data-trace="active"]` **5**（2 边 + 3 节点）/ `dim` **19**；**第二次点同一颗 → 0 / 0 / 0**；第三次 → 回到 1 与 5 / 19。
+**红线（`redline.txt` 原文）**：`: > ~/.dsh/.soak-probe` 开跑前与收尾各一次都是 **`Read-only file system`**；`~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime **前后逐字节相同**；
+3080 根路径 **401 → 401**；live 那份插件仍读作 **`0.13.48`**（**没有升级**）；隔离实例收尾已停、scratch 全部删掉。**一次越界命令照实记**：`dsh web --help` 没带 `DSH_HOME` 就跑，试图写 live 的 `cordis.yml`，被只读挂载挡成 `EROFS`，**没写进去**（mtime 为证）。
+**三条限制照实记**：① **进度页在窄屏不在标签条上**——同一会话探针：**700 / 600 / 500 px 有 `对话,轨迹,进度` 三个页签，420 / 390 / 360 px 只剩 `对话,轨迹`，整份 DOM 里连「进度」两个字都没有**，它退到了**更多会话视图**菜单里（宿主标签条的行为，本轮照实记，不当作本插件要修的东西）；
+② **展开的调用列表浮在邻居上**——手机上压在「任务 2 · 写 test.txt」那张卡上、桌面 1500 遮住「检查」的一部分，字还读得出、也没有横向滚动，**叠压是真的**；
+③ 两档补拍（360 / 700）是改视口补的，保留了原滚动位置，画面停在树的中段，**读数仍是同一刻读的**。
+**`NOT_RUN` 照实记**：等你点头态（发出后 0.59 s 就已是「进行中」）、卡住那句在真机上的文字、未通过 / 已取消 / 出错三态、**421–499 px** 之间的宽度、live 档案升级与重载（红线）、「收下这版」点下去输入框里出现什么、读屏软件、Firefox / Safari。
+**这一版还留着两条要人接着做的**：① **`feat/task-panel` 必须在 2026-12-03 之前有个去处**（合 / rebase / 删），`AGENTS.md` §5 的到期日就记在 `HANDOFF.md` 顶端那一节；
+② 契约（`DESIGN-progress-tab.md` §25）与裁决（`D-173`）已写好，**§21–§24 被 §25 取代**，§22 的退回事实链仍成立、界面出口挪到了「汇总」节点点开后的调用行。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 17:15 的 **`0.13.52` 发布收口那一轮**，它记的是上一版的发布身份、门禁读数、四条带下去的缺口与被拒的 live 探测；
+再往下是 16:22 的 `0.13.51` 收口、16:10 的**批准目录那一轮**，以及更早各轮。`feat/task-panel` 这一轮**没有发版**，所以它不在发布线上，只在这一段里。
+它们的结论一字未改。）
+
 Last updated: 2026-11-26 17:15 +08:00（**`0.13.52` 已发出并收口；这一版发出去的就是「点问题卡片开的块，记录里写明这是点卡片点的」（`CONFIRMED`）** —
 发布提交 **`9cc2e43e0420fc8d26f3533c54b90bb3ca3468fd`**（`chore(release): prepare v0.13.52`，**8 文件 / +24 −22**——`CHANGELOG.md`、`README.md`、
 `README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js`），

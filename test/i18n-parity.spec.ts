@@ -64,10 +64,11 @@ function asymmetric(left: Dict, right: Dict): { leftOnly: string[], rightOnly: s
  * wrong words is the same defect as a missing one — the page would say something nobody
  * agreed to, in the language the operator reads.
  *
- * The page's visible vocabulary is small on purpose: seven leg words, two badges, one count
- * line, one reader label for the flow, the five-state chip, the dock's words and the row
- * words. `progress.plan.*` survives as the *spoken* state word on a node (`aria-label`), so
- * it is still pinned here even though the page never prints it.
+ * The page's visible vocabulary is small on purpose: seven leg words, three badges, one step
+ * sentence (with its estimate and the basis that estimate rests on), three stuck verdicts,
+ * one reader label for the figure, the five-state chip, the dock's words and the row words.
+ * `progress.plan.*` survives as the *spoken* state word on a node (`aria-label`), so it is
+ * still pinned here even though the page never prints it.
  */
 const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string]> = [
   ['progress.chip.waiting', '等你点头', 'Waiting for you'],
@@ -75,7 +76,7 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.chip.done', '已完成', 'Done'],
   ['progress.chip.failed', '未通过', 'Not passed'],
   ['progress.chip.cancelled', '已取消', 'Cancelled'],
-  // The seven leg words, the two badges, the count line and the flow's reader label.
+  // The seven leg words and the three badges (visit, draft, attempt).
   ['progress.flow.start', '起点', 'Start'],
   ['progress.flow.plan', '规划', 'Plan'],
   ['progress.flow.execute', '执行', 'Execute'],
@@ -85,8 +86,22 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.flow.end', '终点', 'End'],
   ['progress.flow.visit', '第 {n} 次', 'Visit {n}'],
   ['progress.flow.draft', '第 {n} 稿', 'Draft {n}'],
-  ['progress.flow.left', '还剩 {left} 步 / 共 {total} 步', '{left} steps left / {total} total'],
-  ['progress.flow.aria', '进度流程图', 'Run flow'],
+  ['progress.flow.attempt', '第 {n} 遍', 'Attempt {n}'],
+  // The task panel's own eleven keys (the operator's panel brief, §21 → the panel): the one
+  // sentence under the title, the estimate and what it rests on, the three stuck verdicts,
+  // the three durations that spell the estimate, the trace's one word and the figure's
+  // reader label. They replace the count line and the flow's label, which are gone.
+  ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
+  ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
+  ['progress.panel.etaBasis', '按 {n} 个已完成步骤的实测耗时推算', 'from the {n} finished steps actually measured'],
+  ['progress.panel.stuck.failed', '卡在 {at}：{role} 第 {n} 遍没过', 'Stuck at {at}: attempt {n} of {role} did not pass'],
+  ['progress.panel.stuck.blocked', '卡在 {at}：这一步没有回报', 'Stuck at {at}: this step never reported back'],
+  ['progress.panel.stuck.rejected', '卡在 {at}：{n} 稿全被退回', 'Stuck at {at}: every draft was rejected ({n})'],
+  ['progress.panel.durationSec', '{s} 秒', '{s}s'],
+  ['progress.panel.durationMin', '{m} 分 {s} 秒', '{m}m {s}s'],
+  ['progress.panel.durationHour', '{h} 小时 {m} 分', '{h}h {m}m'],
+  ['progress.panel.trace', '看线', 'Trace its wires'],
+  ['progress.panel.graph', '任务图', 'Task graph'],
   // The state words a node speaks and never prints (`aria-label`).
   ['progress.plan.waiting', '等着', 'Waiting'],
   ['progress.plan.running', '在做', 'Doing'],
@@ -189,6 +204,11 @@ const REDESIGN_DELETED: readonly string[] = [
   'progress.field.localRuntimeVerified',
   'progress.field.blockers',
   'progress.field.nextAction',
+  // The task panel's own retirement (2026-11-26): the count line counted steps the reader
+  // could not spend, and the figure's label said nothing a reader of the figure did not see.
+  // The one step sentence replaced the first; the figure's `aria-label` is `progress.panel.graph`.
+  'progress.flow.left',
+  'progress.flow.aria',
 ]
 
 /** The namespaces §19.3 deletes whole; no key may carry one of these prefixes. */

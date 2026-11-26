@@ -1,0 +1,52 @@
+{
+ "readings": {
+  "phone-360-done": {
+   "mounted": true,
+   "scrollWidth": 360,
+   "clientWidth": 360,
+   "innerWidth": 360,
+   "devicePixelRatio": 2,
+   "pnodes": 16,
+   "edges": 21,
+   "current": 1,
+   "nodeCalls": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "line": "第 7 步，共 7 步",
+   "stuckPresent": false,
+   "stuckText": null,
+   "chip": "已完成",
+   "dock": "收下这版",
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidEndLines": 0,
+   "mermaidNodeLines": 16,
+   "mermaidEdgeLines": 21,
+   "mermaidTotalLines": 38
+  },
+  "tablet-700-done": {
+   "mounted": true,
+   "scrollWidth": 700,
+   "clientWidth": 700,
+   "innerWidth": 700,
+   "devicePixelRatio": 2,
+   "pnodes": 16,
+   "edges": 21,
+   "current": 1,
+   "nodeCalls": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "line": "第 7 步，共 7 步",
+   "stuckPresent": false,
+   "stuckText": null,
+   "chip": "已完成",
+   "dock": "收下这版",
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidEndLines": 0,
+   "mermaidNodeLines": 16,
+   "mermaidEdgeLines": 21,
+   "mermaidTotalLines": 38
+  }
+ },
+ "consoleErrors": [],
+ "pageErrors": []
+}

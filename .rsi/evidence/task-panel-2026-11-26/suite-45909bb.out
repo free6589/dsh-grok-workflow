@@ -1,0 +1,35 @@
+# whole suite for 45909bb — 2026-11-26T19:06:53+08:00
+# cwd: /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-task-panel
+# TMPDIR=$PWD/.tmp
+# command: TMPDIR=$PWD/.tmp npx vitest run
+# (verbatim tail of the run; the exit code was captured beside it, not appended to the log)
+
+$ npx vitest run
+
+ ✓ test/docs-config-keys.spec.ts (14 tests) 17ms
+ ✓ test/report-ledger-parity.spec.ts (8 tests) 16ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 15ms
+ ✓ test/resume-validator.spec.ts (20 tests) 14ms
+ ✓ test/panel-links.spec.ts (16 tests) 14ms
+ ✓ test/docs-version.spec.ts (8 tests) 13ms
+ ✓ test/input.spec.ts (13 tests) 12ms
+ ✓ test/mode.spec.ts (16 tests) 12ms
+ ✓ test/handoff.spec.ts (15 tests) 11ms
+ ✓ test/i18n-parity.spec.ts (8 tests) 11ms
+ ✓ test/iterate.spec.ts (9 tests) 10ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 11ms
+ ✓ test/config-notices-route.spec.ts (8 tests) 8ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/child-evidence.spec.ts (15 tests) 7ms
+ ✓ test/intake.spec.ts (9 tests) 7ms
+ ✓ test/upstream.spec.ts (8 tests) 6ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+
+ Test Files  105 passed (105)
+      Tests  2030 passed (2030)
+   Start at  19:05:00
+   Duration  95.79s (transform 2.17s, setup 0ms, import 8.23s, tests 75.92s, environment 11ms)
+
+
+[exit 0]
