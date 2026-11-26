@@ -1,0 +1,71 @@
+{
+ "tabPath": "overflow-menu",
+ "tapped": {
+  "360": {
+   "nodeId": "check_t2",
+   "label": "任务 2 · 写 test.txt 过了",
+   "openableCount": 9,
+   "index": 4,
+   "listOpen": 1
+  },
+  "390": {
+   "nodeId": "check_t2",
+   "label": "任务 2 · 写 test.txt 过了",
+   "openableCount": 9,
+   "index": 4,
+   "listOpen": 1
+  }
+ },
+ "widths": {
+  "360": {
+   "openShot": "phone-360-calls",
+   "openAt": 212.588,
+   "overlapAreaTotal": 0,
+   "overlaps": [],
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockShot": "phone-360-calls-dock",
+   "dockAt": 213.374,
+   "dockOverlapAreaAfterScroll": 0,
+   "dockFillOverlapAreaAfterScroll": 0,
+   "dockInsideViewportAfterScroll": true,
+   "overlapAreaTotalAfterScroll": 0,
+   "listStillOpen": 1,
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "overlapAreaTotal": 0
+   }
+  },
+  "390": {
+   "openShot": "phone-390-calls",
+   "openAt": 205.189,
+   "overlapAreaTotal": 0,
+   "overlaps": [],
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockShot": "phone-390-calls-dock",
+   "dockAt": 205.981,
+   "dockOverlapAreaAfterScroll": 0,
+   "dockFillOverlapAreaAfterScroll": 0,
+   "dockInsideViewportAfterScroll": true,
+   "overlapAreaTotalAfterScroll": 0,
+   "listStillOpen": 1,
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "overlapAreaTotal": 0
+   },
+   "hideButton": {
+    "reopenedSheetCount": 1,
+    "hideLabel": "收起",
+    "afterHideSheetCount": 0,
+    "afterHideNodeCalls": 0
+   }
+  }
+ },
+ "afterClosing": {
+  "nodeCalls": 0,
+  "overlapAreaTotal": 0
+ }
+}

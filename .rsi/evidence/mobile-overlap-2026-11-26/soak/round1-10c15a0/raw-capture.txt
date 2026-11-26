@@ -1,0 +1,91 @@
+12:41:40.747 sent from the phone context
+12:41:41.751 progress view opened: true via overflow-menu
+12:44:46.305 run finished: true
+12:44:49.772 opened check_t2 at 390 | lists on screen: 1
+12:44:49.775 reading phone-390-calls-as-opened {"w":390,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.04,"sw":390,"cw":390}
+12:44:50.519 reading phone-390-calls {"w":390,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.046,"sw":390,"cw":390}
+12:44:51.391 reading phone-390-calls-dock {"w":390,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.05,"sw":390,"cw":390}
+12:44:52.716 reading phone-390-calls-closed {"w":390,"chip":"已完成","calls":0,"position":null,"overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":null,"sw":390,"cw":390}
+12:44:53.566 reading phone-390-calls-reopened {"w":390,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.04,"sw":390,"cw":390}
+12:44:54.501 reading phone-390-calls-hidden-by-button {"w":390,"chip":"已完成","calls":0,"position":null,"overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":null,"sw":390,"cw":390}
+12:44:57.899 opened check_t2 at 360 | lists on screen: 1
+12:44:57.902 reading phone-360-calls-as-opened {"w":360,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.043,"sw":360,"cw":360}
+12:44:58.613 reading phone-360-calls {"w":360,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.048,"sw":360,"cw":360}
+12:44:59.409 reading phone-360-calls-dock {"w":360,"chip":"已完成","calls":1,"position":"static","overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":0.054,"sw":360,"cw":360}
+12:45:00.810 reading phone-360-calls-closed {"w":360,"chip":"已完成","calls":0,"position":null,"overlapAreaTotal":0,"overlappingCount":0,"dockOverlap":0,"dockFillOverlap":0,"heightShare":null,"sw":360,"cw":360}
+12:45:00.814 INTERACTION {
+ "tabPath": "overflow-menu",
+ "tapped": {
+  "360": {
+   "nodeId": "check_t2",
+   "label": "任务 2 · 写 test.txt 过了",
+   "openableCount": 9,
+   "index": 4,
+   "listOpen": 1
+  },
+  "390": {
+   "nodeId": "check_t2",
+   "label": "任务 2 · 写 test.txt 过了",
+   "openableCount": 9,
+   "index": 4,
+   "listOpen": 1
+  }
+ },
+ "widths": {
+  "360": {
+   "asOpenedSheetInViewport": true,
+   "asOpenedOverlapAreaTotal": 0,
+   "openShot": "phone-360-calls",
+   "openAt": 197.881,
+   "overlapAreaTotal": 0,
+   "overlaps": [],
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockShot": "phone-360-calls-dock",
+   "dockAt": 198.677,
+   "dockOverlapAreaAfterScroll": 0,
+   "dockFillOverlapAreaAfterScroll": 0,
+   "dockInsideViewportAfterScroll": true,
+   "overlapAreaTotalAfterScroll": 0,
+   "listStillOpen": 1,
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "overlapAreaTotal": 0
+   }
+  },
+  "390": {
+   "asOpenedSheetInViewport": true,
+   "asOpenedOverlapAreaTotal": 0,
+   "openShot": "phone-390-calls",
+   "openAt": 189.788,
+   "overlapAreaTotal": 0,
+   "overlaps": [],
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockShot": "phone-390-calls-dock",
+   "dockAt": 190.659,
+   "dockOverlapAreaAfterScroll": 0,
+   "dockFillOverlapAreaAfterScroll": 0,
+   "dockInsideViewportAfterScroll": true,
+   "overlapAreaTotalAfterScroll": 0,
+   "listStillOpen": 1,
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "overlapAreaTotal": 0
+   },
+   "hideButton": {
+    "reopenedSheetCount": 1,
+    "hideLabel": "收起",
+    "afterHideSheetCount": 0,
+    "afterHideNodeCalls": 0
+   }
+  }
+ },
+ "afterClosing": {
+  "nodeCalls": 0,
+  "overlapAreaTotal": 0
+ }
+}
+12:45:00.814 CONSOLE {"consoleErrors":[],"pageErrors":[]}

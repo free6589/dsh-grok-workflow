@@ -1,0 +1,182 @@
+13:13:08.466 sent from the phone context
+13:13:09.463 progress view opened: true via overflow-menu
+13:15:40.732 run finished: true
+13:15:40.736 openable task nodes: 9
+13:15:42.000 probe index 4 node check_t2 rows 1
+13:15:44.216 probe index 3 node check_t1 rows 1
+13:15:46.427 probe index 5 node check_t3 rows 1
+13:15:48.623 probe index 2 node execute_t3 rows 1
+13:15:50.897 probe index 6 node review_t1 rows 1
+13:15:51.857 chosen node: {"index":4,"rows":1,"nodeId":"check_t2"}
+13:15:53.973 reading phone-390-before-open {"w":390,"chip":"已完成","calls":0,"rows":0,"sheet":0,"sheetBottom":null,"composerTop":676,"gap":null,"aboveComposer":null,"inViewport":null,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":false,"roomHeight":null,"sw":390,"cw":390}
+13:15:55.438 reading phone-390-as-opened {"w":390,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":512,"composerTop":676,"gap":164,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":295.39,"sw":390,"cw":390}
+13:15:56.228 reading phone-390-calls-dock {"w":390,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":267,"composerTop":676,"gap":409,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":295.39,"sw":390,"cw":390}
+13:15:57.010 reading phone-390-bottom {"w":390,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":159,"composerTop":676,"gap":517,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":295.39,"sw":390,"cw":390}
+13:15:58.274 reading phone-390-closed {"w":390,"chip":"已完成","calls":0,"rows":0,"sheet":0,"sheetBottom":null,"composerTop":676,"gap":null,"aboveComposer":null,"inViewport":null,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":false,"roomHeight":null,"sw":390,"cw":390}
+13:15:59.123 reading phone-390-reopened {"w":390,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":512,"composerTop":676,"gap":164,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":295.39,"sw":390,"cw":390}
+13:15:59.977 reading phone-390-hidden-by-button {"w":390,"chip":"已完成","calls":0,"rows":0,"sheet":0,"sheetBottom":null,"composerTop":676,"gap":null,"aboveComposer":null,"inViewport":null,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":false,"roomHeight":null,"sw":390,"cw":390}
+13:16:02.131 reading phone-360-before-open {"w":360,"chip":"已完成","calls":0,"rows":0,"sheet":0,"sheetBottom":null,"composerTop":632,"gap":null,"aboveComposer":null,"inViewport":null,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":false,"roomHeight":null,"sw":360,"cw":360}
+13:16:03.584 reading phone-360-as-opened {"w":360,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":490,"composerTop":632,"gap":142,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":280,"sw":360,"cw":360}
+13:16:04.371 reading phone-360-calls-dock {"w":360,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":245,"composerTop":632,"gap":387,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":280,"sw":360,"cw":360}
+13:16:05.154 reading phone-360-bottom {"w":360,"chip":"已完成","calls":1,"rows":1,"sheet":1,"sheetBottom":130,"composerTop":632,"gap":502,"aboveComposer":true,"inViewport":true,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":true,"roomHeight":280,"sw":360,"cw":360}
+13:16:06.422 reading phone-360-closed {"w":360,"chip":"已完成","calls":0,"rows":0,"sheet":0,"sheetBottom":null,"composerTop":632,"gap":null,"aboveComposer":null,"inViewport":null,"overlapAreaTotal":0,"dockOverlap":0,"dockFillOverlap":0,"room":false,"roomHeight":null,"sw":360,"cw":360}
+13:16:06.423 INTERACTION {
+ "tabPath": "overflow-menu",
+ "sentAt": "2026-11-26T13:13:08.450Z",
+ "tapped": {
+  "phone-390": {
+   "nodeId": "check_t2",
+   "rows": 1,
+   "openAt": 166.988,
+   "composerTop": 676,
+   "sheetBottom": 512,
+   "gapToComposer": 164,
+   "sheetAboveComposer": true,
+   "sheetFullyInViewport": true,
+   "overlapAreaTotal": 0,
+   "dockContentTopBeforeOpen": 1221,
+   "dockContentTopWhileOpen": 1338,
+   "dockMovedBy": 117,
+   "roomStartsAfterDockBy": 4,
+   "roomRemovalProbe": {
+    "dockTopWithRoom": 680,
+    "dockTopWithoutRoom": 680,
+    "delta": 0
+   },
+   "roomPresent": true,
+   "roomAriaHidden": "true",
+   "roomAfterDock": true,
+   "roomHeight": 295.39,
+   "roomHeightShareOfViewport": 0.35
+  },
+  "phone-360": {
+   "nodeId": "check_t2",
+   "rows": 1,
+   "openAt": 175.134,
+   "composerTop": 632,
+   "sheetBottom": 490,
+   "gapToComposer": 142,
+   "sheetAboveComposer": true,
+   "sheetFullyInViewport": true,
+   "overlapAreaTotal": 0,
+   "dockContentTopBeforeOpen": 1221,
+   "dockContentTopWhileOpen": 1338,
+   "dockMovedBy": 117,
+   "roomStartsAfterDockBy": 4,
+   "roomRemovalProbe": {
+    "dockTopWithRoom": 658,
+    "dockTopWithoutRoom": 658,
+    "delta": 0
+   },
+   "roomPresent": true,
+   "roomAriaHidden": "true",
+   "roomAfterDock": true,
+   "roomHeight": 280,
+   "roomHeightShareOfViewport": 0.35
+  }
+ },
+ "widths": {
+  "phone-390": {
+   "dockShot": "phone-390-calls-dock",
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockInsideViewport": true,
+   "overlapAreaTotal": 0,
+   "listStillOpen": 1,
+   "bottomShot": "phone-390-bottom",
+   "bottom": {
+    "scrollerAtBottom": true,
+    "scroller": {
+     "tag": "div",
+     "className": "wSkVaW_scrollBody",
+     "scrollTop": 1087,
+     "scrollHeight": 1855,
+     "clientHeight": 768,
+     "atBottom": true
+    },
+    "windowScrollY": 0,
+    "roomPresent": true,
+    "roomRect": {
+     "left": 0,
+     "top": 381,
+     "right": 383,
+     "bottom": 676.390625,
+     "width": 383,
+     "height": 295.390625
+    },
+    "dockRect": {
+     "left": 4,
+     "top": 327,
+     "right": 379,
+     "bottom": 377,
+     "width": 375,
+     "height": 50
+    },
+    "dockBelowRoom": true,
+    "roomStartsAfterDockBy": 4,
+    "overlapAreaTotal": 0
+   },
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "roomPresent": false,
+    "overlapAreaTotal": 0
+   },
+   "hideButton": {
+    "reopenedSheetCount": 1,
+    "hideLabel": "收起",
+    "afterHideSheetCount": 0,
+    "afterHideNodeCalls": 0,
+    "afterHideRoomPresent": false
+   }
+  },
+  "phone-360": {
+   "dockShot": "phone-360-calls-dock",
+   "dockOverlapArea": 0,
+   "dockFillOverlapArea": 0,
+   "dockInsideViewport": true,
+   "overlapAreaTotal": 0,
+   "listStillOpen": 1,
+   "bottomShot": "phone-360-bottom",
+   "bottom": {
+    "scrollerAtBottom": true,
+    "scroller": {
+     "tag": "div",
+     "className": "wSkVaW_scrollBody",
+     "scrollTop": 1116,
+     "scrollHeight": 1840,
+     "clientHeight": 724,
+     "atBottom": true
+    },
+    "windowScrollY": 0,
+    "roomPresent": true,
+    "roomRect": {
+     "left": 0,
+     "top": 352,
+     "right": 353,
+     "bottom": 632,
+     "width": 353,
+     "height": 280
+    },
+    "dockRect": {
+     "left": 4,
+     "top": 298,
+     "right": 349,
+     "bottom": 348,
+     "width": 345,
+     "height": 50
+    },
+    "dockBelowRoom": true,
+    "roomStartsAfterDockBy": 4,
+    "overlapAreaTotal": 0
+   },
+   "closed": {
+    "sheetCount": 0,
+    "nodeCalls": 0,
+    "roomPresent": false,
+    "overlapAreaTotal": 0
+   }
+  }
+ }
+}
+13:16:06.423 CONSOLE {"consoleErrors":[],"pageErrors":[]}
