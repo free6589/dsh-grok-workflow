@@ -1,0 +1,300 @@
+{
+ "tag": "blocked",
+ "mode": "blocked",
+ "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤；任务二：在 test.txt 里写一行 hello。两个任务并行跑，不要串行；跑完把每个任务做了什么汇总一下。",
+ "url": "http://127.0.0.1:3421/?token=<redacted>",
+ "tabPathNarrow": "overflow-menu",
+ "sentAt": "2026-11-26T12:28:13.949Z",
+ "terminalAfterSeconds": 105,
+ "midRunShot": false,
+ "saved": {
+  "blocked-desktop-1500": {
+   "file": "blocked-desktop-1500.png",
+   "atSeconds": 108,
+   "stuckText": null,
+   "chip": "已完成"
+  },
+  "blocked-narrow-390": {
+   "file": "blocked-narrow-390.png",
+   "atSeconds": 111,
+   "stuckText": null,
+   "chip": "已完成"
+  }
+ },
+ "readings": {
+  "blocked-desktop-1500": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 1500,
+    "innerHeight": 1600,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 1500,
+   "clientWidth": 1500,
+   "pnodes": 21,
+   "edges": 22,
+   "current": 1,
+   "line": "第 11 步，共 11 步",
+   "stuckPresent": false,
+   "stuckText": null,
+   "stuckBox": null,
+   "stuckInViewport": null,
+   "stuckTopmost": null,
+   "chip": "已完成",
+   "dock": "收下这版",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 21,
+   "mermaidEdgeLines": 22,
+   "mermaidTotalLines": 44,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_2",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_2_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check_2",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_2_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "cancelled"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "done"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  },
+  "blocked-narrow-390": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 390,
+    "innerHeight": 844,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 390,
+   "clientWidth": 390,
+   "pnodes": 21,
+   "edges": 22,
+   "current": 1,
+   "line": "第 11 步，共 11 步",
+   "stuckPresent": false,
+   "stuckText": null,
+   "stuckBox": null,
+   "stuckInViewport": null,
+   "stuckTopmost": null,
+   "chip": "已完成",
+   "dock": "收下这版",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 21,
+   "mermaidEdgeLines": 22,
+   "mermaidTotalLines": 44,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_2",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_2_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check_2",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_2_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "cancelled"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "done"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  }
+ },
+ "consoleErrors": [],
+ "pageErrors": []
+}

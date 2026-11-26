@@ -120,9 +120,9 @@
   "pnodes": 16,
   "edges": 21,
   "current": 1,
-  "nodeCalls": 1,
-  "traceActive": 5,
-  "traceDim": 19,
+  "nodeCalls": 0,
+  "traceActive": 0,
+  "traceDim": 0,
   "line": "第 7 步，共 7 步",
   "stuckPresent": false,
   "stuckText": null,
@@ -137,7 +137,20 @@
   "mermaidTotalLines": 38,
   "emptyText": null,
   "nodeCountsAgree": true,
-  "edgeCountsAgree": true
+  "edgeCountsAgree": true,
+  "callListFields": {
+   "source": "raw-readings-widths.json → readings.phone-360-done (capture-widths.mjs, re-capture at 2026-11-26T18:50+08:00 with no interaction on the page). The nodeCalls/traceActive/traceDim above are these values. Background: raw-readings-phone.CORRECTION.md",
+   "matchesImage": "soak/phone-360-done.png, the kept image beside this file: plain done state, no call list open, no trace dimming",
+   "supersededFirstPass": {
+    "nodeCalls": 1,
+    "traceActive": 5,
+    "traceDim": 19,
+    "writtenBy": "capture-phone.mjs first pass: it tapped execute_t1 at 390 px, then resized 390→360 without closing the call list, so this reading describes 'done + call list open', not the plain done state",
+    "sameStateAs": "soak/phone-390-trace.png; timeline.json runC_phone.tap (1 / 5 / 19)",
+    "supersededBy": "raw-readings-widths.json / readings.phone-360-done",
+    "why": "the re-capture overwrote soak/phone-360-done.png; the kept PNG shows no call list, so 0 / 0 / 0 describes it and 1 / 5 / 19 describes a page state that is no longer in this image"
+   }
+  }
  },
  "tablet-700-done": {
   "mounted": true,
@@ -148,9 +161,9 @@
   "pnodes": 16,
   "edges": 21,
   "current": 1,
-  "nodeCalls": 1,
-  "traceActive": 5,
-  "traceDim": 19,
+  "nodeCalls": 0,
+  "traceActive": 0,
+  "traceDim": 0,
   "line": "第 7 步，共 7 步",
   "stuckPresent": false,
   "stuckText": null,
@@ -165,6 +178,19 @@
   "mermaidTotalLines": 38,
   "emptyText": null,
   "nodeCountsAgree": true,
-  "edgeCountsAgree": true
+  "edgeCountsAgree": true,
+  "callListFields": {
+   "source": "raw-readings-widths.json → readings.tablet-700-done (capture-widths.mjs, re-capture at 2026-11-26T18:50+08:00 with no interaction on the page). The nodeCalls/traceActive/traceDim above are these values. Background: raw-readings-phone.CORRECTION.md",
+   "matchesImage": "soak/tablet-700-done.png, the kept image beside this file: plain done state, no call list open, no trace dimming",
+   "supersededFirstPass": {
+    "nodeCalls": 1,
+    "traceActive": 5,
+    "traceDim": 19,
+    "writtenBy": "capture-phone.mjs first pass: it tapped execute_t1 at 390 px, then resized to 360 and then to 700 without closing the call list, so this reading describes 'done + call list open', not the plain done state",
+    "sameStateAs": "soak/phone-390-trace.png; timeline.json runC_phone.tap (1 / 5 / 19)",
+    "supersededBy": "raw-readings-widths.json / readings.tablet-700-done",
+    "why": "the re-capture overwrote soak/tablet-700-done.png; the kept PNG shows no call list, so 0 / 0 / 0 describes it and 1 / 5 / 19 describes a page state that is no longer in this image"
+   }
+  }
  }
 }

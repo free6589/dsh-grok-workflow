@@ -1,0 +1,305 @@
+{
+ "tag": "failed",
+ "mode": "failed",
+ "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤；任务二：在 test.txt 里写一行 hello。两个任务并行跑，不要串行；跑完把每个任务做了什么汇总一下。",
+ "url": "http://127.0.0.1:3421/?token=<redacted>",
+ "tabPathNarrow": "overflow-menu",
+ "sentAt": "2026-11-26T12:24:01.800Z",
+ "terminalAfterSeconds": 32,
+ "midRunShot": true,
+ "saved": {
+  "failed-desktop-1500-midrun": {
+   "file": "failed-desktop-1500-midrun.png",
+   "atSeconds": 12,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "chip": "进行中"
+  },
+  "failed-desktop-1500": {
+   "file": "failed-desktop-1500.png",
+   "atSeconds": 35,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "chip": "未通过"
+  },
+  "failed-narrow-390": {
+   "file": "failed-narrow-390.png",
+   "atSeconds": 38,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "chip": "未通过"
+  }
+ },
+ "readings": {
+  "failed-desktop-1500-midrun": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 1500,
+    "innerHeight": 1600,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 1500,
+   "clientWidth": 1500,
+   "pnodes": 8,
+   "edges": 9,
+   "current": 1,
+   "line": "第 4 步，共 4 步",
+   "stuckPresent": true,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "stuckBox": {
+    "x": 284,
+    "y": 587,
+    "width": 1205,
+    "height": 17,
+    "top": 587,
+    "right": 1489,
+    "bottom": 604,
+    "left": 284
+   },
+   "stuckInViewport": true,
+   "stuckTopmost": {
+    "tag": "P",
+    "isStuckOrChild": true,
+    "dataStuck": true,
+    "parentData": [
+     "gwProgress"
+    ]
+   },
+   "chip": "进行中",
+   "dock": "",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 8,
+   "mermaidEdgeLines": 9,
+   "mermaidTotalLines": 18,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "doing"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  },
+  "failed-desktop-1500": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 1500,
+    "innerHeight": 1600,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 1500,
+   "clientWidth": 1500,
+   "pnodes": 9,
+   "edges": 10,
+   "current": 1,
+   "line": "第 2 步，共 5 步 · 还剩约 1 分 0 秒",
+   "stuckPresent": true,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "stuckBox": {
+    "x": 284,
+    "y": 663,
+    "width": 1205,
+    "height": 17,
+    "top": 663,
+    "right": 1489,
+    "bottom": 680,
+    "left": 284
+   },
+   "stuckInViewport": true,
+   "stuckTopmost": {
+    "tag": "P",
+    "isStuckOrChild": true,
+    "dataStuck": true,
+    "parentData": [
+     "gwProgress"
+    ]
+   },
+   "chip": "未通过",
+   "dock": "",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 9,
+   "mermaidEdgeLines": 10,
+   "mermaidTotalLines": 20,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "failed"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  },
+  "failed-narrow-390": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 390,
+    "innerHeight": 844,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 390,
+   "clientWidth": 390,
+   "pnodes": 9,
+   "edges": 10,
+   "current": 1,
+   "line": "第 2 步，共 5 步 · 还剩约 1 分 0 秒",
+   "stuckPresent": true,
+   "stuckText": "卡在 2：执行 第 1 遍没过",
+   "stuckBox": {
+    "x": 4,
+    "y": 477,
+    "width": 375,
+    "height": 17,
+    "top": 477,
+    "right": 379,
+    "bottom": 494,
+    "left": 4
+   },
+   "stuckInViewport": true,
+   "stuckTopmost": {
+    "tag": "P",
+    "isStuckOrChild": true,
+    "dataStuck": true,
+    "parentData": [
+     "gwProgress"
+    ]
+   },
+   "chip": "未通过",
+   "dock": "",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 9,
+   "mermaidEdgeLines": 10,
+   "mermaidTotalLines": 20,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2",
+     "kind": "execute",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t1",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "execute_2_t2",
+     "kind": "task",
+     "state": "failed"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "failed"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  }
+ },
+ "consoleErrors": [],
+ "pageErrors": []
+}

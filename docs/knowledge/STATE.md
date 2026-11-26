@@ -4075,3 +4075,40 @@ GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.
 `.gitignore` 是 modified、`.rsi/evidence/progress-now/` 是未跟踪（未暂存、未提交、未改、未回滚）；本块**只写文档**，
 没有 `git add` / `commit` / `push`，没有建或移动任何标签，`CHANGELOG` / `README*` / `src` / `test` / `lib` 一行未改，
 `gate-50b3341.out` 只读未改。）
+
+Last updated: 2026-11-26 21:00 +08:00（**卡住那句话拍到了两种形状、第三种拍不到；上一轮两条过期读数已订正且原值原样留着，`CONFIRMED` / `NOT_REACHED`** ——
+分支 `fix/readings-refresh`（worktree `.agents/worktrees/fix-readings-refresh`），基线 `main` 尖端 **`fe6d631`**，版本仍 **`0.13.53`**；
+**没有产品改动**：源码 / 测试 / `lib/` / `package.json` / `CHANGELOG.md` 一行未改，所以**不加 changelog 条目、不抬版本号**；
+**证据两块，都是这一块真做出来的**：
+① **两条过期读数订正**——`raw-readings-phone.json` 里 `phone-360-done` 与 `tablet-700-done` 原记
+`nodeCalls/traceActive/traceDim = 1 / 5 / 19`，与它们旁边**保留下来的两张图**不符（那两张是干净的完成树：没有摊开的调用卡、
+没有点亮的蓝线、没有变暗的节点），成因是第一次截图先点了任务、再改宽度却没关列表，后来重拍的两张图覆盖了 PNG、读数没跟上；
+现在两条是 `0 / 0 / 0`，**三份读数文件在同两个键上一致**（`raw` = `raw-readings-widths` = `readings`），键名与另外四条一个字没动
+（`phone-390-trace` 仍是 `1 / 5 / 19`，那是对的），**原值 `1 / 5 / 19` 原样留在 `callListFields.supersededFirstPass`**，
+带 `writtenBy` / `supersededBy` / `why`，另加 `source` 与 `matchesImage`，同目录一份中文 `raw-readings-phone.CORRECTION.md`
+说清来龙去脉——**没有删、没有原地覆盖、没有把矛盾留着**，理由记在 `D-174`；
+② **真机像素**：隔离克隆 live web 档案、打包安装（`0.13.53`、`lib/client.js` **399448 字节** `sha256 1fb003f3…c1b81f` 与发出去的那份同值、
+tgz **1027274 字节**、`file:` 钉法、版本读回 `0.13.53`、符号链接 **0** 条）、真模型、端口 **3421**、没有合成事件流也没有手写数据；
+拍到了**两种**「卡在……」——**没过的尝试**（DOM 逐字 `卡在 2：执行 第 1 遍没过`，桌面 1500 与窄屏 390 各一张、9 节点 / 10 线、
+牌子 `未通过`；失败是真的：worker 钉在一条这台机器没有密钥的路由上，子调用全 `failed`，`run-end stopReason:"error"`）与
+**稿子全被退回**（`卡在 7：3 稿全被退回`，14 节点 / 16 线，牌子 `已完成`，流里 `summary-rejected {"drafts":3,…}` 与 `run-end completed`；
+够到它必须开 `synthesis: model`——`layered` 默认下确定性回落总会交卷）；**第三种「这一步没有回报」如实记 `NOT_REACHED`**：
+两次有边界的真尝试都到不了，因为这一版引擎收尾时**先取消还开着的子任务、再写本轮结束**（流里 `agent-end …"cancelled"`
+排在 `run-end …"error"` 之前），所以「运行结束了、某一行还没结局」这个形状到不了页面；那句措辞只有单元测试盯着，
+**不当像素证据**；读数自检全过（句子在视口内、正中一点命中它自己、两档 `scrollWidth === clientWidth`、Mermaid 数与 DOM 数一致、
+两个读数文件 `consoleErrors` / `pageErrors` 都是 `[]`）；**三件顺带看到的事只记录、不判对错**：运行收尾了顶上还在给时间
+（`第 2 步，共 5 步 · 还剩约 1 分 0 秒`；退回那页是 `第 7 步，共 8 步 · 还剩约 25 秒`）、绿牌子「已完成」与「三稿全被退回」同页共存、
+同一页仍给 `收下这版`；**重试虚线只有肉眼**（`failed-narrow-390.png` 里两颗尝试点之间一小段虚线），读数里**没有记它的字段**，不算计数读数；
+**一处同类但故意没改的**：桌面那份读数里有个键叫 `phone-390-running`，每个字段都等于它自己的 `desktop-1500-done`
+（1500 宽、`第 7 步，共 7 步`、`已完成`），而这个证据目录**没有任何记录**说桌面侧那一条应该是什么，改写只能编数字——
+**开放问题，成因 `HYPOTHESIS`，明确未修**；
+**红线两端都量了**：写探针 **20:29:14** 与 **20:47:47** 各失败一次（`Read-only file system`）、`~/.dsh`
+**`2026-11-25 23:14:14.025606767`** / `~/.dsh/profiles` **`2026-11-22 16:59:46.687805286`** /
+`~/.dsh/profiles/web` **`2026-11-26 19:41:49.334856619`** 前后同值且都早于 20:10、3080 前后都 **`401`** 一次没重启、
+隔离实例 3421 开工前空着收尾后关掉、**没有提交 / 推送 / 打标签 / 发布 / 改版本号**、scratch 已删、证据目录里没有密钥
+（`sk-…` / `Bearer …` / `*_KEY=` / `token=` 扫描只命中 `token=<redacted>`）；
+**`NOT_RUN`**：块内 `typecheck` / `lint` / spec 与整仓 `npm run ci`——**本轮没有产品改动，没什么可跑，这不是绿灯**；
+真机上那三颗还没拍的胶囊（`等你点头` / `已取消` / `出错`；`未通过` 这一颗本轮拍到了）、421–499 px 这一档、真 Mermaid 渲染器；
+**`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级——本会话写不进 `~/.dsh`，只读读到插件目录已是 **`0.13.53`** 但依赖行**仍浮动**
+（`github:free6589/dsh-grok-workflow`），`~/.dsh/profiles/web` 的 mtime **`19:41:49`** 晚于发布那一轮读到的 `19:20:42`，
+**谁装的 `HYPOTHESIS`**，需要一个对 `~/.dsh` 有写权限的人把那一行钉到 `#v0.13.53`；本块**没写 `~/.dsh`、没重载、没重启** 3080 上的实例。）
