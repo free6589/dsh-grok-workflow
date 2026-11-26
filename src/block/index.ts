@@ -21,6 +21,7 @@ export {
   type BlockStatus,
   type BlockTaskRow,
   type VerdictCriterion,
+  type VerdictOutcome,
   type VerdictReason,
   type VerdictRow,
 } from './types.js'

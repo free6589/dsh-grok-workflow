@@ -23,7 +23,7 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { BLOCK_LEDGER_VERSION, readVerdictRows } from '../src/block/index.js'
@@ -31,7 +31,7 @@ import type { BlockEntry, BlockRow, BlockTaskRow } from '../src/block/index.js'
 import { resolveConfig } from '../src/config.js'
 import { runBlockSupervisor } from '../src/supervisor/index.js'
 import { SCOPE_CRITERION } from '../src/supervisor/checks.js'
-import { SUPERVISOR_FAILED, evidenceHashOf } from '../src/supervisor/verdict.js'
+import { SKIPPED_JUDGE_NOTE, SUPERVISOR_FAILED, evidenceHashOf } from '../src/supervisor/verdict.js'
 import { runWorkflowScript } from './helpers.js'
 
 /* ------------------------------------------------------------------ ledger -- */
@@ -329,9 +329,9 @@ describe('declared paths are read in the directory the block was approved in', (
       tasks: writing(['notes/a.md:1']),
     })
     expect(outcome.failures).toEqual([])
-    expect(outcome.outcome).toBe('pass')
+    expect(outcome.outcome).toBe('skipped')
 
-    // The same root, a file it does not hold: the check still answers, so the pass above
+    // The same root, a file it does not hold: the check still answers, so the skip above
     // is a real answer about the root and not a check that stopped looking.
     const absent = await judge({
       root,
@@ -359,7 +359,7 @@ describe('declared paths are read in the directory the block was approved in', (
       tasks: writing(['link/a.md']),
     })
     expect(outcome.failures.map(failure => failure.criterion)).not.toContain(SCOPE_CRITERION)
-    expect(outcome.outcome).toBe('pass')
+    expect(outcome.outcome).toBe('skipped')
   })
 
   it('keeps the scope failure when the two spellings name directories that really differ', async () => {
@@ -381,6 +381,41 @@ describe('declared paths are read in the directory the block was approved in', (
     expect(scope?.evidence, "the verdict quotes the caller's spelling, never a canonical path").toBe('link/a.md')
   })
 
+  it('names the approval directory and both sides in absolute form in a scope veto', async () => {
+    const root = scratchRoot()
+    mkdirSync(join(root, 'approved'), { recursive: true })
+    mkdirSync(join(root, 'elsewhere'), { recursive: true })
+    writeFileSync(join(root, 'elsewhere', 'a.md'), '# a\n')
+
+    const { outcome } = await judge({
+      root,
+      exists: null,
+      block: { writesPaths: ['approved'] },
+      tasks: writing(['elsewhere/a.md']),
+    })
+    expect(outcome.outcome).toBe('veto')
+    const scope = outcome.failures.find(failure => failure.criterion === SCOPE_CRITERION)!
+    expect(scope.evidence, 'the quote stays the caller\'s own spelling').toBe('elsewhere/a.md')
+    // "Not in scope" on its own cannot be checked by whoever reads it: the reason has to
+    // say which directory the check stood in, and spell both sides absolutely.
+    expect(scope.why).toContain(realpathSync.native(root))
+    expect(scope.why).toContain(realpathSync.native(join(root, 'elsewhere', 'a.md')))
+    expect(scope.why).toContain(realpathSync.native(join(root, 'approved')))
+  })
+
+  it('says the check had no approval directory when a scope veto is written without one', async () => {
+    const { outcome } = await judge({
+      exists,
+      block: { writesPaths: ['other'] },
+      tasks: writing(['src/block/tools.ts']),
+    })
+    expect(outcome.outcome).toBe('veto')
+    const scope = outcome.failures.find(failure => failure.criterion === SCOPE_CRITERION)!
+    // Not a guessed directory: the reason states what the check actually used.
+    expect(scope.why).toContain('没有批准目录')
+    expect(scope.why).toContain(realpathSync.native(process.cwd()))
+  })
+
   it('hands a relative path to an injected seam unchanged when there is no root', async () => {
     const seen: string[] = []
     const { outcome } = await judge({
@@ -390,7 +425,7 @@ describe('declared paths are read in the directory the block was approved in', (
         return true
       },
     })
-    expect(outcome.outcome).toBe('pass')
+    expect(outcome.outcome).toBe('skipped')
     expect(seen, 'no root, no rewriting: the seam sees the string the caller wrote').toEqual(['src/block/tools.ts'])
   })
 })
@@ -523,14 +558,43 @@ describe('a human may overrule the scope veto, and only that one', () => {
   })
 })
 
-describe('skipping the judge is stated, never silent', () => {
-  it('marks the criteria and spends no model call', async () => {
+describe('skipping the judge is a third outcome, never a pass', () => {
+  it('writes skipped, spends no model call, and keeps the criteria honest', async () => {
     const { outcome, engine } = await judge({ judge: false })
-    expect(outcome.outcome).toBe('pass')
+    expect(outcome.outcome).toBe('skipped')
     expect(outcome.judged).toBe(false)
     expect(outcome.verdict.route).toBe('deterministic')
+    expect(outcome.verdict.reasons).toEqual([])
     expect(engine.startCalls).toHaveLength(0)
-    expect(JSON.stringify(outcome.verdict.criteria)).toContain('未过监工')
+    // A criterion has only met true/false, so a skipped row keeps `met: true` with the
+    // skip note as its evidence. That pair is the absence of a judgement, not a pass —
+    // the outcome is what says so.
+    expect(outcome.verdict.criteria.map(criterion => criterion.met)).toEqual([true, true])
+    expect(outcome.verdict.criteria.flatMap(criterion => criterion.evidence)).toEqual([SKIPPED_JUDGE_NOTE, SKIPPED_JUDGE_NOTE])
+    expect(SKIPPED_JUDGE_NOTE).toContain('未过监工')
+
+    // And the ledger reads back exactly what was written: no pass is manufactured on the
+    // way out, and no row rewrites the criteria into something they are not.
+    const rows = await readVerdictRows({ dir: ledgerDir })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.outcome).toBe('skipped')
+    expect(rows[0]!.criteria.map(criterion => criterion.met)).toEqual([true, true])
+    expect(rows[0]!.criteria.flatMap(criterion => criterion.evidence)).toEqual([SKIPPED_JUDGE_NOTE, SKIPPED_JUDGE_NOTE])
+  })
+
+  it('returns the skipped row to a later judge-on close of the same evidence, and says why', async () => {
+    const first = await judge({ judge: false })
+    expect(first.outcome.outcome).toBe('skipped')
+    const engine = new FakeEngine()
+    const second = await judge({ engine })
+    expect(second.outcome.outcome, 'the same evidence never earns a second verdict line').toBe('skipped')
+    expect(second.outcome.evidenceUnchanged).toBe(true)
+    expect(second.outcome.judged).toBe(false)
+    // The warning must not claim this evidence was judged: it was skipped.
+    expect(second.outcome.warnings.join(' ')).toContain('跳过监工')
+    expect(second.outcome.warnings.join(' ')).not.toContain('已经判过')
+    expect(engine.startCalls, 'an existing verdict is not re-judged').toHaveLength(0)
+    expect(verdictLines()).toHaveLength(1)
   })
 })
 

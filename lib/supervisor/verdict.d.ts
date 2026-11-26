@@ -39,6 +39,15 @@ export declare const SUPERVISOR_LABEL = "block-supervisor";
 /** Why the supervisor could not produce a verdict at all. */
 export declare const SUPERVISOR_FAILED = "\u76D1\u5DE5\u8C03\u7528\u5931\u8D25";
 /**
+ * The note a skipped close leaves as the evidence of every criterion.
+ *
+ * A criterion has only `met: true/false`, so a close that never asked the judge cannot
+ * say "unknown" per criterion. It says this instead, and the row's `outcome: 'skipped'`
+ * is what makes the record honest: the `met: true` here is not a judgement, it is the
+ * absence of one, and a reader that shows it as a pass is reading the record wrong.
+ */
+export declare const SKIPPED_JUDGE_NOTE = "\u672A\u8FC7\u76D1\u5DE5\uFF1A\u6309\u8C03\u7528\u65B9\u8981\u6C42\u8DF3\u8FC7\uFF08verify.blockSupervisor=false\uFF09\uFF0C\u8FD9\u4E00\u6761\u6CA1\u6709\u5224\u8FC7";
+/**
  * The guest script: one `agent()` call, one object back.
  *
  * Written as a string because the engine runs it in its own realm; a string answer and
