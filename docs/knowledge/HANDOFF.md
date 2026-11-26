@@ -1,3 +1,48 @@
+## 2026-11-26 — **`0.13.51` 已发布并收口**（合并提交 `e38d5cc`、发布提交 `16453c4`、附注标签 `v0.13.51` 对象 `a2c7eeab…`、两个远端 run 都 success、Release 资产 **1019833** 字节）；**live 档案升级 `BLOCKED`，一条动作留给有写权限的人；块里两条缺口照原样带下去**
+
+- **From:** 发布收口这一轮（`agent-214/release-memory`）· **To:** 有写权限做 live 档案升级的人 / 下一个接手监工模型那条腿的人
+- **发布身份（`CONFIRMED`，本轮自己 `git` / `gh` 只读复核的）**：合并提交 **`e38d5cc`**（`Merge branch 'fix/supervisor-paths' into release/0.13.51`，
+  两父 `c6248f8` + `8d8e60a`、零冲突、35 文件 / +979 −44）→ 发布提交 **`16453c4cd715e53f960478d572f3ab0f4345c0e3`**
+  （`chore(release): prepare v0.13.51`，单亲 `e38d5cc`，8 文件 / **+24 −22**）；`main` 从 `c6248f8` **快进**到 `16453c4`
+  （`git merge --ff-only release/0.13.51`，推送输出逐字 `c6248f8..16453c4  main -> main`，**发布本身没有 merge 提交**；
+  本轮自己读 `git reflog show main` 读到 `16453c4 main@{0}: merge release/0.13.51: Fast-forward`）；
+  附注标签 **`v0.13.51`** 对象 **`a2c7eeab91ce715bdc481bed38d2c959a9ebfbab`** → 剥出 `16453c4`、消息 `Grok Workflow for DSH v0.13.51`、
+  `tagger` `2026-11-26 16:17:03 +0800`；推标签输出 `* [new tag] v0.13.51 -> v0.13.51`。**没有 force-push、没有移动任何已发布标签**，
+  `v0.13.51` 推前本地与远端都不存在——**这三句（两行推送输出与「推前不存在」）是派单记录**，推送当场没留转录、本轮无法回读；
+  本轮推后自己读的是远端 `refs/tags/v0.13.51` = 对象 `a2c7eeab…` 且其 `^{}` = `16453c4…`，只多出这一条。现在 `main` = `origin/main` = `16453c4`。
+- **跑过什么（`CONFIRMED`）**：发布门禁只有一份，是这一版唯一一次完整门禁——`TMPDIR=$PWD/.tmp npm run ci` 在 **`16453c4`** 上由 foreman 跑，
+  转录 `.rsi/evidence/release-0.13.51-2026-11-26/gate-release-16453c4.out`（**401 行 / 24285 字节 /
+  `sha256 51f497cbac00b5d71f6774c8c53aa8c55897084485c3e7638665658beca13133`**，末行 `GATE_EXIT=0`）；
+  本轮**逐行读了这份转录**，不是转述：第 162 行 `Found 15 warnings and 0 errors.`、第 169 行
+  `lib/ at 16453c4 is the build of src/ at 16453c4 (293 files, byte-identical)`、第 168 / 178 行 `client bundle: 386534 bytes → lib/client.js`、
+  第 396 行 `Test Files 105 passed (105)`、第 397 行 `Tests 2057 passed (2057)`、第 399 行 `Duration 99.74s`。
+  远端两个 run 本轮自己 `gh run view` 复核：CI **`45781883093`**（`push` / `main` / `16453c4`）与 Release **`45781886669`**
+  （`push` / `v0.13.51` / `16453c4`，`08:17:17Z` → `08:18:49Z`）都 `completed` / **`success`**；Release 本轮自己 `gh release view` 读回
+  `Grok Workflow for DSH v0.13.51`、非 draft、非 prerelease、`targetCommitish main`、`publishedAt 2026-11-26T08:18:47Z`、
+  正文 22 行 / 2364 字节、唯一资产 `dsh-grok-workflow-0.13.51.tgz` **1019833** 字节 /
+  `digest sha256:1520964cb19805be910e65f7b9602a91d1852767fea6af95750b0deaad855f6e`，<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.51>。
+- **没跑什么（`NOT_RUN` / `BLOCKED`）**：第二遍整份门禁 `NOT_RUN`（`AGENTS.md` §12）、真机 soak `NOT_RUN`（块里与这一轮都没跑）、
+  npm publish `NOT_RUN`（本仓库不发 npm）；`AGENTS.md` §13 的 live 档案升级 **`BLOCKED`**（见下）。
+  块里原本挂着的整仓套件与 `npm run ci` 两项 `NOT_RUN`，已被这次发布门禁覆盖（`105 files / 2057 passed` 就是整仓读数）。
+
+### 交给下一个人的两件事（**块里原有的缺口，这一版照原样带下去；没做，不是做了没记**）
+
+1. **监工的模型判断那条腿仍然没有真机验证。** `0.13.51` 只证明**确定性那六道检查 + 空拆法硬拒**看得见批准目录、判得出范围；
+   `grok_close_block` 里真正的模型判断（`src/supervisor/verdict.ts`）**一次都没有在真机上跑过**，也没有在隔离 `DSH_HOME` 里
+   走完一次「批准→交工→判词」的完整回合。要收这条，得在隔离档案里装 `v0.13.51`、用真会话走一遍。
+2. **`src/supervisor/verdict.ts` 那句 `（这次交工没有报任务拆法）` 还在，而且已经不可达**（第 1 道检查先否决，模型不会被问到）。
+   **故意留着**，因为导出的 `supervisorPrompt` 仍可被直接塞一份空拆法。谁要删，连它的用例一起看，别只删文案。
+
+### live 档案升级（`BLOCKED`，一条动作）
+
+- `~/.dsh` 在工作区外、本会话 `workspace-write`、审批提示被禁用。探测 `: > ~/.dsh/.release-probe-0.13.51` 被拒：`Read-only file system`。
+  **什么都没写、没重试绕过、没重载、没重启、3080 端口没碰。**
+- 只读看到：live 那条插件行是**浮动的** `github:free6589/dsh-grok-workflow`，装着的副本读作 **`0.13.48`**——也就是说 live 上还差三个版本。
+- **有写权限的人要做的（就这一条）**：把那条插件行钉到**确切的 `v0.13.51`**（绝不用浮动范围、`latest` 或分支名），读回版本必须是
+  **`0.13.51`**；读不回来就**回滚那一行**，并报出回滚后的版本。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 的**批准目录那一轮**（分支 `fix/supervisor-paths`）——它写的是**合并之前**的状态：分支未推、未打 tag、版本仍是 `0.13.50`，那三条提交与两件未做的事照原样留着。）
+
 ## 2026-11-26 — **关单改为按「批准时的目录」读产物、空拆法硬拒**（分支 `fix/supervisor-paths`，提交 `08dd95d` + `3598eaa` + 记忆提交）；**块内门禁绿，剩下两件事**
 
 - **From:** 本块的检查那一半（`agent-213/supervisor-checks`）· **To:** 合并这条分支的人 / 下一个接手关单判定的人

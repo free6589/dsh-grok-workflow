@@ -1,3 +1,80 @@
+## `0.13.51` **发出去并收口**：合并提交 `e38d5cc`、发布提交 `16453c4`、`main` 从 `c6248f8` 快进、附注标签 `v0.13.51` 对象 `a2c7eeab…`、两个远端 run 都 success、Release 资产 **1019833** 字节（比 `0.13.50` **+4681**）；发布门禁在 `16453c4` 上 **`GATE_EXIT=0`**（`105 files / 2057 passed` / `99.74s`，转录 **401 行 / 24285 字节 / `sha256 51f497cb…`**）；**第二遍门禁 / 真机 soak / npm publish `NOT_RUN`**、**live 档案升级 `BLOCKED`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`0.13.51` 的发布收口。**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）——这一版发出去的东西
+是功能分支 `fix/supervisor-paths` 的三条提交（源码 + 用例 `08dd95d`、`lib/` 重建 `3598eaa`、记忆 `8d8e60a`），
+契约见 `D-171`，块内门禁读数在下一段（写于合并之前）。这一轮的活是：合流、发版、推 `main` 与标签、盯两个远端 run 到 success、
+核对 Release 元数据与资产、写记忆、确认本机收尾，最后做一次 live 升级探测（预期被拒）。
+**本轮自己重读的是 `git` 与 `gh` 侧**（标签对象、剥离结果、`tagger`、远端 refs、两个 run 的 id 与结论、Release 字段与资产），
+门禁那份转录是**只读复核**（`wc -lc` + `sha256sum` + 逐行读关键读数），**没有重跑门禁、没有重跑任何套件**。
+
+**发布身份（`CONFIRMED`，本轮自己 `git` 读的）**
+
+| 项 | 值 |
+| --- | --- |
+| 合并提交 | `e38d5ccaf8b367a3179d9050f68aedb7efabcc99`（`Merge branch 'fix/supervisor-paths' into release/0.13.51`，两父 `c6248f8` + `8d8e60a`，**零冲突**，35 文件 / +979 −44） |
+| 发布提交 | `16453c4cd715e53f960478d572f3ab0f4345c0e3`（`chore(release): prepare v0.13.51`，**单亲** `e38d5cc`，8 文件 / **+24 −22**） |
+| 合流方式 | `git merge --ff-only release/0.13.51`：`c6248f8` → `16453c4`，**发布本身无 merge 提交**；推送输出 `c6248f8..16453c4  main -> main`（派单记录；本轮自己读 `git reflog show main` = `16453c4 main@{0}: merge release/0.13.51: Fast-forward`） |
+| 附注标签 | `v0.13.51`，`git cat-file -p` 读到 `type commit`；对象 **`a2c7eeab91ce715bdc481bed38d2c959a9ebfbab`** |
+| 剥出 | `git rev-parse v0.13.51^{}` = **`16453c4cd715e53f960478d572f3ab0f4345c0e3`**（= 发布提交） |
+| 标签消息 / 时刻 | `Grok Workflow for DSH v0.13.51` / **`2026-11-26 16:17:03 +0800`**（`1795681023 +0800`） |
+| `main` 现状 | `git rev-parse main` = `git rev-parse origin/main` = `git ls-remote origin refs/heads/main` = **`16453c4…`** |
+| 推标签 | `* [new tag] v0.13.51 -> v0.13.51`、推前 `git tag -l` 与 `git ls-remote --tags origin 'refs/tags/v0.13.51*'` 两侧都不存在——**这三句是派单记录**（推送当场没留转录，本轮无法回读）；**本轮推后自己读**到远端 `refs/tags/v0.13.51` = 对象 `a2c7eeab…`、其 `^{}` = `16453c4…` |
+| 已发布标签未移动 | 派单记录：没有 force-push、没有移动任何已发布标签（**本轮没有推前基线可比**，故不自行升格为 `CONFIRMED`） |
+
+**发布门禁（`CONFIRMED`，转录 `.rsi/evidence/release-0.13.51-2026-11-26/gate-release-16453c4.out`——
+本轮自己 `wc -lc` 与 `sha256sum` 读到 **401 行 / 24285 字节 / `sha256 51f497cbac00b5d71f6774c8c53aa8c55897084485c3e7638665658beca13133`**）**
+
+| 命令 / 动作 | 环境 | 结果 | 出处（转录行号） |
+| --- | --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npm run ci` | `16453c4` 的树，由派单的 foreman 跑 | 末行 **`GATE_EXIT=0`** | 401 |
+| 同上 lint 那一步 | 同上 | `Found 15 warnings and 0 errors.` | 162 |
+| 同上 `verify:lib` | 同上 | `lib/ at 16453c4 is the build of src/ at 16453c4 (293 files, byte-identical)` | 169 |
+| 同上 `npm run build` | 同上 | `client bundle: 386534 bytes → lib/client.js` | 168 / 178 |
+| 同上 `npm test` | 同上 | `Test Files 105 passed (105)` · `Tests 2057 passed (2057)` · `Duration 99.74s` | 396 / 397 / 399 |
+
+**与上一版发布门禁的算术**（`0.13.50` 那次是 `105 files / 2045 passed`、`86.34s`、`386534 bytes`）：用例 `2045 → 2057`（**+12**）、
+测试文件 `105 → 105`、lint `15 / 0` 不变、`lib/` 文件数 `293 → 293` 不变、客户端 bundle **386534 字节不变**（这一版没动浏览器包）。
+**块里原本 `NOT_RUN` 的整仓套件与 `npm run ci`，已经被这一份门禁覆盖**——`105 files / 2057 passed` 就是整仓读数，
+不必再把那两项当缺口挂着。**`D-171` 那轮的块内读数（六份 spec `6 files / 193 passed`、`verify:lib` 在 `3598eaa` 上 `byte-identical`）
+原文在下一段，未改动。**
+
+**远端两个 run（`CONFIRMED`，本轮自己 `gh run view` 只读复核，不是转述）**
+
+| run | id | 触发 / 头分支 / sha | 结论 |
+| --- | --- | --- | --- |
+| CI | **`45781883093`** | `push` / `main` / `16453c4` | `completed` / **`success`** |
+| Release | **`45781886669`** | `push` / `v0.13.51` / `16453c4` | `completed` / **`success`**（`08:17:17Z` → `08:18:49Z`） |
+
+**GitHub Release（`CONFIRMED`，本轮自己 `gh release view v0.13.51 --json …`）**：名字 `Grok Workflow for DSH v0.13.51`、
+`tagName v0.13.51`、`isDraft false`、`isPrerelease false`、`targetCommitish main`、`publishedAt 2026-11-26T08:18:47Z`、
+正文 **22 行 / 2364 字节**（`-q .body` 自己 `wc -lc` 读的，非空）；唯一资产 `dsh-grok-workflow-0.13.51.tgz` = **1019833** 字节、
+`digest sha256:1520964cb19805be910e65f7b9602a91d1852767fea6af95750b0deaad855f6e`、state `uploaded`；
+<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.51>。上一版 `0.13.50` 资产 **1015152** 字节，差 **+4681**。
+
+**本机收尾（`CONFIRMED`，本轮自己 `git branch` / `git worktree list` 读的）**：worktree `.agents/worktrees/fix-supervisor-paths` 已移除
+（移除前干净、零未合并提交）；分支 `fix/supervisor-paths`（was `8d8e60a`）与 `release/0.13.51`（was `16453c4`）已删除；
+`git worktree list` 只剩主检出 `/home/fish/projects_mine/dsh-grok-workflow 16453c4 [main]`；`backup/*` 与 `feat/*` 一条没动，标签全在。
+**这一轮的记忆提交只碰四件**：`docs/knowledge/STATE.md`、`HANDOFF.md`、`VALIDATION.md` 与本目录的 `README.md`；
+工作树里**别人的两处原样没动、一个都没 stage**：` M .gitignore` 与 `?? .rsi/evidence/progress-now/`。
+
+**照实留白（`NOT_RUN` / `BLOCKED`）**
+
+- **第二遍整份门禁 `NOT_RUN`**：`AGENTS.md` §12——整份门禁在发布提交上跑一次，跑过了。
+- **真机 soak `NOT_RUN`**：`D-171` 那一块与这一轮都没有在隔离档案里装包跑真会话；监工的**模型判断**那条腿
+  （`src/supervisor/verdict.ts`）**至今一次都没有在真机上跑过**，这一版只证明确定性六道检查 + 空拆法硬拒。
+- **`src/supervisor/verdict.ts` 那句 `（这次交工没有报任务拆法）` 已不可达但仍在**（第 1 道检查先否决）：故意留着，
+  因为导出的 `supervisorPrompt` 仍可被塞空拆法；**没有删**。
+- **live 档案升级 `BLOCKED`**：`~/.dsh` 在工作区外、本会话 `workspace-write`、审批提示被禁用；探测
+  `: > ~/.dsh/.release-probe-0.13.51` 被拒（`Read-only file system`），**没写、没重试绕过、没重载、没重启、3080 端口没碰**。
+  只读看到的 live 现状：插件行是**浮动的** `github:free6589/dsh-grok-workflow`，装着的副本读作 **`0.13.48`**。
+  有写权限的人要做的：钉到确切的 `v0.13.51`、读回 `0.13.51`，读不回就回滚那一行并报出回滚后的版本。
+- **npm publish `NOT_RUN`**：本仓库不发 npm，发布面只有 GitHub Release。
+
+**证据：** `.rsi/evidence/release-0.13.51-2026-11-26/`（`gate-release-16453c4.out` 是发布门禁原件，401 行；
+`README.md` 是本目录索引，逐条写清命令、读数、行号、远端 run 与 Release 链接）。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 的**批准目录那一轮**（`fix/supervisor-paths`，基线 `c6248f8`）——它记的是**合并之前**的块内门禁：四格全绿、六份 `block-*` spec `6 files / 193 passed`、`verify:lib` 在 `3598eaa` 上 `byte-identical`，以及当时还挂着的四项 `NOT_RUN`。那四项里的整仓套件与 `npm run ci` 已被上一段的发布门禁覆盖，其余结论一字未改。）
+
 ## 关单按批准目录读产物 + 空拆法硬拒（`fix/supervisor-paths`，基线 `c6248f8`）：门禁四格全绿、六份 `block-*` spec **`6 files / 193 passed`**、`verify:lib` **`byte-identical`**；**整仓套件 / `npm run ci` / 真机 soak / live 升级四项 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：修两件事，都在「关单判定」这条路上。① 六道确定性检查原来把任务声明的写路径当成
