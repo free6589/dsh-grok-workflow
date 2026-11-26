@@ -1,3 +1,80 @@
+## `0.13.47` 发版收口：唯一一份门禁（发布树 `63d039b`）`GATE_EXIT=0`（`103 files / 1948 tests`、转录 381 行 / 22779 字节），发布身份、两个远端 run、Release 与资产都复核过；这一版**只发证据**（三种失败页面的真机读数）、**没有行为变化**；**live 档案升级 `BLOCKED`**、**真机 soak / npm / `gh` 全 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.47` 已经出去（tag 推了、Release 建了、资产在），
+本轮只写三份记忆 + 一份证据索引；**没有重跑门禁、没有跑任何 npm 命令、没有跑 `gh`、没有碰 `src/` / `test/` / `lib/`**
+（`AGENTS.md` §12），所以**没有红可记**——这一版没有行为改动；三态证据本身是 `fix/failure-states` 那一轮拍的，
+见本文件下方。
+
+**命令与结果（`CONFIRMED`：门禁是包工头在发布 worktree 的干净树上跑的，本轮只读转录与 `git`，不重跑）**：
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npm run ci` | worktree `.tmp/wt-release-0.13.47`、干净树、独立 `npm ci --prefer-offline`、`HEAD = 63d039b` | **`GATE_EXIT=0`**（唯一一份门禁） | `.rsi/evidence/release-0.13.47-2026-11-26/gate-release-63d039b.out` |
+| 抬版本之前的第二份门禁 | — | **`NOT_RUN`**：这一版只改证据与文档，`test/` 一个文件没动 | 套件读数沿用同一份转录 |
+| 真机 soak | — | **`NOT_RUN`**：这一版没有行为变化可 soak | 三态证据 `.rsi/evidence/failure-states-2026-11-26/` |
+| `wc -lc` + `sha256sum` + `tail -1` + `grep -c`（转录身份） | 本轮 | **381 行 / 22779 字节**、`sha256 42fee211950be38fe2c56be088a4c6677e31996ff0622e85985214be4f8cb569`、末行 `GATE_EXIT=0`、`grep -c FAIL` = **0**、`grep -c 'failed'` = **3**（都是词命中） | 同一份转录 |
+| `git show --stat --oneline 63d039b` / `--numstat` | 本轮 | **8 文件 / +48 −20**（`CHANGELOG.md` +28 −0、`README.md` 5/5、`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、`package-lock.json` 2/2、`package.json` 1/1、`src/client/index.js` 2/2） | 证据索引 §2 |
+| `git rev-list --parents -n1 63d039b` | 本轮 | 父提交 **`dd34832`**，**单父** | 同上 |
+| `cmp src/client/index.js lib/client.js` + `wc -c` | 本轮 | 退出 **0**、各 **348559 字节**（同一个 blob `d2f330e` → `0a30dd2`） | 同上 |
+| `git diff --name-only v0.13.46 63d039b -- test` | 本轮 | **输出为空**（这一版没碰任何测试文件） | 下方「用例算术」 |
+| `git diff --name-only v0.13.46 63d039b -- src` | 本轮 | 只有 `src/client/index.js`（版本字面量那两行） | 同上 |
+| `git cat-file -p v0.13.47` | 本轮 | 对象 **`d74e06e`** → 剥出 `63d039b`、`tagger 1795652687 +0800`（**08:24:47**；派单记录写的 `1795652476` / 08:21:16 与对象不符，以对象为准） | 同上 |
+| `git ls-remote --tags origin 'refs/tags/v0.13.4*'` + `refs/heads/main` | 本轮 | `v0.13.45` 对象 `ca4a42c6…` → 剥出 `63793eb…`、`v0.13.46` 对象 `a1f0f85d…` → 剥出 `84f64c8…`（与开工前基线逐字一致）、`v0.13.47` 对象 `d74e06e` → 剥出 `63d039b`、`main` = `63d039b` | 同上 |
+
+**门禁读数逐行（`CONFIRMED`，`sed -n` 读同一份转录）**：第 2 / 6 / 10 行 `> dsh-grok-workflow@0.13.47 ci` /
+`… typecheck` / `… lint`；第 162 行 `Found 15 warnings and 0 errors.`；第 163 行
+`Finished in 129ms on 184 files with 96 rules using 6 threads.`；第 168 与第 178 行
+`client bundle: 348559 bytes → lib/client.js`（同值，各打一次）；第 169 行
+`lib/ at 63d039b is the build of src/ at 63d039b (289 files, byte-identical)`；第 376 行
+**`Test Files 103 passed (103)`**；第 377 行 **`Tests 1948 passed (1948)`**；第 379 行
+`Duration 90.30s (transform 2.72s, setup 0ms, import 9.84s, tests 67.72s, environment 12ms)`。
+
+**`grep -c 'failed'` = 3，三条都不是失败**：第 182 行用例标题里的 `read failed`；第 225 行用例标题
+`failed rows requeue to pending and keep their dependency gate`；第 304 行 checkpoint 夹具故意造的
+`[smoke] status=failed …`，那行路径逐字带 `…/dsh-grok-workflow/.tmp/wt-release-0.13.47/…`
+（**本身就是「门禁跑在发布 worktree 里」的证据**）。`grep -c FAIL` = **0**，末行 `GATE_EXIT=0`。
+
+**用例算术（`CONFIRMED`，从 git 对象数过）**：spec 文件 **103**、用例 **1948**，与 `0.13.46` 发版门禁报的是
+**同一个数**——这一版**没有增删任何测试文件**（两条 `git diff --name-only v0.13.46 63d039b -- test` / `-- src`
+如上表），所以不是「长了」，是**没动**。
+
+**发布身份（`CONFIRMED`）**：发布提交 **`63d039b6c9717fbab90d0afefab0a602e6206be4`**
+`chore(release): prepare v0.13.47`、父提交 **`dd348327875e829bd38e6314724b47a69f30aaa4`**（单父）、
+**8 文件 / +48 −20**；`src/` 与 `lib/` 的唯一改动是 `PLUGIN_VERSION` / `UPDATE_LATEST` 那一对
+`'0.13.46'` → `'0.13.47'`（blob `d2f330e` → `0a30dd2`，`cmp` 退出 0、各 348559 字节，**没有一行逻辑改动**）；
+`main` 由 `git merge --ff-only release/0.13.47` 前进（推送输出 `dd34832..63d039b  main -> main`），
+所以 **`main` = `origin/main` = 门禁提交 = 标签剥出的提交 = `63d039b`**，没有第二个合并提交；
+附注标签 `v0.13.47` 对象 `d74e06e`、`tagger` **2026-11-26 08:24:47 +0800**（`1795652687 +0800`）、
+标签上的 `package.json` 读 `0.13.47`；**没有 force-push、没有移动任何已发布标签**。
+
+**远端与 Release（`CONFIRMED`，派单记录里的 `gh` 读数；本轮按规则没跑 `gh`）**：Release run **`45728561278`**
+（`headBranch v0.13.47`、sha `63d039b`、**success**、单 job `Validate and publish v0.13.47`、
+`2026-11-26T00:24:56Z → 00:26:18Z` ≈ **82 s**、非 success 步骤 0 个、`gh run watch --exit-status` 退出 0）；
+`main` CI run **`45728550814`**（sha `63d039b`、**success**、`Node 22` + `Node 24` 两个 job 都 success）；
+GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.47 名字
+`Grok Workflow for DSH v0.13.47`、`publishedAt 2026-11-26T00:26:13Z`、非 draft / 非 prerelease、target `main`、
+正文 **28 行**、唯一资产 **`dsh-grok-workflow-0.13.47.tgz` = 990561 字节**（`0.13.46` = 989319 → **+1242**）、
+`digest sha256:520cb409eda07e88bfd01e0533c0541b52f3702c2c6374be39525347e499ff0d`。
+
+**这一版带什么（`CONFIRMED`）**：`v0.13.46..63d039b` 五颗提交、**产品代码零行**——发布提交、两颗
+`merge: failure-states soak evidence, no product change`、`1183b59`（三态证据 62 个文件）、`f7dda97`（`0.13.46` 记忆）。
+用户拿到的是三态真机读数（琥珀汇总节点 / `未通过` 页 / `已取消` 页），**三态读下来没有产品缺陷，所以没有行为变化**。
+**一处口径订正**：判腿证据 `.rsi/evidence/judge-leg-soak-2026-11-26/` 随 **`v0.13.46`** 就已发出
+（`git ls-tree -d --name-only v0.13.46 .rsi/evidence/` 里有它），`0.13.47` **只带三态这一套**。
+
+**`BLOCKED`（`AGENTS.md` §13 的 live 档案升级）**：**没做成**——写探测 `: > ~/.dsh/.release-probe-0.13.47`
+返回 **`Read-only file system`**（`workspace-write`、`~/.dsh` 在工作区外、审批提示被禁用），**没写、没重载、没重启**，
+3080 全程没碰。只读读到：live 装的仍读 **`0.13.46`**、插件行是 `~/.dsh/profiles/web/cordis.patch.yml` 第 **561** 行
+`name: dsh-grok-workflow`、`~/.dsh` mtime `2026-11-25 23:14`、`~/.dsh/profiles` mtime `2026-11-22 16:59`（都在本会话之前）；
+另记一条本轮自己读到的：那一行仍是浮动依赖（`~/.dsh/profiles/web/package.json` 第 12 行
+`"dsh-grok-workflow": "github:free6589/dsh-grok-workflow"`），所以下一个人要把那一行**钉到确切的标签 `v0.13.47`**
+并把版本读回来确认。
+
+**`NOT_RUN` 三条**：① 真机 soak（这一版没有可 soak 的行为变化）；② 任何 npm 命令（含 `npm -v`）与 `gh`
+（记忆轮一条都没跑，远端读数照派单记录转述）；③ 抬版本之前的第二份门禁（`test/` 一个文件没动）。
+
+---
+
 ## `fix/failure-states` 真机三态：琥珀汇总节点 / 整轮失败页 / 被取消页三张 1500 宽截图 + 逐字文本 + 钩子读数 + 两颗按钮的输入框读数；**产品代码一个字没改**、**块内门禁 `NOT_RUN`**（无可门禁的代码）、**未合 `main` / 未 push / 未打 tag / 未发版** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：只补证据，不改产品。三条 `NOT_RUN` 一次拍死：琥珀汇总节点、失败/取消两态、点按钮后输入框里是什么。
