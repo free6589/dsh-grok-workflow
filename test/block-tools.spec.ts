@@ -768,7 +768,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
     expect(mounted.engine.startCalls).toHaveLength(1)
   })
 
-  it('says so when the judge was skipped', async () => {
+  it('records a skipped close as a third outcome, not as a pass', async () => {
     const mounted = await mount()
     const live = headed('sess-close-skip')
     const previewed = await preview(mounted, live)
@@ -790,9 +790,28 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
       verify: { blockSupervisor: false },
     }, live)
-    expect(closed['outcome']).toBe('pass')
+    // Neither a pass nor a veto: the judge was never asked.
+    expect(closed['outcome']).toBe('skipped')
+    expect(closed['judged']).toBe(false)
+    expect(closed['block_status'], 'the order-time switch still settles the block').toBe('accepted')
     expect(String(closed['not_judged'])).toContain('未过监工')
     expect(mounted.engine.startCalls).toHaveLength(0)
+    // The criteria are what the record really holds — `met: true` with the skip note.
+    // Read with the outcome and the judged flag, that pair says "no judgement"; read
+    // alone, it never does.
+    const criteria = closed['criteria'] as { met: boolean, evidence: string[] }[]
+    expect(criteria.map(criterion => criterion.met)).toEqual([true, true])
+    expect(criteria.flatMap(criterion => criterion.evidence).every(text => text.includes('未过监工'))).toBe(true)
+    // And reading the block back is the same record: no pass manufactured by the reader.
+    const status = await call(mounted, BLOCK_TOOL_NAMES.status, { block_id: started['block_id'], block: '读账本' }, live)
+    expect(status['status']).toBe('accepted')
+    const verdicts = status['verdicts'] as { outcome: string, judged: boolean, criteria: { met: boolean, evidence: string[] }[] }[]
+    expect(verdicts).toHaveLength(1)
+    expect(verdicts[0]!.outcome).toBe('skipped')
+    expect(verdicts[0]!.judged).toBe(false)
+    expect(verdicts[0]!.criteria.map(criterion => criterion.met)).toEqual([true, true])
+    expect(status['skips']).toBe(1)
+    expect(status['vetoes']).toBe(0)
   })
 
   it('keeps the judge off when the block was ordered that way, with no verify on close', async () => {
@@ -819,7 +838,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
       ].join('\n'),
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
     }, live)
-    expect(closed['outcome']).toBe('pass')
+    expect(closed['outcome']).toBe('skipped')
     expect(closed['judged']).toBe(false)
     expect(String(closed['not_judged'])).toContain('未过监工')
     expect(mounted.engine.startCalls.map(call => call.meta.name)).not.toContain('Block supervisor')
@@ -976,6 +995,36 @@ describe('the approval directory: preview, then the row, then the close', () => 
     expect(closed['block_status']).toBe('accepted')
     expect(mounted.engine.startCalls.map(call => call.meta.name)).toEqual(['Block supervisor'])
     expect(verdictLines()).toHaveLength(1)
+  })
+
+  it('writes a scope veto that names the approval directory and both sides absolutely', async () => {
+    const mounted = await mount()
+    const dir = tempDir('root-scope-veto')
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    mkdirSync(join(dir, 'elsewhere'), { recursive: true })
+    writeFileSync(join(dir, 'elsewhere', 'a.md'), '# 别处\n')
+
+    const started = await startSplit(mounted, headed('sess-root-scope-veto', dir), {
+      objective: '写一条笔记',
+      blocks: NOTES_BLOCKS,
+    })
+    const closed = await call(mounted, BLOCK_TOOL_NAMES.close, {
+      block_id: started['block_id'],
+      handoff: NOTES_HANDOFF,
+      // The file exists, so the artifact check passes and the one thing wrong with this
+      // hand-in is the tree it was written in.
+      tasks: [{ title: '写笔记', acceptanceCriteria: ['notes/a.md 写好了'], writesPaths: ['elsewhere/a.md'] }],
+    }, headed('sess-root-scope-veto-close', tempDir('root-scope-veto-close')))
+
+    expect(closed['outcome']).toBe('veto')
+    expect(closed['block_status']).toBe('open')
+    expect(mounted.engine.startCalls, 'a scope veto is deterministic').toHaveLength(0)
+    const reasons = closed['reasons'] as { criterion: string, evidence: string, why: string }[]
+    const scope = reasons.find(reason => reason.criterion === '范围 ⊆ 批准')!
+    expect(scope.evidence, 'the quote stays the caller\'s own spelling').toBe('elsewhere/a.md')
+    expect(scope.why).toContain(realpathSync.native(dir))
+    expect(scope.why).toContain(realpathSync.native(join(dir, 'elsewhere', 'a.md')))
+    expect(scope.why).toContain(realpathSync.native(join(dir, 'notes')))
   })
 
   it('does not fall back to the process cwd when the artifact only exists there', async () => {

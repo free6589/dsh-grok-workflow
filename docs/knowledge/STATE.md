@@ -1,3 +1,99 @@
+Last updated: 2026-11-27 04:30 +08:00（**release/0.13.54 第二条合流：`fix/mobile-overlap` 手工融合进横排分叉，两边功能并存（`CONFIRMED`，本树实测）** —
+分支 **`release/0.13.54`**（worktree `/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-054`），基线 **`7cc8db7`**（已合 `feat/task-fork` 的 merge），被合 **`fix/mobile-overlap`** HEAD = **`a3b80c4`**。
+**操作者看到的两件事同时成立**：① 从左往右一张横排分叉（七列、每张任务卡六环、每轮五验、`flowchart LR`、无「收下这版」）；
+② 手机上摊开的调用不再压隔壁卡——≤720px 时搬出图、落到图下抽屉、点完居中（>720px 仍是节点下浮层）。
+**本轮门禁（本树实测）**：`tsc --noEmit` **`EXIT=0`**；`oxlint src test` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+五份相关 spec **`5 files / 247 passed`**（client 153 + progress-panel 48 + progress-panel-model 23 + progress-connector 15 + i18n-parity 8）。
+浏览器包 `lib/client.js` 与 `src/client/index.js` 逐字节相同（`cmp` 空输出）。
+以下上一轮记录原样保留（task-fork 那一节，“未合未推”已过时——它已合入本分支 7cc8db7）：
+分支 **`feat/task-fork`**（worktree `.agents/worktrees/feat-task-fork`），HEAD = **`fe6d631`** = `main` 尖端，本树自己读的身份：
+`git describe --tags --always` = **`v0.13.53-1-gfe6d631`**、`git tag --contains HEAD` 计数 **0**（这颗提交上没有标签）、
+`package.json` 版本 **`0.13.53`**——**没有合、没有推、没有打 tag、没有发版、没有抬版本**。
+**操作者看到的是**：从左往右一张分叉——**起点 → 规划（分叉）→ 任务 1 / 任务 2 … → 每条任务的子任务（横排分支）→ 汇合 → 验收 → 终点**。
+七列按这个顺序排开（没有记录的那一列就不画盒子）；每张任务卡自己带**六盏灯**（规划 / 执行 / 检查 / 复核 / 验收 / 汇总），验收那一列带**五盏验**（机器远端 / 模型复核 / 真机隔离 / 人验 / 对账）。
+**灯是记录的折叠，不是判断**：后来重试补上的那次失败是绿的，没人跑过的验是暗的——页面从不替事件流勾选任何一道验。
+图每次渲染都从这一轮自己的事件行重推，所以**重规划之后图自己长出它真走过的那张任务、那几条分支和线**，别的盒子一个字段不变。
+**接受不必再点**：dock 上只剩「开工」那一颗，`progress.dock.accept` 从两本字典删掉；验收成了图上的一个地方。
+结构来源仍是那份 Mermaid 文本，现在是 **`flowchart LR`**，**每一种状态都是一张连通的图**（没有任务卡时补一条 `plan → sum`），
+终点在文本里写作 `finish`，页面排的是解析回来的那份图（没有引任何画图库）。
+**门禁（本块收尾，本树自己跑）**：`tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`oxlint src test` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+八份进度相关 spec **`8 files / 331 passed`**（client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14）；
+**整仓套件与 `npm run ci` 是 `NOT_RUN`**（`AGENTS.md` §12：块内只跑碰到的 spec）。`progress.*` 键 **64 → 77**（+14 −1）。
+**浏览器包**：`lib/client.js` **422 685** 字节 / `sha256 c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186`，
+与 `src/client/index.js` 同哈希、`cmp` 空输出；`lib/index.js` **27 956** 字节 / `sha256 ac69070e…dfa2c32`，本块没碰它。
+**真机 soak（`CONFIRMED`）**：隔离档案（克隆 live 的 `web`、`DSH_HOME` 走 scratch、端口 **3412**、真模型、三个任务的真实工作流，收尾已拆），
+装进去的是 `file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz`（**1 033 214** 字节 / `sha256 b5b7d208…3c46` / 164 文件），
+读回 **`0.13.53`**、装好的 `lib/client.js` 与工作树同哈希、软链 **0** 个。**七张读数**：桌面 1500 进行中 **11 节点 / 12 边**、完成态 **17 / 24**、
+点开一颗节点 17 / 24（调用列表 **1** 行、亮线 **9** / 暗 **20**）；手机 390 三张同计数；外加一张 native-390 完成态 17 / 24。
+**18 盏环 = 3 张任务卡 × 6**、验收卡 **5 盏验**（`machine=done, model=done, isolated/human/ledger=pending`）、
+完成态 dock 里 `dock-fill` **0** 颗、卡住那句每张都没有；顶上那句进行中 `第 3 步，共 7 步 · 还剩约 …`、完成态 `第 7 步，共 7 步`。
+页面真值核对每张都对：`-source` 首行 `flowchart LR`、节点行 / 线行数与 DOM 相等、**一个连通块**、终点写作 `finish`；
+`document.scrollWidth === clientWidth` 两档成立、390 下图在自己内部横向滚（1078 / 383）；控制台 **0** / 页面异常 **0**；
+这一轮真的写出 `notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**。
+**四条缺陷是真机截图抓到的，不是套件先抓到的**（都在同一分支修掉、各补一条守卫）：① 「汇总」那颗盒子被裁成只剩「汇」；
+② 展开的调用行塌成一字一行；③ 邻居卡片盖住展开的列表（开卡补 `z-index`）；④ 列表透出背景（主题 token 死了，
+改成 `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测算出来 `rgb(255,255,255)`）。
+**套件在修之前是绿的——挡住这四条的是补上的守卫。**
+**红线（照实记，包括两条为别的原因动过的路径）**：`~/.dsh/profiles` **未变**（`2026-11-22 16:59:46`）；
+`~/.dsh` 变成 `2026-11-27 00:22:48`、`~/.dsh/profiles/web` 变成 `2026-11-27 01:01:27`——**都在本块进行期间变过，但不是本块的写**：
+会改文件的每一条命令都带 `DSH_HOME=<clone>`，变动的是 live 档案自己的设置写入加上另一个块的插件作业
+（`pnpm-lock.yaml` / `node_modules` / `.plugin-manager` 00:14:34、`package.json` 00:19:54、`cordis.yml` 00:20:53、
+`cordis.patch.yml` 00:41:08 与 01:01:27）；3080 根路径 **401 → 401**；live 里那份载荷的 sha 是 `1fb003f3…` **不是本块的**，
+live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有升级**）；隔离实例已停、scratch 全部删掉。
+**`NOT_RUN` 照实记**：原生手机上的**进行中**截图、等你点头态（`开工`）在真机上、分支上的 `· 第 n 遍`（三个任务都一次过）、
+深色主题、320 px、读屏软件、Firefox / Safari、真 Mermaid 渲染器、live 档案升级与重载 / 重启、整仓测试与 `npm run ci`。
+**这一版还留着三条要人接着做的**（逐条写在 `HANDOFF.md` 顶端那一节）：① **`feat/task-fork` 要有个去处**（合 / rebase / 删）并按 `AGENTS.md` §5 记下到期日；
+② `progress.flow.visit` 这颗键现在没有代码读它（访问号角标退场后只剩在字典里），删不删等裁决；
+③ 上面那串 `NOT_RUN` 的状态要补测。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 19:05 的 **`feat/task-panel` 那一轮**（竖排步骤树 + `flowchart TD`，已被本轮取代，
+它的 §25 与 `D-173` 仍记着当时的事实）；再往下是 17:15 的 `0.13.52` 发布收口、16:22 的 `0.13.51` 收口、16:10 的**批准目录那一轮**，以及更早各轮。
+`feat/task-fork` 这一轮**没有发版**，所以它不在发布线上，只在这一段里。它们的结论一字未改。）
+
+Last updated: 2026-11-26 21:22 +08:00（**手机上摊开的调用不再压在隔壁那张卡上：它从图里搬出来，成了图下面的一张抽屉；点完就落在屏幕中间，不用再滚一下才看得见（`CONFIRMED`，隔离档案两轮真装真跑）** —
+分支 **`fix/mobile-overlap`**（worktree `.tmp/wt-mobile-overlap`），**两颗提交**：**`10c15a0`**（把列表搬出那张图）与它的子提交 **`5ba1ca2`**（点开就居中，并给面板底部补一段可滚余量；**不是 amend**）；
+基线 `main` 尖端 **`fe6d631`**（= `origin/main`）、`git describe --tags --always` = **`v0.13.53-3-g5ba1ca2`**、`git tag --contains HEAD` 计数 **0**、`package.json` 版本 **`0.13.53`**——**没合、没推、没打 tag、没发版、没抬版本**。
+**操作者看到的一件事**：进度页那张任务图上点一颗节点，摊开的调用列表原来是从节点下面浮出来的绝对定位块，手机上 390 px **压在隔壁那张卡上**（上一轮真机证据 `phone-390-trace.png`，桌面 1500 也遮住「检查」的一部分）；
+现在 **≤ 720 px 时列表离开那张图**，落到面板自己那一列里、紧跟图之后、卡住那句与 dock 之前——它只能把页面往下推，所以**横跨不了任何一张卡，也盖不住 dock 的按钮**；
+**点完它落在屏幕中间**，因为宿主把输入框钉在屏幕底边，贴住底边等于看不见；**> 720 px 一个字没改**，桌面那处叠压这一轮**故意不修**。
+**真机的四项硬指标（`CONFIRMED`，390×844 与 360×800，点完 900 ms 拍、没有手工滚动）**：抽屉 `0,407 → 383,512` / `0,385 → 353,490`，**完全在视口内**；
+与 **16 张**节点卡的相交面积 **0**；与 dock / dock-fill 的相交面积 **0 / 0**；抽屉底 **512 / 490** 对宿主固定栏上沿 **676 / 632**，**余量 164 / 142 px**；`scrollWidth = clientWidth`（390 / 360）。
+**居中为什么要配一段余量（`5ba1ca2`）**：dock **之后**一个空的 `aria-hidden` 占位（`height: 35vh`，只在窄屏且摊开时存在）——
+没有它，只把 `nearest` 换成 `center` 也会被滚到底截断（390 上抽屉底 **771** 对输入框上沿 **664**，**还差 107 px**，`scrollTop == scrollHeight - clientHeight`）；
+**决定性实验**：把占位拿掉再原位放回，dock 的 `delta = 0`（680→680 / 658→658）；抽屉**自己**把 dock 往下推的 117 px（内容轨道 1221→1338）是抽屉的高度，不是占位挤的。
+**门禁（`5ba1ca2` 上，我自己跑的）**：`npm run typecheck` **`exit 0`**；`npm run lint` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+八份进度 spec **`8 files / 336 passed`**（`progress-panel` **35**、`client` 153、`progress-panel-model` 31、`progress-tab` 72、`progress-connector` 15、`progress` 14、`progress-hint-absent` 8、`i18n-parity` 8），
+基线 **326 → 334（`10c15a0`）→ 336（`5ba1ca2`）**，**没有一份变少、没有一份被删**；`cmp lib/client.js src/client/index.js` 空输出、两份 **412 345** 字节（`sha256 8cd45211…7bb599`），重跑 `npm run build` 后 `git status` 不变。
+**整仓全量套件（这一块唯一一次全量，不是 `npm run ci`）**：`TMPDIR=$PWD/.tmp npx vitest run` → **`105 files / 2040 passed`**、`Duration 106.15s`、`SUITE_EXIT=0`
+（转录 worktree 的 `.tmp/suite-5ba1ca2.out`，gitignored）；对照 `main` 尖端 `fe6d631` 的 **105 / 2030** 是**文件数不变、用例 +10**，与 `progress-panel` 25 → 35 的 +10 对得上；
+`npm run ci` 那五步（含 `verify:lib`）**这一轮没跑**，照实记 `NOT_RUN`，留给发版那一轮。
+**真机身份（`CONFIRMED`，两轮各自的隔离 home）**：包 `dsh-grok-workflow-0.13.53.tgz` **1 031 079 B** / `sha256 9015b15b…aa7c95e` / 164 文件，装进隔离 profile 读回 **`0.13.53`**、
+两份 sha256 都等于工作树、插件目录软链 **0**；home `.tmp/soak-overlap/dsh-home`（克隆 live `web`：**7753 文件 / 5 链接 / 抹除凭据后 5/5 逐字节相同**）、
+端口 **3431**（先定 3421，起进程时 `EADDRINUSE`，改端口并重新实测空闲）、Node **v26.8.1** / npm **11.19.0** / dsh **0.2.2-rc.3**。
+第一轮包 **1 029 904 B** / `sha256 0d2dede5…8813b30`、浏览器包 **410 497** 字节。
+**两轮各自证一件事**：第一轮（`10c15a0`）证「不压卡」——抽屉在 16 张卡**之外**（`callsInsideGraph: false`，与每张卡相交 **0**）、与 dock **0 / 0**、点第二次抽屉与列表**双双归 0**、两个宽度都无横向滚动；
+它的第一遍取景正好拍下了那个缺陷（抽屉停 `739 → 844` / `695 → 800`，整块躲在输入框后面）。第二轮（`5ba1ca2`）证「点完当下就看得见」，就是上面那四项。
+两轮都跑了真工作流（三个并行任务、三个文件真写出来），`notes.md` 第二遍没被重写（mtime 停在第一轮 20:37），`consoleErrors: []` / `pageErrors: []`。
+**红线（`redline.txt` 原文）**：`~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime **两轮前后逐字节相同**（连纳秒位）；3080 根路径 **401 → 401**；
+live 那份插件仍读作 **`0.13.53`**（**没升级**）；`: > ~/.dsh/.soak-probe` **四次都是 `Read-only file system`**；隔离实例已停、端口已释放、`.tmp/soak-overlap/`（104 MB 克隆 home、两个 tgz、一次性工作区）全删。
+**soak 自己犯的两处（照实记，别美化）**：① 第二轮克隆后第一次引导**忘了装 tgz**，跑的是 live 那份已发布的 `0.13.53`（没有 `gw-progress-sheet-room`），发现即停、**一条读数都没留用**；
+② 「dock 有没有被挤走」第一遍用 `rect.top + window.scrollY` 算——这个页面是**内层容器滚动**、`window.scrollY` 恒 0，量出来是假值，**「滚到底」那张还用了 `window.scrollTo`（什么也没动、与 dock 那张同字节）**；
+改成在滚动容器坐标系里量、显式滚 `div.wSkVaW_scrollBody` 到底后重拍，修好后 `verify-readings.mjs` **38 条断言全过**。
+**`NOT_RUN` 照实记**：① **多行抽屉**（这一轮所有可摊开节点都只有 **1 行**调用，四行那一档没复现——105 px 抽屉的 164/142 px 余量是真的，换成约 207 px 会怎样没量）；② **> 720 px 那一侧本轮没复测**（声明没改，桌面叠压仍故意不修）；
+③ **720 / 721 断点边界**（只测 390 与 360，没有逐像素找断点）；④ **`matchMedia` 的 `change` 监听**（拖窗口从宽到窄、不刷新）；⑤ **同时摊开两组节点**（只开了一颗）；⑥ 「收起」按钮**只在 390 验过**（360 上没点）；
+⑦ **421–499 px** 之间的宽度；⑧ 旋转 / 现场改视口；⑨ 读屏软件（抽屉的朗读顺序是 `HYPOTHESIS`）；⑩ Firefox / Safari；⑪ live 档案升级 / 重载 / 重启（红线）。
+**这一版还留着一条要人接着做的**：**桌面 > 720 px 那处叠压仍在**（1500 展开时遮住「检查」的一部分），这一轮故意不修——浮层 / 侧栏 / 别的位置都没有证据，留给下一个决定（`HANDOFF.md` 顶端那一节）。
+契约（`DESIGN-progress-tab.md` §26）与裁决（`D-174`）都已写好，**§25 仍然成立**，§26 只改窄屏那一处渲染位置。
+**这条分支也有一个去处**：`fix/mobile-overlap` 要在 **2026-12-03** 之前合 / rebase / 删（`AGENTS.md` §5），而且它**没推**——远端没有这条分支，要合的人得从本机拿。
+Last updated: 2026-11-26 22:10 +08:00（**关单「跳过监工」现在记第三种结局 `skipped`：既不判过也不否决；验收行照原样留 `met:true` + 跳过注记，读的时候必须走 `outcome`；范围否决的 `why` 带批准目录和两侧绝对路径（`CONFIRMED`，四份块 spec 共 175 例、`tsc` EXIT=0、lint 14/0）** —
+分支 **`fix/verdict-honest`**（worktree `.tmp/wt-verdict-honest`），基线 `main` 尖端 **`fe6d631`**（v0.13.53）；**未合、未推、未打 tag、未发版，版本仍 `0.13.53`**。
+改动面：`src/block/{types,store,tools,index}.ts`、`src/supervisor/{index,verdict,checks}.ts`、两份 spec、`docs/ARCHITECTURE.md`、`CHANGELOG.md`、重建的 `lib/`。
+**操作者看到的三件事**：① 关掉监工交的活，答复与账本都写 `skipped`（判过没有，不是判过了），块仍然收下，答复明说「没有第三方判断」；
+② 读回一块时，跳过的判决带 `judged:false`，块上多一个 `skips` 计数；同一份证据再关单时，提示语说的是「按跳过监工记过一次」，不是「已经判过」；
+③ 因为范围被拒时，理由里写明核对用的目录、以及声明路径与批准范围两侧的绝对路径（引文仍是调用方自己的拼写）。
+**`NOT_RUN` 照实记**：真机隔离 soak（本块只跑确定性门禁与真实文件系统的路径用例）。
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 19:05 的**任务面板那一轮**（`feat/task-panel`），再往下是 17:15 的 `0.13.52` 收口、16:22 的 `0.13.51` 收口、16:10 的批准目录那一轮，以及更早各轮。）
+
 Last updated: 2026-11-27 02:20 +08:00（**0.13.54 合版 BLOCKED（工具没恢复，零条合流）；新挖两条合版后修的问题（`CONFIRMED`，契约 §26.8/§26.9 照实记）** —
 ① 估算文案说"按步骤推算"实际数的是"层"（字和数对不上）；② 两个步号同时出现（卡住那句说任务层、顶上那句说分支层，都对但不一样，看着晕）。货都在原位：主检出 `0.13.53`、`feat/task-fork` 两提交未合未推、`release/0.13.54` 没建、脏树与 live 没碰。
 以下为上一轮记录，原样保留：
@@ -5,7 +101,6 @@ Last updated: 2026-11-27 02:20 +08:00（**0.13.54 合版 BLOCKED（工具没恢�
 Last updated: 2026-11-27 02:05 +08:00（**0.13.54 合版 BLOCKED：跑命令的工具没恢复，合流零条完成；五条分支货都在原位没丢（`CONFIRMED`，只读验货）** —
 主检出 `package.json` 仍 `0.13.53`（本轮 `read` 直读）；`feat/task-fork` 交卷仍是两提交未合未推（`HANDOFF.md` 头行原样在）；`release/0.13.54` 没建；脏树没碰、live 没动。等工具恢复即重派合版。
 以下为上一轮记录，原样保留：
-
 Last updated: 2026-11-26 19:05 +08:00（**进度页换成了任务面板：一句话 + 一张由 Mermaid 文本自己排出来的分支树 + 只在卡住时出现的一句；这一版在隔离档案里真装真跑了三次（`CONFIRMED`）** —
 分支 **`feat/task-panel`**（worktree `.tmp/wt-task-panel`），产品提交 **`45909bb`**（`feat(progress): the tab is a task panel — one sentence, a Mermaid-shaped tree, and where it is stuck`，
 10 文件 / **+5298 −4986**：`src/client/index.js` 与 `lib/client.js` 各 2020 行、用例 4 改 2 删 2 新），基线是 `main` 尖端 **`e44e26a`**（v0.13.52）。
@@ -4083,3 +4178,40 @@ GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.
 `.gitignore` 是 modified、`.rsi/evidence/progress-now/` 是未跟踪（未暂存、未提交、未改、未回滚）；本块**只写文档**，
 没有 `git add` / `commit` / `push`，没有建或移动任何标签，`CHANGELOG` / `README*` / `src` / `test` / `lib` 一行未改，
 `gate-50b3341.out` 只读未改。）
+
+Last updated: 2026-11-26 21:00 +08:00（**卡住那句话拍到了两种形状、第三种拍不到；上一轮两条过期读数已订正且原值原样留着，`CONFIRMED` / `NOT_REACHED`** ——
+分支 `fix/readings-refresh`（worktree `.agents/worktrees/fix-readings-refresh`），基线 `main` 尖端 **`fe6d631`**，版本仍 **`0.13.53`**；
+**没有产品改动**：源码 / 测试 / `lib/` / `package.json` / `CHANGELOG.md` 一行未改，所以**不加 changelog 条目、不抬版本号**；
+**证据两块，都是这一块真做出来的**：
+① **两条过期读数订正**——`raw-readings-phone.json` 里 `phone-360-done` 与 `tablet-700-done` 原记
+`nodeCalls/traceActive/traceDim = 1 / 5 / 19`，与它们旁边**保留下来的两张图**不符（那两张是干净的完成树：没有摊开的调用卡、
+没有点亮的蓝线、没有变暗的节点），成因是第一次截图先点了任务、再改宽度却没关列表，后来重拍的两张图覆盖了 PNG、读数没跟上；
+现在两条是 `0 / 0 / 0`，**三份读数文件在同两个键上一致**（`raw` = `raw-readings-widths` = `readings`），键名与另外四条一个字没动
+（`phone-390-trace` 仍是 `1 / 5 / 19`，那是对的），**原值 `1 / 5 / 19` 原样留在 `callListFields.supersededFirstPass`**，
+带 `writtenBy` / `supersededBy` / `why`，另加 `source` 与 `matchesImage`，同目录一份中文 `raw-readings-phone.CORRECTION.md`
+说清来龙去脉——**没有删、没有原地覆盖、没有把矛盾留着**，理由记在 `D-176`（原分支内记 `D-174`）；
+② **真机像素**：隔离克隆 live web 档案、打包安装（`0.13.53`、`lib/client.js` **399448 字节** `sha256 1fb003f3…c1b81f` 与发出去的那份同值、
+tgz **1027274 字节**、`file:` 钉法、版本读回 `0.13.53`、符号链接 **0** 条）、真模型、端口 **3421**、没有合成事件流也没有手写数据；
+拍到了**两种**「卡在……」——**没过的尝试**（DOM 逐字 `卡在 2：执行 第 1 遍没过`，桌面 1500 与窄屏 390 各一张、9 节点 / 10 线、
+牌子 `未通过`；失败是真的：worker 钉在一条这台机器没有密钥的路由上，子调用全 `failed`，`run-end stopReason:"error"`）与
+**稿子全被退回**（`卡在 7：3 稿全被退回`，14 节点 / 16 线，牌子 `已完成`，流里 `summary-rejected {"drafts":3,…}` 与 `run-end completed`；
+够到它必须开 `synthesis: model`——`layered` 默认下确定性回落总会交卷）；**第三种「这一步没有回报」如实记 `NOT_REACHED`**：
+两次有边界的真尝试都到不了，因为这一版引擎收尾时**先取消还开着的子任务、再写本轮结束**（流里 `agent-end …"cancelled"`
+排在 `run-end …"error"` 之前），所以「运行结束了、某一行还没结局」这个形状到不了页面；那句措辞只有单元测试盯着，
+**不当像素证据**；读数自检全过（句子在视口内、正中一点命中它自己、两档 `scrollWidth === clientWidth`、Mermaid 数与 DOM 数一致、
+两个读数文件 `consoleErrors` / `pageErrors` 都是 `[]`）；**三件顺带看到的事只记录、不判对错**：运行收尾了顶上还在给时间
+（`第 2 步，共 5 步 · 还剩约 1 分 0 秒`；退回那页是 `第 7 步，共 8 步 · 还剩约 25 秒`）、绿牌子「已完成」与「三稿全被退回」同页共存、
+同一页仍给 `收下这版`；**重试虚线只有肉眼**（`failed-narrow-390.png` 里两颗尝试点之间一小段虚线），读数里**没有记它的字段**，不算计数读数；
+**一处同类但故意没改的**：桌面那份读数里有个键叫 `phone-390-running`，每个字段都等于它自己的 `desktop-1500-done`
+（1500 宽、`第 7 步，共 7 步`、`已完成`），而这个证据目录**没有任何记录**说桌面侧那一条应该是什么，改写只能编数字——
+**开放问题，成因 `HYPOTHESIS`，明确未修**；
+**红线两端都量了**：写探针 **20:29:14** 与 **20:47:47** 各失败一次（`Read-only file system`）、`~/.dsh`
+**`2026-11-25 23:14:14.025606767`** / `~/.dsh/profiles` **`2026-11-22 16:59:46.687805286`** /
+`~/.dsh/profiles/web` **`2026-11-26 19:41:49.334856619`** 前后同值且都早于 20:10、3080 前后都 **`401`** 一次没重启、
+隔离实例 3421 开工前空着收尾后关掉、**没有提交 / 推送 / 打标签 / 发布 / 改版本号**、scratch 已删、证据目录里没有密钥
+（`sk-…` / `Bearer …` / `*_KEY=` / `token=` 扫描只命中 `token=<redacted>`）；
+**`NOT_RUN`**：块内 `typecheck` / `lint` / spec 与整仓 `npm run ci`——**本轮没有产品改动，没什么可跑，这不是绿灯**；
+真机上那三颗还没拍的胶囊（`等你点头` / `已取消` / `出错`；`未通过` 这一颗本轮拍到了）、421–499 px 这一档、真 Mermaid 渲染器；
+**`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级——本会话写不进 `~/.dsh`，只读读到插件目录已是 **`0.13.53`** 但依赖行**仍浮动**
+（`github:free6589/dsh-grok-workflow`），`~/.dsh/profiles/web` 的 mtime **`19:41:49`** 晚于发布那一轮读到的 `19:20:42`，
+**谁装的 `HYPOTHESIS`**，需要一个对 `~/.dsh` 有写权限的人把那一行钉到 `#v0.13.53`；本块**没写 `~/.dsh`、没重载、没重启** 3080 上的实例。）

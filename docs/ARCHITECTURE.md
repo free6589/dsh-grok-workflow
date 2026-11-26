@@ -534,12 +534,23 @@ accepted; and the handoff carries its four non-empty lines (做了什么 / 证�
 four lines, not four labels on one line). A failure here writes a `veto` with
 `route: "deterministic"` and spends **zero** model calls.
 
-The supervisor returns one of two outcomes — `pass` or `veto` — with per-criterion
-`met`/`evidence` and named reasons. There is no third state: a judge call that cannot be
-parsed after two attempts becomes a `veto` that says so, never a silent pass, and the same
-evidence resubmitted returns the verdict already on file instead of writing a second line. A
-veto changes nothing but the verdict row; a pass appends a new block version with the block
-`accepted`.
+The supervisor records one of three outcomes. `pass` and `veto` are judgements, with
+per-criterion `met`/`evidence` and named reasons; a judge call that cannot be parsed after
+two attempts becomes a `veto` that says so, never a silent pass, and the same evidence
+resubmitted returns the verdict already on file instead of writing a second line. The third,
+`skipped`, is not a judgement at all: a close told not to ask the judge
+(`verify.blockSupervisor: false`) records that the judge was never asked, so the record says
+neither "passed" nor "rejected". Because a criterion has only `met: true/false`, a skipped
+row keeps `met: true` with the skip note as its evidence — that pair is the *absence* of a
+judgement, and every reader goes through `outcome` (or the derived `judged` flag) rather than
+through `met`. A skipped close with clean deterministic checks still settles the block as
+`accepted`: the switch is the caller's order-time policy, and a skipped verdict is final for
+its evidence (re-closing the same evidence returns that row), so refusing to settle would
+leave the block unsettleable. The answer pairs `outcome: "skipped"`, `judged: false` and a
+`not_judged` note, so no reader can take the settlement for a model pass.
+
+A veto changes nothing but the verdict row; a pass or a skipped close appends a new block
+version with the block `accepted`.
 
 `override` is the one human escape hatch and it covers the scope criterion only: a veto is
 overridable when *every* failing reason is `范围 ⊆ 批准`, and the overruling is recorded in

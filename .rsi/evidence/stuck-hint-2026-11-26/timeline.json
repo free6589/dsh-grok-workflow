@@ -1,0 +1,142 @@
+{
+  "note": "Every timestamp below is a real wall-clock reading from this session (Asia/Singapore, +08:00). The container's own logs print UTC, so the run logs in .tmp keep -8h; the two are the same instants. Five runs were needed: two were discarded (one because the plugin refused to load, one because a failing worker makes the `failed` shape outrank `rejected`), two are the blocked attempts that did not reach the state, and two produced the shots.",
+  "environment": {
+    "commit": "fe6d631 (v0.13.53-1-gfe6d631)",
+    "worktree": ".agents/worktrees/fix-readings-refresh (branch fix/readings-refresh)",
+    "profile": "web-clone (clone of ~/.dsh/profiles/web)",
+    "home": ".tmp/stuck-hint/dsh-home (created 20:12, deleted at teardown)",
+    "workspace": ".tmp/stuck-hint/work (created 20:14, deleted at teardown)",
+    "port": 3421,
+    "portNote": "3421 was free when the block started (connect refused, nothing listening); no fallback was needed. The live instance on 3080 was never touched.",
+    "url": "http://127.0.0.1:3421/?token=<redacted>",
+    "node": "v26.8.1",
+    "npm": "11.19.0",
+    "dsh": "0.2.2-rc.3",
+    "installedPlugin": "dsh-grok-workflow 0.13.53 from .tmp/stuck-hint/dsh-grok-workflow-0.13.53.tgz (1027274 B, sha256 35485d31c6abbc3e233aae6364e9924edc3d2386bd5dda62cb4feeb20dcb3a13)",
+    "secrets": "~/.dsh/bifrost.env is sourced into the server process only (`set -a; . ~/.dsh/bifrost.env; set +a` inside the launcher). No key value was printed, copied, or written to any file this round. The one gateway probe below sent the key as a bearer header and printed only the HTTP status."
+  },
+  "modelPins": [
+    {
+      "key": "roles.planner / roles.synthesizer / agent-default-model",
+      "value": "bifrost-responses / opencode-go/muse-spark-1.3-contributor",
+      "why": "as cloned; this is the only model the bifrost-responses provider enumerates and the only one that answers on this machine"
+    },
+    {
+      "key": "roles.verifier / roles.supervisor / guardianModel",
+      "value": "bifrost-responses / opencode-go/muse-spark-1.3-contributor",
+      "why": "repinned from agent2api/*, which cannot answer here (AGENT2API_API_KEY is not set); without the repin not one child call would start"
+    },
+    {
+      "key": "roles.worker (failed run, 20:24)",
+      "value": "agent2api / deepseek-v4.1-flash + agent2api / glm-5.3-flash (the profile's own clones of these pins)",
+      "why": "the state wanted is a real recorded failure; this route is declared by the provider catalogue and really fails on this machine (no credential), so the child starts, ends failed, and the run keeps going"
+    },
+    {
+      "key": "roles.worker (blocked attempts, 20:28 and 20:32)",
+      "value": "bifrost-responses / opencode-go/muse-spark-1.3-contributor",
+      "why": "the blocked attempt needs children that really work and outlive the script's per-call budget, so the worker must be a live model"
+    },
+    {
+      "key": "roles.worker (rejected run, 20:42)",
+      "value": "bifrost-responses / opencode-go/muse-spark-1.3-contributor",
+      "why": "the rejected shape is checked only after every step has settled cleanly, so the workers had to succeed; a failing worker produces the `failed` line instead (that is what discarded run 20:38 showed)"
+    },
+    {
+      "key": "synthesis (rejected runs, 20:38 and 20:42)",
+      "value": "model (was the default `layered`)",
+      "why": "in `layered` mode a rejected model draft falls back to the deterministic narrative, which passes the gate, so nothing is ever rejected and the event never fires. `model` is a documented value of the key and has no fallback; the gate itself is unchanged"
+    },
+    {
+      "key": "timeoutMs / childTimeoutMs (blocked attempts)",
+      "value": "0 / 1000 then 0 / 30000 (defaults are 7200000 / 7200000)",
+      "why": "the blocked hypothesis needs the script to give up on a running child while the run itself is never cancelled; a run deadline would have made the stop reason `cancelled`, which the panel deliberately does not call stuck"
+    },
+    {
+      "key": "config keys removed",
+      "value": "`mode: triage` (grok-workflow), dropped from the clone",
+      "why": "this plugin no longer reads `mode`; src/config.ts lists it among the removed keys"
+    }
+  ],
+  "runs": [
+    {
+      "id": "discarded-a",
+      "sent": "2026-11-26T20:18:53.297+08:00",
+      "what": "first attempt at `failed`",
+      "pins": "roles.worker = bifrost-responses / opencode-go/no-such-model-stuck-hint",
+      "result": "the plugin REFUSED to load: 'roles.worker names model \"opencode-go/no-such-model-stuck-hint\", which provider \"bifrost-responses\" does not enumerate'. With the plugin inert, the conversation model answered with the core `workflow` tool instead, so the 进度 tab showed that engine run (起点 → 终点, run name `parallel-file-writes`, labels `write-notes`/`write-test`) and no stuck line. Not used as evidence; it is why the recipe now checks the boot log for a load error before driving a run.",
+      "lesson": "a bad model id cannot be used as a failure injector: config validation catches it before any run exists"
+    },
+    {
+      "id": "failed",
+      "sent": "2026-11-26T20:24:01.800+08:00",
+      "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤；任务二：在 test.txt 里写一行 hello。两个任务并行跑，不要串行；跑完把每个任务做了什么汇总一下。",
+      "config": "synthesis layered (default), timeoutMs 7200000, childTimeoutMs default, roles.worker = agent2api/deepseek-v4.1-flash + agent2api/glm-5.3-flash",
+      "terminalChipAfterSeconds": 32,
+      "shots": {
+        "failed-desktop-1500.png": { "atSeconds": 35, "viewport": "1500x1600 CSS @ dsf2 (3000x3200 px image)", "chip": "未通过", "stuckText": "卡在 2：执行 第 1 遍没过" },
+        "failed-narrow-390.png": { "atSeconds": 38, "viewport": "390x844 CSS @ dsf2 (780x1688 px image), progress view reached through 更多会话视图", "chip": "未通过", "stuckText": "卡在 2：执行 第 1 遍没过" },
+        "failed-desktop-1500-midrun.png": { "atSeconds": 12, "viewport": "1500x1600 CSS @ dsf2", "chip": "进行中", "stuckText": "卡在 2：执行 第 1 遍没过", "note": "the same line was already on screen while the run was still going; this frame is a bonus, not the required one" }
+      },
+      "session": "session-80da6d1e-fa43-4ca0-a8eb-241816f109ac, run ca6b014d-a3f5-4926-9307-3a8926d6cee9"
+    },
+    {
+      "id": "blocked-attempt-1",
+      "sent": "2026-11-26T20:28:13.949+08:00",
+      "hypothesis": "H1: give every child a 1 s call budget (childTimeoutMs 1000) with no run deadline (timeoutMs 0), so the script abandons a child that is still working and the run ends over a row it never settled",
+      "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤；任务二：在 test.txt 里写一行 hello。两个任务并行跑，不要串行；跑完把每个任务做了什么汇总一下。",
+      "terminalChipAfterSeconds": 105,
+      "observed": "chip 已完成, stuckPresent false at both widths (21 nodes / 22 edges). The abandoned children kept running and their `agent-end` (completed) landed before the run closed, so every row settled and no node was ever blocked. Readings in readings-blocked-attempt1.json; stream in blocked-attempt1-session-stream.txt.",
+      "outcome": "no line"
+    },
+    {
+      "id": "blocked-attempt-2",
+      "sent": "2026-11-26T20:32:28.727+08:00",
+      "hypothesis": "H2: same, but a 30 s call budget and children that genuinely cannot finish in time (each task starts with `sleep 600`), so the run must end while two calls are still open",
+      "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：先执行命令 sleep 600，等它睡够，再在 notes.md 里写三行安装步骤；任务二：先执行命令 sleep 600，等它睡够，再在 test.txt 里写一行 hello。两个任务并行跑，不要串行；跑完把每个任务做了什么汇总一下。",
+      "terminalChipAfterSeconds": 231,
+      "observed": "chip 未通过, stuckPresent false at both widths (9 nodes / 10 edges). The stream shows the mechanism: seq 1, 2 and 6 were still open when the run closed, and the host wrote `agent-end {seq 1, outcome: cancelled}`, `{seq 2, cancelled}`, `{seq 6, cancelled}` BEFORE `run-end {stopReason: error}`. Every row therefore settled, and a cancelled row is not a blocked node. Readings in readings-blocked-attempt2.json; stream in blocked-attempt2-session-stream.txt.",
+      "outcome": "no line",
+      "conclusion": "on this engine the teardown cancels outstanding children before it writes run-end, so the 'run ended over a row it never settled' shape does not survive to the page"
+    },
+    {
+      "id": "discarded-b",
+      "sent": "2026-11-26T20:38:16.873+08:00",
+      "what": "first attempt at `rejected`",
+      "pins": "synthesis model + roles.worker agent2api/deepseek-v4.1-flash (failing)",
+      "observed": "the stuck line appeared, but as `卡在 2：执行 第 1 遍没过`: progressPanelStuck answers the `failed` question before the `rejected` one, and a run whose workers all failed has an unrecovered failed row",
+      "lesson": "rejected can only be reached by a run in which nothing failed, so the workers must be a live model"
+    },
+    {
+      "id": "rejected",
+      "sent": "2026-11-26T20:42:44.934+08:00",
+      "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤，写完数一下一共几行；任务二：在 test.txt 里写一行 hello，写完读回来核对一遍。两个任务并行跑，不要串行；跑完把两个文件各有几行、分别写了什么汇总一下。",
+      "config": "synthesis model, roles.worker bifrost-responses/muse-spark (all children succeed), timeoutMs 7200000, childTimeoutMs default",
+      "terminalChipAfterSeconds": 170,
+      "gate": "3 drafts, all turned back at the verify stage: `check=pass verify=fail drafts=3 reason=the answer does not state the recomputed run verdict (completed)`",
+      "shots": {
+        "rejected-desktop-1500.png": { "atSeconds": 174, "viewport": "1500x1600 CSS @ dsf2 (3000x3200 px image)", "chip": "已完成", "stuckText": "卡在 7：3 稿全被退回" },
+        "rejected-narrow-390.png": { "atSeconds": 177, "viewport": "390x844 CSS @ dsf2 (780x1688 px image), progress view reached through 更多会话视图", "chip": "已完成", "stuckText": "卡在 7：3 稿全被退回" }
+      },
+      "session": "session-f69e83ce-9ec9-4557-8d88-b59fb1f46186, run e176ba09-10a9-4a4e-a797-2d51e8254ff1"
+    }
+  ],
+  "gatewayProbe": {
+    "when": "2026-11-26T20:41+08:00",
+    "what": "one minimal chat/completions request per candidate synthesizer model, to avoid spending a run on a dead route; only the HTTP status was printed",
+    "results": {
+      "tokenrhythm/mimo-v2.6-flash": 403,
+      "tokenrhythm/qwen3.8-flash": 403,
+      "agnes-3.0-flash": 504
+    },
+    "conclusion": "no second model answers here, so the synthesizer had to stay on opencode-go/muse-spark-1.3-contributor"
+  },
+  "serves": [
+    { "booted": "2026-11-26T20:14:15+08:00", "port": 3421, "note": "first boot; used for the discarded run" },
+    { "booted": "2026-11-26T20:19:20+08:00", "port": 3421, "pin": "worker agent2api", "note": "plugin load error was fixed before this boot; the failed run came from it" },
+    { "booted": "2026-11-26T20:28:05+08:00", "port": 3421, "pin": "childTimeoutMs 1000, timeoutMs 0" },
+    { "booted": "2026-11-26T20:32:20+08:00", "port": 3421, "pin": "childTimeoutMs 30000, timeoutMs 0" },
+    { "booted": "2026-11-26T20:38:10+08:00", "port": 3421, "pin": "synthesis model, worker agent2api" },
+    { "booted": "2026-11-26T20:42:36+08:00", "port": 3421, "pin": "synthesis model, worker muse-spark" }
+  ],
+  "console": "no console error and no page error in any of the five browser sessions (see the consoleErrors/pageErrors fields of each readings file)"
+}

@@ -1,3 +1,156 @@
+## 进度页横排分叉（`feat/task-fork`，HEAD `fe6d631`，无标签、版本仍 `0.13.53`）：隔离档案里真装真跑——七张读数（桌面 1500 三态、手机 390 三态、native-390 完成态）、**18 盏环 = 3 × 6**、**5 盏验**、完成态 `dock-fill` **0**、卡住那句每张都不存在、Mermaid 真值核对每张都对（首行 `flowchart LR`、节点/线计数与 DOM 相等、一个连通块、终点写作 `finish`）；门禁 `8 files / 331 passed`；**四条缺陷是真机截图抓到的**；`NOT_RUN`：原生手机进行中 / 等你点头 / `· 第 n 遍` / 深色主题 / 320 px / 读屏 / Firefox·Safari / 真 Mermaid 渲染器 / live 升级 — 2026-11-27 (`CONFIRMED`)
+
+**这一轮是什么**：`feat/task-fork` 把进度页换成一张横排分叉（七列、每张任务卡六环、每轮五验、接受动作删除）。本条目只记**真机读数、门禁与红线**；
+契约见 `DESIGN-progress-tab.md` §26，裁决见 `D-175`。**读数由 soak 那一轮落在 `.rsi/evidence/task-fork-2026-11-26/`，本节照抄它的七张，
+不重新测；门禁与包哈希是本条作者在本树重跑 / 重读过的（`CONFIRMED`）。** 产品代码、测试、`docs/` 本轮一个字节没改（写记忆这一轮只动文档）。
+
+**身份（本树自己读）**：HEAD = **`fe6d631`** = `main` 尖端、`git describe --tags --always` = **`v0.13.53-1-gfe6d631`**、
+`git tag --contains HEAD` 计数 **0**、`package.json` 版本 **`0.13.53`**。浏览器包 `lib/client.js` **422 685** 字节 /
+`sha256 c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186`，`src/client/index.js` 同哈希、`cmp` 空输出；
+`lib/index.js` **27 956** 字节 / `sha256 ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32`（本块没碰）。
+打包：`file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz` **1 033 214** 字节 /
+`sha256 b5b7d208345b0dfc6e1928b11ea05cff288340bd5fe2f6fc5089b132841f3c46`（**164** 文件）；
+装进隔离 profile 的那份读回 **`0.13.53`**、`lib/client.js` 的 sha 与工作树相同、插件目录内软链 **0** 个。
+环境：隔离 home（从 `~/.dsh/profiles/web` 克隆、抹掉凭据、`DSH_HOME` 指向 clone）、一次性工作区、端口 **3412**（开跑前探过空闲）、真模型；
+跑的是**三个任务的真实工作流**，三个文件**真的写出来了**：`notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**；收尾时隔离实例已停、scratch 全部删除。
+
+| 读数 | 宽 | 态 | 节点 / 线 | 环 / 验 | 底部 dock | 调用 / 亮线 / 暗线 | `scrollWidth == clientWidth` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `desktop-1500-running` | 1500 | 进行中 | **11 / 12** | 18 / 5 | 空 | 0 / 0 / 0 | 1500 = 1500 |
+| `desktop-1500-done` | 1500 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 1500 = 1500 |
+| `desktop-1500-node-open` | 1500 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | **1 / 9 / 20** | 1500 = 1500 |
+| `phone-390-running` | 390 | 进行中 | **11 / 12** | 18 / 5 | 空 | 0 / 0 / 0 | 390 = 390（图在自己内部横向滚：1078 / 383） |
+| `phone-390-done` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 390 = 390（同上） |
+| `phone-390-node-open` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | **1 / 9 / 20** | 390 = 390（同上） |
+| `native-390-done` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 390 = 390（同上） |
+
+- **盒数对不对得上**：三个任务、每个任务三条调用。进行中 = 5 个固定盒（起点 / 规划 / 汇合 / 验收 / 终点）+ 3 张任务卡 + 3 条已经开始的
+  分支 = **11 盒 / 12 条线**（`start→plan`、3 条 fork、3 条 branch、3 条 join、`sum→accept`、`accept→end`）；完成态 = 5 + 3 + 9 条分支 =
+  **17 盒 / 24 条线**（1 + 3 + 9 + 9 + 1 + 1）。**每一张的节点行数 / 线行数与 DOM 的 `[data-gw-progress-pnode]` / 边数相等**。
+- **六环与五验真的在**：七张里 `[data-gw-progress-ring]` 都是 **18**（= 3 张任务卡 × 6 盏），`[data-gw-progress-check]` 都是 **5**，
+  且五盏的值是 `machine=done, model=done, isolated=pending, human=pending, ledger=pending`——这一轮跑了检查与复核、没跑真机 / 人验 / 对账，
+  **没跑的那三盏就暗暗地待着**（页面不替事件流勾选）。
+- **顶上那句话**：进行中是 `第 3 步，共 7 步 · 还剩约 …`，完成态是 `第 7 步，共 7 步`（`total` 恒 **7**）。
+- **卡住那句每一张都不存在**（`[data-gw-progress-stuck]` 计数 0）：这一轮一路顺利，按设计它就不该出现；**它长什么样本轮没拍到**。
+- **dock**：完成态 `dock-fill` **0** 颗——「收下这版」已经不在页面上；等你点头那一颗「开工」这一轮没有机会拍到（见 `NOT_RUN`）。
+- **页面自己的真值核对（每张都做）**：`data-gw-progress-source` 首行 **`flowchart LR`**；解析出的节点 / 线与 DOM 相等；
+  把边连起来走一遍，**一个连通块**（没有孤立的「起点 → 规划」）；终点在文本里写作 **`finish`**。
+- **控制台**：七张的浏览器会话 `console` **0** 条、`pageerror` **0** 条。
+
+**四条缺陷（真机截图抓到，不是套件先抓到的；都在同一分支修掉、各补一条守卫，逐条见 `D-175`）**：
+
+| # | 看到的 | 修法 / 守卫 |
+| --- | --- | --- |
+| ① | 「汇总」那颗盒子被裁成只剩「汇」 | 盒宽不再按字数截断，守卫钉住完整词 |
+| ② | 展开的调用行塌成一字一行 | 列表宽度不再被卡片宽度挤住，守卫钉住行宽 |
+| ③ | 邻居卡片盖住展开的列表 | 展开的那张卡补 `z-index`，守卫钉住层序 |
+| ④ | 列表透出背景（主题 token 死了） | 换成 `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测 `rgb(255,255,255)`；守卫钉住这道兜底 |
+
+**红线（照实记，含两条为别的原因动过的路径）**：`~/.dsh/profiles` 的 mtime **未变** = `2026-11-22 16:59:46`；
+`~/.dsh` = `2026-11-27 00:22:48`、`~/.dsh/profiles/web` = `2026-11-27 01:01:27`——**期间变过，但不是本块的写**：
+会改文件的每条命令都带 `DSH_HOME=<clone>`，变动的是 live 档案自己的设置写入加上另一个块的插件作业
+（`pnpm-lock.yaml` / `node_modules` / `.plugin-manager` **00:14:34**、`package.json` **00:19:54**、`cordis.yml` **00:20:53**、
+`cordis.patch.yml` **00:41:08** 与 **01:01:27**）；3080 根路径 **401 → 401**；live 那份载荷 sha `1fb003f3…` **不是本块的**，
+live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有升级**）；隔离实例已停、scratch 全部删掉。
+
+**门禁（本条作者在本树重跑）**：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`npx oxlint src test`
+**`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；八份进度相关 spec **`8 files / 331 passed`**
+（client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14）；
+`node scripts/build-client.mjs` 之后 `cmp lib/client.js src/client/index.js` 空输出。**整仓套件与 `npm run ci` 是 `NOT_RUN`**（`AGENTS.md` §12）。
+
+**`NOT_RUN`（一条不藏）**：① 原生手机上的**进行中**截图；② 等你点头态（`开工` 那颗按钮）在真机上；③ 分支上的 `· 第 n 遍`
+（三个任务都一次过，没造出重试）；④ 深色主题；⑤ 320 px；⑥ 读屏软件；⑦ Firefox / Safari；⑧ 真 Mermaid 渲染器；
+⑨ live 档案升级 / 重载 / 重启（红线）；⑩ 整仓测试与 `npm run ci`（§12）。
+
+**证据：** `.rsi/evidence/task-fork-2026-11-26/`（soak 那一轮落盘的七张读数、截图与安装输出；本条目只引用，不改它）。
+
+## 手机重叠修复（`fix/mobile-overlap`，提交 `10c15a0` + `5ba1ca2`，无标签、版本仍 `0.13.53`）：隔离档案两轮真装真跑——第一轮证「摊开的调用不压隔壁卡」（抽屉在 16 张卡之外、相交 0、与 dock 0 / 0），第二轮证「点完当下就看得见」（390 抽屉 `407→512`、360 `385→490`，对输入框上沿 676 / 632 的余量 **164 / 142 px**，完全在视口内、与卡相交 0、无横向滚动）；占位拿掉再放回 dock `delta = 0`；门禁 `8 files / 336 passed`，整仓全量 **`105 files / 2040 passed`**；**`NOT_RUN`：多行抽屉 / 720·721 边界 / `matchMedia` 的 `change` / 两组同开 / 360 上的「收起」/ 读屏 / Firefox·Safari / live 升级** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：进度页那张任务图上，点一颗节点摊开的调用列表原来是从节点下面浮出来的绝对定位块，手机上压住隔壁那张卡、桌面 1500 遮住「检查」的一部分（上一轮的限制，`task-panel` 那份 README 记过）。
+这一块把它**搬出那张图**（`10c15a0`），再让它**点完落在屏幕中间**（`5ba1ca2`，并给面板底部补一段可滚余量，否则居中会被滚到底截断）。
+本条目只记**真机读数、门禁与全量套件**；契约见 `DESIGN-progress-tab.md` §26，裁决见 `D-174`。
+**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮（取证这一侧）一个字节没改**——它只读；记忆那三份文档由另一条线在写，本轮没 stage、没 commit。
+
+**身份（`CONFIRMED`，本轮自己 `git log` / `git describe` / `node -p version` 各读一次）**：HEAD = **`5ba1ca2`**（父 **`10c15a0`**，**不是 amend**）、`git describe` = **`v0.13.53-3-g5ba1ca2`**、`git tag --contains HEAD` 计数 **0**、`package.json` 版本 **`0.13.53`**、基线 `main` 尖端 **`fe6d631`**。
+两颗提交：`10c15a0` = **5 文件 / +585 −26**（`src/client/index.js` 与 `lib/client.js` 各 +176 −11、`test/progress-panel.spec.ts` +221、`test/i18n-parity.spec.ts` +8 −3、`test/client.spec.ts` +4 −1）；
+`5ba1ca2` = **3 文件 / +113 −8**（`src/client/index.js` 与 `lib/client.js` 各 +35 −4、`test/progress-panel.spec.ts` +43，两条新用例）。服务端、`package.json`、版本号一个字节没动。
+
+**包与地址**：第二轮 `dsh-grok-workflow-0.13.53.tgz` = **1 031 079 B** / `sha256 9015b15b3043ae9e53f67d04fdf9213e9ef70cb6c69f4b34947247204aa7c95e` / 164 文件；
+第一轮 = **1 029 904 B** / `sha256 0d2dede5a8ab9e6fc2cfe7abf109d87385ee635eca9281d3aa28a0fb48813b30`。
+浏览器包 `lib/client.js` = `src/client/index.js` = **412 345** B / `sha256 8cd4521122f89631751969cbd469b142b266ba6ce3f3bdd100be3693577bb599`（第一轮是 **410 497** B / `dbcfaf14…`），`cmp` 空输出、重跑 `npm run build` 后 `git status` 不变（构建可复现）；
+`lib/index.js` 仍是 `ac69070e…`（服务端没动）。装进隔离 profile 的那份读回 **`0.13.53`**、两份 sha256 都等于工作树、插件目录内软链 **0** 个、`readlink -f` 落回 clone 自己；`grep -c gw-progress-sheet-room` = **2**（证明装的是第二轮那份，不是 live 里已发布的同名版本）。
+隔离 home **`.tmp/soak-overlap/dsh-home`**（从 `~/.dsh/profiles/web` 克隆：**7753 文件 / 5 链接 / 抹除凭据后 5/5 逐字节相等**、凭据抹除 1 行）、一次性工作区、端口 **3431**（先定 3421，起进程时 `EADDRINUSE`，改号并重新实测空闲，起成后 `ss -ltn` 显示 LISTEN）、Node **v26.8.1** / npm **11.19.0** / dsh **0.2.2-rc.3**。
+
+**两轮各证一件事，不能互相顶替**：第一轮（`10c15a0`，两遍取样）证「列表不压隔壁卡」——抽屉在 **16 张**节点卡**之外**（`callsInsideGraph: false`、`closest('[data-gw-progress-sheet]')` 命中），与每张卡的相交面积 **0**（`overlaps: []`）、与 `[data-gw-progress-dock]` / `-dock-fill` 相交 **0 / 0**、`scrollWidth = clientWidth`（390 / 360）、点第二次抽屉与列表**双双归 0**、「收起」按钮在 390 上把两者归 0；
+它的**第一遍取景**恰好拍下了那个尚未修的缺陷：抽屉停在 **739 → 844**（390）与 **695 → 800**（360），整块躲在宿主输入框后面（`soak/round1-10c15a0/first-pass-framing-*.png`，读数 `first-pass-readings.json`，**不用于验收**）。
+第二轮（`5ba1ca2`）证「点完当下就看得见」。
+
+**第二轮的读数（`soak/readings.json`，每条与它旁边那张图同一刻、在**一次** `page.evaluate` 里读完；`composerTop` = 宿主钉在底部的 `position: sticky` 栏上沿，高 **168 px**，`676 = 844 − 168` / `632 = 800 − 168` 自洽）**
+
+| 读数 | 视口 | 抽屉矩形 | 抽屉底 | 输入框上沿 | 余量 | 完全在视口内 | 与节点卡相交 | 与 dock / fill | 占位 | 滚动宽=客户宽 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `phone-390-as-opened`（**主证据**，点完 900 ms、无手工滚动） | 390×844 | `0,407 → 383,512` | **512** | **676** | **164** | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-calls-dock` | 390×844 | `0,162 → 383,267` | 267 | 676 | 409 | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-bottom` | 390×844 | `0,54 → 383,159` | 159 | 676 | 517 | 是 | **0** | **0 / 0** | 有 | 390 = 390 |
+| `phone-390-closed` | 390×844 | 无 | — | 676 | — | — | 0 | 0 / 0 | **无** | 390 = 390 |
+| `phone-360-as-opened`（**主证据**） | 360×800 | `0,385 → 353,490` | **490** | **632** | **142** | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-calls-dock` | 360×800 | `0,140 → 353,245` | 245 | 632 | 387 | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-bottom` | 360×800 | `0,25 → 353,130` | 130 | 632 | 502 | 是 | **0** | **0 / 0** | 有 | 360 = 360 |
+| `phone-360-closed` | 360×800 | 无 | — | 632 | — | — | 0 | 0 / 0 | **无** | 360 = 360 |
+
+- **四项硬指标全部成立**，两个宽度都是：① 抽屉矩形完全落在视口内；② **抽屉底 ≤ 输入框上沿**（余量 164 / 142 px 为正）；③ 与 16 张节点卡相交面积 **0**；④ 与 dock / dock-fill 相交 **0 / 0**。外加 `scrollWidth = clientWidth`、`consoleErrors: []` / `pageErrors: []`（`soak/console.json`）。
+- **抽屉尺寸**：高 **105 px**（两个宽度），上限仍是 `max-height: 240px` + `overflow-y: auto`；里面那份列表 `position: static`；这次抽屉里是 **1 行**调用。
+- **占位那段的决定性实验（`soak/interaction.json`）**：DOM 里排在 dock **之后**（`roomAfterDock: true`）、几何上紧隔 **4 px**（dock 底 730 / room 顶 734）、`aria-hidden="true"`、高度正好 `35vh`（390 时 **295.39** px、360 时 **280** px）、只在摊开时存在；
+  把 room 从 DOM 拿掉再原位放回，dock 的 `dockTop` **`delta = 0`**（680→680 / 658→658）。**要分清的另一半**：抽屉**自己**把 dock 往下推了 **117 px**（内容轨道 1221 → 1338），那是抽屉的高度，不是占位挤的。
+- **底部那段是空白、不是被裁**：滚到内层容器最底（`div.wSkVaW_scrollBody`，`scrollTop` **1087 / 1087**（390）、**1116 / 1116**（360），`atBottom: true`）时，dock `327 → 377`、room `381 → 676`、输入框上沿 **676**——room 下沿正好落在输入框上沿，`收下这版` 完整、下面是纯空白。**页面本身 `window.scrollY` 恒 0**：这个宿主是内层容器滚动。
+- **再点一次**：抽屉、列表、占位**三样都归 0**（两个宽度都验过）；「收起」按钮只在 390 验过（`reopened 1 → afterHide 0`）。
+
+**门禁与全量套件（本轮自己跑，`5ba1ca2` 上）**：`npm run typecheck` → **`exit 0`**（无输出）；`npm run lint` → **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+八份进度 spec → **`8 files / 336 passed`**（`progress-panel` **35**、`client` 153、`progress-panel-model` 31、`progress-tab` 72、`progress-connector` 15、`progress` 14、`progress-hint-absent` 8、`i18n-parity` 8。
+**整仓全量套件（这一块唯一一次全量，`AGENTS.md` §12；不是 `npm run ci`）**：`TMPDIR=$PWD/.tmp npx vitest run` → **`Test Files 105 passed (105)` / `Tests 2040 passed (2040)` / `Duration 106.15s` / `SUITE_EXIT=0`**，转录落在 worktree 的 `.tmp/suite-5ba1ca2.out`（gitignored，不随记忆提交）。
+对照 `main` 尖端 `fe6d631` 的 **105 / 2030**：**文件数不变、用例 +10**，与 `progress-panel` 25 → 35 的 +10 对得上——**没有丢一份、没有丢一条**。
+**`npm run ci` 那五步（含 `verify:lib`）这一轮 `NOT_RUN`**：块内只跑轻门禁，全量 `ci` 跑在发版那一轮（`AGENTS.md` §12）。
+
+**soak 自己犯的两处（照实记，不美化）**：
+1. **白跑一次**：第二轮克隆后第一次引导**忘了装 tgz**，跑的其实是 live 那份已发布的 `0.13.53`（`lib/client.js` 的 `sha256 1fb003f3…`，没有 `gw-progress-sheet-room`）。发现即停，**一条读数都没留用**，`install.txt` 第二部分留了原文。
+2. **量法错一次**：「dock 有没有被挤走」第一遍用 `rect.top + window.scrollY` 算——这个页面是**内层容器滚动**、`window.scrollY` 恒为 0，量出来是假值；「滚到底」那张还用了 `window.scrollTo`（什么也没动，与 dock 那张**同字节**）。
+   改成在滚动容器坐标系里量、显式滚 `div.wSkVaW_scrollBody` 到底后**重拍**，修好后 `soak/verify-readings.mjs` **38 条断言全过**（`verify-readings.txt`）。上面表里用的是修好之后那一遍。
+
+**红线（`redline.txt` 第二部分是原文）**：`~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime 两轮前后**逐字节相同**（连纳秒位：`2026-11-25 23:14:14.025606767` / `2026-11-22 16:59:46.687805286` / `2026-11-26 19:41:49.334856619`）；
+3080 根路径 **401 → 401**；live 那份插件仍读作 **`0.13.53`**（**没升级**）；`bash -c ': > ~/.dsh/.soak-probe'` **四次都是 `Read-only file system`**；
+隔离实例已停、3431 已释放、`.tmp/soak-overlap/`（104 MB 克隆 home、两个 tgz、一次性工作区）全部删除。
+
+**`NOT_RUN`（一条不藏）**：① **多行抽屉（四行那种）**——这一轮的树里所有可摊开节点都只有 **1 行**调用（探了中间往外 5 颗：`check_t2` / `check_t1` / `check_t3` / `execute_t3` / `review_t1` 全是 1 行），**105 px 抽屉的 164 / 142 px 余量是真的，换成约 207 px 会怎样本轮没量**；
+② **> 720 px 那一侧本轮没复测**（这一版声明没改，桌面那处叠压仍故意不修）；③ **720 / 721 断点边界**（只测 390 与 360，没有逐像素找断点）；
+④ **`matchMedia` 的 `change` 监听**（拖窗口从宽到窄、不刷新；两个宽度是同一页面改视口）；⑤ **同时摊开两组节点**（只摊开一颗）；⑥ **「收起」按钮只在 390 验过**（360 上没点）；
+⑦ **421–499 px** 之间的宽度；⑧ **旋转 / 现场改视口**；⑨ **读屏软件**（抽屉的朗读顺序是 `HYPOTHESIS`）；⑩ **Firefox / Safari**（只在 Chromium 里跑过）；⑪ **live 档案升级 / 重载 / 重启**（红线）；⑫ **`npm run ci` 五步**（含 `verify:lib`，留给发版那一轮）；⑬ **第一轮的读数没有重跑**（两轮各自对着自己的提交，没有交叉复测第二轮在 700 px 上的样子）。
+
+**证据：** `.rsi/evidence/mobile-overlap-2026-11-26/`（在主检出里，不在这个 worktree）——`README.md`（两轮对照 + 第二轮的图、读数、结论、`NOT_RUN`）、
+`install.txt`（构建 / 打包 / 安装 / 引导，两部分：第一部分 `10c15a0`、第二部分 `5ba1ca2`，含那次白跑的原文）、`redline.txt`（两部分逐字）、
+`capture-phone.mjs`（取样脚本，`--self-test` 带三份夹具：一份"浮出列表压卡"读出 12 480 px²、一份"抽屉吃掉 dock"读出 15 600 px²——**这把尺子读得出非 0**）、
+`soak/readings.json`（第二轮 12 条读数 + 几何）、`soak/interaction.json`（六项硬指标汇总 + 占位拿掉再放回）、`soak/runs.json`（三次运行归档，`verified 3/3`）、
+`soak/console.json`、`soak/verify-readings.mjs` / `.txt`（38 条断言，本目录可复跑）、六张图 `soak/phone-{390,360}-{as-opened,calls-dock,bottom}.png`、
+`soak/round1-10c15a0/`（第一轮全部证据与它自己的 README，含 21 条断言的自检与两帧取景不合格的记录）。
+## 判决写入诚实化（`fix/verdict-honest`，产品提交 `c8fe803`，基线 `main` 尖端 `fe6d631`，无标签、版本仍 `0.13.53`）：跳过监工记成第三种结局 `skipped`、验收行照原样留 `met:true` + 跳过注记；范围否决带批准目录与两侧绝对路径 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`c8fe803`（`fix(blocks): a skipped close records the third outcome, and a scope veto names both sides in full`）改两件事：① `grok_close_block` 在 `verify.blockSupervisor: false` 时不再写 `outcome:"pass"`，改写 `"skipped"`（`VerdictOutcome` + 写侧校验；验收行保持 `met:true` + `SKIPPED_JUDGE_NOTE`）；② 范围否决的 `why` 带批准目录与声明/批准两侧的绝对路径，`criterion`/`evidence` 仍是调用方原拼写。**未合、未推、未打 tag、未发版**；`package.json` 版本 `0.13.53` 未动；`~/.dsh` 与在跑的实例一次没碰。
+
+**环境**：worktree `.tmp/wt-verdict-honest`（`node_modules` 从主检出软链）、Node **v26.8.1**、vitest **4.1.12**、每条命令都带 `TMPDIR=$PWD/.tmp`。工作树起点 `fe6d631`（= `main` = `origin/main`）。
+
+| 检查（本轮自己跑，逐字命令） | 结果 |
+| --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | **`TSC_EXIT=0`**（无输出） |
+| `npx oxlint src test` | **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则；与 `v0.13.53` 基线同为 14/0） |
+| `TMPDIR=$PWD/.tmp npx vitest run test/block-ledger.spec.ts test/block-supervisor.spec.ts test/block-tools.spec.ts test/block-preview.spec.ts` | **`Test Files 4 passed (4)` / `Tests 175 passed (175)` / `Duration 13.87s`**（`block-ledger` 20 + `block-supervisor` 29 + `block-tools` 31 + `block-preview` 95；第二次跑在提交后的树上，读数相同） |
+| `TMPDIR=$PWD/.tmp npm run build` | **`BUILD_EXIT=0`**、`client bundle: 399448 bytes → lib/client.js`（浏览器包没动，与 `0.13.53` 同尺寸；`lib/` 里 15 个 `src` 对应文件重建） |
+| `TMPDIR=$PWD/.tmp npm run verify:lib`（**提交 `c8fe803` 之后**） | `lib/ at c8fe803 is the build of src/ at c8fe803 (293 files, byte-identical)`、**`VERIFY_EXIT=0`** |
+
+**用例账**：`block-supervisor` **26 → 29**（+3：跳过的第三种结局、同证据回读各一条，范围理由两侧绝对路径与「没有批准目录」各一条）；`block-tools` **30 → 31**（+1 新增范围否决带目录；原「跳过监工」一例改写为如实读，含 `status` 回读与 `skips` 计数）；合计 **+4**（其它两份文件一例未改，29 与 31 与实跑 `29 passed` / `31 passed` 对得上）。
+
+**`NOT_RUN` 照实记**：真机隔离 soak（本块没有装进隔离 profile；`verify.blockSupervisor:false` 的真实关单没在真机跑过）；整仓 `npm run ci`（§12：块内只跑 `typecheck + lint + 定向 spec + verify:lib`，全量门禁留给发布提交）；绝降级路径（旧构建读 `skipped` 行会跳过，本轮没有旧构建可跑）。
+
+**红线**：没有 push、没有 force-push、没有 tag、没有改 `package.json` / `package-lock.json`、没有写任何密钥、没有碰 `~/.dsh` 或 3080 上的实例；scratch 用例目录都在 `.tmp/` 下由用例自己清理（`git status` 只剩本轮的源码/测试/`lib/`/文档改动）。
+
 ## 0.13.54 合版 BLOCKED（2026-11-27，主代理只读验货 + 记忆落盘，没动手）(`CONFIRMED`)
 
 | state | command（环境） | result |
@@ -8,7 +161,6 @@
 | 合流/门禁/发版 | — | **`NOT_RUN`**（工具没恢复，`release/0.13.54` 没建，零条合流） |
 | 脏树/live | 只读约定 | 没碰 |
 | 文案键审计（111/256 轮只读小工） | `read` 契约 §26.8 + `test/i18n-parity.spec.ts` 全文 | 新增 14 键中英齐平行无缺、删除清单含死键无遗漏；剩耗时依据一句名实不符（说步骤实际数层），合版后修文案时改 |
-
 ## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`45909bb`（`feat(progress): the tab is a task panel …`）把进度页换成任务面板——顶上一句话、中间一张由 Mermaid 文本自己排出来的分支图、底下一句只在卡住时出现。本条目只记**真机读数与门禁**；契约见 `DESIGN-progress-tab.md` §25，裁决见 `D-173`。**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮一个字节没改**（soak 那一路只读），也没 commit / push / tag / bump / publish。
@@ -9605,7 +9757,7 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak
 | Release 与资产（**本轮自查**，`gh` 重读） | `gh release view v0.13.53 --json name,isDraft,isPrerelease,targetCommitish,publishedAt,assets`、`gh release view v0.13.53 --json body \| wc -l`、`gh release view v0.13.52 --json assets` | https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.53 ——名字 `Grok Workflow for DSH v0.13.53`、`tagName v0.13.53`、`targetCommitish main`、`publishedAt 2026-11-26T11:29:16Z`、`isDraft false`、`isPrerelease false`、正文 **35 行**；唯一资产 **`dsh-grok-workflow-0.13.53.tgz` = 1027274 字节**、`digest sha256:35485d31c6abbc3e233aae6364e9924edc3d2386bd5dda62cb4feeb20dcb3a13`；上一版 `0.13.52` 资产 **1021062** 字节 → **+6212**。三条判据（run success、非 draft、带 `.tgz`）同时成立。**`CONFIRMED`** |
 | 本次内容（**本轮自查**） | `sed -n '5,9p' CHANGELOG.md`、`git show 50b3341 -- README.md README.zh-CN.md`、`git show --numstat 50b3341` | `## [Unreleased]` **空着**，紧跟新的 `## [0.13.53] - 2026-11-26`（发布提交对 `CHANGELOG.md` 只有 `+2`：那行标题 + 空行，正文一字未改）；用户可见的一件事是**进度页从泳道矩阵变成一块任务面板**——顶上一句话（第几步/共几步，**只在能量出来时**补「还剩约 N」）、中间一张 Mermaid `flowchart TD` 生成的分支树（每步一颗节点、每步的计划任务各成一条分支、**每次尝试一颗点、没过的那次与下一次之间一小段虚线**）、底下一句**只在真卡住时**出现的话；点节点摊开它调过的调用、点分支点亮它的线；退场的是等宽步骤条、手机两列网格、步骤上的圆形展开箭头与「还剩 N 步」那一行；**没有百分比、没有通过率、没有新增画图库**；升级须知写明**不用准备任何东西**。**`CONFIRMED`** |
 | 真机 / 隔离档案 soak（**复用那一次，本轮只核对，未重跑**） | `ls .rsi/evidence/task-panel-2026-11-26/soak/*.png \| wc -l`、`soak/readings.json`、`soak/mermaid-done.txt`、`soak/raw-console-*.json`、`cmp src/client/index.js lib/client.js`、`git diff --stat 45909bb c698a36 -- src lib test package.json package-lock.json` | 目录 `.rsi/evidence/task-panel-2026-11-26/`（隔离克隆 live web 档案、打包安装、真模型、端口 **3411**、桌面 **1500** + 窄屏 **390 / 360 / 700**）：**10 张截图**；1500 那张 **16 节点 / 21 条边**加一句话与一颗状态胶囊，390 那张 **6 / 7**；`readings.json` 与图逐条对得上（`nodeCountsAgree` / `edgeCountsAgree` 全 `true`）；`mermaid-done.txt` 首行 `flowchart TD`、**16 行节点 / 21 行边 / 共 38 行**，与 JSON 相符；两侧控制台 `{"consoleErrors": [], "pageErrors": []}`；`cmp` 通过、**399448** 字节。**覆盖的是发布树**：产品代码在 `45909bb` 与 `c698a36` 之间**逐字未变**（上条 `git diff` **0 行**，且 `--is-ancestor` 成立）。**`CONFIRMED`** |
-| soak 的两条缺口（**本轮逐条核对过，照实记**） | 上面那些文件的逐条比对 | **① 卡住那一句在真机上零像素证据**：10 张图里**一次都没渲染**（12 条读数 `stuckPresent` 全 `false`，这是对的——那几次运行没卡住），同样地 `等你点头` / `未通过` / `已取消` / `出错` 四颗胶囊与**重试虚线**在真机上一次都没出现（`mermaid-done.txt` 里 `-.->` **0 条**、21 条边全实线）；**这几条靠的是组件用例（25 + 31 条）与读代码，不是真机截图，不要写成「真机过了」**。**② 一处窄屏碰撞 + 两处取证瑕疵**：`phone-390-trace.png` 里摊开的调用卡片与下一颗节点**叠在一起**（文字仍可读），390 那一档第三颗任务**被输入框圆角面板裁掉**、`收下这版` 落在折叠线以下；`phone-360-done` 与 `tablet-700-done` 两张是滚过顶部拍的，顶句与胶囊**只有 DOM 读数、没有照片**；`raw-readings-phone.json` 里 `phone-360-done` / `tablet-700-done` 仍是**过期**的 `nodeCalls/traceActive/traceDim = 1 / 5 / 19`，与 `readings.json` 的 `0 / 0 / 0` 矛盾；`desktop-1500-trace.png` 这个**名字会骗人**（拍的是轨迹**没开**的状态，`readings.json` 同名条目也是 `0/0/0`，真正开着的是 `desktop-1500-node-open.png` 的 `1/5/19`）。**三条取证 / 出处瑕疵 + 一条窄屏版面磕碰，都不是这次发布的拦路石。`CONFIRMED`** |
+| soak 的两条缺口（**本轮逐条核对过，照实记**） | 上面那些文件的逐条比对 | **① 卡住那一句在真机上零像素证据**：10 张图里**一次都没渲染**（12 条读数 `stuckPresent` 全 `false`，这是对的——那几次运行没卡住），同样地 `等你点头` / `未通过` / `已取消` / `出错` 四颗胶囊与**重试虚线**在真机上一次都没出现（`mermaid-done.txt` 里 `-.->` **0 条**、21 条边全实线）；**这几条靠的是组件用例（25 + 31 条）与读代码，不是真机截图，不要写成「真机过了」**。**② 一处窄屏碰撞 + 两处取证瑕疵**：`phone-390-trace.png` 里摊开的调用卡片与下一颗节点**叠在一起**（文字仍可读），390 那一档第三颗任务**被输入框圆角面板裁掉**、`收下这版` 落在折叠线以下；`phone-360-done` 与 `tablet-700-done` 两张是滚过顶部拍的，顶句与胶囊**只有 DOM 读数、没有照片**；`raw-readings-phone.json` 里 `phone-360-done` / `tablet-700-done` 仍是**过期**的 `nodeCalls/traceActive/traceDim = 1 / 5 / 19`，与 `readings.json` 的 `0 / 0 / 0` 矛盾；`desktop-1500-trace.png` 这个**名字会骗人**（拍的是轨迹**没开**的状态，`readings.json` 同名条目也是 `0/0/0`，真正开着的是 `desktop-1500-node-open.png` 的 `1/5/19`）。**三条取证 / 出处瑕疵 + 一条窄屏版面磕碰，都不是这次发布的拦路石。`CONFIRMED`** **（2026-11-26 后续块已订正 / 已补拍：那两项读数现为 `0 / 0 / 0`、原值原样留在同条 `callListFields.supersededFirstPass` 里；卡住那句拍到两种形状，第三种如实 `NOT_REACHED`——见本文件同日后一节。上面这几句仍是当时的事实，未改写。）** |
 | 清理（**本轮自查**） | `git worktree list`、`git branch -a \| grep release/`、`git status --short` | `git worktree list` 只剩主检出一处（`50b3341 [main]`，门禁跑在主检出）；发布分支 `release/0.13.53` **现在已经不在**（`git branch -a` 只剩一条早先的 `origin/release/0.13.27`）——**是发布那一轮在 Release 变绿之后用 `git branch -d release/0.13.53` 删的**（`Deleted branch release/0.13.53 (was 50b3341)`），记忆收口工**没有删它**、只核对到它已不在；`feat/task-panel`（`was ae4d4c1`）同样由发布那一轮在确认 `--is-ancestor feat/task-panel main` 成立、且它的 worktree `.tmp/wt-task-panel` 干净（`git status --short` 空）之后随 `git worktree remove` 一起删掉，**它的证据目录原样留着**（该分支从来没有远端副本）；`backup/wip-2026-11-24-*` 三条、`feat/audit-layer`、`feat/force-team-routing`、`backup/flowchart-v2-mixed-2026-11-26` 都还在；**没删任何远端分支、没删或移动任何 tag**。`.gitignore`（modified）与 `.rsi/evidence/progress-now/`（未跟踪）是别的会话的遗留，**没暂存、没提交、没改、没回滚**。**`CONFIRMED`** |
 | live 档案升级 | `stat -c '%y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`、`grep '"version"' ~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json`、`~/.dsh/profiles/web/package.json` 第 12 行（**全部只读**） | **`BLOCKED`**：本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，**写入不可能**；本轮**没有做写探测**（纪律：不写 `~/.dsh`）。**没写、没重载、没重启** 3080 上的实例。只读读数：`~/.dsh` mtime **`2026-11-25 23:14:14`**、`~/.dsh/profiles` mtime **`2026-11-22 16:59:46`**、**`~/.dsh/profiles/web` mtime `2026-11-26 19:20:42`**、live 装着的插件读回 **`0.13.52`**、依赖行仍是**浮动的** `github:free6589/dsh-grok-workflow`（无标签固定）——**live 档案不在 0.13.53 上**，升级需要一个对 `~/.dsh` 有写权限的操作员上下文，并顺手把那一行钉到 `#v0.13.53`。**只读观察（`HYPOTHESIS`，不是本块干的）**：`~/.dsh/profiles/web` 的 mtime 落在 **19:20:38–42** 这个窗口里，是**另一个进程**在那个窗口往 live 档案里装了东西；本块写不进 `~/.dsh`，成因未查明。 |
 | 真机 soak 重跑 | —— | **`NOT_RUN`**：这一版**复用** `.rsi/evidence/task-panel-2026-11-26/` 那一次（§上）；覆盖成立的根据是产品代码在两个提交之间逐字相同，不是又跑了一遍。 |
@@ -9616,3 +9768,50 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak
 **证据：** `.rsi/evidence/release-0.13.53-2026-11-26/`（`README.md` 是逐条读数、算术、两条 soak 缺口与红线；
 `gate-50b3341.out` 是发版门禁转录，392 行 / 24016 字节，末行 `GATE_EXIT=0`）。真机那半边在
 `.rsi/evidence/task-panel-2026-11-26/`（10 张截图 + `readings.json` + `mermaid-done.txt`，本轮只核对、未重跑）。
+
+## 卡住那句话：真机拍到两种形状（没过的尝试 / 稿子全被退回），第三种 `blocked` 如实记 `NOT_REACHED`；两条过期读数已订正且原值原样保留；live 档案那一行仍浮动（`HYPOTHESIS`） — 2026-11-26 (`CONFIRMED` 像素与读数 / `NOT_REACHED` / `NOT_RUN`)
+
+**对象**：分支 `fix/readings-refresh`（worktree `.agents/worktrees/fix-readings-refresh`），基线 `main` 尖端 **`fe6d631`**，
+包版本 `0.13.53`。本轮**没有产品改动**——源码、测试、`lib/`、`package.json`、`CHANGELOG.md` 一行未改，只写证据与记忆；
+两条取舍记在 `D-176`（原分支内记 `D-174`）。下面每一行都注明了是**本轮亲手跑 / 亲手读像素**，还是**抄既有转录**。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 环境（**本轮自查**） | `node -v`、`npm -v`、`dsh --version`、`git rev-parse --short HEAD`、`git describe --tags --always` | `v26.8.1` / `11.19.0` / `0.2.2-rc.3` / **`fe6d631`** / `v0.13.53-1-gfe6d631`；`package.json` 读 `0.13.53`；会话文件策略 `workspace-write`、审批提示禁用。**`CONFIRMED`** |
+| 装法（隔离克隆，**本轮自查**） | 克隆 live web 档案到 scratch（`DSH_HOME=<scratch>`，live 只读、不写）→ `npm run build` → `npm pack` → 用 `file:` 把包钉进克隆档案 → 起在 **3421** | `cmp lib/client.js src/client/index.js` **IDENTICAL**；`lib/client.js` **399448 字节** `sha256 1fb003f3f608d0fb7b053504456defdc476c59f88f68b753a3357196f2c1b81f`（**与 `v0.13.53` 发出去的那份同值**）；tgz **1027274 字节** `sha256 35485d31c6abbc3e233aae6364e9924edc3d2386bd5dda62cb4feeb20dcb3a13`；版本读回 **`0.13.53`**；插件目录里符号链接 **0** 条（不是软链安装）。逐条在 `install.txt`。**`CONFIRMED`** |
+| 跑的是真模型 | `timeline.json` 的 `modelPins`；启动脚本 `set -a; . ~/.dsh/bifrost.env; set +a` | `bifrost-responses/opencode-go/muse-spark-1.3-contributor`；密钥只在起的那个服务进程里，**没有打印、没有落盘**；证据目录里对 `sk-…` / `Bearer …` / `*_KEY=` / `token=` 的模式扫描**只命中 `token=<redacted>`**。**`CONFIRMED`** |
+| ① `failed`（**拍到了**） | `read_image` 逐张 + `readings-failed.json` | DOM 逐字 **`卡在 2：执行 第 1 遍没过`**；`failed-desktop-1500.png`（1500×1600 CSS / 3000×3200 像素）与 `failed-narrow-390.png`（390×844 CSS / 780×1688 像素；390 宽下标签条没有「进度」，是从 `更多会话视图` 溢出菜单进去的，就是读者在这个宽度下真要走的那条路）；**9 节点 / 10 条线**；牌子 `未通过`；句子框 663→680（桌面）、477→494（窄屏）。多出一张 `failed-desktop-1500-midrun.png`：同一次运行第 12 秒（牌子 `进行中`、8 节点 / 9 线）。**`CONFIRMED`** |
+| 那次为什么是**真**失败（不是模拟） | `failed-session-stream.txt` 逐字 | 两条任务的每次尝试都 `agent-end {"outcome":"failed"}`、`failureClass: model-unavailable`，最后 `run-end {"stopReason":"error"}`；报告原文写的是这条 provider 路由没有凭据——`roles.worker` 钉在 `agent2api/*`，这台机器上**没有** `AGENT2API_API_KEY`。失败是真的，成因不在本插件，也没有拿别的东西打扮成运行。**`CONFIRMED`** |
+| ② `rejected`（**拍到了**） | `read_image` 逐张 + `readings-rejected.json` + 会话流 | DOM 逐字 **`卡在 7：3 稿全被退回`**；`rejected-desktop-1500.png` 与 `rejected-narrow-390.png`；**14 节点 / 16 条线**；牌子 `已完成`；流里 `summary-rejected {"drafts":3,"stage":"verify","reason":"the answer does not state the recomputed run verdict (completed)"}`、报告行 `review: check=pass verify=fail drafts=3 …`、`run-end {"stopReason":"completed"}`。**够到它的前提是 `synthesis: model`**——`layered` 默认下确定性回落总会交卷，这个形状永远退不了稿。**`CONFIRMED`** |
+| ③ `blocked`（**拍不到，如实记**） | 两次有边界的真尝试：`childTimeoutMs` 1000 + `timeoutMs` 0；再 30 秒预算 + 每个任务先 `sleep 600`；两份读数 + 两份会话流 | **`NOT_REACHED`**：第二次确实以三条调用还开着收尾，但流里的顺序是宿主先给它们补 `agent-end {seq 1,2,6,10, outcome:"cancelled"}`，**然后**才写 `run-end {stopReason:"error"}`——每一行都结了，而「已取消」不是「没回报」。两份读数 `stuckPresent` 全 `false`。改钉法、改预算都到不了；要有**一条既不被结算也不被取消**的调用行才行。**`NOT_REACHED`** |
+| 读数自检（**四张必交图 + 一张多做图**） | `read_image` 逐张；`readings-*.json` 的字段 | 句子在视口内、字读得出；`stuckInViewport: true`；在句子正中一点做命中测试，命中的是它自己（`stuckTopmost.isStuckOrChild: true`）；1500 与 390 两档都 `scrollWidth === clientWidth`；Mermaid 文本的节点 / 线数与 DOM 数一致；`readings-failed.json` 与 `readings-rejected.json` 的 `consoleErrors` / `pageErrors` 都是 `[]`。**`CONFIRMED`** |
+| 两条过期读数的订正（**本轮复核**） | 三份读数逐条比 + `read_image` 两张 PNG + `sha256sum` | `phone-360-done` 与 `tablet-700-done` 原记 `nodeCalls/traceActive/traceDim = 1 / 5 / 19`，与它们旁边保留下来的图不符：`phone-360-done.png`（720×1600）是一棵干净的完成树，**没有摊开的调用卡、没有点亮的蓝线、没有变暗的节点**；对照 `phone-390-trace.png` 才有那张卡片——所以 `1 / 5 / 19` 是一次**真实但属于另一个页面状态**的读数。两张 PNG 的 `sha256` 是 `1212d02272440d611317628de8da61c14dadc2805a212cbe686e0c3706ab7459` / `5114bf36c6ca53e6def92c15263bebedee06945ab2479154b0ca818e972b51db`。改后**三份文件在同两个键上都是 `0 / 0 / 0`**，键名与另外四条读数一个字没动（`phone-390-trace` 仍是 `1 / 5 / 19`）。原值原样留在 `callListFields.supersededFirstPass` 里，带 `writtenBy` / `supersededBy` / `why`，另加 `source` 与 `matchesImage`——**只读这一个文件的人也骗不过去**；同目录的 `raw-readings-phone.CORRECTION.md` 用中文写清了成因与复核方式。**口径要说明一处**：这两笔文件的 mtime 是 **20:12:18 / 20:12:57**，早于本轮真机第一次运行（20:18:53）——这一块的两半是并着做的、**订正在先**，所以 `redline.txt` §7 从真机那一半的视角写「不是这一块写的」；两处说的是同一件事，不矛盾。**`CONFIRMED`** |
+| 同类但**故意没改**的（开放问题） | `raw-readings-desktop.json` 与 `raw-readings-phone.json` 对比 | 桌面那份里有个键叫 `phone-390-running`，它的**每一个字段都等于自己的 `desktop-1500-done`**（`scrollWidth` 1500、`第 7 步，共 7 步`、`已完成`）；电话那份里真正的同名条目是 390 宽、`进行中`、`第 2 步，共 3 步`、6 节点。**没有改**：这个证据目录里没有任何一份记录说桌面侧那一条应该是什么，改写它只能编数字。成因 **`HYPOTHESIS`**（多半是截图脚本按错了键名），**明确未修**，留给下一步定。 |
+| 三件顺带看到的事（只记录，不判对错） | `readings-*.json` 的 `line` / `chip` / `dock` | ① 运行已经收尾，顶上那行还在给时间：`failed-*` 读作 `第 2 步，共 5 步 · 还剩约 1 分 0 秒`，`rejected-*` 读作 `第 7 步，共 8 步 · 还剩约 25 秒`；② `rejected` 那两页**绿牌子「已完成」与「三稿全被退回」同时出现**；③ 同一页仍然提供 `收下这版`（`dock` 读数就是这四个字）。**`CONFIRMED`**（读数）。另有一条**只有肉眼、没有读数字段**：`failed-narrow-390.png` 里同一任务的两颗尝试点之间有一小段虚线——读数里**没有专门记重试连线的字段**，所以这是看图的观察，**不是计数读数**。 |
+| 红线（**两端都量了**） | 写探针、`stat -c '%y'`、`curl 127.0.0.1:3080`、`ss -ltn`、`git status --short --branch` | 写探针 **20:29:14** 与 **20:47:47** 各失败一次（`Read-only file system`），探针文件不存在；`~/.dsh` **`2026-11-25 23:14:14.025606767`**、`~/.dsh/profiles` **`2026-11-22 16:59:46.687805286`**、`~/.dsh/profiles/web` **`2026-11-26 19:41:49.334856619`**，前后同值且都早于 20:10 开工；3080 前后都是 **`401`**，一次没重启 / 没重载 / 没改设置；隔离实例在 **3421**，开工前端口空着、收尾后关掉；没有提交、没有推送、没有打标签、没有发布、没改版本号；scratch 目录 `.tmp/stuck-hint/` 已删。逐条在 `redline.txt`。**`CONFIRMED`** |
+| live 档案（**只读观察**，本块写不进） | `stat -c '%y'` 三个目录、读 live 插件的版本与依赖行 | 插件目录读回 **`0.13.53`**，但依赖行仍是**浮动的** `github:free6589/dsh-grok-workflow`——`AGENTS.md` §13 要的「钉到确切标签」**不满足**；`~/.dsh/profiles/web` 的 mtime **`19:41:49`** 晚于发布那一轮读到的 `19:20:42`。**谁装的、什么时候装的**：**`HYPOTHESIS`**（另一个有写权限的上下文），本块没写、也写不进。 |
+| 门禁 | —— | **`NOT_RUN`**：本轮没有产品代码 / 测试 / `lib/` 改动——`git status --short` 里只有两个证据区和四份记忆文件，按 `AGENTS.md` §12 块内不跑 `typecheck` / `lint` / spec；整仓 `npm run ci` 也 **`NOT_RUN`**（那是发版提交上跑的那一次）。**这一行不是绿灯，是「没什么可跑」。** |
+
+**一句话**：进度页底部那句「卡在……」现在有**两种**形状的真机像素，第三种拍不到、并且把为什么拍不到说清楚了；
+上一轮留下的两条过期读数已经订正，**原始读数原样留着**，没有为了让文件好看而抹掉一次真实的测量。
+
+**第三种为什么到不了页面**：这一版引擎收尾时，会先把还开着的子任务**取消**掉，再写「本轮结束」。
+所以「运行已经结束、可某一行还没有结局」这个形状根本到不了页面。要让它出现，需要一条**既不被结算也不被取消**的调用行——
+那不是改模型钉法或改预算能换来的，得在引擎那一层动。这是 `NOT_REACHED`，不是「拍了个差不多的东西顶上去」。
+那句措辞本身有单元测试盯着（`test/progress-panel.spec.ts` 断言读出来是 `卡在 3：这一步没有回报`），
+但**用例不是像素证据**，这里不当截图算。
+
+**还缺什么（照实记，一条也不软化）**：
+
+- 卡住那句话的**第三种在真机上零像素证据**：`NOT_REACHED`，理由见上一段；两次尝试的读数与会话流都留在目录里，`stuckPresent` 全 `false`。
+- `等你点头` / `已取消` / `出错` **三颗胶囊仍然没有真机照片**；`未通过` 这一颗本轮拍到了（两张 `failed-*` 图上的牌子就是它），另外三颗只有组件用例。
+- **重试虚线只有肉眼观察**：窄屏那张图里，同一任务的两颗尝试点之间有一小段虚线；读数文件里没有记它的字段，所以**不算计数读数**。
+- **421–499 px 这一档仍然没量过**：本轮只拍了两头，1500 与 390。
+- **真的 Mermaid 渲染器仍然没有**：这台机器上没有、也不联网；页面读那段文本、自己排版，图与文本数的一致性靠用例加本轮读数一起钉。
+
+**与上一节的关系**：`0.13.53` 发布那一节记的两条缺口（卡住那句零像素、两条读数仍是旧值）**当时是真的**，
+本节没有回头改写它，只在那两行后面挂了一个指过来的括注。
+
+**证据：** `.rsi/evidence/stuck-hint-2026-11-26/`（`README.md` 是索引：五张图 + 四份读数 + 四份会话流 + `timeline.json` +
+`install.txt` + `redline.txt` + 三个脚本）；读数订正在 `.rsi/evidence/task-panel-2026-11-26/soak/`
+（`raw-readings-phone.json` 的 `callListFields` 与 `raw-readings-phone.CORRECTION.md`）。

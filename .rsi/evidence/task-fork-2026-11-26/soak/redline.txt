@@ -1,0 +1,65 @@
+=== PRESERVED: redline around one isolated soak (fourth and final capture of this block) ===
+(the live instance is on 3080; this round never wrote, installed into or restarted anything inside ~/.dsh)
+
+############ BEFORE — recorded 2026-11-26T23:47:12+08:00, at the START OF THE BLOCK ############
+--- stat live home ---
+/home/fish/.dsh 1568 bytes mtime=2026-11-25 23:14:14.025606767 +0800 ino=3979735
+/home/fish/.dsh/profiles 226 bytes mtime=2026-11-22 16:59:46.687805286 +0800 ino=3979736
+/home/fish/.dsh/profiles/web 196 bytes mtime=2026-11-26 23:36:39.659723112 +0800 ino=21301195
+--- live 3080 ---
+401
+--- live plugin row ---
+github:free6589/dsh-grok-workflow
+0.13.53
+
+############ DURING THIS ROUND — before teardown, 2026-11-27T01:09:01+08:00 ############
+/home/fish/.dsh 1568 bytes mtime=2026-11-27 00:22:48.201318984 +0800 ino=3979735
+/home/fish/.dsh/profiles 226 bytes mtime=2026-11-22 16:59:46.687805286 +0800 ino=3979736
+/home/fish/.dsh/profiles/web 196 bytes mtime=2026-11-27 01:01:27.439425584 +0800 ino=21301195
+--- live 3080 ---
+401
+--- live plugin row: pin / version / installed client sha ---
+github:free6589/dsh-grok-workflow
+0.13.53
+1fb003f3f608d0fb7b053504456defdc476c59f88f68b753a3357196f2c1b81f  /home/fish/.dsh/profiles/web/node_modules/dsh-grok-workflow/lib/client.js
+--- entries changed DIRECTLY inside profiles/web since the block's start ---
+2026-11-27+00:14:34.2713472400 /home/fish/.dsh/profiles/web/pnpm-lock.yaml
+2026-11-27+00:14:34.4153476330 /home/fish/.dsh/profiles/web/node_modules
+2026-11-27+00:14:34.4423477070 /home/fish/.dsh/profiles/web/.plugin-manager
+2026-11-27+00:19:54.1022841820 /home/fish/.dsh/profiles/web/package.json
+2026-11-27+00:20:53.0544677970 /home/fish/.dsh/profiles/web/cordis.yml
+2026-11-27+01:01:27.3484252970 /home/fish/.dsh/profiles/web/cordis.patch.yml
+2026-11-27+01:01:27.4394255840 /home/fish/.dsh/profiles/web
+
+############ AFTER TEARDOWN — to be filled by this round's teardown step ############
+--- ports ---
+LISTEN 0      511                            100.111.111.88:3080       0.0.0.0:*
+LISTEN 0      5                                   127.0.0.1:3080       0.0.0.0:*
+--- live 3080 ---
+401
+--- stat live home ---
+/home/fish/.dsh 1568 bytes mtime=2026-11-27 00:22:48.201318984 +0800 ino=3979735
+/home/fish/.dsh/profiles 226 bytes mtime=2026-11-22 16:59:46.687805286 +0800 ino=3979736
+/home/fish/.dsh/profiles/web 196 bytes mtime=2026-11-27 01:01:27.439425584 +0800 ino=21301195
+--- live plugin row ---
+github:free6589/dsh-grok-workflow
+0.13.53
+1fb003f3f608d0fb7b053504456defdc476c59f88f68b753a3357196f2c1b81f  /home/fish/.dsh/profiles/web/node_modules/dsh-grok-workflow/lib/client.js
+--- deleted ---
+.tmp/soak-fork (108 MB): the isolated DSH home + its clone, the npm cache, the pack4 tgz, the run workspace and every log
+
+############ READING OF THE ABOVE ############
+- ~/.dsh/profiles: 2026-11-22 16:59:46 from the block's start to teardown — unchanged.
+- ~/.dsh: 2026-11-25 23:14:14 at the block's start -> 2026-11-27 00:22:48, which is where it
+  already stood when THIS round began (01:02). It did not move during this round.
+- ~/.dsh/profiles/web: 23:36:39 -> 00:19:54 -> 00:41:08 -> 01:01:27. The last move is 41 s
+  before this round's first command; none of the four is this round's.
+- the moves are settings writes on the LIVE profile plus one plugin operation:
+    pnpm-lock.yaml / node_modules / .plugin-manager @ 00:14:34
+    package.json @ 00:19:54 · cordis.yml @ 00:20:53 · cordis.patch.yml @ 00:41:08 and @ 01:01:27
+  Another writer, while this block was open; I cannot attribute it further and I do not claim
+  'unchanged' for ~/.dsh or ~/.dsh/profiles/web.
+- 3080: 401 at the block's start, during this round (01:09) and after teardown. Never restarted.
+- live plugin row: still github:free6589/dsh-grok-workflow @ 0.13.53, installed client sha256
+  1fb003f3f608d0fb7b053504456defdc476c59f88f68b753a3357196f2c1b81f — NOT this block's build
+  (c6387e1b...). The live profile does not carry this work.

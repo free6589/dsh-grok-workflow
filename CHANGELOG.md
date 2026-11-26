@@ -5,6 +5,76 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.54] - 2026-11-27
+
+### Changed / 变更
+
+- **The progress tab is one horizontal fork now, with six lights on every task and five on the run / 进度页现在是一张横排分叉图，每张任务卡六盏灯、每轮五盏验** —
+  The picture reads left to right: start, the plan, one card per plan task, one branch per call that task made, the
+  summary, the acceptance, the end — seven columns in that order, whether the run is still waiting, still moving or
+  already over (a column with nothing recorded simply draws no box). Every card carries the six stages — plan,
+  execute, check, review, accept, summarize — and the acceptance column carries the five verifications — remote
+  machine, model review, isolated real machine, human review, ledger reconciliation. **The lights are folds of what
+  the run actually reported**: a failure a later retry replaced is green, and a verification nobody ran stays dark —
+  the page never ticks a check the stream did not report. The figure is derived from the run's own event rows on
+  every render, so a replanned run gains the task it really walked, its branches and their wires, and changes
+  nothing else. The Mermaid text the page lays itself out from is now a `flowchart LR`.
+  **Removed:** the vertical step tree, its per-visit badges, the retry dots on a card, and the "accept this version"
+  button in the dock — the acceptance is a place on the figure now, so there is nothing left to click. The dock keeps
+  its one "start" button, and its only other words are the filled-in-box line.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; only the way this tab is drawn.**
+  / 这张图从左往右读：起点、规划、每张计划任务一张卡、那张任务调过的每一次各成一条分支、汇合、验收、终点——
+  七列按这个顺序都在，不管你这一轮还在等着点头、还在跑、还是已经收工（没有记录的那一列就不画盒子）。每张卡带六盏灯（规划、执行、检查、复核、验收、
+  汇总），验收那一列带五盏验（机器远端、模型复核、真机隔离、人验、对账）。**灯只照着这一轮真报过的事折**：
+  后来重试补上的那次失败是绿的，没人跑过的验是暗的——页面不会替事件流勾选任何一道验。
+  图是每次渲染都从这一轮自己的事件行推出来的，所以重规划之后，图自己长出它真走过的那张任务、那几条分支和线，
+  别的什么都不变。页面据以自排的 Mermaid 文本改成 `flowchart LR`。
+  **退场的**：竖排步骤树、每颗节点上的访问号角标、卡片上那排重试圆点，以及底下那颗「收下这版」——
+  验收现在只是图上的一个地方，没有要点的东西了。dock 只留「开工」那一颗，另一句依旧是「已填进输入框」。
+  **升级提示：什么都不用准备——没有设置、存档格式或默认值变化，只是这一页画法变了。**
+
+
+- **A hand-in with the judge switched off is now recorded as "not judged" instead of "passed" / 关掉监工交的活，现在记成「没有判过」，不再记成「通过」** —
+  When a block was ordered with the independent judge switched off, closing it used to write the same `pass` as a block the judge
+  had really cleared. The record now carries a third outcome, `skipped`: neither a pass nor a veto, because no judgement was made.
+  The acceptance lines are kept exactly as written (marked met, with the note that the judge was skipped), and the answer plus
+  every later read now say plainly that this close was never judged — the block still settles, the record just stops calling it a
+  pass. Read back, a block also counts how many of its closes were never judged.
+  **A refusal over the approved scope now says which folder the check used, and spells both sides in full** — so a "that file is
+  outside the approved scope" can be checked by whoever reads it instead of being taken on faith.
+  **Upgrade note: nothing to migrate — records written before this version still read as they did, and no stored byte is rewritten.**
+  / 当一块活是在「关掉独立监工」的情况下开的，交工时它过去会写成和真的被监工放行的块一样的「通过」。现在记录里有第三种结局
+  `skipped`：既不判过也不否决，因为根本没有人判过。验收行照旧留着（标成满足，并附上「跳过监工」那句话），而交工的答复和
+  之后每一次读回，都会明说这一次没有判过——块照样收下，只是记录不再管这叫通过。读回一块时，也会数出它有多少次交工是没有判过的。
+  **因为批准范围被拒的交工，现在会写明核对时用的是哪个文件夹，并把两边的路径都写全**——这样「这个文件不在批准范围里」这句话，
+  看记录的人能自己核对，不用凭信。
+  **升级须知：不用迁移任何东西——这个版本之前写下的记录照样读得出，已经落盘的字节一个都不改。**
+
+### Fixed / 修复
+
+- **On a phone, the calls you open now come out of the figure and stand in a block of their own under it, instead of landing on the card next door / 手机上摊开的调用不再压在隔壁那张卡上，而是落到图下面属于面板自己的一整块里，还能收起来** —
+  Tapping a task node on the progress tab opens the calls that step made. At a phone's width that list used to float up
+  from under the node, straight on top of the card beside it, so one step's numbers were written across another step's
+  name. Now, at phone and tablet widths, the list leaves the figure and becomes one block in the panel's own column,
+  directly under the diagram: it can only push the page down, so it cannot land on a card, and the button at the bottom
+  stays clear of it. It holds exactly what it held before — the same rows, still with their time column even on the
+  narrowest screens, and the name of the card each list belongs to written above it, so it reads correctly after you
+  scroll down to it. It also comes to rest in the middle of the screen rather than against the very bottom edge, so it is
+  in view the moment you tap a card — there is nothing to scroll down to find it. Tapping the node again still closes the
+  list and drops the lit wires, and a "Hide" control in that block puts everything away at once.
+  **On a wide screen nothing changed** — the list still opens from under its node, the way it always has.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; this is only about where that list
+  is placed on a phone.**
+  / 在进度页点一颗任务节点，会摊开这一步调过的调用。手机的宽度下，这个列表原来是从节点下面浮出来的，正好压在旁边
+  那张卡上——一步的数字写在另一步的名字上。现在在手机和平板的宽度下，这个列表从图里搬出来，变成图下面的一整块，落在
+  面板自己的那一列里：它只能把页面往下推，所以压不到任何一张卡，底下那颗按钮也不会被它盖住。它装的东西一件没少——
+  同样的行、最窄的屏幕上照样带着那一列时刻，而且每组开头写着这张列表属于哪张卡，滚下去也读得明白。
+  它还落在屏幕中间，不是贴着最底边——点完抬眼就在，不用再滚一下去找。
+  再点一次那颗节点仍然是收起、并熄灭点亮的线；这一块里还有一个「收起」，一下把所有摊开的都收起来。
+  **宽屏上什么都没变**——列表仍旧从节点下面浮出来，跟以前一样。
+  **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；变的只是手机上这个列表摆在哪儿。**
+
+
 ## [0.13.53] - 2026-11-26
 
 ### Changed / 变更

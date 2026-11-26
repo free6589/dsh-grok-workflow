@@ -107,6 +107,7 @@ export function rowHashOf(row: BlockRow): string {
 const APPROVAL_KINDS = new Set(['preview', 'user', 'question-reply', 'request', 'operator', 'policy'])
 const BLOCK_STATUSES = new Set(['open', 'vetoed', 'accepted'])
 const BLOCK_EXECUTIONS = new Set(['foreman', 'workflow'])
+const VERDICT_OUTCOMES = new Set(['pass', 'veto', 'skipped'])
 
 function fail(message: string): never {
   throw new BlockIntakeError('invalid', message)
@@ -189,7 +190,7 @@ function assertVerdictRow(row: VerdictRow): void {
   if (!Number.isInteger(row.attempt) || row.attempt < 1) fail('attempt 必须是 ≥ 1 的整数')
   if (row.kind !== 'supervisor') fail('kind 必须是 supervisor')
   requireText('route', row.route, 200)
-  if (row.outcome !== 'pass' && row.outcome !== 'veto') fail('outcome 必须是 pass 或 veto')
+  if (!VERDICT_OUTCOMES.has(row.outcome)) fail('outcome 必须是 pass、veto 或 skipped')
   if (!Array.isArray(row.criteria)) fail('criteria 必须是数组')
   row.criteria.forEach((criterion, index) => {
     const at = `criteria[${index}]`

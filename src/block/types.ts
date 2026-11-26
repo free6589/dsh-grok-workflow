@@ -208,6 +208,18 @@ export class BlockIntakeError extends Error {
   }
 }
 
+/**
+ * How one close ended.
+ *
+ * `skipped` is the third outcome: the caller turned the judge off
+ * (`verify.blockSupervisor: false`) and the deterministic checks were clean, so the
+ * close is recorded **without** a judgement — neither a pass nor a veto. A per-criterion
+ * `met` has no third value, so a skipped row keeps `met: true` with the skip note as its
+ * evidence; that pair is a statement about the record, not a verdict, and readers must
+ * read `outcome` (or `judged`) rather than `met` on such a row.
+ */
+export type VerdictOutcome = 'pass' | 'veto' | 'skipped'
+
 /** One acceptance criterion and whether the supervisor saw it met. */
 export interface VerdictCriterion {
   text: string
@@ -236,7 +248,7 @@ export interface VerdictRow {
   attempt: number
   kind: 'supervisor'
   route: string
-  outcome: 'pass' | 'veto'
+  outcome: VerdictOutcome
   criteria: VerdictCriterion[]
   reasons: VerdictReason[]
   evidenceHash: string

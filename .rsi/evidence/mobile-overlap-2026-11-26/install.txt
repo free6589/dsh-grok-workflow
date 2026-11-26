@@ -1,0 +1,326 @@
+# 构建 / 打包 / 安装 / 引导 — 手机重叠修复，2026-11-26
+
+这个块在同一台机器上跑了**两轮**，两轮的命令都记在这里，按轮次分开：
+
+- **第一轮 `10c15a0`**（第一部分）：把摊开的调用列表从节点下面挪到图外面，证明它不压隔壁卡。
+- **第二轮 `5ba1ca2`**（第二部分）：摊开时把列表滚到画面中间 + 在 dock 之后加一段空的滚动余量，
+  证明**点完当下就看得见、且底线在输入框上沿之上**。
+
+两轮之间隔离 home 都是重新克隆的，上一轮的已经删掉。
+
+---
+
+# 第一部分：第一轮，提交 `10c15a0`
+
+被测的是 worktree `/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-mobile-overlap` 上的
+提交 **`10c15a0`**（`fix(progress): a phone's opened calls come out of the tree instead of
+landing on the card next door`），基线 `main` 尖端 `fe6d631`。这个提交上没有标签
+（`git describe` = `v0.13.53-2-g10c15a0`，`git tag --contains HEAD` 为空），包版本 **`0.13.53`**。
+
+下面的命令都在 worktree 里跑；`~/.dsh` 只被读过（克隆源），一次没写。
+
+## 1. 提交与工作树
+
+```
+$ git rev-parse HEAD
+10c15a067dc715460fc22cda4eec0148de0e49bf
+$ git log --oneline -1
+10c15a0 fix(progress): a phone's opened calls come out of the tree instead of landing on the card next door
+$ git describe --tags --always
+v0.13.53-2-g10c15a0
+$ git tag --contains HEAD | wc -l
+0
+$ git diff --stat main..HEAD
+ lib/client.js               | 187 ++++++++++++++++++++++++++++++++++---
+ src/client/index.js         | 187 ++++++++++++++++++++++++++++++++++---
+ test/client.spec.ts         |   5 +-
+ test/i18n-parity.spec.ts    |  11 ++-
+ test/progress-panel.spec.ts | 221 ++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 585 insertions(+), 26 deletions(-)
+$ node -p "require('./package.json').version"
+0.13.53
+$ git status --short          # 构建前后都是空的
+(empty)
+```
+
+## 2. 构建
+
+```
+$ npm run build
+> dsh-grok-workflow@0.13.53 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+client bundle: 410497 bytes → lib/client.js
+
+$ git status --short          # 重建没有改动任何文件：lib/ 与提交一致
+(empty)
+$ stat -c '%s %n' lib/client.js src/client/index.js lib/index.js
+410497 lib/client.js
+410497 src/client/index.js
+27956 lib/index.js
+$ sha256sum lib/client.js src/client/index.js lib/index.js
+dbcfaf1403715975df0717c3dcf0286a2c9dca590527e5d67b797910e8bbc8ba  lib/client.js
+dbcfaf1403715975df0717c3dcf0286a2c9dca590527e5d67b797910e8bbc8ba  src/client/index.js
+ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32  lib/index.js
+$ cmp lib/client.js src/client/index.js && echo IDENTICAL
+IDENTICAL
+```
+
+`lib/client.js` 与 `src/client/index.js` 逐字节相同（410 497 B），这一版改的正是客户端那份。
+`lib/index.js` 与上一轮（`0.13.52`）的哈希相同——服务端一行没动。
+
+## 3. 打包
+
+```
+$ npm_config_cache=<家>/npm-cache npm pack --pack-destination <家>
+dsh-grok-workflow-0.13.53.tgz     (164 files)
+$ stat -c '%s %n' dsh-grok-workflow-0.13.53.tgz
+1029904 dsh-grok-workflow-0.13.53.tgz
+$ sha256sum dsh-grok-workflow-0.13.53.tgz
+0d2dede5a8ab9e6fc2cfe7abf109d87385ee635eca9281d3aa28a0fb48813b30
+$ git status --short          # 打包没有污染工作树
+(empty)
+```
+
+## 4. 隔离 home（克隆）
+
+```
+$ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web \
+    --home .tmp/soak-overlap/dsh-home --name web-clone \
+    --report .tmp/soak-overlap/clone.txt
+clone-profile: ok
+  files 7753 -> 7753 (88702504 bytes)
+  links 5 (relinked 2, already dangling in the source 1)
+  parity 5/5 equal after redaction
+  dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+  credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
+```
+
+克隆里只动了 soak 自己的东西，三处，全部记在这里：
+
+1. `grok-workflow` 配置里删掉已被 `src/config.ts` 列为「已移除」的 `mode: triage` 一行；
+2. 三个角色（worker / verifier / supervisor）与 `guardianModel` 从 `agent2api/…` 改钉到
+   `bifrost-responses/opencode-go/muse-spark-1.3-contributor`——本机没有 `AGENT2API_API_KEY`
+   （只查了存在与否，没读值），不钉就一次子调用都起不来；planner / synthesizer 本来就是这一条；
+3. 写了一条一次性工作区记录（见 §6）。
+
+密钥只走进程环境（`~/.dsh/bifrost.env` 打进那个进程），没有落进任何写出的文件。
+
+## 5. 安装
+
+```
+$ env -u DSH_PROFILE -u DSH_PROFILE_DIR DSH_HOME=<家>/dsh-home \
+    dsh plugin --profile web-clone add file:<家>/dsh-grok-workflow-0.13.53.tgz
+✓ Lockfile passes supply-chain policies (verified 50m ago)
+Progress: resolved 29, reused 27, downloaded 1, added 31, done
+dependencies:
++ dsh-system-prompt-design link:../../../../../../dsh-system-md
+Done in 1.9s using pnpm v12.4.2
+```
+
+装完读回：
+
+```
+$ node -p "require('<profile>/package.json').dependencies['dsh-grok-workflow']"
+file:/…/.tmp/soak-overlap/dsh-grok-workflow-0.13.53.tgz     ← 钉死这个 tgz，不是范围、不是 link
+$ node -p "require('<profile>/node_modules/dsh-grok-workflow/package.json').version"
+0.13.53
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/client.js
+dbcfaf14…8bbc8ba     ← 与 worktree 那份相同
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/index.js
+ac69070e…0021defa    ← 与 worktree 那份相同
+$ find <profile>/node_modules/dsh-grok-workflow -type l | wc -l
+0
+$ readlink -f <profile>/node_modules/dsh-grok-workflow
+/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-overlap/dsh-home/profiles/web-clone/node_modules/dsh-grok-workflow
+    （是真拷贝，不是指回 worktree 的软链）
+```
+
+## 6. 一次性工作区
+
+克隆 home 里原本没有工作区记录（`storages/workspace.json` 是空的 `initialized: true` +
+空表），照 live 的字段形状（`path/title/sessionIds/createdAt/updatedAt`）写了一条，只指向
+一次性目录：
+
+```
+id    0f5a2c31-4a10-4a3a-9b1e-000000000a01   （defaultWorkspaceId 也指向它）
+path  /home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-overlap/work
+title soak-overlap
+```
+
+带 `createdAt` / `updatedAt`（上一轮就是漏了这两个，workspace 域拒绝载入、连带 8 个条目没激活）。
+这一轮 boot 一次成功，日志里没有任何工作区报错。
+
+## 7. 引导
+
+```
+$ node -e '… bind 3431 …'            # 起进程前最后一次实测：3431 bind-ok
+$ env -u DSH_PROFILE -u DSH_PROFILE_DIR DSH_HOME=<家>/dsh-home \
+    dsh --profile web-clone --no-open --port 3431
+dsh web: http://127.0.0.1:3431/?token=<redacted>
+    （BIFROST_VIRTUAL_KEY 由 ~/.dsh/bifrost.env 打进该进程；令牌没有写进任何文件）
+```
+
+端口第一次定的是 **3421**（准备轮实测空闲），起进程时报 `EADDRINUSE 127.0.0.1:3421`——那个
+端口在十几分钟里被别的进程占了（`ss -ltnp` 不显示 pid，不是本会话的进程；同时 3411 上也有一个
+同样特征的空闲监听者，像是另一个沙箱里的实例）。实例没起来，日志留下了原文：
+
+```
+webServer (required)  @deepseek-ai/dsh-host-webserver
+  Error: listen EADDRINUSE: address already in use 127.0.0.1:3421
+Plugins waiting for services (8): web-runtime, open-in-app, directory-picker,
+  harness-dev-context, client-hmr, imagegen, cron-board, chat-in-dsh
+```
+
+换 **3431**（起进程前再实测一次空闲）后一次起成。`ss -ltn` 显示 `LISTEN 127.0.0.1:3431`。
+
+## 8. 引导日志里与本改动无关的两条
+
+```
+serena MCP: OSError: [Errno 30] Read-only file system: '/home/fish/.serena/logs/2026-11-26'
+mdcg-mcp fsutil: append_jsonl 写失败 … '/home/fish/agent-memory/_heartbeat.jsonl' Read-only file system
+```
+
+两条都是本次沙箱对 `~` 只读造成的（`failOnStartupError: false`，实例照常起来），与本次改动无关，
+也不进页面控制台（读数里 `consoleErrors` 为空可以对照）。
+
+
+---
+
+# 第二部分：第二轮，提交 `5ba1ca2`
+
+父提交 `10c15a0`（没有 amend），`fix(progress): a phone's opened calls open in the middle of
+the view, not against the composer`。`git describe` = `v0.13.53-3-g5ba1ca2`，仍无标签，包版本还是
+`0.13.53`。
+
+## 9. 提交与工作树
+
+```
+$ git rev-parse HEAD
+5ba1ca29662d866bbc1643371fc359a92fae5195
+$ git log --oneline -3
+5ba1ca2 fix(progress): a phone's opened calls open in the middle of the view, not against the composer
+10c15a0 fix(progress): a phone's opened calls come out of the tree instead of landing on the card next door
+fe6d631 docs(memory): record the 0.13.53 release
+$ git diff --stat 10c15a0..HEAD
+ lib/client.js               | 39 +++++++++++++++++++++++++++++++++++----
+ src/client/index.js         | 39 +++++++++++++++++++++++++++++++++++----
+ test/progress-panel.spec.ts | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 113 insertions(+), 8 deletions(-)
+$ git status --short          # 构建前、打包后都一样：只有下面这三行文档改动
+ M CHANGELOG.md
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/DESIGN-progress-tab.md
+```
+
+那三个文档改动是**另一条线**在写记忆、还没收口；本轮没有 stage、没有 commit、没有改它们一个字节。
+它们会跟着进 tgz（`npm pack` 收 `docs/` 与 `CHANGELOG.md`），对运行无影响。
+
+## 10. 构建
+
+```
+$ npm run build
+> dsh-grok-workflow@0.13.53 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+client bundle: 412345 bytes → lib/client.js
+
+$ git status --short          # 重建只碰了已提交的 lib/client.js，三行文档改动原样不动
+ M CHANGELOG.md
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/DESIGN-progress-tab.md
+$ stat -c '%s %n' lib/client.js src/client/index.js lib/index.js
+412345 lib/client.js
+412345 src/client/index.js
+27956 lib/index.js
+$ sha256sum lib/client.js src/client/index.js lib/index.js
+8cd4521122f89631751969cbd469b142b266ba6ce3f3bdd100be3693577bb599  lib/client.js
+8cd4521122f89631751969cbd469b142b266ba6ce3f3bdd100be3693577bb599  src/client/index.js
+ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32  lib/index.js
+$ cmp lib/client.js src/client/index.js && echo IDENTICAL
+IDENTICAL
+```
+
+`lib/index.js` 与第一轮、与 0.13.52 都是同一个哈希：这个块从头到尾没动服务端。
+
+## 11. 打包
+
+```
+$ npm_config_cache=<家>/npm-cache npm pack --pack-destination <家>
+npm notice filename: dsh-grok-workflow-0.13.53.tgz
+npm notice total files: 164
+$ stat -c '%s %n' dsh-grok-workflow-0.13.53.tgz
+1031079 dsh-grok-workflow-0.13.53.tgz
+$ sha256sum dsh-grok-workflow-0.13.53.tgz
+9015b15b3043ae9e53f67d04fdf9213e9ef70cb6c69f4b34947247204aa7c95e
+```
+
+## 12. 重新克隆（上一轮的 home 已删）
+
+```
+$ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web \
+    --home .tmp/soak-overlap/dsh-home --name web-clone --report .tmp/soak-overlap/clone.txt
+clone-profile: ok
+  files 7753 -> 7753 (88702504 bytes)
+  links 5 (relinked 2, already dangling in the source 1)
+  parity 5/5 equal after redaction
+  dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+  credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
+```
+
+克隆里只动三处，和第一轮同样三处：删掉已移除的 `mode: triage`；三个角色与 `guardianModel` 从
+`agent2api/…` 改钉 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`；写一条一次性工作区记录。
+差别是这次**工作区记录在引导之前就写好**（照 live 的字段形状，带 `createdAt/updatedAt`），所以只起
+了一次实例，没有第一轮那次「boot → 补记录 → 重启」。
+
+```
+id    0f5a2c31-4a10-4a3a-9b1e-000000000b02
+path  /home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-overlap/work
+```
+
+## 13. 安装
+
+```
+$ env -u DSH_PROFILE -u DSH_PROFILE_DIR DSH_HOME=<家>/dsh-home \
+    dsh plugin --profile web-clone add file:<家>/dsh-grok-workflow-0.13.53.tgz
+Progress: resolved 29, reused 27, downloaded 1, added 31, done
+The integrity of 272 files was checked in 1.0s.
+Done in 2.4s using pnpm v12.4.2
+
+$ node -p "require('<profile>/package.json').dependencies['dsh-grok-workflow']"
+file:/…/.tmp/soak-overlap/dsh-grok-workflow-0.13.53.tgz
+$ node -p "require('<profile>/node_modules/dsh-grok-workflow/package.json').version"
+0.13.53
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/client.js
+8cd45211…577bb599     ← 与 worktree 那份相同
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/index.js
+ac69070e…0021defa     ← 与 worktree 那份相同
+$ grep -c 'gw-progress-sheet-room' <profile>/node_modules/dsh-grok-workflow/lib/client.js
+2                     ← 这一版的滚动余量确实在装好的副本里
+$ find <profile>/node_modules/dsh-grok-workflow -type l | wc -l
+0
+```
+
+## 14. 一次白跑的实例（照实记）
+
+克隆刚建好时，profile 里带的是 **live 那一份已发布的 0.13.53**（`lib/client.js` 的
+`sha256 1fb003f3…`，里面没有 `gw-progress-sheet-room`）。第一次引导之后我漏了安装那一步就开始取样，
+发现后立刻停掉：那一次抓的是没有本次改动的构建，一条读数都没有留下来用。停实例 → 装 tgz →
+读回哈希（§13）→ 重新引导 → 才开始这一轮的取证。
+
+## 15. 引导
+
+```
+$ node -e '… bind 3431 …'                    # 起进程前实测：3431 bind-ok
+$ env -u DSH_PROFILE -u DSH_PROFILE_DIR DSH_HOME=<家>/dsh-home \
+    dsh --profile web-clone --no-open --port 3431
+dsh web: http://127.0.0.1:3431/?token=<redacted>
+```
+
+端口 3431 是第一轮用过、收尾已释放的那个；这一轮重新实测（3431/3432/3441/3451/3461 全部
+`BIND-OK`），起进程前又绑了一次，才用它。两次引导都一次起成，没有 `EADDRINUSE`。
+
+引导日志里与本改动无关的两条（与第一轮相同，沙箱对 `~` 只读造成的）：
+
+```
+serena MCP: OSError: [Errno 30] Read-only file system: '/home/fish/.serena/logs/2026-11-26'
+mdcg-mcp fsutil: append_jsonl 写失败 … '/home/fish/agent-memory/_heartbeat.jsonl' Read-only file system
+```

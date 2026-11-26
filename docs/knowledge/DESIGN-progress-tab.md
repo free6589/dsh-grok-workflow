@@ -1495,3 +1495,337 @@ p.gw-progress-stuck[data-gw-progress-stuck]                   role="status"
   ③ **未通过 / 已取消 / 出错**三态；④ **421–499 px** 之间的宽度（只探了 420 与 500 两侧）；
   ⑤ **live 档案升级 / 重载 / 重启**（红线：live 里那份插件仍读作 `0.13.48`）；⑥ 读屏软件实测；⑦ Firefox / Safari；
   ⑧ 真 Mermaid 渲染器（这台机器上没有，也不联网——真机核的是「文本与 DOM 数得一样」，不是「渲染出来一样」）。
+
+## 26. 横排分叉面板：七层、六环、五验（2026-11-26，`feat/task-fork`）
+
+**§25 的页面被本节取代**：竖排步骤树（腿一行、计划任务挂在腿下）连同 `flowchart TD` 文本一起退场，
+dock 上那颗「收下这版」（`progress.dock.accept`）也删掉。§25 里**仍然成立**的是数据口径那一半：
+§22 的退回事实链（标记 → 读回 → 事件）、§25.7 的诚实边界（不编数字、不从计划里推）、§25.6 的状态词汇与颜色 token。
+本节写的是**现在的模型与契约**（同一块里排版那一半按它渲染：几何、CSS、DOM、真机读数不在本节，见 §26.9）。
+
+本节 `CONFIRMED` 的部分：源码 `src/client/index.js` 的模型与文本写入、`test/progress-panel-model.spec.ts`（23 条）、
+`test/i18n-parity.spec.ts`（8 条），以及门禁三条命令（§26.9 逐字）。裁决条目见 `D-175`。
+
+### 26.1 七层，一列一件事（`CONFIRMED`）
+
+| 层 | 盒子 | id | 形状 | 说什么 |
+| --- | --- | --- | --- | --- |
+| 0 | 起点 | `start` | stadium | `progress.flow.start`（起点），恒 `done`，无调用 |
+| 1 | 规划 | `plan` | stadium | `progress.flow.plan`（规划）；它自己的调用 |
+| 2 | 任务 | `t<号>` / `u1` | round | recorder 写的 phase **原文**（计划任务自己的名字） |
+| 3 | 子任务 | `<任务id>_s<seq>` | rect | 那条调用说的腿词（`执行` / `检查` / `复核`）；不认腿的行用自己那一行标签 |
+| 4 | 汇合 | `sum` | stadium | `progress.flow.summarize`（汇总）；它自己的调用 + 退回裁决 |
+| 5 | 验收 | `accept` | stadium | `progress.flow.accept`（验收）；五盏验 |
+| 6 | 终点 | `end` | stadium | `progress.flow.end`（终点），恒为这一轮的收尾状态 |
+
+- **七层永远都在**：等你点头的一轮、走到一半的一轮、从来没跑到汇总的一轮，`nodes[]` 里都画齐这七层；
+  没有任务就没有层 2 的盒子，没有调用就没有层 3 的盒子，层数本身不缩。
+- **`nodes[]` 的顺序是「先层、后记录序」**：`start`、`plan`、按号排的任务卡（`t2` 在 `t10` 前）、再按任务分组
+  的顺序排各条分支（每组内按 `seq`）、`sum`、`accept`、`end`。
+- **`at` 是层号 + 1**：`total` 恒为 **7**（`PANEL_LEVELS`），`remaining = 7 − at`。读者站的那一盒
+  （`current: true`，全图恰好一颗）见 §26.6。
+
+### 26.2 一个盒子有哪些字段（`CONFIRMED`）
+
+| 字段 | 出现在 | 意思 |
+| --- | --- | --- |
+| `id` | 全部 | 见 §26.1 的 id 规则；文本里只有 `end` 写成 `finish` |
+| `kind` | 全部 | `start` / `plan` / `task` / `sub` / `summarize` / `accept` / `end` |
+| `level` | 全部 | 0–6 |
+| `label` | 全部 | 读者会看见的词；只有任务卡是 recorder 的原文，别的都是腿词 / 键词 |
+| `state` | 全部 | `done` / `doing` / `failed` / `blocked` / `pending` / `cancelled`，折法见 §26.3、§26.4 |
+| `current` | 全部 | 读者站的那一盒 |
+| `calls` | 全部 | 它拥有的行，按 `seq` 排；两端与 `accept` 恒为 `[]` |
+| `openable` | 全部 | 有调用即可开；`sum` 带着退回裁决时也可开（照 §25.1 的老规矩） |
+| `rings` | 仅层 2 | 六盏，顺序固定（§26.3） |
+| `checks` | 仅层 5 | 五盏（§26.4）；同一份 `graph.checks` |
+| `rejected` | 仅层 4 | 每一稿都被退回的裁决，原样来自 `run.summaryRejected` |
+| `subtask` | 仅层 3 | `{ taskId, taskNumber?, seq, leg?, attempt }` |
+
+- **没有 `ordinal` / `attempts` / `taskNumber` / `leg`**：任务号在 id 里（`t3`），一次任务试了几遍写在它各条分支上。
+  旧的两样（重试圆点、访问号角标）跟着旧图一起退场。
+- **`subtask.taskNumber` 只在有号时出现**：`u1` 那一组的分支没有这个字段，别拿它当必有项。
+
+### 26.3 六环：一张任务卡上的六盏灯（`CONFIRMED`）
+
+顺序固定：`plan` → `execute` → `check` → `review` → `accept` → `summarize`（`PANEL_RING_KEYS`）。
+
+| 灯 | 怎么折 |
+| --- | --- |
+| `plan` | **规划那一盒的状态**（每一张卡同一个事实） |
+| `execute` / `check` / `review` | 只看这张卡**自己**的、标签认这条腿的行：`progressNodeState()` 那一套（`ended` 有感知）；一条都没有 → `pending` |
+| `accept` | `check` 或 `review` 是 `failed` / `blocked` → `failed`；两门都 `done` → `done`；任一门 `doing` → `doing`；否则 `pending` |
+| `summarize` | **汇合那一盒的状态** |
+
+- **腿只看标签，相位永远不绑腿**：`phase` 认的是任务，一张名叫 `任务 7 · 检查口径` 的任务卡不会因此多出一盏检查灯。
+- **重试过的那次不算没过**：`progressRecoveredFailures()` 之后才折，所以「先没过、后来过了」是绿灯
+  （那条分支自己仍是红的——它是那一次调用的事实）。
+- **一门没跑就不算过**：`accept` 只在两门都 `done` 时绿；`model` 之类只跑了检查的流，验收灯是暗的，不是绿的。
+
+### 26.4 五验：一轮的五盏灯（`CONFIRMED`）
+
+顺序固定：`machine` → `model` → `isolated` → `human` → `ledger`（`PANEL_CHECK_KEYS`）。
+
+| 灯 | 谁点它 |
+| --- | --- |
+| `machine` | 标签认**检查**这条腿的行（机器验收） |
+| `model` | 标签认**复核**这条腿的行（模型复核） |
+| `isolated` | 标签或相位带 `真机` / `隔离` / `soak` / `isolated` 的行 |
+| `human` | 标签或相位带 `人验` / `人工` / `human` 的行 |
+| `ledger` | 标签或相位带 `对账` / `核对` / `reconcil` 的行 |
+
+折法（顺序就是契约的字面顺序）：**一条都没有 → `pending`；有任何一条还没结算 → `doing`；全都结算且没有当前失败
+→ `done`；否则 `failed`**。「当前失败」= 扣掉被后来的同单位尝试替代的那些（`progressRecoveredFailures()`）。
+
+- **只有记录能点灯**：页面从不替事件流勾选任何一道验。这一轮没跑真机，`isolated` 就是暗的，不会因为「大概没问题」变绿。
+- **拉丁词按词干认**：`reconcil` 是一个词首前缀，所以 `reconciliation` 算对账；中文词照 `progressPhaseCarriesToken()`
+  的边界规则，`人工` 里的字不会误吞。
+- **灯在图上也在验收卡上**：`graph.checks` 与 `accept.checks` 是同一份，读者在哪一处读都读到同一件事。
+
+### 26.5 边与 Mermaid 文本（`CONFIRMED`）
+
+边只有这几种用途，别的边一条都不发：
+
+| 边 | kind |
+| --- | --- |
+| `start → plan` | `chain` |
+| `plan → sum`（**只在没有任何任务卡时**，一轮里只有规划/汇总行也算） | `chain` |
+| `plan → t1`、`plan → t2`…（每张任务卡一条） | `fork` |
+| `任务 → 它自己的每条分支` | `branch` |
+| `每条分支 → sum` | `join` |
+| 一条调用都没有的任务卡 `→ sum` | `join` |
+| `sum → accept` | `chain` |
+| `accept → end` | `chain` |
+
+- **文本是结构来源**：`panelMermaid()` 写 `flowchart LR`，一盒一行、一边一行、两空格缩进；
+  页面排的是 `parsePanelMermaid()` 读回来的那份图，不是 `nodes`（§25.5 的规矩不变）。
+- **形状**：`start` / `plan` / `summarize` / `accept` / `end` → `(["…"])`（stadium），任务卡 `("…")`（round），
+  分支 `["…"]`（rect）。**终点在文本里仍写 `finish`**（`end` 会关 `subgraph`），模型、DOM 钩子与所有边仍叫 `end`。
+- **六环、五验、第几遍是装饰，不进文本**；但分支自己的词条（含 `· 第 2 遍`）是它的标签，所以那半句在文本里。
+- **每一种状态都是**一个**连通块**：没有任务卡时（等你点头的一轮、只有规划/汇总行的一轮），`plan` 与 `sum` 之间
+  **补一条 `chain` 边**，否则「起点 → 规划」会跟「汇总 → 验收 → 终点」两半分着飘。有任务卡时那道缺口由图的分叉
+  自己接上，这条边**一条都不发**，所以「不许有别的边」仍然成立；两种情形 `test/progress-panel-model.spec.ts` 都钉住了。
+
+### 26.6 顶上那句话与「还剩约」（`CONFIRMED`）
+
+- **读者站的那一盒**：有没结算的行 → 那行**最具体**的归属盒（分支优先于它那张任务卡）；这一轮结束了而什么都没开着
+  → 第一颗 `failed` / `blocked` 的盒；否则 → `end`。**一行都没声明、也没结束** → `start`。
+- **`at` = 那一盒的层 + 1**，`total` = 7，`remaining` = 7 − at。等你点头的一轮是「第 1 步，共 7 步」。
+- **估算按层量**：一层算「量到了」要**这一层的每一盒都 `done`、且这一层每一行两个时间戳都在**；这一层的跨度 =
+  `max(endedAt) − min(startedAt)`。估算 = **已量到的层跨度的平均** × 还剩几层，按老规矩圆整
+  （一分钟以下取 5 秒、以上取 10 秒，`progressPanelRounded()`）；**一层都没量到、或者没有剩余层 → 这半句不打印**。
+- **不编数字**：没有百分比、没有通过率，看不见的数一个都不出现（§25.7 的边界原样保留）。
+
+### 26.7 图是数据推出来的，且一行都不丢（`CONFIRMED`）
+
+- **每一次渲染都从 `run.members` 重推**：没有一份缓存，也没有一步「记住上次的计划」。所以**重规划**之后
+  （多一张任务、多几行），图自己长出那张卡、它各条分支和它们的线，别的盒子一个字段都不变
+  （`test/progress-panel-model.spec.ts` 里那条重规划用例就是逐字段比的）。
+- **每一行恰好落在一个归属盒**：归属只有三种——`plan`、某张任务卡、`sum`。分支是任务卡的**再分**，
+  不是第四个归属，所以「每一行恰好一处」与「一条调用一条分支」同时成立。
+- **归属规则**：认腿的行跟腿走（`规划` → plan、`汇总` → sum、`执行`/`检查`/`复核` → 它 phase 认的那张任务卡）；
+  不认腿的行留在它原来那个位置——**第一条工作行之前**归 plan、**最后一条工作行之后**归 sum、
+  **夹在两条工作行之间**归它前面那条工作行的那张卡（§25 的老插入规则，用来保证不丢行）。
+- **Guardian 自己那一行不算这一步的活**（它有自己那张卡，照 §25 的规矩），所以它不在任何盒子的 `calls` 里。
+
+### 26.8 文案：加十四颗、删一颗（`CONFIRMED`）
+
+| 键 | 中文 | English |
+| --- | --- | --- |
+| `progress.flow.accept` | 验收 | Accept |
+| `progress.ring.plan` / `.execute` / `.check` / `.review` / `.accept` / `.summarize` | 规划 / 执行 / 检查 / 复核 / 验收 / 汇总 | Plan / Execute / Check / Review / Accept / Summarize |
+| `progress.verify.machine` / `.model` / `.isolated` / `.human` / `.ledger` | 机器远端 / 模型复核 / 真机隔离 / 人验 / 对账 | Remote machine / Model review / Isolated real machine / Human review / Ledger reconciliation |
+| `progress.panel.rings` / `progress.panel.checks` | 六环 / 五验 | Six stages / Five checks |
+
+- **删掉的一颗**：`progress.dock.accept`（收下这版）——点一下接受这一版的那个动作随旧面板一起退场，
+  两本字典都不许再出现它，`test/i18n-parity.spec.ts` 的删除清单里有它。dock 只剩「开工」那一颗。
+- **`progress.*` 键数 64 → 77**（+14 −1），两本字典仍然逐键平行。
+- **`progress.panel.etaBasis` 的文案没改**：它说的是「按 {n} 个已完成**步骤**的实测耗时推算」，而 `basis` 现在数是**层**。
+  这一块没有改文案的授权，照实记在这里（见 §26.9 的开放点）。
+
+### 26.9 验证指针与没验的（`CONFIRMED` / `NOT_RUN`）
+
+- **门禁（本块收尾，本树自己跑）**：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`npx oxlint src test`
+  **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；八份进度相关 spec **`8 files / 331 passed`**
+  （client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 +
+  i18n-parity 8 + progress-tab 72 + progress 14）。整仓套件与 `npm run ci` **`NOT_RUN`**（§12：块里只跑碰到的 spec）。
+- **浏览器包**：`lib/client.js` **422 685** 字节 / `sha256 c6387e1b…be0186`，与 `src/client/index.js` 同哈希、
+  `cmp` 空输出（`node scripts/build-client.mjs` 之后）。
+- **这一半管什么**：`test/progress-panel-model.spec.ts`（23 条）管模型（七层与 id、边、六环、五验、一句话与估算、
+  `flowchart LR` 往返、重规划、卡住三级、dock 没有接受键）。**排版、样式与 DOM 钩子是同一块的另一半**，
+  由 `test/progress-panel.spec.ts`（38 条）与 `test/progress-connector.spec.ts`（15 条）加下面的真机读数覆盖；
+  本节只转述它们的结论，不记几何数字。
+- **真机（`CONFIRMED`，隔离档案：克隆 live `web` 档案、`DSH_HOME` 走 scratch、端口 **3412**、真模型、三个任务的真实工作流，收尾已拆）**：
+  装进去的是 `file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz`（**1 033 214** 字节 / `sha256 b5b7d208…3c46` / 164 文件），
+  读回 **`0.13.53`**、装好的 `lib/client.js` sha 与工作树相同（`c6387e1b…`）、软链 **0** 个。
+  **七张读数**：桌面 1500 进行中 **11 节点 / 12 边**、完成态 **17 / 24**、点开一颗节点 17 / 24（调用列表 **1** 行、亮线 **9** / 暗 **20**）；
+  手机 390 三张同计数；外加一张 native-390 完成态 17 / 24。**18 盏环 = 3 张任务卡 × 6**、验收卡 **5 盏验**
+  （`machine=done, model=done, isolated/human/ledger=pending`）、完成态 dock 里 `dock-fill` **0** 颗（没有「收下这版」）、
+  卡住那句每张都没有、顶上那句进行中 `第 3 步，共 7 步 · 还剩约 …` / 完成态 `第 7 步，共 7 步`。
+  **页面真值核对每张都对**：`-source` 首行 `flowchart LR`、节点行 / 线行数与 DOM 相等、**一个连通块**、终点写作 `finish`；
+  `document.scrollWidth === clientWidth` 两档成立、390 下图在自己内部横向滚（1078 / 383）；控制台 **0** / 页面异常 **0**；
+  这一轮真的写出 `notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**。
+- **真机截图抓到、套件事先没抓到的四条**（都在同一分支修掉、各补一条守卫，逐条见 `D-175`）：① 「汇总」那颗盒子被裁成只剩「汇」；
+  ② 展开的调用行塌成一字一行；③ 邻居卡片盖住展开的列表（开卡补 `z-index`）；④ 列表透出背景（主题 token 死了，改成
+  `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测算出来 `rgb(255,255,255)`）。
+  **①–④ 是真装真跑拍出来的，不是套件先抓到的；把它们挡在门外的是补上的守卫。**
+- **`NOT_RUN`：** ① 原生手机上的**进行中**截图；② 等你点头态（`开工` 那颗按钮）在真机上；③ 分支上的 `· 第 n 遍`
+  （三个任务都是一次过，没造出重试）；④ 深色主题；⑤ 320 px；⑥ 读屏软件；⑦ Firefox / Safari；⑧ 真 Mermaid 渲染器；
+  ⑨ live 档案升级 / 重载 / 重启（红线：不动 `~/.dsh` 与在跑的实例）；⑩ 整仓测试与 `npm run ci`（§12）。
+- **开放点（照实记，等裁决）**：`u1` 那一组没有任务号，所以它的分支上没有 `subtask.taskNumber`，
+  页面也就没有 `data-task` 可读；`at` 走「分支优先」，所以「卡在哪」那一句说的是任务层（`at` 3）、
+  而顶上那句说的是分支层（`at` 4）——两个数都对，但读者会同时看到两个不同的步号；
+  `progress.flow.visit` 这颗键现在没有代码读它（访问号角标退场后只剩在字典里），删不删等裁决。
+
+## 26. 窄屏：摊开的调用从图里搬出来，落到面板自己那一列的一张抽屉里（2026-11-26，`fix/mobile-overlap`）
+
+**§25 仍然成立。** 本节只改**窄屏那一处的渲染位置**：宽度 ≤ 720 px 时，摊开的调用列表**画在哪里、点开之后落在视野的哪里**。
+三区顺序、模型、文案口径、状态词汇、诚实边界、两个交互的语义一个字都没改；窄屏的图仍是 §25.5 那张一卡一行的侧轨树。
+改之前的样子是 §25.9 的第 ② 条限制（浮出的列表压在隔壁那张卡上）。
+
+这一处跨**两颗提交**：`10c15a0` 把列表搬出图、落到抽屉里；`5ba1ca2` 让点开之后抽屉**落在屏幕中间**
+（而不是贴住底边、正好被宿主那块固定输入框挡住），并为居中补了一段可滚的余量。裁决见 `D-174`。
+
+本节 `CONFIRMED` 的部分：源码（`src/client/index.js` 与它的字节副本 `lib/client.js`，各 **412345** 字节、`cmp` 空输出）、
+`test/progress-panel.spec.ts`（25 → **35**）与 `test/i18n-parity.spec.ts`（+8 −3）、`test/client.spec.ts`（+4 −1）里钉住的形状，
+以及**构建包在无头 Chromium 里的矩形读数**（叠压：390 / 360 / 1500；位置：390×844 与 360×780）。
+**真机（隔离档案真装真跑）这一档是 `NOT_RUN`**，见 §26.7。
+
+### 26.1 DOM 与钩子（`CONFIRMED`）
+
+```text
+section.gw-progress
+  header.gw-progress-bar …                                     （§25.2 原样）
+  div.gw-progress-graph …                                      （§25.2 原样；窄屏时它自己不再画列表）
+  div.gw-progress-sheet[data-gw-progress-sheet]                ← 只有 ≤720 px 且确有节点摊开时存在
+    div.gw-progress-sheet-head
+      span.gw-progress-sheet-title                              progress.panel.calls（调用 / Calls），不是按钮
+      button.gw-progress-sheet-hide[data-gw-progress-sheet-hide]  progress.panel.collapse（收起 / Hide）
+    div.gw-progress-sheet-group                                每个摊开的节点一组，按摊开的先后
+      p.gw-progress-sheet-node                                 那张卡自己的名字（= 节点上那个词）
+      ol.gw-progress-node-calls[data-gw-progress-node-calls="<id>"][id="gw-progress-calls-<id>"]
+         › 既有 ProgressLogRow 行（+ 汇总节点的退回行）
+  p.gw-progress-stuck …                                        （只在卡住时存在）
+  div.gw-progress-guardian …  footer.gw-progress-foot › div.gw-progress-dock …
+  div.gw-progress-sheet-room                                   ← 窄屏且确有节点摊开时才有；空、aria-hidden="true"、35vh（见 §26.3）
+```
+
+- **档里那两处记号只加在抽屉自己的头上**：`data-gw-progress-sheet` 给抽屉本身（一个存在性钩子），
+  `data-gw-progress-sheet-hide` 给那颗按钮。**列表的钩子没变**——还是 `data-gw-progress-node-calls="<id>"`，
+  **`id` 还是 `gw-progress-calls-<id>`**，所以节点的 `aria-controls` 那根指针不用改也能指到它。
+- **列表是从节点手里搬走的，不是复制一份**：宽屏由节点画、窄屏由抽屉画，**同一刻只有一份**（`sheet` 为真时节点自己不再渲染那个 `ol`）。
+- **没有节点的抽屉**：没有可开的东西时抽屉**不存在**（不是空盒子），底部那段占位也**不存在**，和图、卡住那句同一个口径。
+- **底部那段占位是 class，不是钩子**：`.gw-progress-sheet-room` 只用 class 找；它 `aria-hidden="true"`、**没有子节点**、
+  **排在 dock 之后**（所以不推任何按钮），`height: 35vh`。它是给页面腾出可滚余量的空盒子，不是内容——
+  收起列表时跟着消失，宽屏从不出现（两条都写在用例里）。
+
+### 26.2 位置（`CONFIRMED`）
+
+| 关 | 值 |
+| --- | --- |
+| 在哪一层 | 面板（`section.gw-progress`）的直接子元素，**图之后** |
+| 与卡住那句 | 在它**之前** |
+| 与 Guardian / dock | 在两者**之前** |
+| 与底部余量 | 余量（§26.1 那个空盒子）在 **dock 之后**，也就是整个 `section` 的最后一项；抽屉在它前面很远 |
+| 能不能离开这一列 | 不能。它在页面正常的流里，没有 `position: absolute` / `fixed` |
+
+- 一句话：**窄屏时它只能把页面往下推**。推下去的包括卡住那句、Guardian、dock——
+  所以它不可能横跨任何一张卡，也不可能盖住 dock 的按钮（实测相交面积 0，见 §26.7）。
+- 顺序有争议时以元素在 `section` 里的先后为准：用例比的是**两处**——sheet 在 `data-gw-progress-graph` **之后**、
+  在 `data-gw-progress-dock` **之前**（源码里卡住那句紧跟在 sheet 后面，用例没有单独比它）。
+
+### 26.3 几何（`CONFIRMED`：样式表与用例；读数见 §26.7）
+
+| 东西 | 值 |
+| --- | --- |
+| 高度上限 | `max-height: min(50vh, 240px)`（**不变**） |
+| 摊开时的位置 | **屏幕中间**（`scrollIntoView({ block: 'center' })`），不是贴住底边 |
+| 滚动 | **抽屉是这一块唯一的滚动盒**（`overflow-y: auto`，纵向）；里面的列表 `position: static`、`max-height: none`、`overflow-y: visible` |
+| 横向 | 抽屉拿整个面板的宽（`min-width: 0`、没有负边距），所以**不需要横向滚动** |
+| 外观 | `1px` 边框（`--dsw-alias-border-l2`）、`12px` 圆角、`12px` 上外边距、`8px 10px` 内边距 |
+| 组间距 | `6px`（抽屉内），组内 `2px`；卡名 `12px` 半粗 |
+| 收起按钮 | 高 `28px`、胶囊形（`border-radius: 999px`）、右边贴角，`focus-visible` 有 `2px` 外框 |
+| 480 px 以下 | 抽屉里的行**保留时刻列**（`40px` 首列），浮出的那份在同样宽度下丢掉时刻列 |
+| 面板底部余量 | 摊开时多出 `.gw-progress-sheet-room`：空、`aria-hidden`、`height: 35vh`、**dock 之后**；dock 位置不变 |
+
+- **两处细节是刻意的**：① 上限同时受视口（`50vh`）和绝对值（`240px`）约束——手机上四张全摊开时抽屉仍留得住页面其余部分
+  （用例钉 `max-height` / `overflow-y: auto` / `min-width: 0` 三条）；② 抽屉带边框与底色，但里面的列表把自己的边框、底色、阴影
+  **全清掉**（`background: none`、`box-shadow: none`），否则会出现「盒子套盒子」的双层边——**这一条只有源码与它的注释，用例没有逐条断言**。
+- **480 px 那一段**：抽屉是整个面板的宽，所以它拿得回被浮层丢掉的那一列；同一档宽度下浮出的那份仍然只有两列。
+- **为什么要那段余量**：一轮跑完的面板常常只比屏幕高一点点，**可滚的距离本来就短**。没有余量时，
+  `scrollIntoView({ block: 'center' })` 会被滚到底截断，列表仍旧停在靠近底边的地方——也就是宿主钉住输入框的位置
+  （390 px 上量到抽屉底 **771**、输入框上沿 **664**，差 **107 px**，`scrollTop == scrollHeight - clientHeight`）。
+  那段 `35vh` 的空白就是把缺的滚动距离补出来；它排在 dock **之后**，所以**没有按钮因为这件事移动**。
+
+### 26.4 交互（`CONFIRMED`）
+
+- **节点上还是同一次点击**：摊开 / 收起这颗节点的调用，同时点亮 / 熄灭与它有关的线（§25.8 的语义一个字没改，
+  只是窄屏时摊开的那个 `ol` 被画到了抽屉里）。
+- **「收起」是第二个入口**：`button[data-gw-progress-sheet-hide]` 一次清掉**所有**摊开的节点 + 清掉点亮——
+  等价于把每一个摊开的节点各点一次。它的用处是给已经滚过那颗卡的读者一条不用回头找的路。
+- **摊开时把抽屉带到屏幕中间**：`progressPanelReveal()` → `scrollIntoView({ block: 'center' })`，
+  触发条件是「摊开的节点数」变化，不是每次渲染；没有盒子、或者盒子没有 `scrollIntoView`（stub 宿主）就直接返回，不抛。
+  - **为什么不是 `nearest`**：宿主把输入框钉在屏幕底部，滚到最近的一边就是把列表停在它后面——
+    390 px 上量到抽屉停在 `739 → 844`（视口高 **844**），读者点了卡，看起来什么都没发生。
+  - **为什么光换成 `center` 也不够**：面板只比屏幕高一点点，可滚距离本来就短，居中会被滚到底截断
+    （同一档量到抽屉底 **771** 对输入框上沿 **664**，**还差 107 px**）。所以居中要配 §26.3 那段底部余量，
+    两件事合起来才是「点完抬眼就在」。
+- **一次点击仍然两个读数**（列表 + 线），**空白处仍然只取消线**（§25.8）。
+- **不写任何东西**：抽屉里没有任何服务调用，dock 仍是唯一会写的地方。
+
+### 26.5 断点从哪来（`CONFIRMED`）
+
+- **JS 里判定**：`matchMedia('(max-width: 720px)')`，初值在渲染时读，`change` 监听跟着窗口变。
+- **样式表里那个数是同一个 720**（图的堆叠判定 `width < 720`、`@media (max-width: 720px)` 那一段）——**一个数，写在两处，值相同**。
+- **为什么不在 CSS 里决定元素归属**：vitest 没有排版引擎，`display: none` 切两份 DOM 的做法测试读不到，
+  「列表现在在哪」就只能靠眼睛验。把决定放进 JS，用例读得到；样式表只负责它长什么样。
+- **正好 720 px**：用抽屉（`max-width` 含等号），而图的排版是**严格小于** 720 才堆成一列——所以这一档是「图还是行、列表在抽屉里」。
+  按「≤ 720 用抽屉」的口径，这是有意的。
+- **没有 `matchMedia` 的宿主**（stub 渲染器、老组合）：读作宽屏，抽屉永不出现，行为与 §25 完全一致。
+
+### 26.6 > 720 px：一个字都没改（`CONFIRMED`）
+
+- 宽屏仍是**节点下面那个绝对定位的浮层**（`.gw-progress-node-calls`：`position: absolute`、`top: calc(100% + 6px)`、
+  `max-height: 240px` 自己滚、带边框与投影）。
+- 因此**桌面那处叠压仍在**：1500 px 展开时遮住「检查」的一部分，改前改后读数都是 2 / 9（一张 2 张、四张 9 张）。
+  **这一轮故意不修**，不在本节范围内。
+- 宽屏的兄弟间距、层间距、侧轨、拐角一像素没动（§25.5 仍然逐条成立）。
+- 宽屏也**不画底部那段余量**（它跟抽屉同生同灭），所以宽屏页面的高度一个像素没变。
+
+### 26.7 验证指针与没验的（`CONFIRMED` / `NOT_RUN`）
+
+- **门禁（本轮自己在 `5ba1ca2` 上重跑，`TMPDIR=$PWD/.tmp`）**：`npm run typecheck` → `TYPECHECK_EXIT=0`；
+  `npm run lint` → **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+  八份进度 spec → **`8 files / 336 passed`**（`progress-panel` **35**、`client` 153、`progress-panel-model` 31、
+  `progress-tab` 72、`progress-connector` 15、`progress` 14、`progress-hint-absent` 8、`i18n-parity` 8）。
+  基线 **326 → 334（`10c15a0`）→ 336（`5ba1ca2`）**（+10 全在 `progress-panel`：25 → 35），**没有一份变少**。
+  两条新用例：一条钉 `revealSheet(box)` 的实参就是 `{ block: 'center' }`、且对 `undefined` / `null` / 没有 `scrollIntoView`
+  的盒子不抛；一条钉那段占位（只在窄屏且摊开时存在、`aria-hidden`、空、dock **之后**、`height: 35vh`、宽屏与收起后都不存在）。
+- **产物**：`cmp lib/client.js src/client/index.js` 空输出，两份都是 **412345** 字节（`sha256 8cd45211…7bb599`）。
+  `npm run build` 的重跑是实现者做的，本轮复核的是**字节相同**与**改动的文件集**（`5ba1ca2` 是 3 文件 / +113 −8），没有自己重建。
+- **真浏览器读数（`CONFIRMED`，无头 Chromium + 构建包 + 替身 React + 真排版引擎）**：
+
+  **叠压（`10c15a0`，改前 / 改后各一次）**
+
+  | 宽度 | 改前（一张 / 四张摊开） | 改后 | 抽屉高度 | 抽屉 ∩ dock |
+  | --- | --- | --- | --- | --- |
+  | 390 | **2 张 / 8 张** | **0 / 0** | 103 px / 240 px 封顶（内容 374 溢出滚动） | **0** |
+  | 360 | **2 张 / 8 张** | **0 / 0** | 同上 | **0** |
+  | 1500 | 2 张 / 9 张 | **2 张 / 9 张（没变）** | —（不走抽屉） | — |
+
+  `scrollWidth == clientWidth` 在 390 / 360 都成立。
+
+  **位置（`5ba1ca2`）**
+
+  | 宽度 × 视口高 | 改前（`nearest`） | 只换 `center` | 加余量后（一张 / 四张） |
+  | --- | --- | --- | --- |
+  | 390 × 844 | 抽屉停在 **739 → 844**，正压在固定输入框上 | 抽屉底 **771** 对输入框上沿 **664**，**差 107 px** | **373 → 476 / 302 → 542** |
+  | 360 × 780 | — | — | **338 → 441 / 270 → 510** |
+  | 1500 | —（没有抽屉） | — | —（没有抽屉） |
+
+  两档手机的全部读数都**完全在视口内、与卡相交 0、与底部固定栏相交 0、页面无横向滚动**；
+  「只换 `center`」那一列的 `scrollTop == scrollHeight - clientHeight`，说明滚动已经到底、被夹住了。
+- **`NOT_RUN`：** ① **隔离档案里的真机 soak**（这一轮只有无头 Chromium 的矩形读数，**不是真机**；
+  第二轮的「点完当下不滚动」真机读数还没到）；② **421–499 px** 之间的宽度（只量了 390 / 360 / 1500）；
+  ③ **旋转 / 现场改视口后的读数**（`change` 监听写在源码里，用例覆盖了判定本身，但没在真机上转过一屏）；
+  ④ **读屏软件**（抽屉的朗读顺序是 `HYPOTHESIS`）；⑤ Firefox / Safari。

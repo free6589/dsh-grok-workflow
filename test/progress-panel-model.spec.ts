@@ -2,28 +2,31 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The task panel: one graph, one sentence above it, one line under it when the run is stuck.
+ * The fork panel's model: a left-to-right seven-level picture of one run, drawn from its own
+ * recorded rows.
  *
- * The page's shape is fixed by the operator's brief; this file pins the model behind it, the
- * text that model writes, the layout it produces and the page it renders. Four things are
- * settled here and nothing else:
+ * The operator's blueprint retired the vertical step tree and its `flowchart TD` text. What the
+ * page draws now is one fork — 起点 → 规划 → 任务 1 / 任务 2 … → 每条任务的子任务 → 汇合 →
+ * 验收 → 终点 — and this file pins the model that picture is built from, and nothing about how
+ * it is laid out or painted (that half is `test/progress-panel.spec.ts`):
  *
- * 1. **The model is a graph.** `derivePanelGraph` turns the existing flow derivation into
- *    steps and plan tasks with edges between them; a task hangs off the leg that walked it,
- *    and the ids say which visit and which task they are.
- * 2. **The text is the structure.** `panelMermaid` writes the graph out and
- *    `parsePanelMermaid` reads that subset back; the page lays out the parsed text, so the
- *    figure and the text cannot disagree.
- * 3. **The layout is computed, not measured.** Layers come from longest paths, siblings from
- *    the boxes they measured, and each edge from its two boxes. A stacked layer is a side
- *    rail: every wire runs in a 24 px gutter or in a gap between cards, never through one.
- * 4. **Nothing is invented.** The remaining time exists only when finished steps were
- *    measured, the stuck line only while the run really is stuck, and the page prints no
- *    number the events did not report.
+ * 1. **Seven levels, one box a place.** `start`, `plan`, one card per plan task, one branch per
+ *    call a task made, `sum`, `accept`, `end` — always all seven levels, whether the run is
+ *    still waiting, still moving or already over.
+ * 2. **Nothing is dropped and nothing is invented.** Every non-guardian row lands in exactly
+ *    one owning box (the plan, a task or the summary); the guardian's call is not a leg of the
+ *    work. A picture is derived from the rows on every render, so a replanned run gains the
+ *    task it really walked and keeps everything else identical.
+ * 3. **The lights are folds of records.** Six rings per task and five checks per run, each one
+ *    a fold over rows that were really reported — a recovered failure is green, and a
+ *    verification nobody reported stays dark.
+ * 4. **The text is the structure.** `panelMermaid` writes `flowchart LR`, and `parsePanelMermaid`
+ *    reads that subset back; the page lays out the parsed text, so the figure and the text
+ *    cannot disagree.
  *
  * The bundle is loaded the way the host loads it — a stub `__ModuleLoader__` and a stub React
- * whose `useState` really stores — and `useEffect` never runs, which is also the statement
- * that a host without layout still renders: the page falls back to the default boxes.
+ * whose `useState` really stores — and `useEffect` never runs, which is also the statement that
+ * a host without layout still renders.
  */
 
 const SOURCE = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
@@ -57,19 +60,31 @@ interface ProgressRun {
 
 type Translator = (key: string, params?: Record<string, unknown>) => string
 
+interface PanelRing { key: string, state: string }
+
+interface PanelCheck { key: string, state: string }
+
+interface PanelSubtask {
+  taskId: string
+  taskNumber?: number
+  seq: number
+  leg?: string
+  attempt: number
+}
+
 interface PanelNode {
   id: string
   kind: string
-  leg: string
+  level: number
   label: string
   state: string
   current: boolean
-  ordinal: number
-  taskNumber?: number
-  attempts: Array<{ seq: number, state: string }>
   calls: ProgressMember[]
   openable: boolean
+  rings?: PanelRing[]
+  checks?: PanelCheck[]
   rejected?: { drafts: number, stage: string, reason: string }
+  subtask?: PanelSubtask
 }
 
 interface PanelEdge { from: string, to: string, kind: string }
@@ -79,24 +94,19 @@ interface PanelGraph {
   mermaid: string
   nodes: PanelNode[]
   edges: PanelEdge[]
-  headline: { at: number, total: number, eta?: { ms: number, basis: number } }
-  stuck?: { nodeId: string, at: number, kind: string, role?: string, attempt?: number, drafts?: number }
+  headline: { at: number, total: number, remaining: number, eta?: { ms: number, basis: number } }
   at: number
   total: number
   remaining: number
+  checks: PanelCheck[]
+  final?: { draft: number, seq: number }
+  stuck?: { nodeId: string, at: number, kind: string, role?: string, attempt?: number, drafts?: number }
 }
 
 interface ParsedPanel {
   direction: string
   nodes: Array<{ id: string, label: string, shape: string }>
   edges: Array<{ from: string, to: string }>
-}
-
-interface PanelLayout {
-  width: number
-  height: number
-  nodes: Array<{ id: string, x: number, y: number, w: number, h: number }>
-  edges: Array<{ from: string, to: string, d: string }>
 }
 
 interface Bundle {
@@ -109,7 +119,6 @@ interface Bundle {
     derivePanelGraph: (run: ProgressRun, t?: Translator) => PanelGraph
     panelMermaid: (graph: PanelGraph) => string
     parsePanelMermaid: (text: string) => ParsedPanel
-    layoutPanelGraph: (parsed: ParsedPanel, sizes: Record<string, { w: number, h: number }>, availableWidth: number) => PanelLayout
   }
 }
 
@@ -122,9 +131,9 @@ let rendering: Cells | undefined
  * Load the bundle the way the host does, with a stub React whose `useState` really stores.
  *
  * The progress tab reads no host service: its run facts arrive through `useGrokProgress`, so
- * the stub only has to be shaped like the hooks the page touches. `useEffect` never runs
- * here, which is the same statement as "a host without layout measures nothing": the page
- * must render its default boxes rather than wait for a measurement that will never come.
+ * the stub only has to be shaped like the hooks the page touches. `useEffect` never runs here,
+ * which is the same statement as "a host without layout measures nothing": the page must
+ * render its default boxes rather than wait for a measurement that will never come.
  */
 function loadBundle(): Bundle {
   let registration: { id: string, factory: (require: (id: string) => unknown) => Bundle } | undefined
@@ -205,11 +214,6 @@ function hooksOf(tree: unknown, name: string): Element[] {
   return walk(tree).filter((element) => Object.prototype.hasOwnProperty.call(element.props, name))
 }
 
-/** Every element carrying one class token, in document order. */
-function withClass(tree: unknown, name: string): Element[] {
-  return walk(tree).filter((element) => classesOf(element).includes(name))
-}
-
 /** The first element carrying one data hook, or a failure that names the hook. */
 function hookOf(tree: unknown, name: string): Element {
   const found = hooksOf(tree, name)[0]
@@ -224,20 +228,14 @@ function attr(element: Element, name: string): string | undefined {
   return String(value)
 }
 
-/** The classes of one element, split the way the DOM splits them. */
-function classesOf(element: Element): string[] {
-  const value = element.props['className']
-  return typeof value === 'string' ? value.split(/\s+/).filter((token) => token !== '') : []
-}
-
 const bundle = loadBundle()
 const progress = bundle.GROK_WORKFLOW_PROGRESS
 const zh = bundle.GROK_WORKFLOW_INTERNALS.translator('zh')
 const en = bundle.GROK_WORKFLOW_INTERNALS.translator('en')
 
 /**
- * Local wall-clock base of every fixture, built from local components so the clock a call
- * line prints never depends on the machine's zone.
+ * Local wall-clock base of every fixture, built from local components so no assertion depends
+ * on the machine's zone.
  */
 const BASE = new Date(2026, 10, 25, 8, 2).getTime()
 
@@ -245,7 +243,7 @@ const BASE = new Date(2026, 10, 25, 8, 2).getTime()
 function member(
   seq: number,
   label: string,
-  phase: string,
+  phase: string | undefined,
   outcome: string | undefined,
   order: number,
   startedAt: number = BASE + seq * 60_000,
@@ -254,7 +252,7 @@ function member(
   return {
     seq,
     label,
-    phase,
+    ...phase === undefined ? {} : { phase },
     childId: `child-${seq}`,
     order,
     startedAt,
@@ -263,10 +261,10 @@ function member(
 }
 
 /**
- * 进行中: two plan tasks under one execute visit, and a retry inside the first of them.
+ * 进行中: two plan tasks, a retry inside the first, both gates of the first reported.
  *
- * The shape the panel is built for: one leg with two branches, one branch carrying two
- * attempts, one of them still running at the end of the stream.
+ * The shape the fork is built for: one task done, one task still working, and a branch per
+ * call each of them made — the first task's retry is its second branch.
  */
 function twoTaskRun(): ProgressRun {
   return {
@@ -277,13 +275,14 @@ function twoTaskRun(): ProgressRun {
       member(1, '规划助手', '规划', 'completed', 0),
       member(2, '执行', '任务 1 · 建表', 'failed', 1),
       member(3, '执行', '任务 1 · 建表', 'completed', 2),
-      member(4, '执行', '任务 2 · 写文档', undefined, 3),
+      member(4, '检查', '任务 1 · 建表', 'completed', 3),
+      member(5, '执行', '任务 2 · 写文档', undefined, 4),
     ],
     details: [],
   }
 }
 
-/** 已完成: every leg passed and the first summary draft shipped. */
+/** 已完成: one task through both of its gates, and the first summary draft shipped. */
 function finishedRun(): ProgressRun {
   return {
     runId: 'r-panel-done',
@@ -293,7 +292,8 @@ function finishedRun(): ProgressRun {
       member(1, '规划助手', '规划', 'completed', 0),
       member(2, '执行', '任务 1 · 建表', 'completed', 1),
       member(3, '检查', '任务 1 · 建表', 'completed', 2),
-      member(4, '汇总·第1稿', '汇总', 'completed', 3),
+      member(4, '复核', '任务 1 · 建表', 'completed', 3),
+      member(5, '汇总·第1稿', '汇总', 'completed', 4),
     ],
     details: [],
     stopReason: 'completed',
@@ -301,7 +301,7 @@ function finishedRun(): ProgressRun {
   }
 }
 
-/** 未通过: one task tried twice, both attempts failed, the run ended broken. */
+/** 未通过: the check gate failed, so the task is not accepted even though its work landed. */
 function failedRun(): ProgressRun {
   return {
     runId: 'r-panel-failed',
@@ -309,15 +309,15 @@ function failedRun(): ProgressRun {
     anchorSeq: 1,
     members: [
       member(1, '规划助手', '规划', 'completed', 0),
-      member(2, '执行', '任务 1 · 建表', 'failed', 1),
-      member(3, '执行', '任务 1 · 建表', 'failed', 2),
+      member(2, '执行', '任务 1 · 建表', 'completed', 1),
+      member(3, '检查', '任务 1 · 建表', 'failed', 2),
     ],
     details: [],
     stopReason: 'error',
   }
 }
 
-/** 重试通过: the first attempt failed, the second one passed. */
+/** 重试通过: both gates failed once and passed on the second call. */
 function recoveredRun(): ProgressRun {
   return {
     runId: 'r-panel-recovered',
@@ -327,30 +327,11 @@ function recoveredRun(): ProgressRun {
       member(1, '规划助手', '规划', 'completed', 0),
       member(2, '执行', '任务 1 · 建表', 'failed', 1),
       member(3, '执行', '任务 1 · 建表', 'completed', 2),
+      member(4, '检查', '任务 1 · 建表', 'failed', 3),
+      member(5, '检查', '任务 1 · 建表', 'completed', 4),
     ],
     details: [],
     stopReason: 'completed',
-  }
-}
-
-/**
- * 第二遍没过: the first call of one task was cancelled, the retry failed.
- *
- * The retry keeps the bare role word, so its label says nothing about which try it was; the
- * row's place among the rows of its unit is what the stuck line has to read instead.
- */
-function secondTryRun(): ProgressRun {
-  return {
-    runId: 'r-panel-second',
-    name: '任务团队 · 1 个任务',
-    anchorSeq: 1,
-    members: [
-      member(1, '规划助手', '规划', 'completed', 0),
-      member(2, '执行', '任务 1 · 建表', 'cancelled', 1),
-      member(3, '执行', '任务 1 · 建表', 'failed', 2),
-    ],
-    details: [],
-    stopReason: 'error',
   }
 }
 
@@ -371,7 +352,7 @@ function blockedRun(): ProgressRun {
 
 /**
  * 每一稿都被退回, inside the parent (`model` strategy): no call names the summary, so the
- * verdict is the only thing the summary step carries.
+ * verdict is the only thing the summary box carries.
  */
 function rejectedRun(): ProgressRun {
   return {
@@ -388,7 +369,7 @@ function rejectedRun(): ProgressRun {
   }
 }
 
-/** 已取消: a failed call, but the reader stopped the run — which is not "stuck". */
+/** 已取消: a failure, but the reader stopped the run — which is not "stuck". */
 function cancelledRun(): ProgressRun {
   return {
     runId: 'r-panel-cancelled',
@@ -409,51 +390,91 @@ function waitingRun(): ProgressRun {
 }
 
 /**
- * Six steps still ahead of two measured ones: the shape an estimate is read off.
+ * 五验: every screen reported in the run's own words, one of them still open.
  *
- * The two finished steps are a 20 s plan and a 130 s execute, so their mean is 75 s; the
- * steps after them are the calls the run has open, which is what `remaining` counts.
+ * The three screens a leg word does not name are reported on a label or a phase, and a row that
+ * `命名` writes as free text (`人验`) still belongs to the task in front of it.
  */
-function etaRun(): ProgressRun {
+function checksRun(): ProgressRun {
   return {
-    runId: 'r-panel-eta',
-    name: '任务团队 · 1 个任务',
+    runId: 'r-panel-checks',
+    name: '任务团队 · 2 个任务',
     anchorSeq: 1,
     members: [
-      member(1, '规划助手', '规划', 'completed', 0, BASE, BASE + 20_000),
-      member(2, '执行', '任务 1 · 建表', 'completed', 1, BASE + 60_000, BASE + 190_000),
-      member(3, '检查', '检查', undefined, 2),
-      member(4, '检查（第2次）', '检查', undefined, 3),
-      member(5, '复核', '复核', undefined, 4),
-      member(6, '复核（第2次）', '复核', undefined, 5),
-      member(7, '汇总·第1稿', '汇总', undefined, 6),
-      member(8, '汇总·第2稿', '汇总', undefined, 7),
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '检查', '任务 1 · 建表', 'completed', 1),
+      member(3, '复核', '任务 1 · 建表', 'completed', 2),
+      member(4, '执行', '任务 1 · 真机 隔离', 'completed', 3),
+      member(5, '人验', '任务 1 · 建表', 'completed', 4),
+      member(6, '执行', '任务 1 · 对账', 'failed', 5),
+      member(7, '执行', '任务 2 · 真机隔离', undefined, 6),
     ],
     details: [],
   }
 }
 
-/** The same run, with the one row that made the estimate possible left unstamped. */
+/** 对账重试: the ledger failure a later attempt replaced is not a current failure. */
+function recoveredCheckRun(): ProgressRun {
+  return {
+    runId: 'r-panel-checks-recovered',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 对账', 'failed', 1),
+      member(3, '执行', '任务 1 · 对账', 'completed', 2),
+    ],
+    details: [],
+  }
+}
+
+/** 英文对账: the ledger screen matches a Latin word by its stem, not by its whole spelling. */
+function latinLedgerRun(): ProgressRun {
+  return {
+    runId: 'r-panel-ledger-latin',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · reconciliation', 'completed', 1),
+    ],
+    details: [],
+  }
+}
+
+/** The guardian's own call, which is not a leg of the work and owns no box. */
+function guardianRun(): ProgressRun {
+  return {
+    runId: 'r-panel-guardian',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, 'Guardian 判停', 'Guardian', undefined, 1),
+    ],
+    details: [],
+  }
+}
+
+/** The same finished run, measured on a level whose one row cannot be dated. */
 function etaGapRun(): ProgressRun {
-  const run = etaRun()
-  const execute = run.members[1]!
-  delete execute.endedAt
+  const run = twoTaskRun()
+  delete run.members[0]!.endedAt
   return run
 }
 
-/** 一个七秒的步骤, still followed by two: the rounding band under a minute. */
-function etaRoundRun(): ProgressRun {
-  return {
-    runId: 'r-panel-eta-round',
-    name: '任务团队 · 1 个任务',
-    anchorSeq: 1,
-    members: [
-      member(1, '规划助手', '规划', 'completed', 0, BASE, BASE + 7_000),
-      member(2, '执行', '执行', undefined, 1),
-      member(3, '检查', '检查', undefined, 2),
-    ],
-    details: [],
-  }
+/**
+ * 重规划: one more plan task, declared after the summary already ran.
+ *
+ * The rows are appended so the fixture isolates the picture's change: everything the first run
+ * drew keeps its own order and its own stamps, and the only difference is the task the replan
+ * added, its branches, and the wires that carry them.
+ */
+function replannedRun(): ProgressRun {
+  const run = finishedRun()
+  run.members.push(member(6, '执行', '任务 3 · 部署', 'completed', 5))
+  run.members.push(member(7, '检查', '任务 3 · 部署', 'completed', 6))
+  return run
 }
 
 /** The model of one run, with the reader's own words. */
@@ -461,9 +482,31 @@ function graphOf(run: ProgressRun, t: Translator = zh): PanelGraph {
   return progress.derivePanelGraph(run, t)
 }
 
-/** The parsed structure of one model: what the page lays out. */
-function parsedOf(run: ProgressRun, t: Translator = zh): ParsedPanel {
-  return progress.parsePanelMermaid(graphOf(run, t).mermaid)
+/** One box by id, or a failure that names it. */
+function boxOf(graph: PanelGraph, id: string): PanelNode {
+  const found = graph.nodes.find((node) => node.id === id)
+  expect(found, `no box ${id}`).toBeDefined()
+  return found!
+}
+
+/** The lights of one box as `key:state`, in the order the box carries them. */
+function lightsOf(lights: Array<{ key: string, state: string }> | undefined): string[] {
+  return (lights === undefined ? [] : lights).map((light) => `${light.key}:${light.state}`)
+}
+
+/** Every box a reader can walk to from one box, that box included. */
+function reachableFrom(graph: PanelGraph, id: string): Set<string> {
+  const seen = new Set<string>([id])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const edge of graph.edges) {
+      if (!seen.has(edge.from) || seen.has(edge.to)) continue
+      seen.add(edge.to)
+      grew = true
+    }
+  }
+  return seen
 }
 
 /** One page, rendered against a fixed set of props, with its hook cells kept between passes. */
@@ -492,644 +535,440 @@ function pageOf(run: ProgressRun | undefined, extra: Record<string, unknown> = {
   })
 }
 
-/** The page's own copy, without the scoped stylesheet (which is a text child of the tree). */
-function pageTexts(page: unknown): string[] {
-  return texts(page).filter((text) => text !== progress.css)
-}
-
-/**
- * The rule that declares one selector, whether it stands alone or in a group.
- *
- * A state's three amber rules are one line, so a lookup that demanded the selector end the
- * line would report rules the page really has as missing.
- */
-function ruleWith(selector: string): string | undefined {
-  return progress.css.split('\n').find((line) => {
-    if (line.trim().startsWith('@')) return false
-    const at = line.indexOf('{')
-    if (at === -1) return false
-    return line.slice(0, at).split(',').map((part) => part.trim()).includes(selector)
-  })
-}
-
-/** The classes the stylesheet styles, one per selector, with the leading dot. */
-function styledClasses(): string[] {
-  const tokens = new Set<string>()
-  for (const line of progress.css.split('\n')) {
-    if (!line.includes('{') || line.trim().startsWith('@')) continue
-    const selector = line.slice(0, line.indexOf('{'))
-    for (const match of selector.matchAll(/\.([A-Za-z0-9_-]+)/g)) tokens.add(match[1]!)
-  }
-  return [...tokens]
-}
-
-describe('the panel model is one graph', () => {
-  it('gives every step a node, every plan task a branch, and every branch its own id', () => {
+describe('the fork is seven levels, one box a place', () => {
+  it('always draws all seven levels, in level order then recorded order', () => {
     const graph = graphOf(twoTaskRun())
     expect(graph.state).toBe('running')
     expect(graph.nodes.map((node) => node.id))
-      .toEqual(['start', 'plan', 'execute', 'execute_t1', 'execute_t2', 'end'])
-    expect(graph.nodes.map((node) => node.kind)).toEqual(['start', 'plan', 'execute', 'task', 'task', 'end'])
-    expect(graph.nodes.map((node) => node.leg))
-      .toEqual(['start', 'plan', 'execute', 'execute', 'execute', 'end'])
-    // A task's title is the phase the recorder wrote, verbatim: nothing shortens it.
+      .toEqual(['start', 'plan', 't1', 't2', 't1_s2', 't1_s3', 't1_s4', 't2_s5', 'sum', 'accept', 'end'])
+    expect(graph.nodes.map((node) => node.kind))
+      .toEqual(['start', 'plan', 'task', 'task', 'sub', 'sub', 'sub', 'sub', 'summarize', 'accept', 'end'])
+    expect(graph.nodes.map((node) => node.level)).toEqual([0, 1, 2, 2, 3, 3, 3, 3, 4, 5, 6])
     expect(graph.nodes.map((node) => node.label))
-      .toEqual(['起点', '规划', '执行', '任务 1 · 建表', '任务 2 · 写文档', '终点'])
-    expect(graph.nodes.map((node) => node.ordinal)).toEqual([0, 1, 1, 1, 2, 0])
-    expect(graph.nodes.map((node) => node.taskNumber)).toEqual([undefined, undefined, undefined, 1, 2, undefined])
+      .toEqual(['起点', '规划', '任务 1 · 建表', '任务 2 · 写文档', '执行', '执行 · 第 2 遍', '检查', '执行', '汇总', '验收', '终点'])
+    // A run that declared nothing still draws the places it has not reached.
+    expect(graphOf(waitingRun()).nodes.map((node) => node.id)).toEqual(['start', 'plan', 'sum', 'accept', 'end'])
+    expect(graphOf(waitingRun()).nodes.map((node) => node.state))
+      .toEqual(['done', 'pending', 'pending', 'pending', 'pending'])
   })
 
-  it('draws the step states, one current node, and the attempt record behind each task', () => {
+  it('groups the work by the plan task its phase names, one group for the work that names none', () => {
     const graph = graphOf(twoTaskRun())
-    expect(graph.nodes.map((node) => node.state)).toEqual(['done', 'done', 'doing', 'done', 'doing', 'pending'])
-    expect(graph.nodes.map((node) => node.current)).toEqual([false, false, true, false, false, false])
-    // One attempt per row, in `seq` order, each carrying its own row's state: a task that
-    // failed once and then passed is a green task with one amber dot and one green one.
-    expect(graph.nodes[3]!.attempts).toEqual([{ seq: 2, state: 'failed' }, { seq: 3, state: 'done' }])
-    expect(graph.nodes[4]!.attempts).toEqual([{ seq: 4, state: 'doing' }])
-    // A step has no attempts of its own: only a plan task is tried more than once.
-    expect(graph.nodes[2]!.attempts).toEqual([])
+    // A batch number is read as a number: `任务 10` sorts after `任务 2`.
+    const many = graphOf({
+      runId: 'r-order',
+      name: '任务团队 · 3 个任务',
+      anchorSeq: 1,
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '任务 10 · 最后', 'completed', 1),
+        member(3, '执行', '任务 2 · 中间', 'completed', 2),
+        member(4, '执行', undefined, 'completed', 3),
+        member(5, '检查', undefined, 'completed', 4),
+      ],
+      details: [],
+    })
+    expect(many.nodes.filter((node) => node.kind === 'task').map((node) => node.id)).toEqual(['t2', 't10', 'u1'])
+    // The group that names no task carries the leg word of its first call, verbatim otherwise.
+    expect(many.nodes.filter((node) => node.kind === 'task').map((node) => node.label))
+      .toEqual(['任务 2 · 中间', '任务 10 · 最后', '执行'])
+    // A task card owns every row of that task, in recorded order.
+    expect(boxOf(graph, 't1').calls.map((row) => row.seq)).toEqual([2, 3, 4])
+    expect(graph.nodes.filter((node) => node.kind === 'sub').map((node) => node.id))
+      .toEqual(['t1_s2', 't1_s3', 't1_s4', 't2_s5'])
   })
 
-  it('keeps the rows a reader can open with the node they belong to', () => {
+  it('marks exactly one box as the reader’s place, and numbers the headline by its level', () => {
     const graph = graphOf(twoTaskRun())
-    // A leg keeps only the rows that name no task; the numbered rows are the branches'.
-    expect(graph.nodes.map((node) => node.openable)).toEqual([false, true, false, true, true, false])
-    expect(graph.nodes.map((node) => node.calls.map((row) => row.seq))).toEqual([[], [1], [], [2, 3], [4], []])
-    // The summary's all-rejected verdict rides on the node it happened on, not in a card.
-    const rejected = graphOf(rejectedRun()).nodes.find((node) => node.kind === 'summarize')
-    expect(rejected?.rejected).toEqual({ drafts: 3, stage: 'check', reason: 'cites "x", which the report lacks' })
-    // …and the verdict is something a reader can open even though that node declared no call:
-    // the operator's brief asks for the verdict to be readable inside the node's own calls.
-    expect(rejected?.calls).toEqual([])
-    expect(rejected?.openable).toBe(true)
+    expect(graph.nodes.filter((node) => node.current).map((node) => node.id)).toEqual(['t2_s5'])
+    expect([graph.at, graph.total, graph.remaining]).toEqual([4, 7, 3])
+    expect(graph.headline.at).toBe(4)
+    expect(graph.headline.total).toBe(7)
+    expect(graph.headline.remaining).toBe(3)
+    // Nothing declared and nothing ended: the start is where this run is, not the end.
+    expect(graphOf(waitingRun()).at).toBe(1)
+    // A run that ended stands on the first broken box, else at its end.
+    expect(graphOf(failedRun()).at).toBe(3)
+    expect(graphOf(rejectedRun()).at).toBe(5)
+    expect(graphOf(finishedRun()).at).toBe(7)
+    expect(graphOf(finishedRun()).nodes.filter((node) => node.current).map((node) => node.id)).toEqual(['end'])
   })
 
-  it('joins a branch layer to its neighbours, and chains the steps that have none', () => {
+  it('draws the edges of the fork, and no others', () => {
     const graph = graphOf(twoTaskRun())
     expect(graph.edges.map((edge) => `${edge.from} -> ${edge.to} (${edge.kind})`)).toEqual([
       'start -> plan (chain)',
-      'plan -> execute (chain)',
-      'execute -> execute_t1 (branch)',
-      'execute_t1 -> end (join)',
-      'execute -> execute_t2 (branch)',
-      'execute_t2 -> end (join)',
+      'plan -> t1 (fork)',
+      'plan -> t2 (fork)',
+      't1 -> t1_s2 (branch)',
+      't1_s2 -> sum (join)',
+      't1 -> t1_s3 (branch)',
+      't1_s3 -> sum (join)',
+      't1 -> t1_s4 (branch)',
+      't1_s4 -> sum (join)',
+      't2 -> t2_s5 (branch)',
+      't2_s5 -> sum (join)',
+      'sum -> accept (chain)',
+      'accept -> end (chain)',
     ])
-    // Every edge names two nodes the picture really has.
     const ids = new Set(graph.nodes.map((node) => node.id))
     for (const edge of graph.edges) {
       expect(ids.has(edge.from), edge.from).toBe(true)
       expect(ids.has(edge.to), edge.to).toBe(true)
     }
+    // A task that recorded no call at all still reaches the summary.
+    const bare = graphOf({
+      runId: 'r-bare',
+      name: '任务团队 · 1 个任务',
+      anchorSeq: 1,
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '任务 1 · 建表', undefined, 1),
+      ],
+      details: [],
+    })
+    expect(bare.nodes.find((node) => node.id === 'sum')!.calls).toEqual([])
+    // Every state is one connected picture: a run with no task card has nothing between the
+    // plan and the summary, so that gap is closed with one chain edge instead of being left
+    // open — a waiting run must not read as two halves that float apart.
+    const waiting = graphOf(waitingRun())
+    // No task and no branch is drawn, so the picture is the five places the run never leaves.
+    expect(waiting.nodes).toHaveLength(5)
+    expect(waiting.edges.map((edge) => `${edge.from} -> ${edge.to} (${edge.kind})`)).toEqual([
+      'start -> plan (chain)',
+      'plan -> sum (chain)',
+      'sum -> accept (chain)',
+      'accept -> end (chain)',
+    ])
+    expect(reachableFrom(waiting, 'start').size).toBe(waiting.nodes.length)
+    // The same holds for a run whose only rows are a plan call and a summary call.
+    const trunk = graphOf({
+      runId: 'r-trunk',
+      name: '任务团队 · 0 个任务',
+      anchorSeq: 1,
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '汇总助手', '汇总', 'completed', 1),
+      ],
+      details: [],
+      stopReason: 'completed',
+    })
+    expect(trunk.nodes.filter((node) => node.kind === 'task' || node.kind === 'sub')).toEqual([])
+    expect(trunk.edges.map((edge) => `${edge.from} -> ${edge.to} (${edge.kind})`)).toEqual([
+      'start -> plan (chain)',
+      'plan -> sum (chain)',
+      'sum -> accept (chain)',
+      'accept -> end (chain)',
+    ])
+    expect(reachableFrom(trunk, 'start').size).toBe(trunk.nodes.length)
+    // With a task card present the fork owns that gap: the edge is not emitted at all, and the
+    // text says nothing about the plan reaching the summary.
+    expect(graph.edges.filter((edge) => edge.from === 'plan' && edge.to === 'sum')).toEqual([])
+    expect(progress.panelMermaid(graph)).not.toContain('plan --> sum')
+    expect(reachableFrom(graph, 'start').size).toBe(graph.nodes.length)
   })
 
-  it('numbers the headline by the steps the flow counts, task branches excluded', () => {
+  it('carries the shipped draft, and the all-rejected verdict on the one summary box', () => {
+    expect(graphOf(finishedRun()).final).toEqual({ draft: 1, seq: 5 })
+    expect(graphOf(twoTaskRun()).final).toBeUndefined()
+    const rejected = boxOf(graphOf(rejectedRun()), 'sum')
+    expect(rejected.rejected).toEqual({ drafts: 3, stage: 'check', reason: 'cites "x", which the report lacks' })
+    expect(rejected.calls).toEqual([])
+    expect(rejected.openable).toBe(true)
+    expect(rejected.state).toBe('failed')
+  })
+})
+
+describe('every row lands in exactly one owning box', () => {
+  /** The rows one box owns, counting the plan, the task cards and the summary. */
+  function owned(graph: PanelGraph): number[] {
+    const seqs = []
+    for (const node of graph.nodes) {
+      if (node.kind !== 'plan' && node.kind !== 'task' && node.kind !== 'summarize') continue
+      for (const row of node.calls) seqs.push(row.seq)
+    }
+    return seqs.sort((left, right) => left - right)
+  }
+
+  it('keeps every declared call, once, and drops no row from the picture', () => {
+    for (const run of [twoTaskRun(), finishedRun(), failedRun(), blockedRun(), rejectedRun(), checksRun()]) {
+      const declared = run.members.map((row) => row.seq).sort((left, right) => left - right)
+      expect(owned(graphOf(run))).toEqual(declared)
+    }
+  })
+
+  it('gives each branch exactly one row, and the task it hangs under all of them', () => {
     const graph = graphOf(twoTaskRun())
-    expect([graph.at, graph.total, graph.remaining]).toEqual([3, 4, 1])
-    expect(graph.headline.at).toBe(3)
-    expect(graph.headline.total).toBe(4)
-    // A repeated leg is a new step of its own, and its id says which visit it is.
-    const revisited = graphOf(etaRun())
-    expect(revisited.nodes.map((node) => node.id)).toEqual([
-      'start', 'plan', 'execute', 'execute_t1', 'check', 'check_2', 'review', 'review_2', 'summarize', 'summarize_2', 'end',
+    const subs = graph.nodes.filter((node) => node.kind === 'sub')
+    for (const sub of subs) expect(sub.calls).toHaveLength(1)
+    expect(subs.map((sub) => sub.calls[0]!.seq)).toEqual([2, 3, 4, 5])
+    // The branch knows which card it hangs under, which call it is and which try that was.
+    expect(subs.map((sub) => sub.subtask)).toEqual([
+      { taskId: 't1', taskNumber: 1, seq: 2, leg: 'execute', attempt: 1 },
+      { taskId: 't1', taskNumber: 1, seq: 3, leg: 'execute', attempt: 2 },
+      { taskId: 't1', taskNumber: 1, seq: 4, leg: 'check', attempt: 1 },
+      { taskId: 't2', taskNumber: 2, seq: 5, leg: 'execute', attempt: 1 },
     ])
-    // The step count is the flow's own: a task branch is not a step a reader walks through.
-    expect(revisited.total).toBe(10)
+    // Every branch is openable: one row is one call a reader can read.
+    for (const sub of subs) expect(sub.openable).toBe(true)
+    // The retry prints its number, the first try does not.
+    expect(subs.map((sub) => sub.label))
+      .toEqual(['执行', '执行 · 第 2 遍', '检查', '执行'])
+    expect(subs.map((sub) => sub.state)).toEqual(['failed', 'done', 'done', 'doing'])
+  })
+
+  it('keeps a row that names no leg in the box the run had already reached', () => {
+    // The guardian's own call is not a leg of the work, and it owns no box at all.
+    const guarded = graphOf(guardianRun())
+    expect(owned(guarded)).toEqual([1])
+    const middle = graphOf({
+      runId: 'r-middle',
+      name: '任务团队 · 1 个任务',
+      anchorSeq: 1,
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '任务 1 · 建表', 'completed', 1),
+        member(3, '随手一笔', undefined, 'completed', 2),
+        member(4, '检查', '任务 1 · 建表', 'completed', 3),
+        member(5, '汇总助手', '汇总', 'completed', 4),
+        member(6, '收尾一句', undefined, 'completed', 5),
+      ],
+      details: [],
+      stopReason: 'completed',
+    })
+    expect(owned(middle)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(boxOf(middle, 'plan').calls.map((row) => row.seq)).toEqual([1])
+    expect(boxOf(middle, 't1').calls.map((row) => row.seq)).toEqual([2, 3, 4])
+    expect(boxOf(middle, 'sum').calls.map((row) => row.seq)).toEqual([5, 6])
+    // The branch that names no leg speaks its own label, untranslated and un-shortened.
+    expect(boxOf(middle, 't1_s3').label).toBe('随手一笔')
+  })
+})
+
+describe('the six rings of a task, and the five checks of the run', () => {
+  it('folds the three work lights from the task’s own rows, and prints its own name verbatim', () => {
+    const graph = graphOf(twoTaskRun())
+    expect(lightsOf(boxOf(graph, 't1').rings))
+      .toEqual(['plan:done', 'execute:done', 'check:done', 'review:pending', 'accept:pending', 'summarize:pending'])
+    expect(lightsOf(boxOf(graph, 't2').rings))
+      .toEqual(['plan:done', 'execute:doing', 'check:pending', 'review:pending', 'accept:pending', 'summarize:pending'])
+    // Every task carries six lights and only the task cards carry them.
+    for (const node of graph.nodes.filter((box) => box.kind === 'task')) expect(node.rings).toHaveLength(6)
+    for (const node of graph.nodes.filter((box) => box.kind !== 'task')) expect(node.rings).toBeUndefined()
+    // A task's own title is the phase the recorder wrote: nothing translates or shortens it.
+    expect(progress.panelMermaid(graphOf(twoTaskRun(), en))).toContain('  t1("任务 1 · 建表")')
+  })
+
+  it('lights the acceptance of a task only when both of its gates passed', () => {
+    const done = graphOf(finishedRun())
+    expect(lightsOf(boxOf(done, 't1').rings))
+      .toEqual(['plan:done', 'execute:done', 'check:done', 'review:done', 'accept:done', 'summarize:done'])
+    // One broken gate holds the card whatever the other one says.
+    const failed = graphOf(failedRun())
+    expect(lightsOf(boxOf(failed, 't1').rings).slice(2, 5)).toEqual(['check:failed', 'review:pending', 'accept:failed'])
+    // Both gates settled without a failure is the only way to green it: a gate nobody ran is
+    // not a gate that passed.
+    const half = graphOf(twoTaskRun())
+    expect(lightsOf(boxOf(half, 't1').rings)[2]).toBe('check:done')
+    expect(lightsOf(boxOf(half, 't1').rings)[4]).toBe('accept:pending')
+  })
+
+  it('carries the plan light and the summary light of the run on every card', () => {
+    const graph = graphOf(twoTaskRun())
+    const plans = graph.nodes.filter((node) => node.kind === 'task').map((node) => lightsOf(node.rings)[0])
+    expect(new Set(plans)).toEqual(new Set(['plan:done']))
+    // The summary failed while the run did: every card says so, without the card failing.
+    const rejected = graphOf(rejectedRun())
+    expect(lightsOf(boxOf(rejected, 't1').rings)[5]).toBe('summarize:failed')
+    expect(boxOf(rejected, 't1').state).toBe('done')
+  })
+
+  it('does not colour a recovered failure as a failure, in a ring or in the stuck verdict', () => {
+    expect(lightsOf(boxOf(graphOf(recoveredRun()), 't1').rings).slice(1, 3))
+      .toEqual(['execute:done', 'check:done'])
+    expect(graphOf(recoveredRun()).stuck).toBeUndefined()
+    // The branch keeps its own red mark — that is the call that failed — and the card is green.
+    expect(boxOf(graphOf(recoveredRun()), 't1_s2').state).toBe('failed')
+    expect(boxOf(graphOf(recoveredRun()), 't1').state).toBe('done')
+  })
+
+  it('lights the five checks from the rows that reported them, and from nothing else', () => {
+    const graph = graphOf(checksRun())
+    expect(lightsOf(graph.checks))
+      .toEqual(['machine:done', 'model:done', 'isolated:doing', 'human:done', 'ledger:failed'])
+    // The same five live on the acceptance card, in the same order.
+    expect(lightsOf(boxOf(graph, 'accept').checks)).toEqual(lightsOf(graph.checks))
+    // Nothing reported, nothing lit: the page never ticks a verification nobody ran.
+    expect(lightsOf(graphOf(waitingRun()).checks))
+      .toEqual(['machine:pending', 'model:pending', 'isolated:pending', 'human:pending', 'ledger:pending'])
+    // A failure a later attempt of the same screen replaced is not a current failure.
+    expect(lightsOf(graphOf(recoveredCheckRun()).checks)[4]).toBe('ledger:done')
+    // A Latin word is matched by its stem, because the runs write `reconciliation`.
+    expect(lightsOf(graphOf(latinLedgerRun()).checks)[4]).toBe('ledger:done')
+    // The check gate and the review gate are the leg table's, so a phase never lights them.
+    expect(lightsOf(graphOf(latinLedgerRun()).checks)[0]).toBe('machine:pending')
+  })
+})
+
+describe('the remaining time is measured by level, never invented', () => {
+  it('says nothing when no level was measured', () => {
+    expect(graphOf(waitingRun()).headline.eta).toBeUndefined()
+    // The plan row cannot be dated, so its level is not measured, and no other level is done.
+    expect(graphOf(etaGapRun()).headline.eta).toBeUndefined()
+  })
+
+  it('averages the measured level spans and multiplies by the levels still ahead', () => {
+    // The plan level took 20 s, and three levels are still ahead of the reader.
+    expect(graphOf(twoTaskRun()).headline.eta).toEqual({ ms: 60_000, basis: 1 })
+    // Three levels measured at 20 s each, two levels left: the mean is per level, not per row.
+    expect(graphOf(rejectedRun()).headline.eta).toEqual({ ms: 40_000, basis: 3 })
+  })
+
+  it('says nothing when there is nothing left to walk', () => {
+    expect(graphOf(finishedRun()).remaining).toBe(0)
+    expect(graphOf(finishedRun()).headline.eta).toBeUndefined()
   })
 })
 
 describe('the mermaid text is the structure', () => {
-  it('writes one node a line, then one edge a line, two-space indented', () => {
+  it('writes `flowchart LR`, one node a line, then one edge a line, two-space indented', () => {
     expect(progress.panelMermaid(graphOf(twoTaskRun()))).toBe([
-      'flowchart TD',
+      'flowchart LR',
       '  start(["起点"])',
-      '  plan["规划"]',
-      '  execute["执行"]',
-      '  execute_t1("任务 1 · 建表")',
-      '  execute_t2("任务 2 · 写文档")',
+      '  plan(["规划"])',
+      '  t1("任务 1 · 建表")',
+      '  t2("任务 2 · 写文档")',
+      '  t1_s2["执行"]',
+      '  t1_s3["执行 · 第 2 遍"]',
+      '  t1_s4["检查"]',
+      '  t2_s5["执行"]',
+      '  sum(["汇总"])',
+      '  accept(["验收"])',
       '  finish(["终点"])',
       '  start --> plan',
-      '  plan --> execute',
-      '  execute --> execute_t1',
-      '  execute_t1 --> finish',
-      '  execute --> execute_t2',
-      '  execute_t2 --> finish',
+      '  plan --> t1',
+      '  plan --> t2',
+      '  t1 --> t1_s2',
+      '  t1_s2 --> sum',
+      '  t1 --> t1_s3',
+      '  t1_s3 --> sum',
+      '  t1 --> t1_s4',
+      '  t1_s4 --> sum',
+      '  t2 --> t2_s5',
+      '  t2_s5 --> sum',
+      '  sum --> accept',
+      '  accept --> finish',
     ].join('\n'))
   })
 
-  it('writes the end node as `finish`, because `end` closes a subgraph', () => {
-    // A definition line starting with `end` is not a node any mermaid renderer reads, so the
-    // one word the text may not use is renamed — in the text only: the model, the DOM hook
-    // and every edge keep calling that node `end`.
+  it('writes the end box as `finish`, because `end` closes a subgraph', () => {
+    // The one word the text may not use is renamed in the text only: the model, the DOM hook
+    // and every wire keep calling that box `end`.
     const text = progress.panelMermaid(graphOf(twoTaskRun()))
     expect(text).toContain('  finish(["终点"])')
     expect(text.split('\n').filter((line) => line.trim().startsWith('end'))).toEqual([])
-    expect(text).not.toContain('-- > end')
     expect(graphOf(twoTaskRun()).nodes.map((node) => node.id)).toContain('end')
   })
 
-  it('writes the reader’s own words, and a task title exactly as recorded', () => {
-    const english = progress.panelMermaid(graphOf(twoTaskRun(), en)).split('\n')
-    expect(english.slice(1, 7)).toEqual([
-      '  start(["Start"])',
-      '  plan["Plan"]',
-      '  execute["Execute"]',
-      // A task's title is the phase the recorder wrote, so it is never translated: only the
-      // leg words follow the reader's dictionary.
-      '  execute_t1("任务 1 · 建表")',
-      '  execute_t2("任务 2 · 写文档")',
-      '  finish(["End"])',
-    ])
-  })
-
-  it('escapes a quote and flattens a line break, so one label stays one line', () => {
-    const run = twoTaskRun()
-    run.members[1]!.phase = '任务 1 · 引用 "x"\n第二行'
-    const text = progress.panelMermaid(graphOf(run))
-    expect(text).toContain('  execute_t1("任务 1 · 引用 #quot;x#quot; 第二行")')
-    expect(text.split('\n').filter((line) => line.includes('execute_t1('))).toHaveLength(1)
-  })
-
-  it('round-trips the graph, and drops what the subset does not describe', () => {
+  it('round-trips through the parser to exactly the drawn boxes, wires and shapes', () => {
     const graph = graphOf(twoTaskRun())
     const parsed = progress.parsePanelMermaid(graph.mermaid)
-    expect(parsed.direction).toBe('TD')
-    expect(parsed.nodes.map((node) => [node.id, node.shape])).toEqual([
-      ['start', 'stadium'],
-      ['plan', 'rect'],
-      ['execute', 'rect'],
-      ['execute_t1', 'round'],
-      ['execute_t2', 'round'],
-      ['finish', 'stadium'],
+    expect(parsed.direction).toBe('LR')
+    expect(parsed.nodes.map((node) => node.id))
+      .toEqual(['start', 'plan', 't1', 't2', 't1_s2', 't1_s3', 't1_s4', 't2_s5', 'sum', 'accept', 'finish'])
+    expect(parsed.nodes.map((node) => node.shape)).toEqual([
+      'stadium', 'stadium', 'round', 'round', 'rect', 'rect', 'rect', 'rect', 'stadium', 'stadium', 'stadium',
     ])
     // Labels come back unescaped, which is what makes the round trip a round trip.
     expect(parsed.nodes.map((node) => node.label)).toEqual(graph.nodes.map((node) => node.label))
-    // The parser knows no special ids: it reads the words the text uses, and the end node is
-    // the word the text had to change.
     expect(parsed.edges.length).toBe(graph.edges.length)
     expect(parsed.edges.map((edge) => `${edge.from}->${edge.to}`))
       .toEqual(graph.edges.map((edge) => `${edge.from}->${edge.to.replace('end', 'finish')}`))
+  })
 
-    const noisy = [
-      '%% a comment the subset ignores',
-      'flowchart TD',
-      '  start(["起点"])',
-      '  this is not a line mermaid wrote',
-      '  plan["规划"]',
-      '  start --> plan',
-      '  plan --> nowhere',
-      '',
-    ].join('\n')
-    const read = progress.parsePanelMermaid(noisy)
-    expect(read.nodes.map((node) => node.id)).toEqual(['start', 'plan'])
-    // An edge naming a node nobody declared is a route to nowhere, so it is dropped.
-    expect(read.edges).toEqual([{ from: 'start', to: 'plan' }])
+  it('keeps the lights out of the text, and one label on one line', () => {
+    const text = progress.panelMermaid(graphOf(checksRun()))
+    // The rings and the checks are decoration: the text is boxes and wires, nothing else.
+    for (const word of [zh('progress.panel.rings'), zh('progress.panel.checks'), zh('progress.verify.machine')]) {
+      expect(text).not.toContain(word)
+    }
+    expect(text.split('\n').filter((line) => line.trim() === '')).toEqual([])
+    const run = twoTaskRun()
+    run.members[1]!.phase = '任务 1 · 引用 "x"\n第二行'
+    const quoted = progress.panelMermaid(graphOf(run))
+    expect(quoted).toContain('  t1("任务 1 · 引用 #quot;x#quot; 第二行")')
+    expect(quoted.split('\n').filter((line) => line.includes('t1('))).toHaveLength(1)
   })
 })
 
-/**
- * The boxes every layout assertion is read off.
- *
- * Explicit sizes, so the expected numbers are arithmetic rather than whatever a measurement
- * happened to be on the machine that ran the test.
- */
-const SIZES: Record<string, { w: number, h: number }> = {
-  start: { w: 80, h: 32 },
-  plan: { w: 100, h: 32 },
-  execute: { w: 100, h: 32 },
-  execute_t1: { w: 140, h: 34 },
-  execute_t2: { w: 140, h: 34 },
-  finish: { w: 80, h: 32 },
-}
-
-describe('the layout is computed from the boxes', () => {
-  it('lays one layer a row, siblings side by side and centred in the container', () => {
-    const layout = progress.layoutPanelGraph(parsedOf(twoTaskRun()), SIZES, 1440)
-    const box = (id: string) => layout.nodes.find((node) => node.id === id)!
-    expect([layout.width, layout.height]).toEqual([1440, 338])
-    // Layers strictly increase in y, and a layer change is 44 px of air.
-    expect(['start', 'plan', 'execute', 'execute_t1', 'finish'].map((id) => box(id).y)).toEqual([0, 76, 152, 228, 306])
-    // Siblings: 12 px apart, and the pair as a whole centred in the container.
-    expect([box('execute_t1').x, box('execute_t2').x]).toEqual([574, 726])
-    expect(box('execute_t1').x + box('execute_t1').w + 12).toBe(box('execute_t2').x)
-    expect((box('execute_t1').x + box('execute_t2').x + box('execute_t2').w) / 2).toBe(720)
-    // A layer with one node is centred on its own width.
-    expect([box('start').x, box('finish').x]).toEqual([680, 680])
-  })
-
-  it('anchors an edge on the two boxes it joins, straight when they share a column', () => {
-    const layout = progress.layoutPanelGraph(parsedOf(twoTaskRun()), SIZES, 1440)
-    const d = (from: string) => layout.edges.find((edge) => edge.from === from)!.d
-    // Both nodes are 720 wide-centre, so the wire is one straight drop.
-    expect(d('plan')).toBe('M 720 108 L 720 152')
-    // An elbow leaves the bottom centre, turns at the midpoint of the gap, and comes down
-    // onto the target's top centre, with an 8 px radius at each corner.
-    expect(d('execute')).toBe('M 720 184 L 720 198 Q 720 206 712 206 L 652 206 Q 644 206 644 214 L 644 228')
-    expect(d('execute_t1')).toBe('M 644 262 L 644 276 Q 644 284 652 284 L 712 284 Q 720 284 720 292 L 720 306')
-    // The node a branch hangs off and the node it comes back to share one anchor x, which is
-    // why the chain between them is a single vertical run and not a half-pixel stutter.
-    const box = (id: string) => layout.nodes.find((node) => node.id === id)!
-    expect(box('plan').x + box('plan').w / 2).toBe(box('execute').x + box('execute').w / 2)
-    expect(d('execute_t1')).toBe('M 644 262 L 644 276 Q 644 284 652 284 L 712 284 Q 720 284 720 292 L 720 306')
-    expect(d('execute_t2')).toBe('M 796 262 L 796 276 Q 796 284 788 284 L 728 284 Q 720 284 720 292 L 720 306')
-  })
-
-  it('turns a column into a side rail: one card a row, and every wire in a gutter', () => {
-    const layout = progress.layoutPanelGraph(parsedOf(twoTaskRun()), SIZES, 360)
-    const box = (id: string) => layout.nodes.find((node) => node.id === id)!
-    // The container is the width it was handed, and no node is wider than it.
-    expect(layout.width).toBe(360)
-    for (const node of layout.nodes) expect(node.w).toBeLessThanOrEqual(360)
-    // Every card keeps a 24 px gutter on both sides, so both trunks fit beside it.
-    expect([box('execute_t1').x, box('execute_t1').w]).toEqual([24, 312])
-    expect([box('execute_t2').x, box('execute_t2').w]).toEqual([24, 312])
-    // A leg and the two ends are the trunk line itself: full width, no gutter to keep.
-    expect([box('start').x, box('start').w]).toEqual([0, 360])
-    expect(['start', 'plan', 'execute', 'execute_t1', 'execute_t2', 'finish'].map((id) => box(id).y))
-      .toEqual([0, 62, 124, 186, 246, 310])
-    const d = (from: string, to: string) => layout.edges.find((edge) => edge.from === from && edge.to === to)!.d
-    // A chain drops straight through the gap: one stem, no corner.
-    expect(d('start', 'plan')).toBe('M 180 32 L 180 62')
-    // A fork: out of the leg's bottom centre, a 12 px stem, a bar to the left trunk, down the
-    // trunk, and in over the card's own top edge 8 px from its left corner.
-    expect(d('execute', 'execute_t1'))
-      .toBe('M 180 156 L 180 162 Q 180 168 174 168 L 17 168 Q 12 168 12 173 Q 12 178 17 178 L 28 178 Q 32 178 32 182 L 32 186')
-    // Its sibling is entered on the opposite corner, so two branches of one leg read as two
-    // connections rather than one blur.
-    expect(d('execute', 'execute_t2'))
-      .toBe('M 180 156 L 180 162 Q 180 168 174 168 L 20 168 Q 12 168 12 176 L 12 230 Q 12 238 20 238 L 324 238 Q 328 238 328 242 L 328 246')
-    // A join leaves the card's bottom edge 8 px in from its right corner, runs down the right
-    // trunk, and comes into the next step's top centre.
-    expect(d('execute_t1', 'finish'))
-      .toBe('M 328 220 L 328 224 Q 328 228 332 228 L 340 228 Q 348 228 348 236 L 348 290 Q 348 298 340 298 L 186 298 Q 180 298 180 304 L 180 310')
-    expect(d('execute_t2', 'finish'))
-      .toBe('M 328 280 L 328 284 Q 328 288 332 288 L 343 288 Q 348 288 348 293 Q 348 298 343 298 L 186 298 Q 180 298 180 304 L 180 310')
-    // The trunks are the two rails, 12 px in from either edge of the column.
-    for (const edge of layout.edges) {
-      for (const point of verticesOf(edge.d)) expect(point[0]).toBeGreaterThanOrEqual(12)
-    }
-  })
-
-  it('never runs a wire through a card, at either width', () => {
-    for (const width of [1440, 360]) {
-      const layout = progress.layoutPanelGraph(parsedOf(twoTaskRun()), SIZES, width)
-      for (const edge of layout.edges) {
-        const points = verticesOf(edge.d)
-        for (let index = 0; index + 1 < points.length; index += 1) {
-          const [x1, y1] = points[index]!
-          const [x2, y2] = points[index + 1]!
-          if (x1 !== x2) continue
-          // The corner curve shaves a couple of pixels off each end; what is left of the run
-          // is what a reader would see drawn across the card.
-          const top = Math.min(y1, y2) + 2
-          const bottom = Math.max(y1, y2) - 2
-          if (bottom <= top) continue
-          for (const box of layout.nodes) {
-            const insideX = x1 > box.x + 0.5 && x1 < box.x + box.w - 0.5
-            const overlapsY = bottom > box.y && top < box.y + box.h
-            expect(insideX && overlapsY, `${edge.from} -> ${edge.to} runs through ${box.id} at ${width}px`)
-              .toBe(false)
-          }
-        }
-      }
-    }
-  })
-})
-
-/**
- * The vertices of one path, in order.
- *
- * A `Q` contributes only its on-curve end: the control point is not a place the wire goes,
- * so a run that "turns" there would be measured as if it did.
- */
-function verticesOf(d: string): Array<[number, number]> {
-  const points: Array<[number, number]> = []
-  for (const token of d.match(/[MLQ][^MLQ]*/g) ?? []) {
-    const numbers = token.slice(1).trim().split(/[\s,]+/).map(Number)
-    if (token[0] === 'Q') points.push([numbers[2]!, numbers[3]!])
-    else points.push([numbers[0]!, numbers[1]!])
-  }
-  return points
-}
-
-describe('the remaining time is measured, never invented', () => {
-  it('says nothing when no finished step was measured', () => {
-    expect(graphOf(waitingRun()).headline.eta).toBeUndefined()
-    // The running fixture has one finished step and one open one: the open one was not
-    // measured, so the estimate rests on the one that was.
-    expect(graphOf(twoTaskRun()).headline.eta).toEqual({ ms: 20_000, basis: 1 })
-  })
-
-  it('averages the finished steps it measured and multiplies by what is left', () => {
-    const graph = graphOf(etaRun())
-    expect(graph.remaining).toBe(6)
-    // (20 s + 130 s) / 2 = 75 s a step, times the six still ahead.
-    expect(graph.headline.eta).toEqual({ ms: 450_000, basis: 2 })
-  })
-
-  it('leaves out a finished step that cannot be dated', () => {
-    const graph = graphOf(etaGapRun())
-    expect(graph.headline.eta).toEqual({ ms: 120_000, basis: 1 })
-  })
-
-  it('says nothing when there is nothing left, and rounds to what it can measure', () => {
-    expect(graphOf(finishedRun()).remaining).toBe(0)
-    expect(graphOf(finishedRun()).headline.eta).toBeUndefined()
-    // 7 s a step times two, rounded to the nearest 5 s under a minute.
-    expect(graphOf(etaRoundRun()).headline.eta).toEqual({ ms: 15_000, basis: 1 })
+describe('a replan only adds the picture it walked', () => {
+  it('gains the task, its branches and their wires, and changes nothing else', () => {
+    const before = graphOf(finishedRun())
+    const after = graphOf(replannedRun())
+    expect(after.nodes.map((node) => node.id))
+      .toEqual(['start', 'plan', 't1', 't3', 't1_s2', 't1_s3', 't1_s4', 't3_s6', 't3_s7', 'sum', 'accept', 'end'])
+    // Every box the first picture drew is the same box, field for field.
+    const added = (id: string) => id === 't3' || id.startsWith('t3_s')
+    const kept = after.nodes.filter((node) => !added(node.id))
+    expect(kept).toEqual(before.nodes)
+    // The same holds for the wires: the new ones are the fork, the two branches and their joins.
+    const newEdges = after.edges.filter((edge) => added(edge.from) || added(edge.to))
+    expect(newEdges.map((edge) => `${edge.from} -> ${edge.to} (${edge.kind})`)).toEqual([
+      'plan -> t3 (fork)',
+      't3 -> t3_s6 (branch)',
+      't3_s6 -> sum (join)',
+      't3 -> t3_s7 (branch)',
+      't3_s7 -> sum (join)',
+    ])
+    expect(after.edges.filter((edge) => !newEdges.includes(edge))).toEqual(before.edges)
+    // The text gains exactly the new boxes and wires, line for line.
+    const lines = (graph: PanelGraph) => new Set(graph.mermaid.split('\n'))
+    expect([...lines(after)].filter((line) => !lines(before).has(line)).sort()).toEqual([
+      '  plan --> t3',
+      '  t3 --> t3_s6',
+      '  t3 --> t3_s7',
+      '  t3("任务 3 · 部署")',
+      '  t3_s6 --> sum',
+      '  t3_s7 --> sum',
+      '  t3_s6["执行"]',
+      '  t3_s7["检查"]',
+    ].sort())
+    // The state of the run it drew, and the place it stands on, are the same facts.
+    expect([after.state, after.at, after.remaining]).toEqual([before.state, before.at, before.remaining])
   })
 })
 
 describe('where the run is stuck, if it is', () => {
-  it('names the first step whose failure is still current, with its role and attempt', () => {
-    // The verdict names the failure the run is held at, which is the first one nothing has
-    // replaced: two failed tries still report the first, because that is the try still open.
+  it('names the card holding the failure that is still current, and never calls a cancelled run stuck', () => {
+    // The card owns its own rows, so it can say which call broke and which try that was.
     expect(graphOf(failedRun()).stuck)
-      .toEqual({ nodeId: 'execute_t1', at: 3, kind: 'failed', role: '执行', attempt: 1 })
-    // A failure on a later try says which try it was, counted among the rows of its unit:
-    // the label carries no number, so the row's own place is the number.
-    expect(graphOf(secondTryRun()).stuck)
-      .toEqual({ nodeId: 'execute_t1', at: 3, kind: 'failed', role: '执行', attempt: 2 })
-    // A failure a later attempt of the same task replaced is not current, so it is not stuck.
+      .toEqual({ nodeId: 't1', at: 3, kind: 'failed', role: '检查', attempt: 1 })
+    // A run that ended over a call nobody settled is blocked at the card that held it.
+    expect(graphOf(blockedRun()).stuck).toEqual({ nodeId: 't1', at: 3, kind: 'blocked' })
+    // A gate that turned every draft back is the third verdict, and it rides the summary.
+    expect(graphOf(rejectedRun()).stuck).toEqual({ nodeId: 'sum', at: 5, kind: 'rejected', drafts: 3 })
+    // Neither a cancellation nor a failure a retry replaced is "stuck".
+    expect(graphOf(cancelledRun()).stuck).toBeUndefined()
     expect(graphOf(recoveredRun()).stuck).toBeUndefined()
     expect(graphOf(twoTaskRun()).stuck).toBeUndefined()
   })
-
-  it('falls back to a blocked step, then to a summary that was turned back', () => {
-    expect(graphOf(blockedRun()).stuck).toEqual({ nodeId: 'execute', at: 3, kind: 'blocked' })
-    expect(graphOf(rejectedRun()).stuck).toEqual({ nodeId: 'summarize', at: 4, kind: 'rejected', drafts: 3 })
-  })
-
-  it('never calls a cancelled run stuck', () => {
-    expect(graphOf(cancelledRun()).stuck).toBeUndefined()
-  })
 })
 
-describe('the page: a header, the graph, the stuck line, the dock', () => {
-  it('keeps the run and the chip, and says the one sentence under them', () => {
-    const page = pageOf(twoTaskRun())()
-    const bar = hookOf(page, 'data-gw-progress-bar')
-    expect(attr(bar, 'data-gw-progress-bar')).toBe(bar.props['data-gw-progress-bar'] === true ? 'true' : undefined)
-    expect(textOf(hookOf(page, 'data-gw-progress-run'))).toBe('任务团队 · 2 个任务')
-    expect(attr(hookOf(page, 'data-gw-progress-chip'), 'data-state')).toBe('running')
-    const line = hookOf(page, 'data-gw-progress-line')
-    expect(line.type).toBe('p')
-    expect(classesOf(line)).toEqual(['gw-progress-line'])
-    expect(textOf(line)).toBe('第 3 步，共 4 步 · 还剩约 20 秒')
-    // The method is the tooltip, and only while the number exists.
-    expect(attr(line, 'title')).toBe(zh('progress.panel.etaBasis', { n: 1 }))
-    // A run with nothing to estimate says the step and nothing else.
-    const leaning = pageOf(finishedRun())()
-    expect(textOf(hookOf(leaning, 'data-gw-progress-line'))).toBe('第 6 步，共 6 步')
-    expect(attr(hookOf(leaning, 'data-gw-progress-line'), 'title')).toBeUndefined()
-  })
-
-  it('draws the graph the text describes, and marks exactly one node as current', () => {
-    const page = pageOf(twoTaskRun())()
-    const graph = hookOf(page, 'data-gw-progress-graph')
-    expect(graph.type).toBe('div')
-    expect(classesOf(graph)).toEqual(['gw-progress-graph'])
-    const source = attr(graph, 'data-gw-progress-source')!
-    const parsed = progress.parsePanelMermaid(source)
-    expect(parsed.nodes).toHaveLength(6)
-    expect(parsed.edges).toHaveLength(6)
-    expect(parsed.nodes.map((node) => node.id))
-      .toEqual(['start', 'plan', 'execute', 'execute_t1', 'execute_t2', 'finish'])
-
-    // The tree keeps the model's own words, so a reader of the DOM never meets the id the
-    // text had to rename: the last node is `end` here and `finish` in the source above.
-    const nodes = hooksOf(page, 'data-gw-progress-pnode')
-    expect(nodes).toHaveLength(6)
-    expect(nodes.map((node) => attr(node, 'data-gw-progress-pnode')))
-      .toEqual(['start', 'plan', 'execute', 'execute_t1', 'execute_t2', 'end'])
-    expect(nodes.filter((node) => attr(node, 'data-current') === 'true')).toHaveLength(1)
-    expect(attr(nodes[2]!, 'data-current')).toBe('true')
-    // The task nodes carry their number, and every node its kind, state and ordinal.
-    expect(nodes.map((node) => [attr(node, 'data-kind'), attr(node, 'data-state'), attr(node, 'data-ordinal')])).toEqual([
-      ['start', 'done', '0'],
-      ['plan', 'done', '1'],
-      ['execute', 'doing', '1'],
-      ['task', 'done', '1'],
-      ['task', 'doing', '2'],
-      ['end', 'pending', '0'],
-    ])
-    expect(nodes.map((node) => attr(node, 'data-task'))).toEqual([undefined, undefined, undefined, '1', '2', undefined])
-    // Every node is placed by the layout, and its height is left to the box.
-    const style = nodes[2]!.props['style'] as Record<string, string>
-    expect(Object.keys(style).sort()).toEqual(['left', 'top', 'width'])
-    // One path per edge, each naming the two nodes it joins and the kind of step it is.
-    const edges = hooksOf(page, 'data-gw-progress-edge')
-    expect(edges.map((edge) => attr(edge, 'data-kind'))).toEqual(['chain', 'chain', 'branch', 'join', 'branch', 'join'])
-    expect(edges.map((edge) => `${attr(edge, 'data-from')}->${attr(edge, 'data-to')}`))
-      .toEqual([
-        'start->plan',
-        'plan->execute',
-        'execute->execute_t1',
-        'execute_t1->end',
-        'execute->execute_t2',
-        'execute_t2->end',
-      ])
-    for (const edge of edges) {
-      expect(attr(edge, 'marker-end')).toBe('url(#gw-progress-arrow)')
-      expect(attr(edge, 'd')).toMatch(/^M /)
-    }
-    const svg = hookOf(page, 'data-gw-progress-wires')
-    expect(attr(svg, 'aria-hidden')).toBe('true')
-    expect(hooksOf(page, 'data-gw-progress-pnodes')).toHaveLength(1)
-  })
-
-  it('draws one dot per attempt, and a dashed step between a failure and its retry', () => {
-    const page = pageOf(twoTaskRun())()
-    const dots = withClass(page, 'gw-progress-pnode-attempt')
-    expect(dots.map((dot) => [attr(dot, 'data-attempt'), attr(dot, 'data-state')]))
-      .toEqual([['1', 'failed'], ['2', 'done'], ['1', 'doing']])
-    // Only the pair that is a retry carries the mark, and it sits between that pair.
-    const retries = withClass(page, 'gw-progress-pnode-retry')
-    expect(retries).toHaveLength(1)
-    const first = hooksOf(page, 'data-gw-progress-pnode').find((node) => attr(node, 'data-gw-progress-pnode') === 'execute_t1')!
-    const order = walk(first).map((element) => classesOf(element).join(' '))
-    expect(order.indexOf('gw-progress-pnode-attempt')).toBeLessThan(order.indexOf('gw-progress-pnode-retry'))
-    expect(order.indexOf('gw-progress-pnode-retry')).toBeLessThan(order.lastIndexOf('gw-progress-pnode-attempt'))
-    // The dots are decoration, and a node with one attempt carries no mark at all.
-    for (const dot of dots) expect(attr(dot, 'aria-hidden')).toBe('true')
-    // One try each in the finished run's two tasks: two dots, both the first of their task.
-    const once = withClass(pageOf(finishedRun())(), 'gw-progress-pnode-attempt')
-    expect(once.map((dot) => attr(dot, 'data-attempt'))).toEqual(['1', '1'])
-    expect(withClass(pageOf(finishedRun())(), 'gw-progress-pnode-retry')).toHaveLength(0)
-  })
-
-  it('says the leg or the task, never a sentence, and speaks the state instead', () => {
-    const page = pageOf(twoTaskRun())()
-    const words = hooksOf(page, 'data-gw-progress-pnode-word')
-    expect(words.map((word) => textOf(word))).toEqual(['起点', '规划', '执行', '任务 1 · 建表', '任务 2 · 写文档', '终点'])
-    // The word carries its own tooltip, so a cut label can still be read whole.
-    expect(words.map((word) => attr(word, 'title'))).toEqual(words.map((word) => textOf(word)))
-    // The state is spoken, never printed; the badge is the attempt count, and only past one.
-    const labels = hooksOf(page, 'data-gw-progress-pnode').map((node) => attr(node, 'aria-label'))
-    expect(labels[2]).toBe(`执行 ${zh('progress.plan.running')}`)
-    expect(labels[3]).toBe(`任务 1 · 建表 ${zh('progress.flow.attempt', { n: 2 })} ${zh('progress.plan.done')}`)
-    const badges = hooksOf(page, 'data-gw-progress-pnode-badge')
-    expect(badges.map((badge) => textOf(badge))).toEqual(['第 2 遍'])
-    for (const text of pageTexts(page)) expect(text).not.toContain(zh('progress.plan.done'))
-  })
-
-  it('draws the stuck line only while something is stuck', () => {
-    expect(hooksOf(pageOf(twoTaskRun())(), 'data-gw-progress-stuck')).toHaveLength(0)
-    expect(hooksOf(pageOf(finishedRun())(), 'data-gw-progress-stuck')).toHaveLength(0)
-    expect(hooksOf(pageOf(cancelledRun())(), 'data-gw-progress-stuck')).toHaveLength(0)
-    const failed = hookOf(pageOf(failedRun())(), 'data-gw-progress-stuck')
-    expect(failed.type).toBe('p')
-    expect(classesOf(failed)).toEqual(['gw-progress-stuck'])
-    expect(textOf(failed)).toBe('卡在 3：执行 第 1 遍没过')
-    expect(textOf(hookOf(pageOf(blockedRun())(), 'data-gw-progress-stuck'))).toBe('卡在 3：这一步没有回报')
-    expect(textOf(hookOf(pageOf(rejectedRun())(), 'data-gw-progress-stuck'))).toBe('卡在 4：3 稿全被退回')
-    // The line is a sibling after the graph, and before the Guardian card.
-    const page = pageOf(failedRun())()
-    const order = walk(page)
-    expect(order.indexOf(hookOf(page, 'data-gw-progress-stuck')))
-      .toBeGreaterThan(order.indexOf(hookOf(page, 'data-gw-progress-graph')))
-    if (hooksOf(page, 'data-gw-progress-guardian').length > 0) {
-      expect(order.indexOf(hookOf(page, 'data-gw-progress-stuck')))
-        .toBeLessThan(order.indexOf(hookOf(page, 'data-gw-progress-guardian')))
-    }
-  })
-
-  it('offers the dock’s one button where it could work, and no count line anywhere', () => {
-    const fill = () => false
-    expect(attr(hookOf(pageOf(waitingRun(), { fillDraft: fill })(), 'data-gw-progress-dock'), 'data-state')).toBe('start')
-    expect(textOf(hookOf(pageOf(waitingRun(), { fillDraft: fill })(), 'data-gw-progress-dock-fill'))).toBe(zh('progress.dock.start'))
-    expect(attr(hookOf(pageOf(finishedRun(), { fillDraft: fill })(), 'data-gw-progress-dock'), 'data-state')).toBe('accept')
-    expect(textOf(hookOf(pageOf(finishedRun(), { fillDraft: fill })(), 'data-gw-progress-dock-fill'))).toBe(zh('progress.dock.accept'))
-    // A run that is still working asks for no click, and a shell that cannot write the box
-    // offers no button rather than one that would do nothing.
+describe('the dock keeps one button', () => {
+  it('offers the start button, and no acceptance click on a finished run', () => {
+    const fill = () => true
+    const waiting = pageOf(waitingRun(), { fillDraft: fill })()
+    expect(attr(hookOf(waiting, 'data-gw-progress-dock'), 'data-state')).toBe('start')
+    expect(textOf(hookOf(waiting, 'data-gw-progress-dock-fill'))).toBe(zh('progress.dock.start'))
+    // The acceptance click is gone with the panel it belonged to: a finished run asks for no
+    // click at all, and the word the button carried is in neither dictionary.
+    const done = pageOf(finishedRun(), { fillDraft: fill })()
+    expect(hooksOf(done, 'data-gw-progress-dock-fill')).toHaveLength(0)
+    expect(texts(done)).not.toContain('收下这版')
+    expect(Object.keys(bundle.GROK_WORKFLOW_DICT.zh ?? {})).not.toContain('progress.dock.accept')
+    // A run that is still working asks for no click either.
     expect(hooksOf(pageOf(twoTaskRun(), { fillDraft: fill })(), 'data-gw-progress-dock-fill')).toHaveLength(0)
+    // The one button stops at the input box, and a shell that cannot write it offers none.
     expect(hooksOf(pageOf(waitingRun())(), 'data-gw-progress-dock-fill')).toHaveLength(0)
-    // The count line is gone: the header's sentence is the only step count on the page.
-    expect(hooksOf(pageOf(finishedRun())(), 'data-gw-progress-left')).toHaveLength(0)
-  })
-
-  it('carries no retired hook or class, anywhere in the tree', () => {
-    const retired = [
-      'data-gw-progress-flow',
-      'data-gw-progress-nodes',
-      'data-gw-progress-left',
-      'data-gw-progress-cols',
-      'data-gw-progress-col',
-      'data-gw-progress-subs',
-      'data-gw-progress-sub',
-      'data-gw-progress-sub-toggle',
-      'data-gw-progress-node-toggle',
-      'data-gw-progress-branch-side',
-    ]
-    const retiredClasses = [
-      'gw-progress-flow',
-      'gw-progress-nodes',
-      'gw-progress-cols',
-      'gw-progress-col',
-      'gw-progress-subs',
-      'gw-progress-sub',
-      'gw-progress-sub-dots',
-      'gw-progress-sub-dot',
-      'gw-progress-sub-word',
-      'gw-progress-sub-badge',
-      'gw-progress-sub-calls',
-      'gw-progress-node-toggle',
-      'gw-progress-left',
-    ]
-    for (const run of [twoTaskRun(), finishedRun(), failedRun(), waitingRun()]) {
-      const page = pageOf(run)()
-      for (const name of retired) expect(hooksOf(page, name), name).toHaveLength(0)
-      for (const element of walk(page)) {
-        for (const name of classesOf(element)) {
-          // `gw-progress-task` is retired outright: no class may carry it as a substring.
-          expect(name.includes('gw-progress-task'), name).toBe(false)
-          expect(retiredClasses.includes(name), name).toBe(false)
-        }
-      }
-    }
-    // …and the bundle does not keep the retired names for a later reader either.
-    for (const name of retired) expect(SOURCE.includes(name), name).toBe(false)
-  })
-})
-
-describe('the stylesheet', () => {
-  it('stays scoped, token-coloured and free of the retired page', () => {
-    expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
-    expect(progress.css).not.toMatch(/\brgba?\(/)
-    expect(progress.css).not.toMatch(/\bhsla?\(/)
-    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
-    expect(progress.css).not.toContain('overflow-x')
-    for (const rule of progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))) {
-      expect(rule.trim().startsWith('.gw-progress'), rule).toBe(true)
-    }
-    // Every colour is a design token, or a mix of one, and every family too.
-    expect(progress.css).toContain('var(--dsw-font-family-sans')
-    const colours = progress.css.match(/(?:^|[^-\w])(?:color|background|border-color|fill|stroke)\s*:\s*[^;]+/g) ?? []
-    expect(colours.length).toBeGreaterThan(10)
-    for (const declaration of colours) {
-      expect(declaration, declaration).toMatch(/var\(--dsw-alias-|transparent|currentColor|none|inherit/)
-    }
-  })
-
-  it('styles the panel’s own classes, and none of the ones it replaced', () => {
-    const styled = styledClasses()
-    for (const name of [
-      'gw-progress-line',
-      'gw-progress-graph',
-      'gw-progress-pnodes',
-      'gw-progress-pnode',
-      'gw-progress-pnode-body',
-      'gw-progress-pnode-dot',
-      'gw-progress-pnode-word',
-      'gw-progress-pnode-badge',
-      'gw-progress-pnode-dots',
-      'gw-progress-pnode-attempt',
-      'gw-progress-pnode-retry',
-      'gw-progress-stuck',
-      // Kept for the control that opens a node's calls.
-      'gw-progress-node-calls',
-    ]) expect(styled, name).toContain(name)
-    for (const name of [
-      'gw-progress-flow',
-      'gw-progress-nodes',
-      'gw-progress-cols',
-      'gw-progress-col',
-      'gw-progress-subs',
-      'gw-progress-sub',
-      'gw-progress-sub-dots',
-      'gw-progress-sub-dot',
-      'gw-progress-sub-word',
-      'gw-progress-sub-badge',
-      'gw-progress-sub-calls',
-      'gw-progress-node-toggle',
-      'gw-progress-left',
-    ]) expect(styled, name).not.toContain(name)
-  })
-
-  it('gives each state one token, keeps the unreached dashed, and stops the motion', () => {
-    const states: Array<[string, string]> = [
-      ['done', '--dsw-alias-state-success-primary'],
-      ['doing', '--dsw-alias-state-business-primary'],
-      ['pending', '--dsw-alias-state-idle-primary'],
-      ['failed', '--dsw-alias-state-warn-primary'],
-      ['blocked', '--dsw-alias-state-warn-primary'],
-      ['cancelled', '--dsw-alias-state-warn-primary'],
-    ]
-    for (const [state, token] of states) {
-      const dot = ruleWith(`.gw-progress-pnode[data-state="${state}"] .gw-progress-pnode-dot`)
-      expect(dot, `no dot rule for ${state}`).toBeDefined()
-      expect(dot).toContain(token)
-    }
-    const pending = progress.css.split('\n').find((line) => line.trim().startsWith('.gw-progress-pnode[data-state="pending"] .gw-progress-pnode-body {'))
-    expect(pending).toContain('border-style: dashed')
-    const reduced = progress.css.slice(progress.css.indexOf('@media (prefers-reduced-motion: reduce)'))
-    expect(reduced).toContain('animation: none')
-    expect(reduced).toContain('.gw-progress-pnode')
-    expect(reduced).toContain('.gw-progress-pnode-attempt')
-    // The ring marks the reader's place whatever state it is in.
-    expect(progress.css).toContain('.gw-progress-pnode[data-current="true"] .gw-progress-pnode-body')
-    // A phone wraps a label instead of cutting it.
-    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
-    expect(narrow).toMatch(/\.gw-progress-pnode-word \{[^}]*overflow-wrap: anywhere/)
   })
 })

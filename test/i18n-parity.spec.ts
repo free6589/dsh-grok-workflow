@@ -87,10 +87,28 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.flow.visit', '第 {n} 次', 'Visit {n}'],
   ['progress.flow.draft', '第 {n} 稿', 'Draft {n}'],
   ['progress.flow.attempt', '第 {n} 遍', 'Attempt {n}'],
-  // The task panel's own eleven keys (the operator's panel brief, §21 → the panel): the one
+  // The fork panel (2026-11-26, contract §26): the acceptance as a place rather than a leg, the
+  // six lights a task card carries, the five the run is verified against, and the two words that
+  // name those two rows of lights — plus the two words of the sheet a narrow screen opens a list in.
+  ['progress.flow.accept', '验收', 'Accept'],
+  ['progress.ring.plan', '规划', 'Plan'],
+  ['progress.ring.execute', '执行', 'Execute'],
+  ['progress.ring.check', '检查', 'Check'],
+  ['progress.ring.review', '复核', 'Review'],
+  ['progress.ring.accept', '验收', 'Accept'],
+  ['progress.ring.summarize', '汇总', 'Summarize'],
+  ['progress.verify.machine', '机器远端', 'Remote machine'],
+  ['progress.verify.model', '模型复核', 'Model review'],
+  ['progress.verify.isolated', '真机隔离', 'Isolated real machine'],
+  ['progress.verify.human', '人验', 'Human review'],
+  ['progress.verify.ledger', '对账', 'Ledger reconciliation'],
+  ['progress.panel.rings', '六环', 'Six stages'],
+  ['progress.panel.checks', '五验', 'Five checks'],
+  // The task panel's own keys (the operator's panel brief, §21 → the panel): the one
   // sentence under the title, the estimate and what it rests on, the three stuck verdicts,
-  // the three durations that spell the estimate, the trace's one word and the figure's
-  // reader label. They replace the count line and the flow's label, which are gone.
+  // the three durations that spell the estimate, the trace's one word, the figure's
+  // reader label, and the two words of the sheet a narrow screen opens a list in. The first
+  // eleven replace the count line and the flow's label, which are gone.
   ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
   ['progress.panel.etaBasis', '按 {n} 个已完成步骤的实测耗时推算', 'from the {n} finished steps actually measured'],
@@ -102,6 +120,10 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.panel.durationHour', '{h} 小时 {m} 分', '{h}h {m}m'],
   ['progress.panel.trace', '看线', 'Trace its wires'],
   ['progress.panel.graph', '任务图', 'Task graph'],
+  // The sheet a narrow screen draws an opened list in: what it holds, and the one control
+  // that puts it away. Wide pages print neither word.
+  ['progress.panel.calls', '调用', 'Calls'],
+  ['progress.panel.collapse', '收起', 'Hide'],
   // The state words a node speaks and never prints (`aria-label`).
   ['progress.plan.waiting', '等着', 'Waiting'],
   ['progress.plan.running', '在做', 'Doing'],
@@ -124,7 +146,6 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.final.rejectedStage', '卡在{stage}', 'Held at {stage}'],
   ['progress.final.rejectedReason', '最后不过：{reason}', 'Last failure: {reason}'],
   ['progress.dock.start', '开工', 'Start'],
-  ['progress.dock.accept', '收下这版', 'Accept this version'],
   ['progress.dock.fill', '确认', 'yes'],
   ['progress.dock.filled', '已填进输入框，按发送', 'Filled the box; press send'],
 ]
@@ -209,6 +230,9 @@ const REDESIGN_DELETED: readonly string[] = [
   // The one step sentence replaced the first; the figure's `aria-label` is `progress.panel.graph`.
   'progress.flow.left',
   'progress.flow.aria',
+  // The fork panel's own retirement (2026-11-26): the acceptance became a place on the figure,
+  // and the user acceptance click that used to sit in the dock went with it.
+  'progress.dock.accept',
 ]
 
 /** The namespaces §19.3 deletes whole; no key may carry one of these prefixes. */

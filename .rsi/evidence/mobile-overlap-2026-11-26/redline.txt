@@ -1,0 +1,283 @@
+# 红线探针 — 手机重叠修复，2026-11-26
+
+这个块在同一台机器上跑了**两轮 soak**，红线读数按轮次分成两部分：
+
+- **第一部分（§1–§15）**：第一轮 `10c15a0`，含准备工作与收尾复读。
+- **第二部分（§16–§20）**：第二轮 `5ba1ca2`，收尾复读，与第一轮开跑前的读数逐字对照。
+
+---
+
+# 第一部分：第一轮 `10c15a0`（准备 20:08–20:13，收尾 20:50）
+
+本轮准备阶段实测到的红线读数。装包、跑工作流、拍照都不在这一节（见 §6）。
+
+## 1. 结论先说
+
+`~/.dsh` 在整个会话里是**只读**的，写入探针两次都是 `Read-only file system`；live 的
+三个目录 mtime 前后**逐位相同**；3080 那个实例**一次没碰**（两次状态码都是 401，没有重启、
+没有重载、没有改设置）。
+
+## 2. 只读是怎么成立的
+
+```
+$ findmnt -no SOURCE,TARGET,OPTIONS --target /home/fish/.dsh
+/dev/mapper/omarchy_root[/@home] /home ro,nosuid,nodev,noatime,...
+                                                       ↑ 整个 /home 是 ro
+$ awk '$5 ~ /dsh-grok-workflow/ {print}' /proc/self/mountinfo
+... /home/fish/projects_mine/dsh-grok-workflow rw,nosuid,nodev,...
+                                                 ↑ 只有工作目录被单独 rw 挂回来
+```
+
+所以：工作目录（含 `.tmp/`、`.rsi/evidence/`）可写，`~/.dsh` 经只读的 `/home` 不可写。
+这不是约定，是挂载事实。
+
+## 3. 写入探针（原文）
+
+```
+$ bash -c ': > ~/.dsh/.soak-probe'          # 20:09，动任何东西之前
+bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+exit: 1
+$ ls -la ~/.dsh/.soak-probe
+ls: cannot access '/home/fish/.dsh/.soak-probe': No such file or directory
+```
+
+```
+$ bash -c ': > ~/.dsh/.soak-probe'          # 20:13，准备做完之后
+bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+exit: 1
+```
+
+两次都失败，文件没有出现。
+
+## 4. 三个 mtime 与 3080（前 / 后）
+
+```
+                        BEFORE (20:09)                      AFTER PREP (20:13)
+~/.dsh                  2026-11-25 23:14:14.025606767       2026-11-25 23:14:14.025606767
+~/.dsh/profiles         2026-11-22 16:59:46.687805286       2026-11-22 16:59:46.687805286
+~/.dsh/profiles/web     2026-11-26 19:41:49.334856619       2026-11-26 19:41:49.334856619
+
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/
+401     (20:09)          401     (20:13)
+```
+
+纳秒位都一样。这一轮执行过的 `dsh` 只有一条 `dsh --version`（打印 `0.2.2-rc.3`），
+其余全是 `node` / `stat` / `curl` / `findmnt` / `sha256sum` / 克隆脚本。
+live 的插件版本读回 **0.13.53**（上一次发布升上去的，本轮没动）。
+
+## 5. 端口
+
+用真实的 `net::Server.listen()` 绑 127.0.0.1 试，不是只看 `ss`：
+
+```
+3412 BIND-OK(free)   3413 BIND-OK(free)   3421 BIND-OK(free)
+3455 BIND-OK(free)   3477 BIND-OK(free)
+```
+
+**定 3421**（避开 3080，也避开上一轮用过的 3411）。选中之后又绑了一次作为复核：
+
+```
+bind ok on 127.0.0.1:3421
+ss -ltn | grep ':3421$'  → 没有监听
+ss -ltn | grep ':3411$'  → 没有监听（上一轮用过，本轮不重用）
+```
+
+## 6. 这一轮没做的事
+
+- 没有 `npm run build`、没有 `npm pack`、没有 `dsh plugin add`（装包要等放行）。
+- 没有 `dsh --profile web-clone` 起隔离实例，因此也没有任何截图、没有任何工作流运行。
+- 没有重启、重载、改写 3080 那个实例；没有 push、tag、publish。
+- 取样脚本只做了**离线**自检（§7），没有连任何实例。
+
+## 7. 取样脚本的离线自检（证明"数"算得对）
+
+`node capture-phone.mjs --self-test` 用三份本地构造的页面（不联网、不连实例）验证相交面积
+的算法：
+
+```
+ok   floating list over the card below it (the defect)  overlapAreaTotal 12480 · 1 hit (task-2) · dock 0
+ok   sheet at the bottom, clear of every card           overlapAreaTotal 0 · 0 hits · dock 0
+ok   sheet that eats the dock                           overlapAreaTotal 0 · dock 15600
+     （第三份同时读出 dockFillOverlapArea 7800，说明 fill 那一路也在量）
+self-test: all fixtures agree   exit 0
+```
+
+第一份就是"改之前"的形态（浮出来的列表压住下面那张卡），面积手算 390 × 32 = 12480，一致。
+自检时踩到并修掉的一个真问题：移动上下文里如果不带 `viewport` meta，布局视口是 980 px 宽、
+矩形会被缩放（上一轮 `§7.2` 犯的是同一类错），所以夹具和判断都按真的 meta 走。
+
+## 8. 下一轮的陷阱：这个 shell 已经导出了 live 的值
+
+```
+DSH_HOME=/home/fish/.dsh
+DSH_PROFILE=web
+DSH_PROFILE_DIR=/home/fish/.dsh/profiles/web
+```
+
+上一轮有一次 `dsh web --help` 漏带 `DSH_HOME`，它去写了 live 的 `cordis.yml`，被只读挡住。
+本轮的规矩是每条 `dsh` 命令都显式带 clone，并且把三个环境变量一起清掉：
+
+```
+env -u DSH_PROFILE -u DSH_PROFILE_DIR DSH_HOME=$PWD/.tmp/soak-overlap/dsh-home dsh ...
+```
+
+## 9. 分支现状（准备时读到的事实，不是判断）
+
+```
+$ git -C .tmp/wt-mobile-overlap log --oneline -1
+fe6d631 docs(memory): record the 0.13.53 release
+$ git -C .tmp/wt-mobile-overlap status --porcelain
+ M src/client/index.js
+$ git rev-parse fix/mobile-overlap main
+fe6d6313e99bf0c48ca5af0e0840630feaba9e4e
+fe6d6313e99bf0c48ca5af0e0840630feaba9e4e     ← 两条 ref 同一个提交
+```
+
+20:08 时 worktree 与 `main` 完全一致（无提交、无改动）；20:12 再看，`src/client/index.js`
+已被改动、尚未提交。也就是说修复**正在被写**。放行时要么等它提交，要么就从工作树打包
+（打包前记 `git status` 与两个哈希，写进下一轮的 `install.txt`）。
+
+## 10. 写了什么，写在哪
+
+| 路径 | 是什么 |
+| --- | --- |
+| `.tmp/soak-overlap/dsh-home/profiles/web-clone/**` | 隔离 home（从 `~/.dsh/profiles/web` 克隆，7753 文件 / 5 链接），下一轮装包用 |
+| `.tmp/soak-overlap/clone.txt` | 克隆器的完整报告（JSON） |
+| `.tmp/soak-overlap/work/` | 一次性工作区（空目录） |
+| `.rsi/evidence/mobile-overlap-2026-11-26/capture-phone.mjs` | 本轮取样脚本（含离线自检） |
+| `.rsi/evidence/mobile-overlap-2026-11-26/redline.txt` | 本文件 |
+
+`git status` 里另有别人留下的两行，不是本轮的：`.gitignore`（加了本地设计稿的忽略规则）、
+`.rsi/evidence/progress-now/`（另一个块的证据目录）。
+
+---
+
+# 第二部分：装包、跑工作流、拍图之后的复读（20:50）
+
+放行后做的：装包 → 起实例（端口 3431）→ 跑真工作流（两遍，见 README §1）→ 拍四张图 →
+停实例 → 删 `.tmp/soak-overlap/` → 再读一遍同样的三项。下面每一条都能和 §3/§4 逐字对照。
+
+## 11. 写入探针（第三次，收尾时）
+
+```
+$ bash -c ': > ~/.dsh/.soak-probe'
+bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+exit: 1
+$ ls ~/.dsh/.soak-probe
+ls: cannot access '/home/fish/.dsh/.soak-probe': No such file or directory
+```
+
+## 12. 三个 mtime 与 3080（准备前 / 收尾后）
+
+```
+                        BEFORE (20:09)                     AFTER (20:50)
+~/.dsh                  2026-11-25 23:14:14.025606767      2026-11-25 23:14:14.025606767
+~/.dsh/profiles         2026-11-22 16:59:46.687805286      2026-11-22 16:59:46.687805286
+~/.dsh/profiles/web     2026-11-26 19:41:49.334856619      2026-11-26 19:41:49.334856619
+
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/
+401     (20:09)          401     (20:50)
+```
+
+纳秒位一致。中间这一小时里做过：克隆（只读源）、`dsh plugin add`（写的是克隆的 profile）、
+起了一个跑在 3431 的隔离实例、跑了两遍工作流（写的是 `.tmp/soak-overlap/work`）、四张截图。
+live 那边一行没写：`dsh` 的每条命令都带 `DSH_HOME=<克隆>`，且 `dsh --version` 之外没有别的
+触碰 live 档案的命令。
+
+## 13. 隔离实例的生命周期
+
+```
+3421   bind-ok → bind-ok → 起进程时 EADDRINUSE（被别人占了，见 install.txt §7）
+3431   bind-ok（起进程前）→ LISTEN 127.0.0.1:3431 → 收尾停掉 → 已释放（ss 无该端口）
+```
+
+live 的 3080 一次没重启、没重载、没改设置。
+
+## 14. 收尾删掉了什么
+
+```
+.tmp/soak-overlap/                  ← 克隆 home（104 MB）、tgz（1 029 904 B）、npm 缓存、
+                                           boot.log、capture 日志、一次性工作区（含三个写出的文件）
+保留        .rsi/evidence/mobile-overlap-2026-11-26/   ← 只有读数、脚本、图、本文件
+```
+
+删之前核对过绝对路径是 `/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-overlap`，
+删完 `ls .tmp | grep soak-overlap` 无输出。
+
+## 15. 收尾时 `git status` 的四行，逐行解释
+
+| 行 | 是谁的 |
+| --- | --- |
+| ` M .gitignore` | 不是本轮的（别的块加的本地设计稿忽略规则，20:08 之前就在） |
+| `?? .rsi/evidence/mobile-overlap-2026-11-26/` | **本轮的**：README、install.txt、redline.txt、脚本、soak/ 四张图与读数 |
+| `?? .rsi/evidence/progress-now/` | 不是本轮的（上一轮就存在） |
+| `?? us-weather-week.html` | 不是本轮的（20:48:18 出现在仓库根，别的块或另一个 agent 的临时物；本轮没有下载过任何网页） |
+
+本轮没有在仓库根、`docs/`、`src/` 写任何临时物；`lib/`、`src/`、`test/` 在 worktree 里，
+构建前后 `git status` 都是空的。
+
+
+
+---
+
+# 第二部分：第二轮 `5ba1ca2`（21:00–21:18）
+
+## 16. 写入探针（第四次，第二轮收尾时）
+
+```
+$ bash -c ': > ~/.dsh/.soak-probe'
+bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+exit: 1
+$ ls ~/.dsh/.soak-probe
+ls: cannot access '/home/fish/.dsh/.soak-probe': No such file or directory
+```
+
+## 17. 三个 mtime 与 3080（第一轮开跑前 / 第二轮收尾后）
+
+```
+                        BEFORE (20:09, 第一轮)              AFTER (21:18, 第二轮收尾)
+~/.dsh                  2026-11-25 23:14:14.025606767      2026-11-25 23:14:14.025606767
+~/.dsh/profiles         2026-11-22 16:59:46.687805286      2026-11-22 16:59:46.687805286
+~/.dsh/profiles/web     2026-11-26 19:41:49.334856619      2026-11-26 19:41:49.334856619
+
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/
+401     (20:09)          401     (21:18)
+```
+
+跨两轮、两次克隆、两次装包、四遍取样（第一轮 2 遍 + 第二轮 3 遍，其中一遍白跑，见 install.txt §14）、
+五次工作流运行之后，live 的三个 mtime 连纳秒位都和开跑前一样。live 的插件版本仍是 `0.13.53`（没升）。
+
+## 18. 隔离实例的生命周期（第二轮）
+
+```
+3431   bind 实测 OK（3431/3432/3441/3451/3461 全 free）→ 起进程前再 bind 一次 → LISTEN
+       → 白跑一次（profile 里还是已发布的构建）→ 停 → 装 tgz → 再引导 → LISTEN
+       → 三遍取样 → 收尾停掉 → 已释放（ss 无该端口）
+```
+
+3080 一次没重启、没重载、没改设置。
+
+## 19. 收尾删掉了什么（第二轮）
+
+```
+.tmp/soak-overlap/     ← 重新克隆的 home（104 MB）、tgz（1 031 079 B）、npm 缓存、boot.log、
+                          capture.log、一次性工作区（notes.md 96 B / test.txt 6 B / third.txt 4 B）
+保留 .rsi/evidence/mobile-overlap-2026-11-26/   ← README、install.txt、redline.txt、脚本、
+                                                   soak/（第二轮读数与图）+ soak/round1-10c15a0/（第一轮）
+```
+
+删之前核对过绝对路径是 `/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-overlap`，
+删完 `ls .tmp | grep soak-overlap` 无输出。
+
+## 20. 收尾时 `git status` 的四行（与第一轮相同，一行没变）
+
+| 行 | 是谁的 |
+| --- | --- |
+| ` M .gitignore` | 不是本块的 |
+| `?? .rsi/evidence/mobile-overlap-2026-11-26/` | **本块的**（两轮的证据都在里面） |
+| `?? .rsi/evidence/progress-now/` | 不是本块的 |
+| `?? us-weather-week.html` | 不是本块的（20:48:18 出现在仓库根） |
+
+worktree `.tmp/wt-mobile-overlap` 里那三个**未提交**的文档改动（`CHANGELOG.md`、
+`docs/knowledge/DECISIONS.md`、`docs/knowledge/DESIGN-progress-tab.md`）是另一条线在写记忆，
+本块从头到尾没有 stage、没有 commit、没有改一个字节；`install.txt` §9 照实记了它们。

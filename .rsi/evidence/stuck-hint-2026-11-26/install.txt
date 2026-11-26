@@ -1,0 +1,28 @@
+$ git rev-parse --short HEAD
+fe6d631
+$ git describe --tags --always
+v0.13.53-1-gfe6d631
+$ node -p "require(\"./package.json\").version"
+0.13.53
+$ node -v
+v26.8.1
+$ npm -v
+11.19.0
+$ dsh --version
+0.2.2-rc.3
+$ npm run build
+  client bundle: 399448 bytes -> lib/client.js
+$ cmp lib/client.js src/client/index.js
+  IDENTICAL
+$ sha256sum lib/client.js lib/index.js
+1fb003f3f608d0fb7b053504456defdc476c59f88f68b753a3357196f2c1b81f  lib/client.js
+ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32  lib/index.js
+$ npm pack --pack-destination .tmp/stuck-hint
+  1027274 .tmp/stuck-hint/dsh-grok-workflow-0.13.53.tgz
+35485d31c6abbc3e233aae6364e9924edc3d2386bd5dda62cb4feeb20dcb3a13  .tmp/stuck-hint/dsh-grok-workflow-0.13.53.tgz
+$ node -p "require(\"<profile>/package.json\").dependencies[\"dsh-grok-workflow\"]"
+file:/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-readings-refresh/.tmp/stuck-hint/dsh-grok-workflow-0.13.53.tgz
+$ node -p "require(\"<profile>/node_modules/dsh-grok-workflow/package.json\").version"
+0.13.53
+$ find <plugin dir> -type l | wc -l
+0

@@ -1,3 +1,112 @@
+## 2026-11-27 — release/0.13.54 第二条合流（`fix/mobile-overlap` 手工融合成横排分叉）**（融合中未提交；门禁 `tsc 0 / oxlint 14w0e / 5 files 247 passed`；两边功能并存已由 spec 钉住**
+
+- **From:** 合流执行的这一块 · **To:** 主代理（验收 merge + 决定 mobile-overlap 分支去留的人）
+- **合了什么（`CONFIRMED`，本树实测）**：基线 `7cc8db7`（横排分叉已合）+ `fix/mobile-overlap`（`a3b80c4`，手机抽屉）。
+  产品代码手工融合（非批发 checkout）：i18n 键取并集（rings/checks + calls/collapse 都留）、窄屏断点与抽屉函数整体保留、
+  横排布局常量与六环五验模型保留；`lib/client.js` 重建与 `src/` 逐字节相同。test 断言兼容新模型
+  （旧节点名映射到 t1/u1_s2/sum，两处全表守卫收窄到各自盒子）。已验证无必须二选一的签名死结。
+- **门禁（本树实测，可照抄复现）**：`tsc --noEmit` `EXIT=0`；`oxlint src test` `Found 14 warnings and 0 errors.`；
+  5 份相关 spec `5 files / 247 passed`（client 153 + progress-panel 48 + progress-panel-model 23 + progress-connector 15 + i18n-parity 8）。
+  整仓套件与 `npm run ci` 是 `NOT_RUN`（留给发版那一轮）。
+- **待主代理裁决**：`fix/mobile-overlap` 到期日 2026-12-03 的去处（合后可删）；桌面 >720px 叠压仍故意不修（留给下一个决定）。
+
+## 2026-11-27 — 横排分叉进度页（`feat/task-fork`）**（已合入本分支 `7cc8db7`；门禁 `8 files / 331 passed`、真机 soak 七张读数都过；四条缺陷由真机截图抓到并已修**
+
+- **From:** 这一块（模型那一半 + 契约 + 记忆；排版那一半同分支、同文件的不同区段）· **To:** 决定这条分支去留的人 / 下一个补测的人
+- **用户看到的一件事（`CONFIRMED`）**：进度页是一张**横排分叉**——起点 → 规划（分叉）→ 任务 1 / 任务 2 … → 每条任务的子任务 → 汇合 → 验收 → 终点。
+  七列永远画齐；每张任务卡带**六盏灯**（规划 / 执行 / 检查 / 复核 / 验收 / 汇总），验收一列带**五盏验**（机器远端 / 模型复核 / 真机隔离 / 人验 / 对账），
+  **灯只照着真报过的记录折**（重试补上的失败是绿的，没人跑过的验是暗的）。图每次渲染从事件行重推，重规划会自己长出新任务与它的线。
+  **dock 只剩「开工」**，`progress.dock.accept`（收下这版）已从两本字典删除；结构文本改成 `flowchart LR`，每种状态都是一张连通的图。
+- **做完了什么（`CONFIRMED`）**：`src/client/index.js` 的 i18n 两张表（`progress.*` **64 → 77**）与面板模型区（`derivePanelGraph(run, t)` 的签名与导出名未变）；
+  `lib/client.js` 重建为字节副本（**422 685** 字节 / `sha256 c6387e1b…be0186`，`cmp` 空输出）；
+  `test/progress-panel-model.spec.ts` 重写（23 条）、`test/i18n-parity.spec.ts` 只改 `progress.*` 那几行；
+  契约 `DESIGN-progress-tab.md` **§26**（§25 被取代、§21–§24 的界面形状一并退场，§22 的退回事实链仍成立）、裁决 **`D-175`**、`CHANGELOG.md` 的 `[Unreleased]`、`STATE.md` 与 `VALIDATION.md` 各一条。
+  排版、样式、DOM 钩子与 `test/progress-panel.spec.ts`（38 条）/ `test/progress-connector.spec.ts`（15 条）是同一块的另一半。
+- **门禁（本树实测，可照抄复现）**：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`npx oxlint src test` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+  八份进度 spec **`8 files / 331 passed`**。**整仓套件与 `npm run ci` 是 `NOT_RUN`**（§12），合并 / 发版那一步要跑。
+- **真机（`CONFIRMED`，隔离档案：克隆 live `web`、`DSH_HOME` 走 scratch、端口 **3412**、真模型、三个任务的真工作流，收尾已拆）**：
+  装的是 `file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz`（**1 033 214** 字节 / `sha256 b5b7d208…3c46` / 164 文件），读回 **`0.13.53`**、客户端 sha 与工作树相同、软链 **0** 个；
+  七张读数（桌面 1500 进行中 **11 / 12**、完成 **17 / 24**、点开一颗 **17 / 24** 且调用 **1** / 亮 **9** 暗 **20**；手机 390 三张同计数；native-390 完成 17 / 24）、
+  **18 盏环 = 3 × 6**、**5 盏验**（`machine=done, model=done, isolated/human/ledger=pending`）、完成态 `dock-fill` **0**、无卡住那句、
+  `-source` 首行 `flowchart LR` 且节点/线计数与 DOM 相符、一个连通块、`scrollWidth === clientWidth` 两档成立、控制台 0 / 页面异常 0。
+  四条缺陷（「汇总」裁成「汇」、调用行一字一行、邻居卡盖住列表、列表透出背景）**是真机截图抓到的**，修在同一分支、各带守卫。
+- **下一个块必须做的三件（按顺序）**：
+  1. **给 `feat/task-fork` 一个去处**（`AGENTS.md` §5 的「合 / rebase / 删」三选一），**到期日占位 `2026-12-04`**（主代理合并时可改）。
+     合的时候整仓门禁跑一次（`TMPDIR=$PWD/.tmp npm run ci`），`lib/client.js` 必须已是 `src/` 的字节副本，`CHANGELOG` 那一条已写好、不要加数字。
+  2. **`progress.flow.visit` 已经没有代码读它了**（访问号角标随旧版退场，它只剩在两本字典里）：删 / 留由裁决，
+     删的话两本字典一起删、并加进 `test/i18n-parity.spec.ts` 的删除清单。
+  3. **补测上面那串 `NOT_RUN`**：原生手机的**进行中**、等你点头态（`开工`）在真机上、分支上的 `· 第 n 遍`（要制造一次重试）、
+     深色主题、320 px、读屏软件、Firefox / Safari、真 Mermaid 渲染器。
+- **复现门禁的准确命令（在本 worktree 里）**：
+  ```text
+  cd /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-task-fork
+  node scripts/build-client.mjs                 # 期望：client bundle: 422685 bytes → lib/client.js
+  cmp lib/client.js src/client/index.js         # 期望：空输出
+  npx tsc -p tsconfig.json --noEmit             # 期望：无输出，EXIT=0
+  npx oxlint src test                           # 期望：Found 14 warnings and 0 errors.（187 文件 / 96 规则）
+  TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/progress-panel.spec.ts \
+    test/progress-panel-model.spec.ts test/progress-connector.spec.ts test/progress-hint-absent.spec.ts \
+    test/i18n-parity.spec.ts test/progress-tab.spec.ts test/progress.spec.ts
+                                                # 期望：8 files / 331 passed
+  ```
+- **红线照实记**：本块每条会改文件的命令都带 `DSH_HOME=<clone>`；`~/.dsh/profiles` 的 mtime **未变**（`2026-11-22 16:59:46`）；
+  `~/.dsh`（`2026-11-27 00:22:48`）与 `~/.dsh/profiles/web`（`2026-11-27 01:01:27`）**在本块期间变过但不是本块的写**
+  （live 档案自己的设置写入 + 另一个块的插件作业）；3080 **401 → 401**；live 那份载荷 sha `1fb003f3…` 不是本块的，live 仍钉 `0.13.53`、**没有升级**。
+
+## 2026-11-26 — **手机上摊开的调用搬出那张图**（`fix/mobile-overlap`，产品提交 **`10c15a0`** + **`5ba1ca2`**，基线 `main` 尖端 `fe6d631`；**未合、未推、未打 tag、未发版，版本仍是 `0.13.53`**）；隔离档案真装真跑两轮，四项硬指标到齐；**这条分支要在 2026-12-03 之前有个去处（合 / rebase / 删）**
+
+- **From:** `fix/mobile-overlap` 这一块的记忆与真机 soak（两轮）· **To:** 决定这条分支去向的人 / 接着处理桌面那处叠压的人
+- **这一支是什么（产品层面）**：进度页那张任务图上点一颗节点，摊开的调用列表原来是从节点下面浮出来的绝对定位块，
+  手机上**压在隔壁那张卡上**、桌面 1500 遮住「检查」的一部分。现在 **≤ 720 px 时列表离开那张图**，成了面板自己那一列里的一张抽屉
+  （图之后、卡住那句与 dock 之前）——它只能把页面往下推，所以压不到任何一张卡、也盖不住 dock 的按钮；**点完它落在屏幕中间**，
+  不用再滚一下才看得见（宿主把输入框钉在屏幕底边，原来贴底边等于看不见）。**> 720 px 一个字没改**。
+  抽屉里装的东西一件没少：同样的调用行、同样的 `id`（节点的 `aria-controls` 仍指得到）、最窄的屏幕上照样带时刻列；
+  每组第一行写着那张卡自己的名字；右上多一个「收起」，是同一条开关的第二个入口。新增两颗文案键（`progress.panel.calls` / `progress.panel.collapse`）。
+- **身份（`CONFIRMED`，本轮自己读）**：HEAD = **`5ba1ca2`**（父 `10c15a0`，**不是 amend**）、`git describe` = **`v0.13.53-3-g5ba1ca2`**、
+  `git tag --contains HEAD` = **0**、版本 **`0.13.53`**；`10c15a0` = **5 文件 / +585 −26**、`5ba1ca2` = **3 文件 / +113 −8**；
+  浏览器包 **412 345** 字节 / `sha256 8cd45211…7bb599`（`lib/client.js` 与 `src/client/index.js` 逐字节相同，构建可复现）；
+  服务端、`package.json`、版本号一个字节没动（`lib/index.js` 仍是 `ac69070e…`）。
+- **跑过什么（`CONFIRMED`）**：门禁 `npm run typecheck` **0** / `npm run lint` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）/
+  八份进度 spec **`8 files / 336 passed`**（`progress-panel` **35**，基线 326 → 336，没有一份变少、没有一份被删）；
+  **整仓全量套件（这一块唯一一次全量，不是 `npm run ci`）**：`TMPDIR=$PWD/.tmp npx vitest run` **`105 files / 2040 passed`**、
+  `Duration 106.15s`（转录 worktree 的 `.tmp/suite-5ba1ca2.out`，gitignored）；对照基线 `fe6d631` 的 **105 / 2030** 是文件数不变、用例 +10；
+  **`npm run ci` 五步（含 `verify:lib`）是 `NOT_RUN`**，留给发版那一轮。
+  隔离档案（`.tmp/soak-overlap/dsh-home`，端口 3431，包 **1 031 079 B** / `sha256 9015b15b…aa7c95e`）里两轮真跑，证据 `.rsi/evidence/mobile-overlap-2026-11-26/`：
+  第一轮 `10c15a0` 证「不压卡」（抽屉在 16 张卡之外、与每张卡相交 0、与 dock 0 / 0）、第二轮 `5ba1ca2` 证「点完当下就看得见」
+  （390 抽屉 `407→512`、360 `385→490`，完全在视口内；对输入框上沿 676 / 632 的余量 **164 / 142 px**；
+  与卡相交 0、与 dock / dock-fill 0 / 0、无横向滚动）；「占位拿掉再放回、dock `delta = 0`」那条决定性实验也在 `soak/interaction.json`。
+- **没跑什么（`NOT_RUN`）**：**多行抽屉**（这一轮所有可摊开节点都只有 1 行调用，四行那一档没复现；105 px 抽屉的余量是真的，
+  换成约 207 px 会怎样没量）、**>720 px 那一侧本轮没复测**、**720 / 721 断点边界**、**`matchMedia` 的 `change` 监听**（拖窗口跨断点不刷新）、
+  **同时摊开两组节点**、「收起」按钮只在 390 验过、**421–499 px** 之间的宽度、旋转 / 现场改视口、读屏软件、Firefox / Safari、
+  live 档案升级与重载（红线）。逐条都在 `.rsi/evidence/mobile-overlap-2026-11-26/README.md` §10 与 `VALIDATION.md` 的那一条里。
+
+### 交出去的时候还剩什么
+
+1. **这条分支的去处（到期日 2026-12-03）**：`AGENTS.md` §5 要求长期分支有一个决策日期——**2026-12-03 之前合 / rebase / 删**。
+   这一支的形状是：产品 + 用例 + `lib/` 两颗提交（`10c15a0` → `5ba1ca2`），记忆与证据在各轮之上，`main` 从头到尾没被它碰过。
+2. **这条分支没推，远端没有它。** `git ls-remote --heads origin 'refs/heads/fix/mobile-overlap'` 是空输出、本地也没有远端跟踪引用；
+   要合的人得从**本机**拿这一支（`git fetch <这台机器的路径>` 或者在本机直接合），别以为远端已经有了。
+3. **桌面 > 720 px 那处叠压仍在，这一轮故意不修。** 1500 px 展开时遮住「检查」的一部分，改前改后读数都是 2 / 9（一张压 2 张卡、四张压 9 张）。
+   这是留给**下一个决定**的：浮层 / 侧栏 / 换成别的摆放都没有证据，也没有板——先定一条决定，再动宽屏那一侧，别顺手改。
+4. **真机没覆盖的那几档**：多行抽屉（四行）、720 / 721 那一像素、拖窗口跨断点（`change`）、两组同时摊开、360 上的「收起」按钮、
+   读屏软件、Firefox / Safari。要补哪一档，读数脚本与断言都在证据目录里（`soak/capture-phone.mjs`、`soak/verify-readings.mjs`），
+   改动量是「跑一次 + 加一条读数」，不需要重做面板。
+## 2026-11-26 — 判决写入诚实化（`fix/verdict-honest`，worktree `.tmp/wt-verdict-honest`，基线 `main` 尖端 `fe6d631`，**未合、未推、未打 tag、版本仍 `0.13.53`**）
+
+- **From:** 5 并行第 5 块（`agent-226`，包工头自己写）· **To:** 合流的主代理 / 下一个接手判决面的人
+- **做了什么（`CONFIRMED`，分支上的提交与用例为准）**：关单「跳过监工」那次从 `pass` 改成第三种结局 `skipped`
+  （`VerdictOutcome` + 写侧校验）；验收行保持 `met:true` + `SKIPPED_JUDGE_NOTE`（单条验收只有布尔，这一对是「没有判决」，读的人走 `outcome`）；
+  跳过仍把块收成 `accepted`（开关是接单时策略，且同证据再关单只回那一行，不收就是卡死），但答复同时给 `judged:false` + `not_judged`；
+  读侧 `verdictView` 加派生 `judged`、`grok_block_status` 加 `skips`、同证据提示语在跳过时改说「按跳过监工记过一次」；
+  范围否决的 `why` 现在带批准目录（没目录就写「按进程当前目录 X 解析」）与声明/批准两侧的绝对路径，`criterion`/`evidence` 仍是调用方原拼写。
+- **用户看到什么**：交工时说「没有判过」，不再说「通过」；被范围拒的时候，理由能自己核对，不用凭信。
+- **跑过什么**：`tsc` `EXIT=0`、`oxlint src test` `14 warnings / 0 errors`、`block-ledger + block-supervisor + block-tools + block-preview`
+  **4 文件 / 175 通过**、`npm run build` `client bundle: 399448 bytes`、**提交后** `npm run verify:lib` 读回逐字节相同。细节与命令在 `VALIDATION.md`。
+- **没做（照实记）**：**真机隔离 soak `NOT_RUN`**（本块只跑确定性门禁与真实文件系统的路径用例）；没有 push、没有合、没有发版、没有碰 live 档案。
+- **下一步**：由主代理决定合流顺序；合流后按 §12 只跑一次发布门禁，不需要为这条改动单独抬版本。
+- **一处已知的读侧边界（不是缺陷，要写下来）**：旧构建读到 `skipped` 行会**跳过那一行**（读侧一贯「不认识就跳过」），所以**不承诺降级**；
+  新构建读老行没有任何变化。
+
 ## 2026-11-27 — 0.13.54 合版 BLOCKED（跑命令的工具没恢复，合流零条）**（主检出 `0.13.53` 没动；`feat/task-fork` 两提交未合未推货齐；`release/0.13.54` 没建；127/256 轮用户新指令：脏树自动弄干净，等工具恢复合版时一并执行；等工具恢复即重派）**
 
 - **From:** 主代理本轮（只读验货 + 记忆落盘，没动手）· **To:** 工具恢复后重派合版的人
@@ -12,7 +121,6 @@
   过期两行是 `raw-readings-phone.json` 里 `phone-360-done` 与 `tablet-700-done` 的 `1/5/19` 改成 `0/0/0`，旧值原样留在同条 `supersededFirstPass` 里；
   正名哪张改哪张在本次只读范围没落实，`CORRECTION` 只写命名不一致但明确未改动）；
   ⑤ 删死键、给无号分支补标识、升级须知写清不承诺降级。
-
 ## 2026-11-26 — 0.13.53 发布（main）**（合并提交 `c698a36`、发布提交 `50b3341`、附注标签 `v0.13.53` 对象 `8a0f9be0…`、两个远端 run 都 success、Release 资产 **1027274** 字节）；真机 soak 是复用的、带两条缺口；live 档案升级仍 `BLOCKED`**
 
 - **From:** 发布收口这一轮（`agent-218/memory-053`，只写文档）· **To:** 有写权限做 live 档案升级的人 / 下一个要补真机缺口或修取证瑕疵的人
@@ -6762,3 +6870,30 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **留给下一手最容易踩的两处口径**：① 这次的转录**末行是 `Duration`，没有 `GATE_EXIT=` 行**（上一轮 0.13.40 有），
   退出码只有命令层面的读数，别写成「转录末行写着 EXIT=0」；② `release/0.13.41` 已用 `git branch -d` 删除，
   `backup/*` 与所有 tag 都在，别把「本地只剩 main」理解成远端也被清了。
+
+## 2026-11-26 — 卡住那句话拍到两种、第三种拍不到；两条老读数订正（`fix/readings-refresh`，未合、未推、未发版）
+
+- **From:** 记忆收口工（`agent-223/memory-writer`）· **To:** 下一个接手的人
+- **交付**：分支 `fix/readings-refresh`（worktree `.agents/worktrees/fix-readings-refresh`），基线 `main` 尖端 **`fe6d631`**，
+  版本仍是 `0.13.53`。**未合、未推、未打 tag、没发版**；这一块**没有产品改动**，只有两块证据 + 四份记忆。
+- **用户能看到什么**：进度页底部那句「卡在……」现在有**两种**形状的真机照片——一次是真的没过（重试也没过），
+  一次是稿子全被守门退回；桌面宽屏和手机窄屏各一张，句子都在画面里、读得清。第三种（有一步到最后都没回报）
+  **没有照片**，而且不是没试：这一版引擎收尾时会先把还在跑的活取消掉、再宣布本轮结束，所以那个形状到不了页面。
+- **留给下一手的事**：
+  1. **第三种卡住要「引擎级解锁」，不是改配置。** 想要那句话出现在页面上，得让一条调用行**既不被结算也不被取消**
+     （现在收尾前宿主会给每条开着的行补一个「已取消」）。改模型钉法、改预算、改超时都试过两次，都不行；
+     引擎那一层不动，这个形状永远拍不到。那句措辞只有单元测试覆盖，**别把它当像素证据用**。
+  2. **桌面那份读数里有一条键名对不上的记录，等着人决定。** 它写着手机竖屏运行中，内容却是桌面已完成态
+     （每个字段与自己那条桌面完成记录一模一样）；这个证据目录里没有任何材料说它应该是什么，改它只能编数字，
+     所以**留着没动**。要么下一轮补一次真拍、要么把它标成「不描述任何图」，两条都得有人点头。
+  3. **live 档案那一行还是浮动的，需要有写权限的人钉住。** 插件目录读回 `0.13.53`，但依赖那一行仍是跟着仓库最新走
+     （`github:free6589/dsh-grok-workflow`），不满足「钉到确切标签」；写 `~/.dsh` 这件事本会话做不了，
+     顺手把那一行钉到 `#v0.13.53` 就补上了。
+  4. **还有三颗状态胶囊没有真机照片**：等你点头、已取消、出错。`未通过` 这一颗本轮拍到了；另外三颗只有组件用例。
+     重试那条虚线也只有肉眼看图，读数里没有记它的字段——要当证据用，得先给读数加一个字段。
+  5. **421–499 px 之间那一档宽度仍然没量过**（本轮只拍 1500 与 390 两头）；**这台机器上没有真的绘图库**，
+     图是页面自己照那段文本排的。
+  6. **分支判定日期 2026-11-26**：合流即删；它是证据与记忆，产品代码一个字没动，合起来不牵动任何构建产物。
+- **最容易踩的一处口径**：上一轮发布记录里那两句「两条读数还是旧的」「卡住那句零像素证据」**当时是真的**，
+  这一块只在它们后面挂了一个指过来的括注，**没有改写原句**。读的时候别把两节当成互相矛盾——
+  一节说的是发布那一刻，一节说的是之后补做的取证。

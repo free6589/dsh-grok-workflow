@@ -1,0 +1,262 @@
+{
+ "tag": "rejected2",
+ "mode": "rejected",
+ "prompt": "用 grok_workflow 工具跑一个工作流（只用 grok_workflow，不要用内置的 workflow 工具），拆成两个互相独立、可以并行的任务，每个任务都要真的写一个文件：任务一：在 notes.md 里写三行安装步骤，写完数一下一共几行；任务二：在 test.txt 里写一行 hello，写完读回来核对一遍。两个任务并行跑，不要串行；跑完把两个文件各有几行、分别写了什么汇总一下。",
+ "url": "http://127.0.0.1:3421/?token=<redacted>",
+ "tabPathNarrow": "overflow-menu",
+ "sentAt": "2026-11-26T12:42:44.934Z",
+ "terminalAfterSeconds": 170,
+ "midRunShot": false,
+ "saved": {
+  "rejected2-desktop-1500": {
+   "file": "rejected2-desktop-1500.png",
+   "atSeconds": 174,
+   "stuckText": "卡在 7：3 稿全被退回",
+   "chip": "已完成"
+  },
+  "rejected2-narrow-390": {
+   "file": "rejected2-narrow-390.png",
+   "atSeconds": 177,
+   "stuckText": "卡在 7：3 稿全被退回",
+   "chip": "已完成"
+  }
+ },
+ "readings": {
+  "rejected2-desktop-1500": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 1500,
+    "innerHeight": 1600,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 1500,
+   "clientWidth": 1500,
+   "pnodes": 14,
+   "edges": 16,
+   "current": 1,
+   "line": "第 7 步，共 8 步 · 还剩约 25 秒",
+   "stuckPresent": true,
+   "stuckText": "卡在 7：3 稿全被退回",
+   "stuckBox": {
+    "x": 284,
+    "y": 969,
+    "width": 1205,
+    "height": 17,
+    "top": 969,
+    "right": 1489,
+    "bottom": 986,
+    "left": 284
+   },
+   "stuckInViewport": true,
+   "stuckTopmost": {
+    "tag": "P",
+    "isStuckOrChild": true,
+    "dataStuck": true,
+    "parentData": [
+     "gwProgress"
+    ]
+   },
+   "chip": "已完成",
+   "dock": "收下这版",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 14,
+   "mermaidEdgeLines": 16,
+   "mermaidTotalLines": 31,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "summarize_2",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "summarize_3",
+     "kind": "summarize",
+     "state": "failed"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "done"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  },
+  "rejected2-narrow-390": {
+   "mounted": true,
+   "viewport": {
+    "innerWidth": 390,
+    "innerHeight": 844,
+    "devicePixelRatio": 2
+   },
+   "scrollWidth": 390,
+   "clientWidth": 390,
+   "pnodes": 14,
+   "edges": 16,
+   "current": 1,
+   "line": "第 7 步，共 8 步 · 还剩约 25 秒",
+   "stuckPresent": true,
+   "stuckText": "卡在 7：3 稿全被退回",
+   "stuckBox": {
+    "x": 4,
+    "y": 451,
+    "width": 375,
+    "height": 17,
+    "top": 451,
+    "right": 379,
+    "bottom": 468,
+    "left": 4
+   },
+   "stuckInViewport": true,
+   "stuckTopmost": {
+    "tag": "P",
+    "isStuckOrChild": true,
+    "dataStuck": true,
+    "parentData": [
+     "gwProgress"
+    ]
+   },
+   "chip": "已完成",
+   "dock": "收下这版",
+   "graphMounted": true,
+   "mermaidFirstLine": "flowchart TD",
+   "mermaidNodeLines": 14,
+   "mermaidEdgeLines": 16,
+   "mermaidTotalLines": 31,
+   "nodeStates": [
+    {
+     "id": "start",
+     "kind": "start",
+     "state": "done"
+    },
+    {
+     "id": "execute",
+     "kind": "execute",
+     "state": "done"
+    },
+    {
+     "id": "execute_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "execute_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check",
+     "kind": "check",
+     "state": "done"
+    },
+    {
+     "id": "check_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "check_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review",
+     "kind": "review",
+     "state": "done"
+    },
+    {
+     "id": "review_t1",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "review_t2",
+     "kind": "task",
+     "state": "done"
+    },
+    {
+     "id": "summarize",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "summarize_2",
+     "kind": "summarize",
+     "state": "done"
+    },
+    {
+     "id": "summarize_3",
+     "kind": "summarize",
+     "state": "failed"
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "state": "done"
+    }
+   ],
+   "emptyText": null,
+   "nodeCountsAgree": true,
+   "edgeCountsAgree": true
+  }
+ },
+ "consoleErrors": [],
+ "pageErrors": []
+}
