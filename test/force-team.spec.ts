@@ -6,6 +6,7 @@ import {
   FORCE_TEAM_SOURCE_KIND,
   TEAM_INSTRUCTION_EN,
   TEAM_INSTRUCTION_ZH,
+  TEAM_STARTING_TOOLS,
   asksForTeam,
   installForceTeam,
   languageOf,
@@ -35,8 +36,9 @@ import { DEFAULT_FORCE_TEAM_ROUTING, resolveConfig } from '../src/config.js'
  *   session that is not in grok mode are inert, and inert means the decision the loop
  *   proposed comes back unchanged (the same array), not a copy that happens to match.
  * - **The turn gate fires once, and only on evidence.** One reject per turn, only for
- *   the turn that carried the keyword, only when that turn's own log shows no
- *   `tool-workflow/*` event — and never when the log cannot be read.
+ *   the turn that carried the keyword, only when that turn's own log shows neither a
+ *   `tool-workflow/*` event nor a `tool/call` to a team-starting tool — and never when
+ *   the log cannot be read.
  */
 
 /* ---------------------------------------------------------------- fixtures -- */
@@ -58,6 +60,22 @@ function userMessage(text: string, kind = 'user'): UserMessage {
 function runStartEvent(session: Session, runId = 'run-1'): void {
   const raw = session as unknown as { append(type: string, data: Record<string, unknown>): unknown }
   raw.append('tool-workflow/run-start', { runId, name: '任务团队 · 2 个任务' })
+}
+
+/** Log a `tool/call` the way the tool layer does: name and turn inside `data`. */
+function callEvent(session: Session, name: string, turn: number, step = 1): void {
+  session.append('tool/call', { turn, step, callId: `call_${name}` as never, name, arguments: '{}' })
+}
+
+/**
+ * A log of exactly these events.
+ *
+ * Used for the shapes a real `Session.append` would refuse to write (a `tool/call`
+ * with no `data`, a `name` that is not a string): the reader has to survive a log
+ * written by something other than this build, not only a log this build wrote.
+ */
+function logOf(events: Array<{ type: string, seq: number, data?: unknown }>): Session {
+  return { id: 'sess-log', ownEvents: () => events } as unknown as Session
 }
 
 /** Turn the session's grok mode on, the way `/grok on` does. */
@@ -476,6 +494,92 @@ describe('the turn evidence is read from the session log, not assumed', () => {
     // Unknown must never become a refusal: a brake that fires on unreadable evidence
     // refuses turns for a reason it cannot state.
     expect(teamGateVerdict({ flag: { turn: 5, step: 1, chars: 2 }, turn: 5, step: 2, teamStarted: undefined })).toBe('none')
+  })
+})
+
+/* ------------------------------------------------------ widened evidence -- */
+
+/**
+ * The measured defect: the block intake is a team start with no session event.
+ *
+ * `grok_open_block` writes its block to an on-disk ledger (`src/block/store.ts`) and
+ * records nothing in the session, so a turn that opened a block carried no
+ * `tool-workflow/*` event at all — and the gate refused a turn that had already
+ * started real work. The session log does record the call itself, with `name` and
+ * `turn` in its `data`, and that is the evidence these cases pin.
+ */
+describe('a team-starting tool call counts as the team this turn started', () => {
+  it('pins the two tools a turn can start a team with', () => {
+    expect([...TEAM_STARTING_TOOLS]).toEqual(['grok_workflow', 'grok_open_block'])
+  })
+
+  it('accepts a `grok_open_block` call as this turn\'s team', () => {
+    const session = headed('sess-evidence-block')
+    session.append('turn/start', { turn: 9 })
+    expect(teamStartedInTurn(session, 9)).toBe(false)
+    callEvent(session, 'grok_open_block', 9)
+    expect(teamStartedInTurn(session, 9)).toBe(true)
+  })
+
+  it('accepts a `grok_workflow` call as this turn\'s team', () => {
+    const session = headed('sess-evidence-workflow')
+    session.append('turn/start', { turn: 9 })
+    callEvent(session, 'grok_workflow', 9)
+    expect(teamStartedInTurn(session, 9)).toBe(true)
+  })
+
+  it('does not accept a call to any other tool', () => {
+    const session = headed('sess-evidence-bash')
+    session.append('turn/start', { turn: 9 })
+    callEvent(session, 'bash', 9)
+    // A near miss is not a member of the set: the match is the whole tool name.
+    callEvent(session, 'grok_open_block_preview', 9)
+    expect(teamStartedInTurn(session, 9)).toBe(false)
+  })
+
+  it('still accepts a `tool-workflow/*` event', () => {
+    const session = headed('sess-evidence-run')
+    session.append('turn/start', { turn: 9 })
+    runStartEvent(session)
+    expect(teamStartedInTurn(session, 9)).toBe(true)
+  })
+
+  it('does not accept a team call recorded in another turn', () => {
+    const session = headed('sess-evidence-other-turn')
+    // Before this turn opened: a call the previous turn made.
+    callEvent(session, 'grok_workflow', 8)
+    session.append('turn/start', { turn: 9 })
+    // After it opened, but carrying the earlier turn: the `turn` field decides, so
+    // ordering alone cannot be what accepts it.
+    callEvent(session, 'grok_open_block', 8)
+    expect(teamStartedInTurn(session, 9)).toBe(false)
+  })
+
+  it('reads a malformed call as no evidence, without throwing', () => {
+    const session = logOf([
+      { type: 'turn/start', seq: 1, data: { turn: 4 } },
+      { type: 'tool/call', seq: 2, data: null },
+      { type: 'tool/call', seq: 3 },
+      { type: 'tool/call', seq: 4, data: { turn: 4, name: null } },
+      { type: 'tool/call', seq: 5, data: { turn: '4', name: 'grok_workflow' } },
+      { type: 'tool/call', seq: 6, data: { turn: 4, name: 42 } },
+      { type: 'tool/call', seq: 7, data: 'not an object' },
+    ])
+    expect(teamStartedInTurn(session, 4)).toBe(false)
+  })
+
+  it('does not refuse a turn that opened a block', async () => {
+    // The defect end to end: the model did what the instruction asked — it formed a
+    // team through the intake — and the gate refused the next step anyway.
+    const session = headed('sess-gate-block')
+    grokOn(session)
+    const { dispatch } = harness()
+    await dispatch({ agent: { session }, messages: [userMessage('开团把这件事做完')], turn: 5, step: 1 })
+    session.append('turn/start', { turn: 5 })
+    callEvent(session, 'grok_open_block', 5)
+    const before = session.ownEvents().length
+    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })).kind).toBe('enter')
+    expect(session.ownEvents().length, 'no refusal row is written').toBe(before)
   })
 })
 

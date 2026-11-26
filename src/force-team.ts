@@ -22,12 +22,13 @@
  *    separate `session.append()` on top of it would be a second copy of the same
  *    words in the transcript (the P0-1 defect the old gate was fixed for).
  * 2. **The turn gate (replaces `enter` with `reject`).** A turn that matched and then
- *    asked for a second step without writing a single `tool-workflow/*` event was
- *    about to be worked alone. That step is refused once — `reject` is the only
- *    decision that reliably produces zero model calls — and the session gets one
- *    user-role row carrying the intake's bilingual refusal text, because a bare
- *    `reject` is invisible: the reader would see an empty turn and no reason
- *    (`src/intake.ts` is the one place that owns that wording).
+ *    asked for a second step without either writing a `tool-workflow/*` event or
+ *    calling one of `TEAM_STARTING_TOOLS` was about to be worked alone. That step is
+ *    refused once — `reject` is the only decision that reliably produces zero model
+ *    calls — and the session gets one user-role row carrying the intake's bilingual
+ *    refusal text, because a bare `reject` is invisible: the reader would see an
+ *    empty turn and no reason (`src/intake.ts` is the one place that owns that
+ *    wording).
  *
  * Why the instruction is a command and not a suggestion. A suggestion is a piece of
  * advice competing with everything else in context, and the case this feature exists
@@ -246,16 +247,61 @@ export function isDelegatedSession(session: Session | undefined): boolean {
 }
 
 /**
- * Whether the given turn wrote any `tool-workflow/*` event since it opened.
+ * The tools a turn can start a team with, as the turn gate counts them.
  *
- * The progress family (`run-start` and friends) is written while a run is alive, so
- * its presence in the turn's own log is the only evidence a team was started —
- * nothing here trusts a flag or a timer. `undefined` means the log could not be read,
- * which a caller must never turn into a refusal.
+ * `grok_workflow` runs a workflow script through the engine, whose progress family
+ * (`tool-workflow/*`) is written to the session while the run is alive.
+ * `grok_open_block` is the block intake, and it writes its block to an on-disk JSONL
+ * ledger (`src/block/store.ts`) and nothing to the session — so a block a turn opened
+ * leaves no `tool-workflow/*` event, which is the defect this set exists to close: on
+ * a real machine a model that formed its team through the intake was refused as if it
+ * had started nothing.
+ *
+ * The rule is a named, exported set rather than an inline list so the next reader sees
+ * which calls count, and the spec pins the membership.
+ */
+export const TEAM_STARTING_TOOLS = ['grok_workflow', 'grok_open_block'] as const
+
+/** The same set, for the per-event lookups the log scan does. */
+const TEAM_STARTING_TOOL_SET: ReadonlySet<string> = new Set(TEAM_STARTING_TOOLS)
+
+/**
+ * Whether one log event is a call to a team-starting tool made by this turn.
+ *
+ * The `turn` inside the call's own `data` is what decides, not its position in the
+ * log: a call the previous turn made must never pay this turn's debt. A log this
+ * build did not write — no `data`, a `name` that is not a string — reads as "not a
+ * call" rather than throwing, because a gate may not refuse a turn for a reason it
+ * cannot state.
+ */
+function isTeamStartingCall(event: unknown, turn: number): boolean {
+  const data = (event as { data?: unknown }).data
+  if (data === null || typeof data !== 'object') return false
+  const call = data as { turn?: unknown, name?: unknown }
+  if (call.turn !== turn) return false
+  return typeof call.name === 'string' && TEAM_STARTING_TOOL_SET.has(call.name)
+}
+
+/**
+ * Whether the given turn started a team since it opened.
+ *
+ * Two kinds of evidence, both read from the turn's own log and neither from a flag:
+ *
+ * - a `tool-workflow/*` event, the family a live workflow run writes;
+ * - a `tool/call` to one of {@link TEAM_STARTING_TOOLS}.
+ *
+ * The second kind is not belt-and-braces: the block intake leaves no session event at
+ * all (`grok_open_block` records its block in its own ledger and writes nothing here),
+ * so the event family alone answered "no team" for a turn that had already opened a
+ * block and started real work. The session log does record the call — `name` and
+ * `turn` are in its `data` — and that is the evidence read below.
+ * `undefined` means the log could not be read, which a caller must never turn into a
+ * refusal.
  * @param session - the session whose log is read.
  * @param turn - the turn the question is about.
- * @returns true when a team event followed this turn's `turn/start`, false when it
- * did not (or when this log never opened the turn), `undefined` when unreadable.
+ * @returns true when a team event or a team-starting call followed this turn's
+ * `turn/start`, false when neither did (or when this log never opened the turn),
+ * `undefined` when unreadable.
  */
 export function teamStartedInTurn(session: Session | undefined, turn: number): boolean | undefined {
   if (session === undefined || typeof session.ownEvents !== 'function') return undefined
@@ -271,6 +317,7 @@ export function teamStartedInTurn(session: Session | undefined, turn: number): b
       if (event.seq <= openedAt) continue
       const type: unknown = event.type
       if (typeof type === 'string' && type.startsWith('tool-workflow/')) return true
+      if (type === 'tool/call' && isTeamStartingCall(event, turn)) return true
     }
     return false
   } catch {

@@ -218,7 +218,7 @@ DSH 启动后，直接提问即可：
 | `loopIntervalMin` | `0`（`0` = 用循环自己的下限） | `10080`（七天） | 两轮之间的分钟数。实际等待不会低于一轮最坏耗时、也不低于 60 分钟，所以 `0` 是「上一轮跑完就接上」，不是「立刻开始」 |
 | `iterateIntervalMin` | `0`（`0` = 用心跳自己的下限） | `10080`（七天） | 自迭代心跳之间的分钟数，下限语义与 `loopIntervalMin` 相同：不低于一轮最坏耗时、也不低于 60 分钟 |
 | `iterateTemplate` | 内置默认，即 `docs/iterate-template.md` | 最多 4000 字符 | 「自迭代」开关武装心跳时，存进 `RSI heartbeat` 调度任务的整段提示词。纯空白回退到内置默认。内置默认就是 `docs/iterate-template.md` 里的轮次提示词（POOL 优先选题、R1–R6、三重评审、四道刹车、禁区），`test/iterate-template.spec.ts` 保证文件与常量逐字节一致。在设置页「自迭代」分组的文本框里编辑、随档案保存；不带路由标记，编辑它不会改变一条投递被当成什么 |
-| `forceTeamRouting` | `true` | `true` \| `false` | 命中「要团队」的消息强制走团队路径：中文 `开团` / `组队` / `分工`（子串）或英文 `form a team` / `split the work` / `delegate`（只认整词，`delegated`、`delegation` 不算）命中时，给模型看到的用户文本尾部追加一段固定硬指令——是命令句而不是建议句；随后仍然单独作答的回合再拒一次，文案沿用 intake 的中英双语形状，所以记录里既留着用户原话也留着原因。设为 `false` 时一个监听都不注册；它是载入期开关，因此不投影到设置页。打过 `/grok off` 的会话既不注入也不兜底 |
+| `forceTeamRouting` | `true` | `true` \| `false` | 命中「要团队」的消息强制走团队路径：中文 `开团` / `组队` / `分工`（子串）或英文 `form a team` / `split the work` / `delegate`（只认整词，`delegated`、`delegation` 不算）命中时，给模型看到的用户文本尾部追加一段固定硬指令——是命令句而不是建议句；随后仍然单独作答、整轮没起来任何团队（`grok_workflow` 与 `grok_open_block` 都没调过）的回合再拒一次，文案沿用 intake 的中英双语形状，所以记录里既留着用户原话也留着原因。设为 `false` 时一个监听都不注册；它是载入期开关，因此不投影到设置页。打过 `/grok off` 的会话既不注入也不兜底 |
 | `blockIntake` | `true` | `true` \| `false` | 是否挂上接单台：六个 `grok_*block*`/`grok_steer`/`grok_stop` 工具、判一个块交工的监工，以及接单台自己的那个心跳 `agent/pre-step` 观测。M3.3 起默认打开，什么都不写的档案也能拿到这些工具。它是载入期开关（工具在载入时注册一次），因此不投影到设置页。设为 `false` 时一个块工具都不注册、接单台观测也不装，只留那两个常驻工具；决定心跳去留的窄监听不属于这个开关（每次载入都有），接单台也从不改变路由决策——它的观测把决策原样传下去 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
@@ -335,7 +335,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` 依次运行 typecheck、lint、build 与**105 个文件 / 2041 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、消息路径的放行、交付路径、接单台、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、递归、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+`npm run ci` 依次运行 typecheck、lint、build 与**105 个文件 / 2049 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、消息路径的放行、交付路径、接单台、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、递归、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
 
 ## 安全与兼容性
 
