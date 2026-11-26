@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.53] - 2026-11-26
+
 ### Changed / 变更
 
 - **The progress tab is one task panel now: a sentence on top, a branch tree in the middle, and a sentence at the bottom only while the run is really held up / 进度页现在是一块任务面板：上面一句话，中间一张分支树，底下一句只在真的卡住时才出现** —
