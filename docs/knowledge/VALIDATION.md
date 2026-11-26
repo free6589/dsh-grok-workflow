@@ -131,6 +131,25 @@ live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有�
 `soak/readings.json`（第二轮 12 条读数 + 几何）、`soak/interaction.json`（六项硬指标汇总 + 占位拿掉再放回）、`soak/runs.json`（三次运行归档，`verified 3/3`）、
 `soak/console.json`、`soak/verify-readings.mjs` / `.txt`（38 条断言，本目录可复跑）、六张图 `soak/phone-{390,360}-{as-opened,calls-dock,bottom}.png`、
 `soak/round1-10c15a0/`（第一轮全部证据与它自己的 README，含 21 条断言的自检与两帧取景不合格的记录）。
+## 判决写入诚实化（`fix/verdict-honest`，产品提交 `c8fe803`，基线 `main` 尖端 `fe6d631`，无标签、版本仍 `0.13.53`）：跳过监工记成第三种结局 `skipped`、验收行照原样留 `met:true` + 跳过注记；范围否决带批准目录与两侧绝对路径 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`c8fe803`（`fix(blocks): a skipped close records the third outcome, and a scope veto names both sides in full`）改两件事：① `grok_close_block` 在 `verify.blockSupervisor: false` 时不再写 `outcome:"pass"`，改写 `"skipped"`（`VerdictOutcome` + 写侧校验；验收行保持 `met:true` + `SKIPPED_JUDGE_NOTE`）；② 范围否决的 `why` 带批准目录与声明/批准两侧的绝对路径，`criterion`/`evidence` 仍是调用方原拼写。**未合、未推、未打 tag、未发版**；`package.json` 版本 `0.13.53` 未动；`~/.dsh` 与在跑的实例一次没碰。
+
+**环境**：worktree `.tmp/wt-verdict-honest`（`node_modules` 从主检出软链）、Node **v26.8.1**、vitest **4.1.12**、每条命令都带 `TMPDIR=$PWD/.tmp`。工作树起点 `fe6d631`（= `main` = `origin/main`）。
+
+| 检查（本轮自己跑，逐字命令） | 结果 |
+| --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | **`TSC_EXIT=0`**（无输出） |
+| `npx oxlint src test` | **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则；与 `v0.13.53` 基线同为 14/0） |
+| `TMPDIR=$PWD/.tmp npx vitest run test/block-ledger.spec.ts test/block-supervisor.spec.ts test/block-tools.spec.ts test/block-preview.spec.ts` | **`Test Files 4 passed (4)` / `Tests 175 passed (175)` / `Duration 13.87s`**（`block-ledger` 20 + `block-supervisor` 29 + `block-tools` 31 + `block-preview` 95；第二次跑在提交后的树上，读数相同） |
+| `TMPDIR=$PWD/.tmp npm run build` | **`BUILD_EXIT=0`**、`client bundle: 399448 bytes → lib/client.js`（浏览器包没动，与 `0.13.53` 同尺寸；`lib/` 里 15 个 `src` 对应文件重建） |
+| `TMPDIR=$PWD/.tmp npm run verify:lib`（**提交 `c8fe803` 之后**） | `lib/ at c8fe803 is the build of src/ at c8fe803 (293 files, byte-identical)`、**`VERIFY_EXIT=0`** |
+
+**用例账**：`block-supervisor` **26 → 29**（+3：跳过的第三种结局、同证据回读各一条，范围理由两侧绝对路径与「没有批准目录」各一条）；`block-tools` **30 → 31**（+1 新增范围否决带目录；原「跳过监工」一例改写为如实读，含 `status` 回读与 `skips` 计数）；合计 **+4**（其它两份文件一例未改，29 与 31 与实跑 `29 passed` / `31 passed` 对得上）。
+
+**`NOT_RUN` 照实记**：真机隔离 soak（本块没有装进隔离 profile；`verify.blockSupervisor:false` 的真实关单没在真机跑过）；整仓 `npm run ci`（§12：块内只跑 `typecheck + lint + 定向 spec + verify:lib`，全量门禁留给发布提交）；绝降级路径（旧构建读 `skipped` 行会跳过，本轮没有旧构建可跑）。
+
+**红线**：没有 push、没有 force-push、没有 tag、没有改 `package.json` / `package-lock.json`、没有写任何密钥、没有碰 `~/.dsh` 或 3080 上的实例；scratch 用例目录都在 `.tmp/` 下由用例自己清理（`git status` 只剩本轮的源码/测试/`lib/`/文档改动）。
 
 ## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
 

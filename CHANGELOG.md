@@ -31,6 +31,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   验收现在只是图上的一个地方，没有要点的东西了。dock 只留「开工」那一颗，另一句依旧是「已填进输入框」。
   **升级提示：什么都不用准备——没有设置、存档格式或默认值变化，只是这一页画法变了。**
 
+
+- **A hand-in with the judge switched off is now recorded as "not judged" instead of "passed" / 关掉监工交的活，现在记成「没有判过」，不再记成「通过」** —
+  When a block was ordered with the independent judge switched off, closing it used to write the same `pass` as a block the judge
+  had really cleared. The record now carries a third outcome, `skipped`: neither a pass nor a veto, because no judgement was made.
+  The acceptance lines are kept exactly as written (marked met, with the note that the judge was skipped), and the answer plus
+  every later read now say plainly that this close was never judged — the block still settles, the record just stops calling it a
+  pass. Read back, a block also counts how many of its closes were never judged.
+  **A refusal over the approved scope now says which folder the check used, and spells both sides in full** — so a "that file is
+  outside the approved scope" can be checked by whoever reads it instead of being taken on faith.
+  **Upgrade note: nothing to migrate — records written before this version still read as they did, and no stored byte is rewritten.**
+  / 当一块活是在「关掉独立监工」的情况下开的，交工时它过去会写成和真的被监工放行的块一样的「通过」。现在记录里有第三种结局
+  `skipped`：既不判过也不否决，因为根本没有人判过。验收行照旧留着（标成满足，并附上「跳过监工」那句话），而交工的答复和
+  之后每一次读回，都会明说这一次没有判过——块照样收下，只是记录不再管这叫通过。读回一块时，也会数出它有多少次交工是没有判过的。
+  **因为批准范围被拒的交工，现在会写明核对时用的是哪个文件夹，并把两边的路径都写全**——这样「这个文件不在批准范围里」这句话，
+  看记录的人能自己核对，不用凭信。
+  **升级须知：不用迁移任何东西——这个版本之前写下的记录照样读得出，已经落盘的字节一个都不改。**
+
 ### Fixed / 修复
 
 - **On a phone, the calls you open now come out of the figure and stand in a block of their own under it, instead of landing on the card next door / 手机上摊开的调用不再压在隔壁那张卡上，而是落到图下面属于面板自己的一整块里，还能收起来** —
@@ -54,6 +71,7 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   再点一次那颗节点仍然是收起、并熄灭点亮的线；这一块里还有一个「收起」，一下把所有摊开的都收起来。
   **宽屏上什么都没变**——列表仍旧从节点下面浮出来，跟以前一样。
   **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；变的只是手机上这个列表摆在哪儿。**
+
 
 ## [0.13.53] - 2026-11-26
 

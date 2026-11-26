@@ -28,7 +28,10 @@
  * Both sides of the scope comparison are canonicalised first, so two spellings that
  * reach the same file compare equal: `link/a.md` through a symlink is `real/a.md`. A
  * verdict still quotes the path the caller wrote — an absolute canonical path is the
- * checker's own working value and never appears in `criterion` or `evidence`.
+ * checker's own working value and never appears in `criterion` or `evidence`. It does
+ * appear in `why` for a scope failure, together with the directory the check read the
+ * paths in: a veto that only says "not in scope" cannot be checked by whoever reads it,
+ * and "which directory was this relative to" is the first thing a disagreement is about.
  */
 import type { BlockEntry, BlockRow, BlockTaskRow, VerdictReason } from '../block/index.js';
 /** The criterion label the scope check uses, so an override can name it exactly. */

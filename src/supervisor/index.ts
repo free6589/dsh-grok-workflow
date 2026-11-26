@@ -16,6 +16,12 @@
  * 4. **Append only.** A veto writes one verdict line and changes nothing else: the
  *    block row keeps its status, its tasks and its plan id exactly as they were.
  *
+ * A close that was told not to ask the judge (`verify.blockSupervisor: false`) records the
+ * third outcome, `skipped`: neither a pass nor a veto. The criteria keep `met: true` with
+ * `SKIPPED_JUDGE_NOTE` as their evidence because the schema has no third per-criterion
+ * state — the outcome is what says no judgement was made, and every read of that row has
+ * to go through it rather than through `met`.
+ *
  * `override` exists for exactly one class of veto — the scope check — because that is
  * the one a human can legitimately overrule ("yes, I approved that file too"). It is
  * recorded in the verdict row, so the record says who overruled what and why.
@@ -25,9 +31,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { randomUUID } from 'node:crypto'
 import { appendVerdictRow, verdictsFor, verdictsFile } from '../block/index.js'
-import type { BlockEntry, BlockRow, BlockTaskRow, VerdictReason, VerdictRow } from '../block/index.js'
+import type { BlockEntry, BlockRow, BlockTaskRow, VerdictOutcome, VerdictReason, VerdictRow } from '../block/index.js'
 import { runDeterministicChecks, SCOPE_CRITERION } from './checks.js'
-import { SUPERVISOR_FAILED, callBlockSupervisor, evidenceHashOf, reasonsFromCriteria, supervisorPrompt } from './verdict.js'
+import { SKIPPED_JUDGE_NOTE, SUPERVISOR_FAILED, callBlockSupervisor, evidenceHashOf, reasonsFromCriteria, supervisorPrompt } from './verdict.js'
 import type { WorkflowLogger } from '../run.js'
 import type { ResolvedConfig } from '../types.js'
 
@@ -53,8 +59,8 @@ export interface BlockSupervisorInput {
   override?: { who: string, why: string }
   /**
    * `false` skips the judge (`verify.blockSupervisor: false`). The deterministic
-   * checks still run, the returned verdict is still appended, and the outcome says
-   * `judged: false` so no caller can read it as a model pass.
+   * checks still run, the appended row says `outcome: 'skipped'` (with `judged: false`
+   * in the answer) so no caller can read it as a model pass, and no model call is made.
    */
   judge?: boolean
   /** Filesystem seam for the artifact check (tests inject a set of paths). */
@@ -75,7 +81,8 @@ export interface BlockSupervisorInput {
 
 /** What the caller gets back. */
 export interface BlockSupervisorOutcome {
-  outcome: 'pass' | 'veto'
+  /** `skipped` means the judge was never asked: no pass and no veto was recorded. */
+  outcome: VerdictOutcome
   verdict: VerdictRow
   /** True when this call returned an earlier verdict instead of writing a new one. */
   evidenceUnchanged: boolean
@@ -125,7 +132,11 @@ export async function runBlockSupervisor(input: BlockSupervisorInput): Promise<B
       evidenceUnchanged: true,
       judged: false,
       failures: last.outcome === 'veto' ? last.reasons : [],
-      warnings: ['同一份证据已经判过，没有写第二条判决'],
+      warnings: [last.outcome === 'skipped'
+        // A skipped row is not a judgement: saying "已经判过" here would be the same lie
+        // in the warning that the skipped outcome exists to avoid in the row.
+        ? '同一份证据已经按「跳过监工」记过一次，没有写第二条判决'
+        : '同一份证据已经判过，没有写第二条判决'],
       ledgerPath: verdictsFile(options),
     }
   }
@@ -171,13 +182,14 @@ export async function runBlockSupervisor(input: BlockSupervisorInput): Promise<B
 
   const override = overridden ? { override: { who: input.override!.who, why: input.override!.why } } : {}
 
-  // 3. The judge. Skipped only when the caller said so, and then the verdict says so.
+  // 3. The judge. Skipped only when the caller said so, and then the row says `skipped`:
+  // neither a pass nor a veto was recorded, because neither was produced.
   if (input.judge === false) {
     return await write({
       ...base,
       route: 'deterministic',
-      outcome: 'pass',
-      criteria: block.acceptance.map(text => ({ text, met: true, evidence: ['未过监工：按调用方要求跳过（verify.blockSupervisor=false）'] })),
+      outcome: 'skipped',
+      criteria: block.acceptance.map(text => ({ text, met: true, evidence: [SKIPPED_JUDGE_NOTE] })),
       reasons: [],
       ...override,
     })

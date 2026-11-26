@@ -28,7 +28,10 @@
  * Both sides of the scope comparison are canonicalised first, so two spellings that
  * reach the same file compare equal: `link/a.md` through a symlink is `real/a.md`. A
  * verdict still quotes the path the caller wrote — an absolute canonical path is the
- * checker's own working value and never appears in `criterion` or `evidence`.
+ * checker's own working value and never appears in `criterion` or `evidence`. It does
+ * appear in `why` for a scope failure, together with the directory the check read the
+ * paths in: a veto that only says "not in scope" cannot be checked by whoever reads it,
+ * and "which directory was this relative to" is the first thing a disagreement is about.
  */
 
 import { existsSync, realpathSync, statSync } from 'node:fs'
@@ -152,6 +155,26 @@ function taskCriteria(tasks: readonly BlockTaskRow[]): string[] {
   return tasks.flatMap(task => task.acceptanceCriteria.map(normalizeText))
 }
 
+/**
+ * The directory a scope reason was read in, spelled so the reader can check it.
+ * @param root - the approval directory, or `undefined` when the call had none.
+ * @returns A parenthesised clause naming the directory.
+ */
+function approvalDirLabel(root: string | undefined): string {
+  if (root !== undefined) return `（批准目录 ${canonical(root)}）`
+  return `（没有批准目录，按进程当前目录 ${canonical(process.cwd())} 解析）`
+}
+
+/**
+ * The absolute spelling of one side of the scope comparison, for the reason text only.
+ * @param root - the approval directory, or `undefined` for the process cwd.
+ * @param base - the declared or approved path, pointer already stripped.
+ * @returns The canonical absolute path.
+ */
+function absoluteSpelling(root: string | undefined, base: string): string {
+  return canonical(resolve(root ?? process.cwd(), base))
+}
+
 /** Every path a task declared, de-duplicated, pointers stripped. */
 function declaredPaths(tasks: readonly BlockTaskRow[]): string[] {
   const seen = new Set<string>()
@@ -251,12 +274,16 @@ export function runDeterministicChecks(input: BlockCheckInput): BlockCheckResult
 
   // ---- 4. scope is inside the approval -------------------------------------
   const approved = block.writesPaths.map(path => path.trim()).filter(path => path !== '')
+  // The reason names the directory and both sides in absolute form; the criterion and
+  // evidence keep the caller's own spelling (`path`), so the quote is still a quote.
+  const dirLabel = approvalDirLabel(input.root)
+  const approvedAbsolute = approved.map(path => absoluteSpelling(input.root, path))
   for (const path of declaredPaths(tasks)) {
     if (approved.length === 0) {
       failures.push({
         criterion: SCOPE_CRITERION,
         evidence: path,
-        why: '这一块批准的范围是「不写文件」，但任务声明了写路径',
+        why: `这一块批准的范围是「不写文件」${dirLabel}，但任务声明了写路径 ${path}（绝对路径 ${absoluteSpelling(input.root, path)}）`,
       })
       continue
     }
@@ -266,7 +293,7 @@ export function runDeterministicChecks(input: BlockCheckInput): BlockCheckResult
       failures.push({
         criterion: SCOPE_CRITERION,
         evidence: path,
-        why: `批准的范围是 ${approved.join('、')}，这条写路径不在其中`,
+        why: `批准的范围是 ${approved.join('、')}${dirLabel}，这条写路径不在其中：${path}（绝对路径 ${absoluteSpelling(input.root, path)}）；批准的范围解析为 ${approvedAbsolute.join('、')}`,
       })
     }
   }

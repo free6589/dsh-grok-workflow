@@ -16,13 +16,19 @@
  * 4. **Append only.** A veto writes one verdict line and changes nothing else: the
  *    block row keeps its status, its tasks and its plan id exactly as they were.
  *
+ * A close that was told not to ask the judge (`verify.blockSupervisor: false`) records the
+ * third outcome, `skipped`: neither a pass nor a veto. The criteria keep `met: true` with
+ * `SKIPPED_JUDGE_NOTE` as their evidence because the schema has no third per-criterion
+ * state — the outcome is what says no judgement was made, and every read of that row has
+ * to go through it rather than through `met`.
+ *
  * `override` exists for exactly one class of veto — the scope check — because that is
  * the one a human can legitimately overrule ("yes, I approved that file too"). It is
  * recorded in the verdict row, so the record says who overruled what and why.
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import type { BlockEntry, BlockRow, BlockTaskRow, VerdictReason, VerdictRow } from '../block/index.js';
+import type { BlockEntry, BlockRow, BlockTaskRow, VerdictOutcome, VerdictReason, VerdictRow } from '../block/index.js';
 import type { WorkflowLogger } from '../run.js';
 import type { ResolvedConfig } from '../types.js';
 /** What the caller asks the supervisor to do. */
@@ -50,8 +56,8 @@ export interface BlockSupervisorInput {
     };
     /**
      * `false` skips the judge (`verify.blockSupervisor: false`). The deterministic
-     * checks still run, the returned verdict is still appended, and the outcome says
-     * `judged: false` so no caller can read it as a model pass.
+     * checks still run, the appended row says `outcome: 'skipped'` (with `judged: false`
+     * in the answer) so no caller can read it as a model pass, and no model call is made.
      */
     judge?: boolean;
     /** Filesystem seam for the artifact check (tests inject a set of paths). */
@@ -71,7 +77,8 @@ export interface BlockSupervisorInput {
 }
 /** What the caller gets back. */
 export interface BlockSupervisorOutcome {
-    outcome: 'pass' | 'veto';
+    /** `skipped` means the judge was never asked: no pass and no veto was recorded. */
+    outcome: VerdictOutcome;
     verdict: VerdictRow;
     /** True when this call returned an earlier verdict instead of writing a new one. */
     evidenceUnchanged: boolean;
