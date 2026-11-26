@@ -4023,3 +4023,55 @@ Last updated: 2026-11-26 17:00 +08:00（**卡片批准在账本里有了自己�
 删掉多余目录、重装、重启、重跑才拿到 `question-reply`，那条旧读数作为第二条「改前」对照留在证据里，没有删。
 证据目录 `.rsi/evidence/card-approval-2026-11-26/`（`README.md` 是索引）。**红线**：`~/.dsh` 三个 mtime 全早于会话且跑完未变、
 3080 前后 `401`、未 push / 未打 tag / 未 bump / 未 publish、未合 `main`；soak 的临时 home 收尾时删除。）
+
+Last updated: 2026-11-26 19:33 +08:00（**`0.13.53` 已发布：进度页从泳道矩阵换成一块任务面板，`CONFIRMED`** ——
+发布分支 `release/0.13.53` 从 `main` 的 **`e44e26a`** 切出，`feat/task-panel`（尖端 **`ae4d4c1`**）以 **`git merge --no-ff`** 折入，
+合并提交 **`c698a36`**（两父 `e44e26a` + `ae4d4c1`）**零冲突——真相是 `main` 本来就是功能分支的祖先，没有冲突要解**：
+合并树 `a5a895e` 与功能尖端的树逐字相同、`git diff --stat ae4d4c1 c698a36` **0 行**；发布提交 **`50b3341`**
+`chore(release): prepare v0.13.53`、父 `c698a36`、**8 文件 / +24 −22**（`CHANGELOG` 2/0、两份 `README` 6/6、
+`docs/LOCAL-TESTING.md` 3/3、`lib/client.js` 2/2、`package-lock` 2/2、`package.json` 1/1、`src/client/index.js` 2/2，
+**无 `test/` 文件**），版本读 `0.13.53`，`src/client/index.js` 与 `lib/client.js` 仍**逐字节相同**（各 **399448** 字节、
+`sha256 1fb003f3…c1b81f`）；`main` 用 `git merge --ff-only release/0.13.53` 前进，所以 **`main` = `origin/main` =
+门禁提交 = 标签剥出的提交 = `50b3341`**，`git describe --tags` 读作 `v0.13.53`；附注标签 **`v0.13.53`** 对象
+**`8a0f9be0fc1371d2ebb0580d623b12b1df4be82c`** → 剥出 `50b3341`、`tagger` **19:27:30 +0800**，
+**没有 force-push、没有重写历史、没有移动任何已发布标签**（`v0.13.52 → 9c7ebe3c…`、`v0.13.51 → a2c7eeab…` 同值）；
+**用户看到的一件事**：进度页现在是一块任务面板——顶上一句话（第几步、共几步，**只有这一轮自己的耗时能量出来时**才补
+「还剩约 N」，算法是已跑完步骤的实测平均 × 还剩几步，一步没量到就不出现）、中间一张分支树（每步一颗节点、每步走过的
+计划任务各成一条分支、**每次尝试一颗点、没过的那次与下一次之间一小段虚线**；图是从一份标准 Mermaid `flowchart TD`
+文本生成的，页面自己排版，**没有新增画图库**）、底下一句**只在真卡住时**出现的话（有一次没过 / 有一步没回报 /
+守门把稿子全退回）；点节点摊开它调过的调用、点分支点亮它的线、再点一次或点空白取消；跟着退场的是等宽步骤条、
+手机两列网格、步骤上的圆形展开箭头与「还剩 N 步」那一行；**页面上没有百分比、没有通过率**，升级须知写明**不用准备任何东西**；
+**发版门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `50b3341` 上 `EXIT=0`**（`Test Files 105 passed (105)` /
+**`Tests 2030 passed (2030)`**、`Duration 106.86s`、`Start at 19:20:51`；lint `Found 14 warnings and 0 errors.` +
+`187 files with 96 rules`；`client bundle: 399448 bytes → lib/client.js`；`lib/ at 50b3341 … (293 files, byte-identical)`；
+**转录末行就是 `GATE_EXIT=0`**——转录 `.rsi/evidence/release-0.13.53-2026-11-26/gate-50b3341.out`，
+**392 行 / 24016 字节**、`sha256 533602edcf215bf0853b62b511325e3d2d5a7253ff559536269092274ac60a69`，本轮自己 `wc -lc` +
+`sha256sum` + 逐行核对，**没有重跑门禁**）；**算术本轮自己从 git 对象数过**：份数 `e44e26a` / `c698a36` / `50b3341`
+**都是 105**（没变），用例 **`2060 → 2030`（−30）**——这 −30 是**两份旧进度 spec 合并成两份新 spec** 的净差额
+（删 `progress-flow.spec.ts` 1626 行 + `progress-lanes.spec.ts` 1312 行，加 `progress-panel.spec.ts` 1157 行 / 25 条 +
+`progress-panel-model.spec.ts` 1135 行 / 31 条），**不是丢了不相干领域的覆盖、也不是发布提交造成的**（发布提交 0 行 `test/`；
+两份 `README` 的 `2060 → 2030` 各 6/6 行就是这个数；`2060` 这个前值只能从发布提交的 diff 反读，`HYPOTHESIS` 口径）；
+**远端两个 run 都用 `gh` 重读过**：Release run **`45810786218`**（`headBranch=v0.13.53`、sha `50b3341`、**success**，
+单 job `Validate and publish v0.13.53` **11:27:44Z → 11:29:20Z** 约 96 秒、**19 步里非 success 的 0 个**；本轮第一次读到它时
+还在 `in_progress`，等了一分钟才读到 completed，**结论是等出来的**）与 `main` 的 CI run **`45810749356`**（sha `50b3341`、**success**）；
+GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.53 名字
+`Grok Workflow for DSH v0.13.53`、`publishedAt 2026-11-26T11:29:16Z`、非 draft / 非 prerelease、target `main`、正文 **35 行**、
+唯一资产 **`dsh-grok-workflow-0.13.53.tgz` = 1027274 字节**、`digest sha256:35485d31…b3a13`（上一版 `0.13.52` = 1021062，**+6212**）；
+**真机 soak 是复用的、这一版没有重跑**：`.rsi/evidence/task-panel-2026-11-26/`（隔离克隆 live web 档案、打包安装、真模型、
+端口 3411、桌面 1500 + 窄屏 390/360/700；**10 张截图**、1500 那张 **16 节点 / 21 条边**、390 那张 **6 / 7**、`readings.json` 与图
+逐条对得上、`mermaid-done.txt` 是 16 行节点 / 21 行边的 `flowchart TD`、两侧控制台 0 错），覆盖成立是因为**产品代码在 `45909bb`
+与 `c698a36` 之间逐字未变**（`git diff` 那五个路径 **0 行**）；**两条缺口照实记、不软化**——① **卡住那一句在真机上零像素证据**
+（10 张图里一次没渲染，12 条读数 `stuckPresent` 全 `false`；`等你点头` / `未通过` / `已取消` / `出错` 四颗胶囊与**重试虚线**
+同样一次没拍到，`mermaid-done.txt` 里 `-.->` **0 条**），**这些状态靠 25 + 31 条组件用例与读代码，不是真机截图**；
+② 一处窄屏碰撞（`phone-390-trace.png` 摊开的调用卡片被下一颗节点压住、390 那一档第三颗任务被输入框圆角面板裁掉、
+`收下这版` 在折叠线以下；360 / 700 两张是滚过顶部拍的，顶句与胶囊只有 DOM 读数）+ 两处取证瑕疵
+（`raw-readings-phone.json` 里 `phone-360-done` / `tablet-700-done` 仍是过期的 `1 / 5 / 19`，与 `readings.json` 的 `0 / 0 / 0` 矛盾；
+`desktop-1500-trace.png` 名字骗人，拍的其实是轨迹**没开**）——**都不是拦路石**；**`BLOCKED` 一条**：`AGENTS.md` §13 的 live 档案升级
+**没做成**——本会话 `workspace-write`、`~/.dsh` 在工作区外，**写入不可能**，本轮**没有做写探测**，**没写、没重载、没重启** 3080 上的实例；
+只读实读 live 装着 **`0.13.52`**、依赖行仍是**浮动的** `github:free6589/dsh-grok-workflow`、`~/.dsh` mtime `2026-11-25 23:14:14`、
+`~/.dsh/profiles` mtime `2026-11-22 16:59:46`、**`~/.dsh/profiles/web` mtime `2026-11-26 19:20:42`**——**live 档案不在 0.13.53 上**，
+升级需要一个对 `~/.dsh` 有写权限的操作员上下文并顺手钉到 `#v0.13.53`；**一条只读观察（`HYPOTHESIS`，不是本块干的）**：那个
+`profiles/web` 的 mtime 落在 **19:20:38–42** 窗口里，是**另一个进程**往 live 档案装了东西；**两处别的会话的遗留没碰**：
+`.gitignore` 是 modified、`.rsi/evidence/progress-now/` 是未跟踪（未暂存、未提交、未改、未回滚）；本块**只写文档**，
+没有 `git add` / `commit` / `push`，没有建或移动任何标签，`CHANGELOG` / `README*` / `src` / `test` / `lib` 一行未改，
+`gate-50b3341.out` 只读未改。）
