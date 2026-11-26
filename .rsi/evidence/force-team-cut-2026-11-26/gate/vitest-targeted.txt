@@ -1,0 +1,16 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/block-flag-baseline.spec.ts (14 tests) 129ms
+ ✓ test/config.spec.ts (50 tests) 118ms
+ ✓ test/force-team.spec.ts (21 tests) 25ms
+ ✓ test/docs-config-keys.spec.ts (14 tests) 17ms
+ ✓ test/docs-version.spec.ts (8 tests) 12ms
+ ✓ test/intake.spec.ts (9 tests) 6ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+
+ Test Files  7 passed (7)
+      Tests  119 passed (119)
+   Start at  12:33:00
+   Duration  2.10s (transform 718ms, setup 0ms, import 1.01s, tests 313ms, environment 1ms)
+
