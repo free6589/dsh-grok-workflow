@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.50] - 2026-11-26
+
 ### Changed / 变更
 
 - **On a phone the progress figure is a tree now: one leg per line, its tasks on two rails, and names wrap instead of being cut / 手机上进度图变成一棵树：一条腿一整行，任务挂在两条轨上，任务名折行而不是被截断** —
