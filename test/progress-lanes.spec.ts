@@ -401,6 +401,88 @@ function skippedLaneRun(): ProgressRun {
   }
 }
 
+/**
+ * 已完成 with one task that failed and was then re-answered inside the same leg.
+ *
+ * Both calls name the same task, so they land in one cell: the cell reads `done` by the
+ * recovery rule, which is exactly why the amber has to survive on the dot that earned it.
+ * The rows are listed out of `seq` order on purpose — a stream may arrive that way, and the
+ * dots are ordered by `seq`, not by arrival.
+ */
+function retryRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-retry',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+      member(1, '执行', '任务 1 · 修复登录', 'failed', 0),
+    ],
+    details: [],
+    stopReason: 'completed',
+  }
+}
+
+/** 进行中 with the retry still open: the first attempt failed, the second has not settled. */
+function retryOpenRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-retry-open',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '执行', '任务 1 · 修复登录', 'failed', 0),
+      member(2, '执行', '任务 1 · 修复登录', undefined, 1),
+    ],
+    details: [],
+  }
+}
+
+/** 已完成 with one call answered twice and both answers good: no retry to draw. */
+function resubmitRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-resubmit',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '执行', '任务 1 · 修复登录', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+    ],
+    details: [],
+    stopReason: 'completed',
+  }
+}
+
+/** 失败整轮: one task finished, the second was still open when the run stopped on an error. */
+function failedRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-failed',
+    name: '任务团队 · 2 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+      member(3, '执行', '任务 2 · 写文档', undefined, 2),
+    ],
+    details: [],
+    stopReason: 'error',
+  }
+}
+
+/** 已取消: the leg that was running when the run was cancelled. */
+function cancelledRun(): ProgressRun {
+  return {
+    runId: 'r-lanes-cancelled',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'cancelled', 1),
+    ],
+    details: [],
+    stopReason: 'cancelled',
+  }
+}
+
 /** The same run with no task numbers anywhere: the lane matrix must not appear. */
 function plainRun(): ProgressRun {
   return {
@@ -957,12 +1039,15 @@ describe('lanes: the wires are directed and bend at a wrap (追加 4)', () => {
 })
 
 describe('lanes: no new words (追加 5)', () => {
-  it('adds no dictionary key, in either language', () => {
+  it('adds no dictionary key beyond the one a retry needs, in either language', () => {
     const keys = progressKeys('zh')
-    expect(keys.length, 'the progress namespace changed size').toBe(54)
+    // 55, not 54: 追加 8 (`progress.flow.attempt`, 中 `第 {n} 遍` / 英 `Attempt {n}`) is the
+    // one key this block adds, and it is the only one it may add.
+    expect(keys.length, 'the progress namespace changed size').toBe(55)
+    expect(keys, 'the retry key is missing').toContain('progress.flow.attempt')
     expect(progressKeys('en'), 'the two dictionaries disagree').toEqual(keys)
-    // Nothing in the namespace names the new structure: a key is a sentence waiting to be
-    // written, and this block ships no sentence.
+    // Nothing else in the namespace names the new structure: a key is a sentence waiting to
+    // be written, and this block ships no sentence.
     const vocabulary = keys.filter((key) => /(?:^|\.)(?:subs?|lanes?|swim|cell|cells|cols?|rows?|matrix)(?:\.|$)/iu.test(key))
     expect(vocabulary).toEqual([])
   })
@@ -987,5 +1072,165 @@ describe('lanes: no new words (追加 5)', () => {
     for (const state of ['progress.plan.waiting', 'progress.plan.running', 'progress.plan.done', 'progress.plan.failed', 'progress.plan.cancelled']) {
       expect(bundle.GROK_WORKFLOW_DICT['zh']![state], `${state} is missing`).toBeTypeOf('string')
     }
+  })
+})
+
+/**
+ * A retry is not a colour that gets overwritten: every attempt keeps its own mark.
+ *
+ * Contract 追加 8. A cell is still one task on one leg, and the recovery rule still colours
+ * the cell — but the attempt that failed keeps its own dot, the count of attempts is spoken
+ * once, and the pair that was re-read is joined by a dashed wire. Nothing here is a new
+ * sentence, and nothing moves: the cell stays 26px and the rows stay task-numbered.
+ */
+describe('lanes: every attempt keeps its own mark (追加 8)', () => {
+  /** The cells of one column, or a failure that names the column. */
+  function cellsOfColumn(page: unknown, kind = 'execute'): Element[] {
+    const column = columnsOf(page).find((entry) => attr(entry, 'data-gw-progress-col') === kind)
+    expect(column, `the fixture drew no ${kind} column`).toBeDefined()
+    return cellsOf(column!)
+  }
+
+  /** The one cell of a run whose only work leg walked one task. */
+  function cellOf(page: unknown, kind = 'execute'): Element {
+    const cells = cellsOfColumn(page, kind)
+    expect(cells, `the ${kind} column drew no single cell`).toHaveLength(1)
+    return cells[0]!
+  }
+
+  /** The dots of one cell, in document order. */
+  function dotsOf(cell: Element): Element[] {
+    return walk(cell).filter((element) => classesOf(element).includes('gw-progress-sub-dot'))
+  }
+
+  it('draws one dot per attempt in seq order, each coloured by its own row', () => {
+    const cell = cellOf(pageOf(retryRun())())
+    const dots = dotsOf(cell)
+    // 8.1: 每行一颗点，按 `seq` 从左到右（`seq` 1 是失败那次，即使它到达得更晚）。
+    expect(dots.map((dot) => attr(dot, 'data-attempt'))).toEqual(['1', '2'])
+    // 8.1: 一颗点的颜色只看那一行 —— 第一次琥珀，第二次绿。
+    expect(dots.map((dot) => attr(dot, 'data-state'))).toEqual(['failed', 'done'])
+    // 而格自己仍是恢复规则的结果：那颗琥珀没有被格吞掉，格也没有被点染红。
+    expect(attr(cell, 'data-state')).toBe('done')
+    // The dots share a container of their own, and the cell keeps its single row of content.
+    expect(walk(cell).filter((element) => classesOf(element).includes('gw-progress-sub-dots')), 'the dots have no container').toHaveLength(1)
+  })
+
+  it('keeps a retry that is still running open on its own dot', () => {
+    const cell = cellOf(pageOf(retryOpenRun())())
+    expect(dotsOf(cell).map((dot) => [attr(dot, 'data-attempt'), attr(dot, 'data-state')])).toEqual([['1', 'failed'], ['2', 'doing']])
+    // The first attempt really did fail and nothing has replaced it yet, so the cell is amber.
+    expect(attr(cell, 'data-state')).toBe('failed')
+  })
+
+  it('names the attempt count on a retried cell, and stays silent where one call passed', () => {
+    // 8.1: N>1 才有角标，文字是新键 `progress.flow.attempt`，n = 该格的行数。
+    expect(zh('progress.flow.attempt', { n: 2 })).toBe('第 2 遍')
+    expect(bundle.GROK_WORKFLOW_INTERNALS.translator('en')('progress.flow.attempt', { n: 2 })).toBe('Attempt 2')
+    const retried = cellOf(pageOf(retryRun())())
+    expect(textOf(hookOf(retried, 'data-gw-progress-sub-badge'))).toBe(zh('progress.flow.attempt', { n: 2 }))
+    // A cell whose task passed first time is the norm: no badge, and no word for it.
+    const once = cellsOfColumn(pageOf(laneRun())())[0]!
+    expect(hooksOf(once, 'data-gw-progress-sub-badge'), 'a first-pass cell grew a badge').toHaveLength(0)
+    expect(dotsOf(once).map((dot) => attr(dot, 'data-attempt'))).toEqual(['1'])
+  })
+
+  it('hangs a retry wire only on the pair whose first attempt did not complete', () => {
+    // 8.2: 虚线、只用 border token、不表状态（没有 `data-tone`）。
+    const dashed = RULES.filter((rule) => rule.body.includes('stroke-dasharray'))
+    expect(dashed.length, 'no wire is dashed').toBeGreaterThan(0)
+    for (const rule of dashed) expect(rule.body, 'the retry wire takes a state colour').toContain('--dsw-alias-border-l2')
+    const page = pageOf(retryRun())()
+    const tones = walk(page).filter((element) => Object.prototype.hasOwnProperty.call(element.props, 'data-tone'))
+    expect(tones.map((element) => classesOf(element).join(' ')), 'the wire claims a tone').toEqual([])
+    // Nothing is drawn on a host without layout, and nothing throws.
+    expect(drawnPaths(hookOf(page, 'data-gw-progress-wires'))).toHaveLength(0)
+
+    // Which pairs are joined is read off the dots: the left dot of a retried pair is not
+    // `done`, while a task answered twice and good twice offers no pair to join.
+    const retried = cellOf(page)
+    expect(dotsOf(retried).map((dot) => attr(dot, 'data-state')), 'the failing attempt lost its mark').toEqual(['failed', 'done'])
+    const resubmitted = cellOf(pageOf(resubmitRun())())
+    expect(dotsOf(resubmitted).map((dot) => attr(dot, 'data-state')), 'a good pair looks like a retry').toEqual(['done', 'done'])
+  })
+
+  it('draws that wire from one dot’s right edge to the next dot’s left edge', () => {
+    // 8.2: 从那一颗点的右缘中点 → 下一颗点的左缘中点，仍走 `measureProgressFlowWires()`.
+    // The measurement is driven with dot boxes and their own states, so the run's model — not
+    // my arithmetic — decides which pairs are joined; a segment may be reported with the
+    // wires or as a retry step, and either place counts as drawn.
+    const box = (x: number, w: number, attributes: Record<string, string>) => ({
+      getBoundingClientRect: () => ({ left: x, top: 0, width: w, height: 6, right: x + w, bottom: 6 }),
+      getAttribute: (name: string) => attributes[name] ?? null,
+      dataset: { state: attributes['data-state'] ?? '', attempt: attributes['data-attempt'] ?? '' },
+    })
+    const flowWith = (states: readonly string[]): unknown => ({
+      querySelectorAll: (selector: string) => {
+        if (/sub-dot|attempt/iu.test(selector)) {
+          return states.map((state, index) => box(index * 12, 6, { 'data-state': state, 'data-attempt': String(index + 1), 'data-gw-progress-sub-dot': 'k' }))
+        }
+        if (/data-gw-progress-sub(?![-a-z])|\.gw-progress-sub(?![\w-])/u.test(selector)) return [box(0, 200, { 'data-gw-progress-sub': 'k' })]
+        return []
+      },
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 400, right: 1000, bottom: 400 }),
+    })
+    const segmentsOf = (measured: unknown): number[][][] => {
+      const value = measured as { paths?: number[][][], retries?: number[][][] }
+      return [...(value.paths ?? []), ...(value.retries ?? [])]
+    }
+    expect(segmentsOf(progress.measureWires(flowWith(['failed', 'done']))), 'the retried pair lost its wire').toContainEqual([[6, 3], [12, 3]])
+    // An attempt that passed is not re-read: two good dots offer no pair to join.
+    expect(segmentsOf(progress.measureWires(flowWith(['done', 'done']))), 'a good pair grew a retry wire').toEqual([])
+    // One dot, one attempt: nothing to join.
+    expect(segmentsOf(progress.measureWires(flowWith(['done'])))).toEqual([])
+  })
+
+  it('keeps a failed run’s page the same drawing, only coloured by what it recorded', () => {
+    const run = failedRun()
+    const page = pageOf(run)()
+    const flow = progress.deriveProgressFlow(run)
+    // 8.3: 该琥珀的格琥珀、该绿的格绿；同一张图、同一套 `data-*`。
+    const execute = columnsOf(page).find((column) => attr(column, 'data-gw-progress-col') === 'execute')!
+    expect(attr(execute, 'data-state')).toBe('blocked')
+    expect(cellsOf(execute).map((cell) => attr(cell, 'data-state'))).toEqual(['done', 'blocked'])
+    // The footer is still the one count line, and it is still the flow's own key.
+    expect(textOf(hookOf(page, 'data-gw-progress-left'))).toBe(zh('progress.flow.left', { left: flow.remaining, total: flow.total }))
+    expect(flow.remaining).toBe(flow.total - flow.at)
+    // And the page invented no sentence to explain itself.
+    const allowed = new Set<string>([run.name, ...Object.values(bundle.GROK_WORKFLOW_DICT['zh'] ?? {})])
+    for (const row of run.members) if (row.phase !== undefined) allowed.add(row.phase)
+    allowed.add(zh('progress.flow.left', { left: flow.remaining, total: flow.total }))
+    for (let n = 2; n <= run.members.length; n += 1) allowed.add(zh('progress.flow.attempt', { n }))
+    expect(pageTexts(page).filter((text) => !allowed.has(text)), 'the failed page says something new').toEqual([])
+  })
+
+  it('writes the engine’s own `cancelled` on a cancelled run’s cells and columns', () => {
+    const run = cancelledRun()
+    const page = pageOf(run)()
+    const execute = columnsOf(page).find((column) => attr(column, 'data-gw-progress-col') === 'execute')!
+    // 8.3: 取消页 `data-state` 用引擎原话，不派生。
+    expect(attr(execute, 'data-state')).toBe('cancelled')
+    const cell = cellOf(page)
+    expect(attr(cell, 'data-state')).toBe('cancelled')
+    expect(dotsOf(cell).map((dot) => attr(dot, 'data-state'))).toEqual(['cancelled'])
+    // Same page, no new words, and the same one count line.
+    const flow = progress.deriveProgressFlow(run)
+    expect(textOf(hookOf(page, 'data-gw-progress-left'))).toBe(zh('progress.flow.left', { left: flow.remaining, total: flow.total }))
+    const allowed = new Set<string>([run.name, ...Object.values(bundle.GROK_WORKFLOW_DICT['zh'] ?? {})])
+    for (const row of run.members) if (row.phase !== undefined) allowed.add(row.phase)
+    allowed.add(zh('progress.flow.left', { left: flow.remaining, total: flow.total }))
+    expect(pageTexts(page).filter((text) => !allowed.has(text)), 'the cancelled page says something new').toEqual([])
+  })
+
+  it('stops the highlight on the column whose newest attempt has not settled', () => {
+    // 8.3: 重试正在跑 → 高亮停在同一列，不往后跳也不往前滑。
+    const run = retryOpenRun()
+    const page = pageOf(run)()
+    const flow = progress.deriveProgressFlow(run)
+    const current = columnsOf(page).filter((column) => attr(column, 'data-current') === 'true')
+    expect(current, 'exactly one column is the current one').toHaveLength(1)
+    expect(attr(current[0]!, 'data-gw-progress-col')).toBe('execute')
+    expect(flow.at).toBe(flow.nodes.findIndex((node) => node.kind === 'execute') + 1)
+    expect(flow.remaining).toBe(flow.total - flow.at)
   })
 })
