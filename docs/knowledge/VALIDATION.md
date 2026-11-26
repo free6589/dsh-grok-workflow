@@ -1,3 +1,51 @@
+## `0.13.50` **发出去并收口**：发布提交 `55a8afd`、`main` 从 `33c170b` 快进、附注标签 `v0.13.50` 对象 `8d079144…`、两个远端 run 都 success、Release 资产 **1015152** 字节（比 `0.13.49` **+5237**）；发布门禁在 `55a8afd` 的干净树上 **`GATE_EXIT=0`**（`105 files / 2045 passed` / `86.34s`），收口这一轮自己另跑一遍 `verify:lib` 读到 **`VERIFY_LIB_EXIT=0`**；**真机 soak `NOT_RUN`**（行为由上一块的模拟屏读数覆盖）、**live 档案升级 `BLOCKED`**、npm publish `NOT_RUN` — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`0.13.50` 的收口。功能本身没在这一轮写——要发的东西是上一块的「手机上的进度图变成一棵树」
+（`4278ccd`，36 文件 / +2491 −90），发布提交 `55a8afd` 只抬版本（8 文件 / **+24 −22**）。
+这一轮的活是：**独立复核门禁**（不采信上游转述）、打附注标签、推 `main` 与标签、盯两个远端 run 到 success、
+核对 Release 元数据与资产、归档转录、写记忆、拆 worktree / 删分支，最后做一次 live 升级探测（预期被拒）。
+
+**发布身份（`CONFIRMED`，`git` / `gh` 逐条读的）**
+
+| 项 | 值 |
+| --- | --- |
+| 发布提交 | `55a8afdaac6511dd1e1a84227e11b7dcbfe32d2b`（`chore(release): prepare v0.13.50`，单父 `4278ccd`） |
+| 附注标签 | `v0.13.50`，`git cat-file -t` = **`tag`**；对象 **`8d07914432851377ad460aa85d296f11296b77c9`** |
+| 剥出 | `git rev-parse v0.13.50^{}` = **`55a8afdaac6511dd1e1a84227e11b7dcbfe32d2b`**（= 发布提交） |
+| 标签消息 / 时刻 | `Grok Workflow for DSH v0.13.50` / `2026-11-26 15:26:08 +0800`（epoch `1795677968` 换算） |
+| `main` | 推前 `33c170b` → 推后 **`55a8afd`**，输出 `33c170b..55a8afd  release/0.13.50 -> main`（**快进**，无 merge 提交） |
+| 旧标签 | 推前推后各读一次 `git ls-remote --tags origin`：`v0.13.45`×5 全同值，**没有 force-push、没有移动已发布标签** |
+
+**门禁（`CONFIRMED`，转录 `.rsi/evidence/release-0.13.50-2026-11-26/gate-release-55a8afd.out`，373 行 / 22004 字节 / `sha256 07bdb64d43652bb5c4629494e5cf88d22c4433b89ddfa2a6f351e86365e64c07`）**
+
+| 命令 / 动作 | 结果 | 出处（转录行号） |
+| --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npm run ci`（发布 worktree 的 `55a8afd` 干净树） | 末行 **`GATE_EXIT=0`** | 373 |
+| 同上的 lint 那一步 `npx oxlint src test` | `Found 15 warnings and 0 errors.`（187 文件 / 96 规则） | 162 |
+| 同上的 `verify:lib` | `lib/ at 55a8afd is the build of src/ at 55a8afd (293 files, byte-identical)` | 169 |
+| 同上的 `npm run build` | `client bundle: 386534 bytes → lib/client.js` | 168 / 178 |
+| 同上的 `npm test` | `Test Files 105 passed (105)` / `Tests 2045 passed (2045)` / `Duration 86.34s` | 368 / 369 / 371 |
+| **收口这一轮自己跑** `node scripts/verify-lib.mjs` | `client bundle: 386534 bytes → lib/client.js` + `… (293 files, byte-identical)`，**`VERIFY_LIB_EXIT=0`**，跑完 `git status --short` 仍空 | 现场输出（非转录） |
+
+**远端两个 run（`CONFIRMED`，`gh run view` 逐条读的）**
+
+| run | id | 触发 / 头分支 / sha | 结论 |
+| --- | --- | --- | --- |
+| CI | **`45775313465`** | `push` / `main` / `55a8afd` | `completed` / **`success`**（`07:26:20Z` → `07:27:54Z`） |
+| Release | **`45775329492`** | `push` / `v0.13.50` / `55a8afd` | `completed` / **`success`**（`07:26:28Z` → `07:27:41Z`） |
+
+**GitHub Release（`CONFIRMED`，`gh release view v0.13.50 --json …`）**：名字 `Grok Workflow for DSH v0.13.50`、
+`tagName` `v0.13.50`、`isDraft false`、`isPrerelease false`、`targetCommitish main`、`publishedAt 2026-11-26T07:27:38Z`、
+正文 **29 行 / 3234 字节**（非空，就是 `CHANGELOG.md` 的 `## [0.13.50] - 2026-11-26` 那一节）；
+唯一资产 `dsh-grok-workflow-0.13.50.tgz` = **1015152** 字节、`digest sha256:50b191cdec86d338efa063a6088896bb00c1e05ca2800ec9ce9664f8edbf5719`；
+<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.50>。与 `0.13.49`（1009915 字节）差 **+5237**。
+
+**照实留白**：**真机 soak 在本轮 `NOT_RUN`**——手机上看得到的行为由上一块 `.rsi/evidence/mobile-tree-2026-11-26/` 的
+**模拟屏**读数覆盖（`shots.json`：`30-done` 9 格 / 20 根线 / `cardsCut 0` / `crossings 0` / `scroll [390,390]`；
+`40-narrow-360` 无横向溢出），**真手机从头到尾没跑过**；第二遍整份门禁 `NOT_RUN`（`AGENTS.md` §12）；npm publish `NOT_RUN`（本仓库不发 npm）。
+**`BLOCKED` 一条**：`AGENTS.md` §13 的 live 档案升级——`~/.dsh` 在工作区外、本会话 `workspace-write`，
+探测 `: > ~/.dsh/.release-probe-0.13.50` 被拒（`Read-only file system`），**没重试绕过、没重载、没重启、没写 `~/.dsh`**。
+
 ## 进度页手机排版换成树（`fix/flowchart-mobile-tree`，基点 `33c170b`）：门禁六格 + 真页面三状态两宽度；**`npm run ci` 与 `verify:lib` 是 `NOT_RUN`**、**真手机是 `NOT_RUN` / 锁屏截图 `BLOCKED`**；门禁四份转录随证据入库（`gate-tsc` / `gate-lint` / `gate-specs` / `gate-full` 各带自己的 `*_EXIT=0`）— 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：只动浏览器包——`src/client/index.js` 加一段 `@media (max-width: 720px)`（一条腿一行、两轨、卡折行不截字）

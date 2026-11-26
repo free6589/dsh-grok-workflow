@@ -1,7 +1,42 @@
-## 2026-11-26 — **进度页手机排版换成树**（分支 `fix/flowchart-mobile-tree`，基点 `33c170b`，全部改动**还在工作树里、一颗提交都没提**）：`lib/client.js` 是同一块里重建的、必须跟源码**一次提交**；分支 24 小时内合或删；手机读数是**模拟屏**，真机没跑
+## 2026-11-26 — **`0.13.50` 已发布并收口**（发布提交 `55a8afd`，附注标签 `v0.13.50` 对象 `8d079144…`、`main` 从 `33c170b` 快进，两个远端 run 都 success）；**审计留下的六条未修项照实留在这里，一条都没改代码**
+
+- **From:** 收口施工者（`agent-211/closer`）· **To:** 下一个接手进度页 / 手机排版的人
+- **发布身份（`CONFIRMED`）**：发布提交 **`55a8afdaac6511dd1e1a84227e11b7dcbfe32d2b`**（`chore(release): prepare v0.13.50`，单父 `4278ccd`，8 文件 / +24 −22）；附注标签 **`v0.13.50`** 对象 **`8d07914432851377ad460aa85d296f11296b77c9`** → 剥出 `55a8afd`；`main` = `origin/main` = `55a8afd`（`33c170b..55a8afd` 快进，旧标签 `v0.13.45`–`v0.13.49` 推前推后同值）。
+- **跑过什么（`CONFIRMED`）**：发布门禁在 `55a8afd` 干净树上 `GATE_EXIT=0`（`105 files / 2045 passed`、`86.34s`、lint `15 warnings / 0 errors`、`293 files, byte-identical`、`386534 bytes`），转录 `.rsi/evidence/release-0.13.50-2026-11-26/gate-release-55a8afd.out`（373 行 / 22004 字节 / `sha256 07bdb64d…`）；收口这一轮自己另跑一遍 `verify-lib` 读到 `VERIFY_LIB_EXIT=0`；CI run **`45775313465`** 与 Release run **`45775329492`** 都 `completed success`；Release 资产 **1015152** 字节（比 `0.13.49` **+5237**）。
+- **没跑什么（`NOT_RUN` / `BLOCKED`）**：本轮**没有重跑真机 soak**，手机行为全部由上一块的**模拟屏**读数覆盖（`.rsi/evidence/mobile-tree-2026-11-26/`），**真手机仍是 `NOT_RUN`**；第二遍整份门禁 `NOT_RUN`（`AGENTS.md` §12）；`AGENTS.md` §13 的 live 档案升级 **`BLOCKED`**（`~/.dsh` 在工作区外、`workspace-write`，探测 `: > ~/.dsh/.release-probe-0.13.50` 被拒 `Read-only file system`，没重试绕过、没重启），live 那行仍是浮动的 `github:free6589/dsh-grok-workflow`。
+
+### 审计留下的六条未修项（**都没有修**，谁接谁先看这里）
+
+标 `CONFIRMED` 的，是收口这一轮**自己读了代码或证据**复核过的；标 `NOT_VERIFIED` 的，是审计报了但本轮**没有再量**，不许当成已核实。
+
+1. **两处注释说「连线测量会读 `data-gw-progress-branch-side`」，实际不读** — **`CONFIRMED`**（本轮自己 grep 复核）。
+   `src/client/index.js:4727-4729` 与 `test/progress-connector.spec.ts:422-424` 都写着这个属性有两个读者（手机布局 **和** 连线测量），
+   但全仓对这个属性的引用只有 `4111-4113` 三条 CSS 选择器和 `4736` 一处写入；
+   `getAttribute('data-gw-progress-branch-side')` / `dataset.gwProgressBranchSide` **一处都没有**——`measureProgressFlowWires()` 不读它。
+   影响只在注释与用例意图的描述，行为没问题；改文案时别把注释当成事实来源。
+2. **断点是视口 720px，721–约 860px 之间仍然挤** — **半 `CONFIRMED`**：断点那一半本轮自己读了，就是 `@media (max-width: 720px)`
+   （`src/client/index.js:4103`），**721px 起走的是原矩阵**；「721–约 860 仍然挤」那半 **`NOT_VERIFIED`**（本轮没量那个区间）。
+   这一格**改前也一样、不是本次引入的回归**，别写成新 bug。
+3. **「任务名折行」没有被观察到过** — **`CONFIRMED`**（本轮自己读的三份 soak JSON）。
+   `soak/20-running.json` 3 条、`soak/30-done.json` 9 条、`soak/40-narrow-360.json` 9 条，**每一条 `lines` 都是 `1`**（共 21 条读数），
+   也就是说**一次真的折行都没出现过**。「卡能折行」目前只由样式表契约那几条用例撑着（`height: auto` / `white-space: normal` /
+   `overflow-wrap: anywhere`），**没有一张读数是「名字真的折成两行」**。要证它，得用长名字再造一次屏。
+   另注：这三张屏都是**模拟屏**（360 / 390 CSS px），真手机整轮 `NOT_RUN`。
+4. **手机页面 7 腿 / 9 卡大约 3.5 屏长** — **`NOT_VERIFIED`**（审计读数，本轮没量页高；`soak/shots.json` 只记 `subs` / `wires` /
+   `cardsCut` / `crossings` / `scroll`，没有页高字段）。要引用请自己量一次。
+5. **1400px 桌面那一格只有 PNG、没有 JSON** — **`CONFIRMED`**（本轮自己列目录）：`soak/` 里只有 `50-desktop-1400.png`，
+   **没有** `50-desktop-1400.json`，所以那一格是「派单读数」、不能逐字段复核。「>720px 一个字没动」这个结论，
+   真正能回指的证据是三种手机屏上的 `cardsCut 0` / `crossings 0` / `scroll [390,390]` 和桌面那张图，不是一份结构化 JSON。
+6. **旧的「折行 = 肘弯」用例已经删了，与之对应的分支实际不可达** — **`NOT_VERIFIED`**（审计读数，本轮没有重新追溯那段逻辑）。
+   引用前先自己看一眼现在还有没有那条分支。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 的**手机树排版**那一轮，它那句「全部改动还在工作树里、一颗提交都没提」
+**是失实的**（改动实际是提交 `4278ccd`），本轮已就地改正这一个说法，其余结论一字未动。）
+
+## 2026-11-26 — **进度页手机排版换成树**（分支 `fix/flowchart-mobile-tree`，基点 `33c170b`，改动**后来收成一颗提交 `4278ccd`**——写这一条时还在工作树里）：`lib/client.js` 是同一块里重建的、必须跟源码**一次提交**；分支 24 小时内合或删；手机读数是**模拟屏**，真机没跑
 
 - **From:** 记忆施工者（`agent-210/memory`）· **To:** 合并这条分支的人 / 下一个接手进度页的人
-- **这条分支现在是什么**：从 `main` 的尖端 `33c170b` 长出，**自己零提交**；工作树里 7 个文件、`src` / `lib` 各 **+258 −20**：
+- **这条分支现在是什么**：从 `main` 的尖端 `33c170b` 长出，**改动收成一颗提交 `4278ccd`**（写这一条时还只在工作树里：7 个文件、`src` / `lib` 各 **+258 −20**）：
   `src/client/index.js`（`@media (max-width: 720px)` 与 `data-gw-progress-branch-side`、`measureProgressFlowWires()` 前九个几何助手）、
   `lib/client.js`（构建产物）、四份浏览器 spec（`progress-connector` +135 / `progress-lanes` +73 / `progress-flow` +157 −45 /
   `client.spec` +20 −5）、`docs/knowledge/DESIGN-progress-tab.md` 的 §24。用户看到的一件事：**窄于 720px 时进度页是一条腿一行的树**
