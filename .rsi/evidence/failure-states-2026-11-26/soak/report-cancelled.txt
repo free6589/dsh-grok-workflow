@@ -1,0 +1,15 @@
+# session session-f5980088-0950-4a05-9768-6e88c91cbc5d
+
+[tool-workflow/run-start] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "name": "任务团队"}
+
+[tool-workflow/guardian-start] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "armed": true, "budgetMs": 7200000}
+
+[tool-workflow/agent-start] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "seq": 1, "label": "规划（第1次）", "phase": "规划", "childId": "0e2cb2c0-3d15-46ed-b375-5758e8ae6e8a"}
+
+[tool-workflow/agent-end] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "seq": 1, "outcome": "cancelled"}
+
+[tool-workflow/guardian-end] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "cancelled": false, "findingCount": 0}
+
+[tool-workflow/run-end] {"runId": "872022b2-e916-46b1-af34-81c0ab367fca", "stopReason": "cancelled"}
+
+Error: grok_workflow cancelled: grok_workflow was cancelled by its caller before the whole run finished; finished tasks are kept, unfinished ones are marked, and resending the same request continues from here

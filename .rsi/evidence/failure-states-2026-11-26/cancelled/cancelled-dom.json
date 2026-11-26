@@ -1,0 +1,47 @@
+{
+  "mounted": true,
+  "chipText": "已取消",
+  "chipState": "cancelled",
+  "left": "还剩 0 步 / 共 3 步",
+  "nodes": [
+    {
+      "key": "flow:start",
+      "kind": "start",
+      "ordinal": "0",
+      "state": "done",
+      "current": "false",
+      "aria": "起点 过了",
+      "word": "起点",
+      "badge": "",
+      "toggle": false
+    },
+    {
+      "key": "flow:0:plan:1",
+      "kind": "plan",
+      "ordinal": "1",
+      "state": "cancelled",
+      "current": "false",
+      "aria": "规划 没做",
+      "word": "规划",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:end",
+      "kind": "end",
+      "ordinal": "0",
+      "state": "cancelled",
+      "current": "true",
+      "aria": "终点 没做",
+      "word": "终点",
+      "badge": "",
+      "toggle": false
+    }
+  ],
+  "logRows": 0,
+  "guardianBlocks": 4,
+  "dockState": "none",
+  "dockText": "",
+  "dockButton": "",
+  "text": "任务团队\n已取消\n起点\n规划\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 3 步"
+}

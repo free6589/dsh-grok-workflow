@@ -1,0 +1,21 @@
+# the summary node, opened by clicking its own detail control
+
+node state: done
+node aria-label: 汇总 第 1 稿 过了
+toggle aria-expanded: true
+rejected rows: 0
+
+# the rows inside the node, one per line
+- 8:00
+汇总·第1稿
+汇总
+交卷
+打开子会话
+
+# the node list, verbatim
+
+8:00
+汇总·第1稿
+汇总
+交卷
+打开子会话
