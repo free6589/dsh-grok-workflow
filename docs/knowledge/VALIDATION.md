@@ -1,3 +1,34 @@
+## `fix/card-approval` 上的卡片批准来源：账本从 `user` 改记 `question-reply`（`CONFIRMED`）— 2026-11-26
+
+**这一轮是什么**：D-137 让卡片答案能开出块之后留下的那一格——账本把卡片点头和打字点头写成同一个 `kind:"user"`。本块把来源拆开：
+卡片答案记 `question-reply`（`user` 声明或默认时自动改记），打字回合仍记 `user`，调用方声明的 `request` / `operator` / `policy` 原样保留。
+来源只加一个合法值，`quote` 的逐字契约、D-137 的两道闸（提问必须问在预览之后、只取 `selected` / `custom`）一个字没改。
+
+**真机读数（两轮同脚本、同克隆、同模型路由，只换构建）**
+
+| 项 | 值 |
+| --- | --- |
+| 改前 | 会话 `session-9f00ae2a-fab1-4a97-91b9-bda24865c6d4`，seq 46 `user/message` `source.kind=user-question-reply`，seq 48 `start` 放行，账本 `"approval":{"kind":"user","quote":"确认"}` |
+| 改后 | 会话 `session-50bd4d8f-5ed4-494c-bbb7-6d034eae72d7`，seq 36 同形状的卡片答案，seq 38 `start` 放行，账本 `"approval":{"kind":"question-reply","quote":"确认"}` |
+| 环境 | 隔离 `DSH_HOME=<worktree>/.tmp/soak/dsh-home`（`clone-profile` 克隆 `web`）、端口 3411、真模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、宿主提问工具 `mode: timed, timeout: 20` |
+| 证据 | `.rsi/evidence/card-approval-2026-11-26/`（`README.md` 是索引；`event.txt` / `event-after.txt` 是答案事件逐字，`ledger-before.jsonl` / `ledger-after.jsonl` 是账本逐字，`cardanswertext-before.txt` 是三种答案形状的读数，`gate.txt` 是门禁转录） |
+| 红线 | `~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime 分别 2026-11-25 23:14 / 2026-11-22 16:59 / 2026-11-26 11:22，全部早于会话开始（16:35），跑完复查仍是这三个值；线上 3080 前后都是 `401`；未 push / 未打 tag / 未 bump / 未 publish |
+
+**块内门禁（`CONFIRMED`，转录 `.rsi/evidence/card-approval-2026-11-26/gate.txt`，在 `b0c3f5d` 的树上跑）**
+
+| 命令 | 结果 |
+| --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | `EXIT=0` |
+| `npx oxlint src test` | `Found 15 warnings and 0 errors.`（187 文件）`EXIT=0` |
+| `TMPDIR=$PWD/.tmp npx vitest run test/block-tools.spec.ts test/block-preview.spec.ts test/block-ledger.spec.ts` | `3 passed (3)` / `145 passed (145)`，`EXIT=0` |
+| `npm run build` 第二次 | `client bundle: 386534 bytes`，之后 `git status --short` 里没有 `lib/` 与 `src/` 的改动（构建可复现） |
+
+**`NOT_RUN` 照实记：** 整仓 `npx vitest run`、`npm run ci`、`node scripts/verify-lib.mjs`——`AGENTS.md` §12 把块内门禁收在被改的 spec 上，整仓与 `ci` 留给发布提交。
+**`BLOCKED` 无。** 本块唯一一次失误是「改后」那一轮第一次装包时把相对路径算错（装到了一个多余目录，克隆里仍是旧包），第一次「改后」读数因此仍是 `kind:"user"`；
+发现后删掉多余目录、重装、重启、重跑，得到上面那行 `question-reply`。那一行旧读数没有删，作为第二条「改前」对照留在 `ledger-after.jsonl` 的第二行。
+
+---
+
 ## `0.13.51` **发出去并收口**：合并提交 `e38d5cc`、发布提交 `16453c4`、`main` 从 `c6248f8` 快进、附注标签 `v0.13.51` 对象 `a2c7eeab…`、两个远端 run 都 success、Release 资产 **1019833** 字节（比 `0.13.50` **+4681**）；发布门禁在 `16453c4` 上 **`GATE_EXIT=0`**（`105 files / 2057 passed` / `99.74s`，转录 **401 行 / 24285 字节 / `sha256 51f497cb…`**）；**第二遍门禁 / 真机 soak / npm publish `NOT_RUN`**、**live 档案升级 `BLOCKED`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`0.13.51` 的发布收口。**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）——这一版发出去的东西

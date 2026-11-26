@@ -1,3 +1,24 @@
+## 2026-11-26 — **卡片批准在账本里有了自己的来源：`kind:"question-reply"`**（分支 `fix/card-approval`，提交 `b0c3f5d` + 本条记忆提交）；**块内门禁绿 + 真机两轮对照，未合**
+
+- **From:** 这一块的唯一执行者（`agent-215/worker-card-approval`）· **To:** 合并这条分支的人 / 下一个接手卡片路径的人
+- **这条分支现在是什么（`CONFIRMED`）**：从 `main` 尖端 **`226d673`** 干净长出，两条提交：源码 + 用例 + `lib/` 一起的 **`b0c3f5d`**
+  （16 文件 / +165 −24）、本条记忆与证据提交紧随其后。**未推、未打 tag、版本仍是 `0.13.51`**，没碰 `~/.dsh` 与在跑的实例。
+- **为什么改**：D-137 让卡片答案能开出块，但账本那一格没跟着改——真机那一行是 `"approval":{"kind":"user","quote":"确认"}`，
+  **点的卡片和打的一句话在记录里长得一模一样**，事后读记录的人分不出来（引文本身就分不出来，两种方式留下的都是「确认」两个字）。
+- **改成什么**：`userMessagesSince()` 回 `{ text, kind }[]`（`text` 照旧喂逐字校验，`kind` 说来源）；`start` 在「调用方声明或默认 `user`、
+  且逐字命中的**第一条**消息是卡片答案」时改记 `question-reply`；`request` / `operator` / `policy` / `preview` 原样保留。
+  `ApprovalKind` 与两处校验集合各加一个成员。**D-137 的两道闸一个字没改**：卡片只认「问在预览之后」的那一次，
+  `quote` 仍只取 `selected` / `custom`，绝不把宿主的 JSON 批次（含模型自己写的问题）当成批准。详见 `D-172`。
+- **跑过什么（`CONFIRMED`）**：真机两轮、同脚本同克隆同模型路由，只换构建——改前账本 `kind:"user"`，改后 `kind:"question-reply"`，
+  两轮块都照常开。逐字证据在 `.rsi/evidence/card-approval-2026-11-26/`（`README.md` 是索引，`gate.txt` 是门禁转录，
+  `cardanswertext-before.txt` 是三种答案形状的读数）。块内门禁：`tsc --noEmit` `EXIT=0`、`oxlint src test` `15/0`（187 文件）、
+  三份块 spec `145 passed`、第二次 `npm run build` 之后 `src/` 与 `lib/` 无改动。
+- **没跑什么（`NOT_RUN`）**：`npm run ci`、整仓 `npx vitest run`、`node scripts/verify-lib.mjs`（`AGENTS.md` §12，块内只跑被改的 spec）；
+  **真机上「卡片在预览之前问、预览之后才答」仍然只有单测覆盖**，这一轮没有在真机上摆出那个顺序。
+- **给下一个人的两件事**：① **`cardAnswerText()` 的空答案兜底没动**——`selected: []` 且没有 `custom` 时它回落成整段 JSON，
+  那时连「确认」都能从模型自己的选项标签里匹配上（`cardanswertext-before.txt` 的 (c)）。这是 D-137 留下的口子，要收得先定「一个字都没答算不算点头」，
+  单独一条决定。② **`question-reply` 是新增的合法值：旧构建读到会跳过那一行**（读路本来就是「不认识就跳过并记 `skipped`」）。
+  方向是单向的——新构建读老行没问题，老构建读新行会少一行，所以**发布说明里不要承诺降级**。
 ## 2026-11-26 — **`0.13.51` 已发布并收口**（合并提交 `e38d5cc`、发布提交 `16453c4`、附注标签 `v0.13.51` 对象 `a2c7eeab…`、两个远端 run 都 success、Release 资产 **1019833** 字节）；**live 档案升级 `BLOCKED`，一条动作留给有写权限的人；块里两条缺口照原样带下去**
 
 - **From:** 发布收口这一轮（`agent-214/release-memory`）· **To:** 有写权限做 live 档案升级的人 / 下一个接手监工模型那条腿的人
