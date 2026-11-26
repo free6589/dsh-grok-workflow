@@ -1,0 +1,2 @@
+$ npx tsc -p tsconfig.json --noEmit   (final tree bc5bc65)
+EXIT=0

@@ -1,0 +1,421 @@
+{
+ "bodyText": "DSH 本地构建\n0.2.2-rc.3-6b729fe\n会话\n生图\n新会话\n插件\n定时任务\n自动化任务\n网页版\nSDLC\n更多\n工作区\nsoak-lanes\n进行中\n用 grok_workflow 工具跑一个工作\n2分钟\n用 grok_workflow 工具跑一个工作\n5分钟\n用 grok_workflow 工具跑一个工作\n9分钟\n待办\n设置\n用 grok_workflow 工具跑一个工作\n标准模式\n11 个子智能体\n对话\n轨迹\n进度\n任务团队 · 3 个任务\n已完成\n起点\n执行\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n检查\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n复核\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n汇总\n第 1 稿\n汇总\n第 2 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 7 步\n\n收下这版\n发消息或创建任务, / 调用指令, @ 文件或对话\n工作区内修改\n自动接着跑\n关\n自迭代\n关\n工作流开关\n未开 · 还没设过\n1 轮 1 步·417 tok/s\n35.8K tok·缓存命中 99.6%\n7%",
+ "panelText": "任务团队 · 3 个任务\n已完成\n起点\n执行\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n检查\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n复核\n任务 1 · 写 notes.md 安装步骤\n任务 2 · 写 test.txt hello\n任务 3 · 写 steps.txt 数字行\n汇总\n第 1 稿\n汇总\n第 2 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 7 步\n\n收下这版",
+ "headerText": "任务团队 · 3 个任务\n已完成",
+ "counts": {
+  "cols": 7,
+  "nodes": 7,
+  "subGroups": 3,
+  "subCells": 9,
+  "wires": 1,
+  "paths": 13,
+  "markers": 1,
+  "toggles": 11,
+  "calls": 0,
+  "guardian": 1,
+  "planRows": 0
+ },
+ "cols": [
+  {
+   "kind": "start",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 284,
+   "w": 161.8,
+   "h": 32
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 457.84,
+   "w": 161.9,
+   "h": 128
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 631.7,
+   "w": 161.9,
+   "h": 128
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 805.56,
+   "w": 161.9,
+   "h": 128
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 979.42,
+   "w": 161.9,
+   "h": 32
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 1153.28,
+   "w": 161.9,
+   "h": 32
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "current": "true",
+   "top": 138,
+   "left": 1327.14,
+   "w": 161.9,
+   "h": 32
+  }
+ ],
+ "nodes": [
+  {
+   "kind": "start",
+   "state": "done",
+   "ordinal": "0",
+   "current": "false",
+   "col": "start",
+   "top": 138,
+   "left": 284,
+   "w": 161.8,
+   "h": 32,
+   "text": "起点"
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "execute",
+   "top": 138,
+   "left": 457.84,
+   "w": 161.9,
+   "h": 32,
+   "text": "执行"
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "check",
+   "top": 138,
+   "left": 631.7,
+   "w": 161.9,
+   "h": 32,
+   "text": "检查"
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "review",
+   "top": 138,
+   "left": 805.56,
+   "w": 161.9,
+   "h": 32,
+   "text": "复核"
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "summarize",
+   "top": 138,
+   "left": 979.42,
+   "w": 161.9,
+   "h": 32,
+   "text": "汇总 第 1 稿"
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "ordinal": "2",
+   "current": "false",
+   "col": "summarize",
+   "top": 138,
+   "left": 1153.28,
+   "w": 161.9,
+   "h": 32,
+   "text": "汇总 第 2 稿"
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "ordinal": "0",
+   "current": "true",
+   "col": "end",
+   "top": 138,
+   "left": 1327.14,
+   "w": 161.9,
+   "h": 32,
+   "text": "终点"
+  }
+ ],
+ "subs": [
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 1 · 写 notes.md 安装步骤",
+   "title": "任务 1 · 写 notes.md 安装步骤",
+   "aria": "任务 1 · 写 notes.md 安装步骤 过了",
+   "top": 176,
+   "left": 457.84,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 2 · 写 test.txt hello",
+   "title": "任务 2 · 写 test.txt hello",
+   "aria": "任务 2 · 写 test.txt hello 过了",
+   "top": 208,
+   "left": 457.84,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 3 · 写 steps.txt 数字行",
+   "title": "任务 3 · 写 steps.txt 数字行",
+   "aria": "任务 3 · 写 steps.txt 数字行 过了",
+   "top": 240,
+   "left": 457.84,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "check",
+   "word": "任务 1 · 写 notes.md 安装步骤",
+   "title": "任务 1 · 写 notes.md 安装步骤",
+   "aria": "任务 1 · 写 notes.md 安装步骤 过了",
+   "top": 176,
+   "left": 631.7,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "check",
+   "word": "任务 2 · 写 test.txt hello",
+   "title": "任务 2 · 写 test.txt hello",
+   "aria": "任务 2 · 写 test.txt hello 过了",
+   "top": 208,
+   "left": 631.7,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "check",
+   "word": "任务 3 · 写 steps.txt 数字行",
+   "title": "任务 3 · 写 steps.txt 数字行",
+   "aria": "任务 3 · 写 steps.txt 数字行 过了",
+   "top": 240,
+   "left": 631.7,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "review",
+   "word": "任务 1 · 写 notes.md 安装步骤",
+   "title": "任务 1 · 写 notes.md 安装步骤",
+   "aria": "任务 1 · 写 notes.md 安装步骤 过了",
+   "top": 176,
+   "left": 805.56,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "review",
+   "word": "任务 2 · 写 test.txt hello",
+   "title": "任务 2 · 写 test.txt hello",
+   "aria": "任务 2 · 写 test.txt hello 过了",
+   "top": 208,
+   "left": 805.56,
+   "w": 161.9,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "review",
+   "word": "任务 3 · 写 steps.txt 数字行",
+   "title": "任务 3 · 写 steps.txt 数字行",
+   "aria": "任务 3 · 写 steps.txt 数字行 过了",
+   "top": 240,
+   "left": 805.56,
+   "w": 161.9,
+   "h": 26
+  }
+ ],
+ "lanes": [
+  {
+   "lane": "1",
+   "byCol": {
+    "execute": 176,
+    "check": 176,
+    "review": 176
+   },
+   "spread": 0
+  },
+  {
+   "lane": "2",
+   "byCol": {
+    "execute": 208,
+    "check": 208,
+    "review": 208
+   },
+   "spread": 0
+  },
+  {
+   "lane": "3",
+   "byCol": {
+    "execute": 240,
+    "check": 240,
+    "review": 240
+   },
+   "spread": 0
+  }
+ ],
+ "paths": [
+  {
+   "d": "M0 0 L8 4 L0 8 Z",
+   "points": 3,
+   "arrow": false
+  },
+  {
+   "d": "M166 16 L178 16",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M340 16 L352 16",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M340 51 L352 51",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M340 83 L352 83",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M340 115 L352 115",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M514 16 L526 16",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M514 51 L526 51",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M514 83 L526 83",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M514 115 L526 115",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M687 16 L699 16",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M861 16 L873 16",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M1035 16 L1047 16",
+   "points": 2,
+   "arrow": true
+  }
+ ],
+ "leafTexts": [
+  ".gw-progress { position: relative; box-sizing: border-box; display: flex; flex-direction: column; width: 100%; min-width: 0; color: var(--dsw-alias-label-primary); font-family: var(--dsw-font-family-sans, inherit); font-size: 13px; }\n.gw-progress-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px 9px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }\n.gw-progress-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary, inherit); }\n.gw-progress-chip { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 12%, transparent); color: var(--dsw-alias-label-secondary, inherit); font-size: 12px; font-weight: 600; white-space: nowrap; }\n.gw-progress-chip-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }\n.gw-progress-chip[data-state=\"waiting\"] { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-inverse, inherit); }\n.gw-progress-chip[data-state=\"running\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent); color: var(--dsw-alias-state-business-primary); }\n.gw-progress-chip[data-state=\"running\"] .gw-progress-chip-dot { animation: gw-progress-pulse 1.7s ease-in-out infinite; }\n.gw-progress-chip[data-state=\"done\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent); color: var(--dsw-alias-state-success-primary); }\n.gw-progress-chip[data-state=\"failed\"], .gw-progress-chip[data-state=\"cancelled\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-flow { position: relative; box-sizing: border-box; display: block; width: 100%; min-width: 0; margin: 14px 0 0; padding: 0 4px; }\n.gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }\n.gw-progress-wires > path { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 1.5; }\n.gw-progress-cols { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 0; }\n.gw-progress-col { position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; max-width: 100%; margin: 0; padding: 0; list-style: none; }\n.gw-progress-node { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 6px; height: 32px; min-width: 0; max-width: 100%; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background-color: transparent; }\n.gw-progress-node[data-kind=\"start\"], .gw-progress-node[data-kind=\"end\"] { border-radius: 999px; }\n.gw-progress-node-dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }\n.gw-progress-node-word { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }\n.gw-progress-node-ord { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }\n.gw-progress-node[data-state=\"done\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent)); }\n.gw-progress-node[data-state=\"done\"] .gw-progress-node-dot { background: var(--dsw-alias-state-success-primary); }\n.gw-progress-node[data-state=\"done\"] .gw-progress-node-word { color: var(--dsw-alias-state-success-primary); }\n.gw-progress-node[data-state=\"doing\"] { border-color: var(--dsw-alias-state-business-primary); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent); }\n.gw-progress-node[data-state=\"doing\"] .gw-progress-node-dot { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }\n.gw-progress-node[data-state=\"doing\"] .gw-progress-node-word { color: var(--dsw-alias-state-business-primary); }\n.gw-progress-node[data-state=\"pending\"] { border-style: dashed; background-color: transparent; background-image: none; }\n.gw-progress-node[data-state=\"pending\"] .gw-progress-node-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }\n.gw-progress-node[data-state=\"pending\"] .gw-progress-node-word { color: var(--dsw-alias-label-secondary, inherit); }\n.gw-progress-node[data-state=\"failed\"], .gw-progress-node[data-state=\"blocked\"], .gw-progress-node[data-state=\"cancelled\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 50%, transparent); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent)); }\n.gw-progress-node[data-state=\"failed\"] .gw-progress-node-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node[data-state=\"failed\"] .gw-progress-node-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node[data-state=\"blocked\"] .gw-progress-node-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node[data-state=\"blocked\"] .gw-progress-node-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node[data-state=\"cancelled\"] .gw-progress-node-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node[data-state=\"cancelled\"] .gw-progress-node-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--dsw-alias-label-secondary, inherit); font: inherit; cursor: pointer; }\n.gw-progress-node-toggle::after { content: \"\"; width: 5px; height: 5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }\n.gw-progress-node-toggle[aria-expanded=\"true\"]::after { transform: rotate(-135deg); }\n.gw-progress-node-toggle:hover { color: var(--dsw-alias-state-business-primary); }\n.gw-progress-node-toggle:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }\n.gw-progress-node-calls, .gw-progress-sub-calls { position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; right: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; max-height: 240px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: var(--dsw-alias-bg-elevated, var(--dsw-alias-bg-l1, transparent)); box-shadow: 0 6px 16px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent); }\n.gw-progress-subs { display: grid; grid-template-rows: repeat(var(--gw-lanes, 1), 26px); gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }\n.gw-progress-sub { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 4px; height: 26px; min-width: 0; max-width: 100%; padding: 3px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; font-size: 12px; background-color: transparent; }\n.gw-progress-sub-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }\n.gw-progress-sub-word { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.gw-progress-sub[data-state=\"done\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent)); }\n.gw-progress-sub[data-state=\"done\"] .gw-progress-sub-dot { background: var(--dsw-alias-state-success-primary); }\n.gw-progress-sub[data-state=\"done\"] .gw-progress-sub-word { color: var(--dsw-alias-state-success-primary); }\n.gw-progress-sub[data-state=\"doing\"] { border-color: var(--dsw-alias-state-business-primary); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent)); }\n.gw-progress-sub[data-state=\"doing\"] .gw-progress-sub-dot { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }\n.gw-progress-sub[data-state=\"doing\"] .gw-progress-sub-word { color: var(--dsw-alias-state-business-primary); }\n.gw-progress-sub[data-state=\"pending\"] { border-style: dashed; background-color: transparent; background-image: none; }\n.gw-progress-sub[data-state=\"pending\"] .gw-progress-sub-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }\n.gw-progress-sub[data-state=\"pending\"] .gw-progress-sub-word { color: var(--dsw-alias-label-secondary, inherit); }\n.gw-progress-sub[data-state=\"failed\"], .gw-progress-sub[data-state=\"blocked\"], .gw-progress-sub[data-state=\"cancelled\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 50%, transparent); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent)); }\n.gw-progress-sub[data-state=\"failed\"] .gw-progress-sub-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-sub[data-state=\"failed\"] .gw-progress-sub-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-sub[data-state=\"blocked\"] .gw-progress-sub-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-sub[data-state=\"blocked\"] .gw-progress-sub-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-sub[data-state=\"cancelled\"] .gw-progress-sub-dot { background: var(--dsw-alias-state-warn-primary); }\n.gw-progress-sub[data-state=\"cancelled\"] .gw-progress-sub-word { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node-calls .gw-progress-log-row, .gw-progress-sub-calls .gw-progress-log-row { grid-template-columns: 46px minmax(0, 1fr) auto auto; padding: 6px 4px; }\n.gw-progress-node-rejected { margin: 0; padding: 6px 4px; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }\n.gw-progress-node-rejected[data-gw-progress-node-rejected=\"drafts\"] { font-weight: 600; color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-node-calls [data-gw-progress-task-chain], .gw-progress-sub-calls [data-gw-progress-task-chain] { flex: none; padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; white-space: nowrap; }\n.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }\n.gw-progress-log-row:last-child { border-bottom: 0; }\n.gw-progress-log-time { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }\n.gw-progress-log-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }\n.gw-progress-log-role { flex: none; font-size: 13px; font-weight: 600; }\n.gw-progress-log-name { min-width: 0; font-size: 13px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }\n.gw-progress-log-word { flex: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; }\n.gw-progress-log-row[data-state=\"done\"] .gw-progress-log-word { color: var(--dsw-alias-state-success-primary); }\n.gw-progress-log-row[data-state=\"doing\"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent); }\n.gw-progress-log-row[data-state=\"doing\"] .gw-progress-log-word { color: var(--dsw-alias-state-business-primary); font-weight: 600; }\n.gw-progress-log-row[data-state=\"failed\"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); }\n.gw-progress-log-row[data-state=\"blocked\"] { border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); }\n.gw-progress-log-row[data-state=\"failed\"] .gw-progress-log-word { color: var(--dsw-alias-state-warn-primary); font-weight: 600; }\n.gw-progress-log-row[data-state=\"blocked\"] .gw-progress-log-word { color: var(--dsw-alias-state-warn-primary); font-weight: 600; }\n.gw-progress-open { display: inline-flex; align-items: center; height: 22px; margin-left: auto; padding: 0 9px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 11px; white-space: nowrap; }\n.gw-progress-open[type=\"button\"] { cursor: pointer; }\n.gw-progress-open[type=\"button\"]:hover { border-color: var(--dsw-alias-state-business-primary); }\n.gw-progress-foot { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; padding: 0 4px 4px; border-top: 1px solid var(--dsw-alias-border-l2, currentColor); }\n.gw-progress-left { margin: 0; padding-top: 10px; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }\n.gw-progress-dock { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }\n.gw-progress-dock-fill { display: block; width: 100%; height: 40px; border: 0; border-radius: 12px; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-inverse, inherit); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }\n.gw-progress-dock-fill:hover { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 85%, var(--dsw-alias-label-primary, currentColor)); }\n.gw-progress-dock-fill:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }\n.gw-progress-filled { margin: 0; text-align: center; font-size: 12px; color: var(--dsw-alias-state-success-primary); }\n.gw-progress-empty { padding: 14px 4px; color: var(--dsw-alias-label-secondary, inherit); }\n.gw-progress-guardian { box-sizing: border-box; min-width: 0; margin-top: 16px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }\n.gw-progress-guardian[data-state=\"active\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, transparent); }\n.gw-progress-guardian[data-state=\"cancelled\"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 38%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); }\n.gw-progress-guardian-blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }\n.gw-progress-guardian-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 6px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 6%, transparent); }\n.gw-progress-guardian-block[data-gw-progress-guardian-block=\"findings\"] { grid-column: 1 / -1; padding: 0; border-color: transparent; background: transparent; }\n.gw-progress-guardian-block-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }\n.gw-progress-guardian-block-value { font-size: 12px; font-weight: 650; color: var(--dsw-alias-label-primary, inherit); overflow-wrap: anywhere; }\n.gw-progress-guardian[data-state=\"active\"] [data-gw-progress-guardian-block=\"status\"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-business-primary); }\n.gw-progress-guardian[data-state=\"finished\"] [data-gw-progress-guardian-block=\"status\"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-success-primary); }\n.gw-progress-guardian[data-state=\"cancelled\"] [data-gw-progress-guardian-block=\"status\"] .gw-progress-guardian-block-value { color: var(--dsw-alias-state-warn-primary); }\n.gw-progress-guardian-empty { margin: 0; color: var(--dsw-alias-label-secondary, inherit); font-size: 11px; }\n.gw-progress-guardian-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }\n.gw-progress-guardian-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; padding: 6px 8px; border-inline-start: 3px solid var(--dsw-alias-state-warn-primary, currentColor); border-radius: 7px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); font-size: 11px; }\n.gw-progress-guardian-list li[data-action=\"rescue\"] { border-inline-start-color: var(--dsw-alias-state-success-primary, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }\n.gw-progress-guardian-finding-label { font-weight: 600; }\n.gw-progress-guardian-finding-action { color: var(--dsw-alias-label-secondary, inherit); }\n@keyframes gw-progress-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }\n@keyframes gw-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }\n@media (prefers-reduced-motion: reduce) {\n  .gw-progress-node[data-state=\"doing\"] .gw-progress-node-dot, .gw-progress-chip[data-state=\"running\"] .gw-progress-chip-dot, .gw-progress-sub[data-state=\"doing\"] .gw-progress-sub-dot { animation: none; }\n}\n@media (max-width: 720px) {\n  .gw-progress-cols { gap: 8px; }\n  .gw-progress-col { flex: 1 1 calc(50% - 4px); max-width: calc(50% - 4px); }\n}\n@media (max-width: 480px) {\n  .gw-progress-col { flex: 1 1 100%; max-width: 100%; }\n  .gw-progress-dock { flex-direction: column; align-items: stretch; }\n  .gw-progress-node-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }\n  .gw-progress-sub-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }\n  .gw-progress-node-calls .gw-progress-log-time { display: none; }\n  .gw-progress-sub-calls .gw-progress-log-time { display: none; }\n}",
+  "任务团队 · 3 个任务",
+  "起点",
+  "执行",
+  "任务 1 · 写 notes.md 安装步骤",
+  "任务 2 · 写 test.txt hello",
+  "任务 3 · 写 steps.txt 数字行",
+  "检查",
+  "复核",
+  "汇总",
+  "第 1 稿",
+  "第 2 稿",
+  "终点",
+  "Guardian 监控",
+  "监控结束",
+  "子任务存活判断预算 · 7200 秒",
+  "0 条处置记录",
+  "暂无处置记录",
+  "还剩 0 步 / 共 7 步",
+  "收下这版"
+ ],
+ "scroll": {
+  "docScrollW": 1500,
+  "docClientW": 1500
+ },
+ "state": "done",
+ "takenAt": "138.84s"
+}

@@ -1,0 +1,398 @@
+{
+ "bodyText": "工作区\n用 grok_workflow 工具跑一个工作\n对话\n轨迹\n进度\n任务团队 · 3 个任务\n已完成\n起点\n执行\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n检查\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n复核\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n汇总\n第 1 稿\n汇总\n第 2 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 7 步\n\n收下这版\n发消息或创建任务, / 调用指令, @ 文件或对话\n自动接着跑\n关\n自迭代\n关\n工作流开关\n未开 · 还没设过\n1 轮 2 步·273 tok/s\n72.3K tok·缓存命中 98%\n7%",
+ "panelText": "任务团队 · 3 个任务\n已完成\n起点\n执行\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n检查\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n复核\n任务 1 · 写 notes.md\n任务 2 · 写 test.txt\n任务 3 · 写 steps.txt\n汇总\n第 1 稿\n汇总\n第 2 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 7 步\n\n收下这版",
+ "headerText": "任务团队 · 3 个任务\n已完成",
+ "counts": {
+  "cols": 7,
+  "nodes": 7,
+  "subGroups": 3,
+  "subCells": 9,
+  "wires": 1,
+  "paths": 13,
+  "markers": 1,
+  "toggles": 11,
+  "calls": 0,
+  "guardian": 1,
+  "planRows": 0
+ },
+ "cols": [
+  {
+   "kind": "start",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 4,
+   "w": 465,
+   "h": 32
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "current": "false",
+   "top": 178,
+   "left": 4,
+   "w": 465,
+   "h": 128
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "current": "false",
+   "top": 314,
+   "left": 4,
+   "w": 465,
+   "h": 128
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "current": "false",
+   "top": 450,
+   "left": 4,
+   "w": 465,
+   "h": 128
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 586,
+   "left": 4,
+   "w": 465,
+   "h": 32
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 626,
+   "left": 4,
+   "w": 465,
+   "h": 32
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "current": "true",
+   "top": 666,
+   "left": 4,
+   "w": 465,
+   "h": 32
+  }
+ ],
+ "nodes": [
+  {
+   "kind": "start",
+   "state": "done",
+   "ordinal": "0",
+   "current": "false",
+   "col": "start",
+   "top": 138,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "起点"
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "execute",
+   "top": 178,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "执行"
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "check",
+   "top": 314,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "检查"
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "review",
+   "top": 450,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "复核"
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "ordinal": "1",
+   "current": "false",
+   "col": "summarize",
+   "top": 586,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "汇总 第 1 稿"
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "ordinal": "2",
+   "current": "false",
+   "col": "summarize",
+   "top": 626,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "汇总 第 2 稿"
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "ordinal": "0",
+   "current": "true",
+   "col": "end",
+   "top": 666,
+   "left": 4,
+   "w": 465,
+   "h": 32,
+   "text": "终点"
+  }
+ ],
+ "subs": [
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 1 · 写 notes.md",
+   "title": "任务 1 · 写 notes.md",
+   "aria": "任务 1 · 写 notes.md 过了",
+   "top": 216,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 2 · 写 test.txt",
+   "title": "任务 2 · 写 test.txt",
+   "aria": "任务 2 · 写 test.txt 过了",
+   "top": 248,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "execute",
+   "word": "任务 3 · 写 steps.txt",
+   "title": "任务 3 · 写 steps.txt",
+   "aria": "任务 3 · 写 steps.txt 过了",
+   "top": 280,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "check",
+   "word": "任务 1 · 写 notes.md",
+   "title": "任务 1 · 写 notes.md",
+   "aria": "任务 1 · 写 notes.md 过了",
+   "top": 352,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "check",
+   "word": "任务 2 · 写 test.txt",
+   "title": "任务 2 · 写 test.txt",
+   "aria": "任务 2 · 写 test.txt 过了",
+   "top": 384,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "check",
+   "word": "任务 3 · 写 steps.txt",
+   "title": "任务 3 · 写 steps.txt",
+   "aria": "任务 3 · 写 steps.txt 过了",
+   "top": 416,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "review",
+   "word": "任务 1 · 写 notes.md",
+   "title": "任务 1 · 写 notes.md",
+   "aria": "任务 1 · 写 notes.md 过了",
+   "top": 488,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "review",
+   "word": "任务 2 · 写 test.txt",
+   "title": "任务 2 · 写 test.txt",
+   "aria": "任务 2 · 写 test.txt 过了",
+   "top": 520,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  },
+  {
+   "task": "3",
+   "lane": "3",
+   "ordinal": "3",
+   "state": "done",
+   "col": "review",
+   "word": "任务 3 · 写 steps.txt",
+   "title": "任务 3 · 写 steps.txt",
+   "aria": "任务 3 · 写 steps.txt 过了",
+   "top": 552,
+   "left": 4,
+   "w": 465,
+   "h": 26
+  }
+ ],
+ "lanes": [
+  {
+   "lane": "1",
+   "byCol": {
+    "execute": 216,
+    "check": 352,
+    "review": 488
+   },
+   "spread": 272
+  },
+  {
+   "lane": "2",
+   "byCol": {
+    "execute": 248,
+    "check": 384,
+    "review": 520
+   },
+   "spread": 272
+  },
+  {
+   "lane": "3",
+   "byCol": {
+    "execute": 280,
+    "check": 416,
+    "review": 552
+   },
+   "spread": 272
+  }
+ ],
+ "paths": [
+  {
+   "d": "M0 0 L8 4 L0 8 Z",
+   "points": 3,
+   "arrow": false
+  },
+  {
+   "d": "M237 32 L237 40",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 72 L237 176",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 104 L237 214",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 136 L237 246",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 168 L237 278",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 208 L237 312",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 240 L237 350",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 272 L237 382",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 304 L237 414",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 344 L237 448",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 480 L237 488",
+   "points": 2,
+   "arrow": true
+  },
+  {
+   "d": "M237 520 L237 528",
+   "points": 2,
+   "arrow": true
+  }
+ ],
+ "scroll": {
+  "docScrollW": 480,
+  "docClientW": 480
+ },
+ "state": "narrow480"
+}

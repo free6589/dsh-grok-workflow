@@ -4792,3 +4792,65 @@ spine 为空，pre-fix 形状会进脊柱。
   live 3080 全程没碰）：`Plan: planner; 3 task(s); 3 verified`、`COMPLETED`，两道边界子的提示词读作
   `- count_readme [verified] 统计 README.md 行数` 与 `- count_readme [verified] … / - count_changelog [verified] …`，
   两份提示词都不含 `undefined`（`.rsi/evidence/settled-rows-2026-11-26/soak/boundary-settled-lines.txt`）。
+
+## D-166 · 进度页画成泳道矩阵（行 = 任务、列 = 腿），失败重试画进图，且**只动浏览器包**（2026-11-26，未发版）
+
+- **Date:** 2026-11-26
+- **Context:** §21 的流程图把「一条腿」画成一颗节点、把调用行藏在节点下面。操作者连拍两板：
+  第一板 **子任务不要藏**——执行 / 检查 / 复核 每一步下面挂「任务 1..N」的格子，常显、不用点开，行 = 任务、列 = 腿；
+  第二板 **失败重试也要画出来**——一格里有几次尝试、第几遍、重连一次一条虚线。两板都落在同一页上，
+  而这一页当时是「模型算数字、浏览器画图」的分工：`src/progress-tab.ts` 的 `deriveProgressFlow()` 产出节点，
+  `src/client/index.js` 的手写镜像再画一遍。
+- **Decision:**
+  1. **泳道与格子的分组只实现一次，就在浏览器侧**：`deriveProgressFlow()` **不新增 `subs`**，TS 侧 API 一个字不动；
+     「哪些行属于哪个任务号」这条呈现分组只活在 `src/client/index.js` 的镜像里，不改事件、不改 recorder、
+     不改 fold、不改任何数字（`total` / `at` / `remaining` / `nodeState()` 全部沿用）。`src/progress-tab.ts` 里
+     不出现 `subs` / `lane` / `swim`，由用例钉住。
+  2. **DOM 换壳、钩子沿用**：`ol.gw-progress-nodes` 退场，换成 `ol.gw-progress-cols` → `li.gw-progress-col[data-gw-progress-col]`
+     → 列头仍是 `[data-gw-progress-node]`（四个既有属性一个不少）+ 工作腿下的 `ol.gw-progress-subs` →
+     `li.gw-progress-sub[data-gw-progress-sub]`（`data-task` / `data-lane` / `data-ordinal` / `data-state`）。
+     格子自己的展开按钮用**新钩子** `data-gw-progress-sub-toggle`（裁决 A：同一个钩子挂两种控件会让
+     「节点 toggle 数 = 还有杂行的步骤数」这条既有读法失效）。
+  3. **对齐靠网格、不靠测量**：列内 `display: grid; grid-template-rows: repeat(var(--gw-lanes,1), 26px)`，
+     每格 `grid-row: <任务号>`，`--gw-lanes` = 整张图最大的任务号；缺号留白，不补位元素（裁决 C）。
+  4. **连线有向 + 折行肘弯**：`<marker id="gw-progress-arrow">`，相邻列对与同一 lane 相邻两格各一条；
+     折行的画三段折线（下→横→下，90°），**取代 §21.3 的「折行不画」**。
+  5. **重试落在点上，不落在格上**：格的状态仍是 `nodeState(该格的行, ended)`（恢复过就是绿），
+     但**每行一颗点** `data-attempt="1..N"`、每颗点只看自己那一行；`N>1` 多一个 `第 {n} 遍` 角标
+     （新键 `progress.flow.attempt`，键数 54 → 55）；相邻两次尝试中前一行非 `completed` 时画一条 `3 3` 虚线重看线。
+     **取代 §21.7 第 1 条**（那里把第一次访问留成一颗琥珀节点；现在琥珀在点上，事实仍然看得见）。
+- **Alternatives rejected:**
+  - **在 `deriveProgressFlow()` 里加 `subs`（TS 与镜像双份实现）。** 那是本块最贵的一条路：两份分组逻辑要各自维护，
+    任何一侧漂移都会让「同一份 fixture 两个答案」；而这条分组是**呈现**，不改变任何事实，放进模型层是把 UI 的选择
+    写进数据契约。
+  - **按「出现顺序」排格（缺号不补位、不加网格）。** 执行列走过 1/2/3、检查列只走过 2/3 时，检查列第一格（任务 2）
+    会落到执行列第二格（任务 2）的上一行——同一条水平线指向两个不同任务，横向连线与「同一 lane 同高」同时失真。
+    这是缺陷不是代价（裁决 C）。
+  - **把「重试过」写成一格两种颜色（半绿半琥珀）。** 格只有一条 `data-state`，半个状态没有词也没有 token，
+    屏幕阅读器更读不出来；点列 + 角标 + 重看线把「几次、第几遍、中间断过」三件事分开说，各自都能被机器读到。
+  - **窄屏继续用「不画线」表达折行。** 折行后列的相邻关系还在，只是换了一行；不画等于说「这些列不相邻」。
+- **Consequences / 已知边界（照实记）：**
+  1. **代价：§11 的「TS 与镜像双份 fixture」在本块不适用。** 泳道只存在于浏览器侧，所以这批用例只存在于浏览器 spec
+     （`progress-lanes` / `progress-flow` / `client` / `progress-connector`），`test/progress-tab.spec.ts` 零改动。
+     这不是遗漏，是本块画下的边界；将来若把分组搬回模型层，那批用例要跟着搬。
+  2. **≤720 px 跨行后同一 lane 不再同高**（真机 700 px 极差 136、480 px 极差 272）。折行的必然；
+     硬指标仍是「列折行 + 不横向滚动」（`scrollWidth === clientWidth`）。
+  3. **空出来的行是留白**：任务号不连续时（只有 1 和 3）中间那一行没有元素，读者看到的是空行，不是空盒子。
+  4. **格子的 `pending` / 琥珀态没有真机读数**：格要有行才存在，有行就说明那一步发生过；真机只看到 `doing` / `done` / `failed`。
+     组件用例覆盖，本块不冒充。
+- **Evidence:** 真机六次运行、三棵树三个包（身份表在 `.rsi/evidence/flowchart-v2-2026-11-26/README.md` §0）：
+  三态（等你点头 15.07 s / 进行中 15.39 s / 已完成 138.84 s）、失败后重试（1 条重看线 + `第 2 遍` + 两颗点 `failed→done`）、
+  整轮失败页（2 条重看线 + 两个角标 + `还剩 6 步 / 共 10 步` + 无按钮）、取消页（`已取消`）、窄屏 700/480 无横向滚动；
+  逐 lane `top` 极差 **0.00 px**（三列三 lane，三个时刻）；整轮 `consoleErrors` / `pageErrors` 全空。
+  门禁：本分支（`feat/flowchart-v2`，泳道矩阵尖端 `743ac3d`）上 `tsc -p tsconfig.json --noEmit` `EXIT=0`、
+  `oxlint src test` `15 warnings / 0 errors`（185 文件）、七份进度 spec `339 passed`、
+  **整仓 `npx vitest run` = `104 files / 2013 passed`（`EXIT=0`，87.90 s）**；`verify:lib` 在本沙箱 **`BLOCKED`**
+  （`Cannot find module '/tmp/verify-lib-*/node_modules/typescript/bin/tsc'`，`verifylib-BLOCKED.out`）。
+  **证据目录的来历照实说**：`.rsi/evidence/flowchart-v2-2026-11-26/` 是这一块在**混合分支**上跑出来的读数，
+  其中以 `gate-bc5bc65-*` 命名的转录测的是那条把强制路由与泳道矩阵放在一起的树（尖端 `4def2a4`，
+  现在保留为 `backup/flowchart-v2-mixed-2026-11-26`），那份转录里的 `105 files / 2041 passed` 含
+  另一半功能（强制团队路由）那份 spec 的 28 条，**不属于本分支**；本分支自己的读数是上面那一行 `104 files / 2013 passed`
+  （差的正好是那 28 条）。
+  真机那部分（三态 / 重试 / 失败 / 取消 / 窄屏）与泳道矩阵相关，逐条对本分支成立。
+  设计契约见 `DESIGN-progress-tab.md` §23。
+

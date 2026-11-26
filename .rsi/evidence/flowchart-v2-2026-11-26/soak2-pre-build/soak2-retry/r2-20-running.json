@@ -1,0 +1,109 @@
+{
+ "headerText": "任务团队\n进行中",
+ "chip": {
+  "state": "running",
+  "text": "进行中"
+ },
+ "panelText": "任务团队\n进行中\n起点\n规划\n执行\n任务 1 · 计算12乘12\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 4 步",
+ "counts": {
+  "cols": 4,
+  "subGroups": 1,
+  "cells": 1,
+  "plainWires": 4,
+  "retryWires": 0,
+  "attemptDots": 1,
+  "badges": 0,
+  "toggles": 2,
+  "guardian": 1,
+  "dock": "true"
+ },
+ "cols": [
+  {
+   "kind": "start",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 284,
+   "w": 292.3,
+   "h": 32
+  },
+  {
+   "kind": "plan",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 588.25,
+   "w": 292.3,
+   "h": 32
+  },
+  {
+   "kind": "execute",
+   "state": "doing",
+   "current": "true",
+   "top": 138,
+   "left": 892.5,
+   "w": 292.3,
+   "h": 64
+  },
+  {
+   "kind": "end",
+   "state": "pending",
+   "current": "false",
+   "top": 138,
+   "left": 1196.75,
+   "w": 292.3,
+   "h": 32
+  }
+ ],
+ "cells": [
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "doing",
+   "col": "execute",
+   "aria": "任务 1 · 计算12乘12 在做",
+   "word": "任务 1 · 计算12乘12",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "doing"
+    }
+   ],
+   "top": 176,
+   "left": 892.5,
+   "w": 292.3,
+   "h": 26
+  }
+ ],
+ "lanes": [
+  {
+   "lane": "1",
+   "byCol": {
+    "execute": 176
+   },
+   "spread": 0
+  }
+ ],
+ "retries": [],
+ "footer": "还剩 1 步 / 共 4 步",
+ "scroll": {
+  "docScrollW": 1500,
+  "docClientW": 1500
+ },
+ "leafTexts": [
+  "任务团队",
+  "起点",
+  "规划",
+  "执行",
+  "任务 1 · 计算12乘12",
+  "终点",
+  "Guardian 监控",
+  "监控中",
+  "子任务存活判断预算 · 7200 秒",
+  "0 条处置记录",
+  "暂无处置记录",
+  "还剩 1 步 / 共 4 步"
+ ]
+}

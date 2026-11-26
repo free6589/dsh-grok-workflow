@@ -1,3 +1,48 @@
+## 2026-11-26 — 泳道矩阵收口（`feat/flowchart-v2`）：从 `e772cd6` 干净复长的九个提交，六次真运行拍全三态 + 重试 / 失败 / 取消，整仓 **104 files / 2013 passed**；`verify:lib` 在本沙箱 **`BLOCKED`**（原文在证据里）；本分支**不含**强制路由
+
+- **From:** 收尾施工者（`agent-202/soak-memory` 的产物，由拆版施工者 `agent-202/split-release` 复长并复核）· **To:** 下一个接手者 / 要合并这条分支的人
+- **这一轮是什么**：**拆开发版 + 收尾**。产品代码我没写一行（`src/client/index.js` 与四份浏览器 spec 由 A、B 两条线写）；
+  本轮做的是：把 `e772cd6..4def2a4` 那条**混着两条功能**的历史拆成两条各自可发版的分支，本文件这一条是**泳道矩阵那一半**。
+  混合尖端原样保留为 `backup/flowchart-v2-mixed-2026-11-26`（`4def2a4`，**不许删**）。
+- **身份**：分支 **`feat/flowchart-v2`**，从 `e772cd6` 用 cherry-pick 长出来的九个提交
+  （`922dc10` `3241a9a` `a80c8eb` `4d855e9` `a6c10c9` `3af6d4e` `06fc737` `2327aa0` `743ac3d`），产品尖端 **`743ac3d`**。
+  `lib/client.js` **372480 字节**、`sha256 e51daa66…3cff`。**本分支没有单独的构建提交**：
+  这九个提交自带 `lib/client.js`，`npm run build` 在尖端上**零改动**（`git status --short` 空）——不是漏了一步，是没有东西可建。
+  版本号仍 `0.13.47`（没 bump），认身份用 `lib/client.js` 的哈希。
+- **门禁（本分支自己跑的）**：`tsc -p tsconfig.json --noEmit` **`EXIT=0`**、`oxlint src test` **`15 warnings / 0 errors`**（185 文件）、
+  七份进度 spec **`339 passed`**、整仓 `npx vitest run` **`104 files / 2013 passed`**（`EXIT=0`，87.90 s）。
+  `npm run build` 之后 `git status --short` 空。**`node scripts/verify-lib.mjs` 是 `BLOCKED`，不是通过**：
+  它复制树到 `/tmp/verify-lib-*` 再装依赖，沙箱装不上，原文 `Error: Cannot find module '/tmp/verify-lib-kWkfnx/node_modules/typescript/bin/tsc'`。
+  `npm run ci` 整份 `NOT_RUN`（`AGENTS.md` §12）。
+- **真机（六次运行，隔离 home + 真模型、端口 3391）**：三态 **等你点头 15.07 s / 进行中 15.39 s / 已完成 138.84 s**；
+  **失败后重试 → 已完成**（1 条 `3px,3px` 虚线重看线、1 个 `第 2 遍` 角标、两颗点 `failed → done`）；
+  **整轮失败页**（2 条重看线、2 个角标、`还剩 6 步 / 共 10 步`、无按钮）；**取消页**（`已取消`）。
+  逐 lane `getBoundingClientRect().top` 极差 **0.00 px**；窄屏 700 / 480 `scrollWidth === clientWidth`；`consoleErrors` / `pageErrors` 全空。
+  **这批读数是在混合分支的树上拍的**：证据目录里以 `gate-bc5bc65-*` 命名的转录测的是 `4def2a4` 那一棵树，
+  它的 `105 files / 2041 passed` 含另一半功能（强制团队路由）那份 spec 的 28 条、**不属于本分支**；
+  本分支自己的读数是上面那行 `104 / 2013`，差的正好是那 28 条。
+  索引：`.rsi/evidence/flowchart-v2-2026-11-26/README.md`。
+- **这一半**：泳道矩阵（行 = 任务、列 = 腿）、格子常显、失败重试落成「每行一颗点 + 第 N 遍角标 + 虚线重看线」、
+  有向连线与折行肘弯；`src/progress-tab.ts` 零改动，分组只活在 `src/client/index.js` 的镜像里（`D-166`、`DESIGN` §23）。
+  **本分支不含强制团队路由**：服务端那个强制路由模块、它的开关、它的 spec、`D-167`、那条 CHANGELOG 都不在这里，
+  它们在**另一条分支**上（同一起点 `e772cd6` 长出；名字与文件清单写在 `.rsi/evidence/flowchart-v2-2026-11-26/README.md`
+  的「拆版之后」一节，故意不写进 `docs/`，免得被那条反证 grep 自己命中）；两条分支各自构建、各自过全量。
+- **下一手最容易踩的几个坑**（这一轮真踩过的）：
+  1. **`npm pack` 之前先 `npm run build`**：本仓库的规矩是产品提交不碰 `lib/`，它经常落后于 `src/`（本分支例外，九个提交都自带）。
+  2. **`dsh` 的 profile 只能选一次**：克隆档案用 **`dsh --profile <name> --port … --host 127.0.0.1`**，并先
+     `env -u DSH_PROFILE -u DSH_PROFILE_DIR -u DSH_WEB_URL -u DSH_SESSION_ID`。
+  3. **任何 `dsh` 命令之前 `export DSH_HOME=<scratch>`**：`dsh web --help` 不是纯帮助，它先 `prepareProfile` 去写档案。
+  4. **全局 `playwright` CLI 起不来**；用 npx 缓存里的那份（1.64.1，rev 1248）。
+  5. **抓三态要在发送后 ≥3.5 s 才开始采信面板**：否则会拍到上一个会话的完成页。
+  6. **窄屏跨行后同一 lane 不同高是折行的必然**（700 px 极差 136、480 px 极差 272），别当缺陷去修；
+     硬指标是「列折行 + `scrollWidth === clientWidth`」。
+  7. **`querySelectorAll('svg path').length` 含 `<marker>` 自己那条三角形**：连线数 = 总数 − 1。
+- **分支判定**：`feat/flowchart-v2` 若在 **2026-12-03** 前没有合并进 `main`，就按 `AGENTS.md` §5 处理——合并、rebase 或删除，
+  三者选一，别留着当第二真相。本轮没合并、没推送、没打 tag、没发版。
+- **live 档案**：仍然**没动**（`~/.dsh` 与 `~/.dsh/profiles` 的 mtime 都在本会话开始之前），3080 上的实例前后都是 401，
+  没重载没重启。live 里装的仍是 `0.13.47`。
+- **scratch**：`.tmp/soak-lanes/` 与本次拆版用的第二个工作树（在 `.tmp/worktrees/` 下，按另一条分支命名）收尾都整棵删除。
+
 ## 2026-11-26 — `0.13.47` 已发布收口：一个发布提交（8 文件 / +48 −20、单父）、一份门禁 `GATE_EXIT=0`（`103 files / 1948 tests`）、`main` 尖端 `63d039b`、附注标签、两个远端 run 与 Release 资产都在；这一版**只发证据**（三种失败页面的真机读数）、**没有行为变化**；**live 档案升级仍 `BLOCKED`**（live 里装的仍读 `0.13.46`，且那一行还是浮动依赖）、**真机 soak `NOT_RUN`**
 
 - **From:** 包工头（`agent-200`；收口这几份记忆由 `agent-200/memdocs-47` 写）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

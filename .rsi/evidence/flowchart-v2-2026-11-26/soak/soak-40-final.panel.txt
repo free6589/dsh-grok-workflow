@@ -1,0 +1,30 @@
+任务团队 · 3 个任务
+已完成
+起点
+执行
+任务 1 · 写 notes.md 安装步骤
+任务 2 · 写 test.txt hello
+任务 3 · 写 steps.txt 数字行
+检查
+任务 1 · 写 notes.md 安装步骤
+任务 2 · 写 test.txt hello
+任务 3 · 写 steps.txt 数字行
+复核
+任务 1 · 写 notes.md 安装步骤
+任务 2 · 写 test.txt hello
+任务 3 · 写 steps.txt 数字行
+汇总
+第 1 稿
+汇总
+第 2 稿
+终点
+Guardian 监控
+监控结束
+子任务存活判断预算 · 7200 秒
+0 条处置记录
+
+暂无处置记录
+
+还剩 0 步 / 共 7 步
+
+收下这版

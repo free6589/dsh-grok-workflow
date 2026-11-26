@@ -1,3 +1,52 @@
+## `feat/flowchart-v2` 拆版后的收尾复核：泳道矩阵三态 + 重试 / 失败 / 取消的真机读数，本分支整仓 **`104 files / 2013 passed`**、七份进度 spec `339 passed`、`tsc` 0、`oxlint` 15/0、`npm run build` 零改动；**`verify:lib` `BLOCKED`**（沙箱装不上依赖）— 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`e772cd6..4def2a4` 那条历史把**泳道矩阵**与**强制路由**混在一起。本轮把它拆成两条各自可发版的分支，
+本文件这一条是**泳道矩阵那一半**：`feat/flowchart-v2` = `e772cd6` + 九个泳道 / 重试提交（尖端 `743ac3d`）。
+混合尖端原样保留为 `backup/flowchart-v2-mixed-2026-11-26`（`4def2a4`）。`npm run ci` 整份 **`NOT_RUN`**（`AGENTS.md` §12：发版那一次跑）。
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `npx tsc -p tsconfig.json --noEmit` | 本分支尖端 `743ac3d` | **`EXIT=0`** | 本轮自己跑的 |
+| `npx oxlint src test` | 同上 | `Found 15 warnings and 0 errors.` · `185 files` · **`EXIT=0`** | 本轮自己跑的 |
+| `TMPDIR=$PWD/.tmp npx vitest run`（七份进度 spec） | 同上 | **`7 files / 339 passed`** · `EXIT=0` | 本轮自己跑的 |
+| `TMPDIR=$PWD/.tmp npx vitest run`（整仓） | 同上 | **`104 files / 2013 passed`** · `Duration 87.90s` · `EXIT=0` | 本轮自己跑的 |
+| `npm run build` | 同上 | `client bundle: 372480 bytes → lib/client.js` · **`git status --short` 空**（本分支九个提交自带产物，无可建） | 本轮自己跑的 |
+| `node scripts/verify-lib.mjs` | 同上 | **`BLOCKED`**：`Error: Cannot find module '/tmp/verify-lib-kWkfnx/node_modules/typescript/bin/tsc'` · `EXIT=1` | `.rsi/evidence/flowchart-v2-2026-11-26/verifylib-BLOCKED.out` |
+| `npm run ci`（整份） | — | **`NOT_RUN`** | — |
+| 真机 soak（六次运行） | 隔离 home `web-clone`、端口 3391、真模型 | 见下 | `.rsi/evidence/flowchart-v2-2026-11-26/soak/` `soak2/` |
+
+**真机读数（`CONFIRMED`，用户视角，Playwright + 真模型；这批是在混合分支的树上拍的，泳道那一半逐条对本分支成立）**：
+
+| 状态 | 文件 | 关键读数 |
+| --- | --- | --- |
+| 等你点头 | `soak/soak-10-waiting.*` | 15.07 s，`-col 2 / -sub 0`，`svg path 2`（含 marker 1），页脚 `还剩 1 步 / 共 2 步` |
+| 进行中 | `soak/soak-20-running.*`、`soak/soak-21-midrun.*` | 15.39 s 四列 3 格；中段六列 9 格、汇总 `doing`、终点 `pending` |
+| 已完成（第一轮） | `soak/soak-30-done.*` | 138.84 s，7 列 / 9 格 / 12 条连线（+1 marker）/ 对齐 **0.00 px** |
+| 失败后重试 → 已完成（最终构建） | `soak2/retry/r2-30-done.*` | 12 列 / 6 格；`check` 列任务 1 = 格 `done` + 角标 `第 2 遍` + 两点 `failed→done`；**1 条** `3px,3px` 重看线 |
+| 整轮失败页 | `soak2/failed/r2-30-failed.*` | `未通过`；10 列 / 6 格；**2 条**重看线 / 2 个角标；`还剩 6 步 / 共 10 步`；无按钮 |
+| 取消页 | `soak2/cancelled/r2-30-cancelled.*` | `已取消`；7 列 / 3 格；第二颗 `规划` 与 `终点` 是 `cancelled`；无按钮、无重看线 |
+
+- **逐 lane `getBoundingClientRect().top`**：宽屏完成态 `lane 1 = 176/176/176`、`lane 2 = 208/208/208`、
+  `lane 3 = 240/240/240`（execute / check / review），**极差 0.00 px**；中段与早期同值。
+- **窄屏**：700 px 列折两行、**6 条 4 顶点肘弯**（`M520 32 L520 84 L173 84 L173 136`）、`scrollWidth 700 = clientWidth 700`；
+  480 px 单列纵排、`480 = 480`。跨行后同一 lane 极差 136 / 272 px（折行必然，不是缺陷）。
+- **控制台**：六次运行 `consoleErrors: []` / `pageErrors: []`。
+
+**本分支「必须没有」的反证（`CONFIRMED`，本轮跑过）**：按派单给的三个路径——`src`、`test`、两份 README 与 `docs`——
+grep 服务端强制路由的模块名与开关名 → **无命中**（`grep` 退出 1）。这条反证的两个名字**故意不写进 `docs/`**：
+它们连同原文命令记在 `.rsi/evidence/flowchart-v2-2026-11-26/README.md` 的「拆版之后」一节（那里不在 grep 的三个路径里），
+否则这份记录会命中自己。服务端那个强制路由模块、它的 spec、`D-167` 与路由那条 CHANGELOG 都不在本分支上；
+它们与整仓 `105 files / 2041 passed` 的那份读数一起留在 `backup/flowchart-v2-mixed-2026-11-26` 上，
+本分支的读数是 `104 files / 2013 passed`（差的正是另一半功能那份 spec 的 28 条）。
+
+**没做到的（`NOT_RUN` / 边界，别升级成「验过」）**：格子的 `pending` / 琥珀态（格要有行才存在，真机只看到
+`doing` / `done` / `failed`）、无 layout 宿主不画连线、整轮 `npm run ci`、跨行后的 lane 对齐（不成立）；
+**强制路由的真机读数不在本分支的范围内**（它不在这条分支上）。
+
+**`BLOCKED` 一条**：`scripts/verify-lib.mjs` 在 `/tmp/verify-lib-*` 里装依赖时失败，本沙箱无法完成；
+`lib/` 与 `src/` 的逐字一致**本轮没有用这条脚本证明**，能证明的是 `npm run build` 在尖端上 `EXIT=0` 且
+`git status --short` 为空（即已提交的 `lib/` 就是 `src/` 的构建产物）。
+
 ## `0.13.47` 发版收口：唯一一份门禁（发布树 `63d039b`）`GATE_EXIT=0`（`103 files / 1948 tests`、转录 381 行 / 22779 字节），发布身份、两个远端 run、Release 与资产都复核过；这一版**只发证据**（三种失败页面的真机读数）、**没有行为变化**；**live 档案升级 `BLOCKED`**、**真机 soak / npm / `gh` 全 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.47` 已经出去（tag 推了、Release 建了、资产在），

@@ -1107,3 +1107,124 @@ Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the repo
   它由组件用例与 CSS 保证。
 - **`NOT_RUN`：`check=pass verify=fail` 的写入端**没有在活引擎上跑过：解析端与渲染端有用例；写入端复用的是既有的
   阶段三元表达式，新增的只有理由后缀。
+## 23. 泳道矩阵：行 = 任务、列 = 腿，失败重试画进图（2026-11-26，`feat/flowchart-v2`）
+
+§21 把页面换成了流程图（一步一节点、节点底下挂行）。操作者这一段又拍了一次板：**子任务不要藏在节点里，直接画在图上**——
+执行 / 检查 / 复核 每一步下面挂「任务 1..N」的格子，常显、不用点开；随后又追加一条：**失败重试也要画出来**
+（一格里有几次尝试、第几遍、重看线）。本节是这两条的产品契约，写的是**页面怎么摆**，事实来源与形状由 §21 / §22 继续管。
+
+本节全部 `CONFIRMED`：源码 `src/client/index.js` 的镜像与渲染、`test/progress-lanes.spec.ts` / `test/progress-flow.spec.ts` /
+`test/client.spec.ts` / `test/progress-connector.spec.ts`、真机读数在
+`.rsi/evidence/flowchart-v2-2026-11-26/`（`README.md` 是索引，`soak/` 是三态，`soak2/` 是重试 / 失败 / 取消，
+`soak2-pre-build/` 是同一套场景在「重建 `lib/` 之前」那一棵树上的读数），裁决条目见 `D-166`。
+
+### 23.1 只动浏览器包（本块最重要的一条边界，`CONFIRMED`）
+
+- **`src/progress-tab.ts` 一个字没改**：`deriveProgressFlow()` 不新增 `subs`，「哪些行属于哪个任务」这条分组
+  **只存在于 `src/client/index.js` 的镜像里**。它是对已折叠行的**呈现分组**，不改事件、不改 recorder、不改任何数字：
+  `total = nodes.length`、`at`、`remaining`、`nodeState()` 全部沿用。
+- 用例把这条边界钉住：`src/progress-tab.ts` 里不出现 `subs` / `lane` / `swim`；`test/progress-tab.spec.ts` 零改动。
+- **代价（照实记）**：§11 的「TS 与镜像双份 fixture」在本块**不适用**——泳道只存在于浏览器侧，所以这批用例只存在于
+  浏览器 spec（`progress-lanes` / `progress-flow` / `client` / `progress-connector`）。这不是遗漏，是本块的边界。
+
+### 23.2 DOM（`CONFIRMED`，钩子是真机与用例一起用的那一套）
+
+```text
+div.gw-progress-flow[data-gw-progress-flow]                坐标原点（既有测量宿主）
+  svg.gw-progress-wires[data-gw-progress-wires]            aria-hidden；<defs><marker id="gw-progress-arrow">
+  ol.gw-progress-cols[data-gw-progress-cols]               列容器：flex + wrap + gap 12
+    li.gw-progress-col[data-gw-progress-col="<kind>"]      一列 = 一条腿；data-state 该腿聚合态；data-current
+      div.gw-progress-node[data-gw-progress-node]          列头 = 步骤节点（钩子、腿词、角标、toggle 全沿用 §21）
+      ol.gw-progress-subs[data-gw-progress-subs]           仅工作腿且点到任务号时出现
+        li.gw-progress-sub[data-gw-progress-sub]           一格 = 一个任务在这一列的那几次调用
+           data-task / data-lane / data-ordinal = 任务号；data-state = 该格聚合态
+          span.gw-progress-sub-dots                        点的容器
+            span.gw-progress-sub-dot[data-attempt="1..N"][data-state="<该行自己的状态>"]
+          span.gw-progress-sub-word[data-gw-progress-sub-word]    phase 原文，ellipsis + title
+          span.gw-progress-sub-badge[data-gw-progress-sub-badge]  只有 N>1；文字 progress.flow.attempt
+          button[data-gw-progress-sub-toggle="<key>"]     格子自己的展开按钮（裁决 A）
+          ol.gw-progress-sub-calls[data-gw-progress-sub-calls]    仅展开时；既有 ProgressLogRow
+```
+
+- **`ol.gw-progress-nodes` 退场**，节点从 `li` 变成列里的 `div`，列本身是 `li`；`data-kind` / `data-state` /
+  `data-ordinal` / `data-current` 四个属性一个不少。
+- **列序** = 既有 `flow.nodes` 的顺序（起点 / 规划 / 执行 / 检查 / 复核 / 汇总 / 终点）；汇总写过两稿就是两列。
+- **裁决 A（包工头口径）**：格子自己的展开按钮用自己的钩子 `data-gw-progress-sub-toggle`，
+  步骤节点继续用 `data-gw-progress-node-toggle`——同一个钩子同时挂在两种控件上会让「节点 toggle 数 =
+  还有杂行的步骤数」这条既有读法失效。
+- **裁决 B**：「步骤节点不再有 toggle」**只对每一行都带任务号的腿成立**；规划 / 汇总 / 两端这类腿的行不带号，
+  它们**保留 toggle**，否则那条已声明的调用在页面上无处可读（真机：完成态 7 颗节点里 2 颗汇总各有一个 toggle，
+  工作腿一个都没有）。
+
+### 23.3 几何与对齐（数字是硬约束，`CONFIRMED` 真机实测）
+
+| 东西 | 值 | 真机读数（`soak/soak-30-done.json`） |
+| --- | --- | --- |
+| 步骤节点 | 高 `32px`、圆角 `10px`；起点/终点胶囊 `999px` | 列头高 `32` |
+| 子任务格 | 高 `26px`、圆角 `10px`、格间距 `6px`、列间距 `12px` | 格高 `26`，同一列 `176 → 208 → 240` |
+| 状态填充 | 同一 token `12% → 5%` 竖向渐变，`background-color: transparent` | `linear-gradient(color(srgb .13 .77 .37 / .12), … / .05)` |
+| `pending` | 唯一虚线、唯一空心点、**无渐变** | `border-style: dashed`、`background-image: none` |
+| 展开的调用清单 | **绝对定位**浮在节点/格下方，不推动任何兄弟 | 展开后列宽 `161.9` 不变 |
+| 横向 | 无 `overflow-x: auto`、无 `#hex`、无 `rgba()`、无 `--dsw-alias-state-error-primary` | 插件样式表逐项 0 命中 |
+
+**对齐靠网格、不靠测量（裁决 C）**：列内 `ol.gw-progress-subs` 是
+`display: grid; grid-template-rows: repeat(var(--gw-lanes, 1), 26px); gap: 6px`，每格 `grid-row: <任务号>`，
+`--gw-lanes` 是整张图**最大的任务号**。缺号就留白，不补位元素、不加 class，格子计数与 `data-*` 口径都不变。
+真机逐 lane 实测 `getBoundingClientRect().top`：`lane 1 = 176/176/176`、`lane 2 = 208/208/208`、
+`lane 3 = 240/240/240`（execute / check / review 三列），**极差 0.00 px**，三个时刻（进行中早期 / 进行中中段 / 已完成）都一样。
+
+**窄屏（≤720px）列折行，对齐只在行内成立**：700 px 实测列折成两行（`top` 138 / 274 / 410 / 450），
+同一 lane 跨行后 `176 / 312 / 312`（极差 136 px）；480 px 单列纵排（极差 272 px）。
+**这是折行的必然，不是缺陷**；两条硬指标仍然成立：`scrollWidth === clientWidth`（700/700、480/480），
+没有横向滚动。
+
+### 23.4 连线（有向 + 折行肘弯 + 重看线，`CONFIRMED`）
+
+- **有向**：`<marker id="gw-progress-arrow" markerWidth="8">`，每条 `path` 带 `marker-end`，
+  箭头填 `--dsw-alias-border-l2`（线不表状态，状态由点和节点自己说）。
+- **画什么**：列头相邻对（`flow.nodes` 的相邻列）+ 同一 lane 的相邻两格（执行→检查→复核）。
+  真机完成态：相邻列对 **6** + 同号格对 **6** = **12** 条连线；`querySelectorAll('svg path')` 读到 **13**，
+  多的那 1 条是 `<marker>` 自己的三角形 `M0 0 L8 4 L0 8 Z`——读数时按「总数 − 1」算。
+- **折行肘弯**：相邻两个落点不在同一行时画**三段折线**（下 → 横 → 下，拐角 90°），不再「不画」。
+  700 px 实测 6 条 4 顶点的路径，例如 `M520 32 L520 84 L173 84 L173 136`。
+  **这一条取代 §21.3 的「折到下一行的那一对不画线」。**
+- **重看线**：同一格里相邻两次尝试，前一行的状态不是 `completed` 时，从那一颗点的右缘中点到下一颗点的左缘中点
+  画一条短线，`data-gw-progress-retry`、`stroke-dasharray: 3 3`、`marker-end` 同一条箭头。
+  真机「失败一次后重试通过」：**1 条** `M300 51 L303 51`，`stroke-dasharray = 3px, 3px`；
+  「两次都失败」：**2 条**。
+- 仍由 `measureProgressFlowWires()` 读矩形，`sameProgressWires()` 的「同一次测量不重渲」不变；
+  没有 layout 的宿主一条都不画、不报错（真机没有这种宿主，这一条只有组件用例覆盖）。
+
+### 23.5 尝试可见：一格里的每颗点、第 N 遍（追加 8，`CONFIRMED`）
+
+- **格的状态不变**，仍是 `nodeState(该格的行, ended)`：失败过一次、第二次过了 → **格是绿的**（恢复规则）。
+- **点改成每行一颗**（`data-attempt="1..N"`，按 `seq` 从左到右），每颗点**只看它自己那一行**的状态：
+  `completed` 绿、`failed`/`blocked`/`cancelled` 琥珀、未结算蓝。
+  于是「失败过一次、第二次过了」读作：**两颗点，第一颗琥珀、第二颗绿，格自己绿**。真机实测的正是这个形状
+  （`soak2/retry` 的 check 列任务 1：`[{1, failed}, {2, done}]`，格 `done`）。
+  **这一条取代 §21.7 第 1 条**（那里为了不抹掉「重试过」，把第一颗节点留成琥珀；现在琥珀落在**点上**，
+  节点与格子可以绿，事实仍然看得见）。
+- **第 N 遍**：`N = 该格的行数`，`N > 1` 才多一个角标 `progress.flow.attempt`（中文 `第 {n} 遍`，
+  English `Attempt {n}`）；`N === 1` 不加字。真机：`任务 1` 在检查列读作 `第 2 遍`。
+- **`at` 的重试口径**：重试正在跑时高亮停在那一列，不往后跳也不往前滑；`remaining = total - at` 口径不变。
+  真机「第二次尝试在跑」时：`data-current="true"` 落在第二颗 `execute` 列，页脚 `还剩 1 步 / 共 4 步`。
+
+### 23.6 三种终态页（同一张图、同一套钩子，`CONFIRMED`）
+
+| 页面 | 真机读数 |
+| --- | --- |
+| 已完成（重试通过） | 12 列 / 6 格 / 1 条重看线 / 页脚 `还剩 0 步 / 共 12 步` / `收下这版` |
+| 未通过（整轮失败） | 10 列 / 6 格 / 2 条重看线 / 2 个 `第 2 遍` 角标 / `还剩 6 步 / 共 10 步` / **没有按钮**（`dock` 里没有 `收下这版`） |
+| 已取消 | 见 `soak2/cancelled/`（读者按「停止生成」中途掐断） |
+
+三张页都**没有新句子**：叶子文本仍只有运行名、状态词、腿词、角标、任务标题、计数行与按钮
+（`soak/soak-92-styles.json` 的 `leafTexts` 里那 19 条，第一项是 `<style>` 自己，静态检查用）。
+
+### 23.7 与 §21 / §22 的取代关系
+
+- **取代**：§21.1 的 DOM（`ol.gw-progress-nodes` → `ol.gw-progress-cols` + 列 + 任务轨）；§21.3 的「折行不画线」
+  → 三段肘弯；§21.7 第 1 条的「重试留一颗琥珀节点」→ 琥珀落在**每颗尝试点**上；§21.4 钩子表里的
+  `-nodes` 退场，新增 §23.2 那一批。
+- **不取代**：§21.2 的状态词与 `at` 口径、§21.5 的腿词 / 角标 / 计数文案、§21.6 的宽度与「无字面色值」，
+  §21.8 的按钮机制（只填框、不代发）、§22 的汇总结论链与其界面出口（汇总节点的琥珀 + 展开行）。
+- **文案增量只有一个键**：`progress.flow.attempt`（键数 54 → 55）；`test/progress-hint-absent.spec.ts` 一字未改。

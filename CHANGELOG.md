@@ -5,6 +5,29 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **Every plan task is now a cell under the leg that ran it, and a retried task shows how many tries it took / 进度页把每个计划任务画成一格挂在执行/检查/复核下面，失败重试也画出来，第几遍、重看线、还剩几步一目了然** —
+  The progress figure is a lane matrix: one column per leg (`起点 / 规划 / 执行 / 检查 / 复核 / 汇总 / 终点`) and, under the
+  three work legs, one 26px cell per plan task. The cells are always on the figure, so "任务 1..N" no longer hides behind a
+  toggle, and the same task number sits on the same horizontal line in every leg that walked it (measured: 0.00 px spread
+  across three columns on a real run at 1500 px). A task that failed once and passed on the second try keeps its cell green
+  but shows **two dots — amber then green — a `第 2 遍` badge, and a dashed re-read line** between the two attempts, so
+  "it was retried" is visible instead of being smoothed away by the recovery rule; the footer still counts steps only
+  (`还剩 N 步 / 共 M 步`), and the whole-run failed page and the cancelled page use the same figure. Wires are directed
+  with an arrow head and, when the columns wrap, drawn as three-segment elbows instead of being dropped. Under 720 px the
+  columns wrap and nothing scrolls sideways. **Nothing in the data model changed**: the grouping lives only in the browser
+  bundle, so the typed half of the page, every session event and every counter are byte-for-byte what they were.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 进度图画成泳道矩阵：一条腿一列（`起点 / 规划 / 执行 / 检查 / 复核 / 汇总 / 终点`），三条工作腿下面各挂一排 26 px 的格子，
+  一个计划任务一格。格子**常显**，所以「任务 1..N」不用点开；同一个任务号在走过它的每一列里落在**同一条水平线**上
+  （真机 1500 px、三列实测极差 **0.00 px**）。失败过一次、第二次才过的任务，格子仍是绿的，但它会显示**两颗点——先琥珀后绿——
+  一个 `第 2 遍` 角标，以及两次尝试之间一条虚线重看线**，于是「重试过」看得见，而不是被恢复规则抹平；页脚仍只数步数
+  （`还剩 N 步 / 共 M 步`），整轮失败页与被取消页用的是同一张图。连线有箭头，列折行时画三段肘弯而不是不画。
+  窄于 720 px 时列折行、不出现横向滚动。**数据模型一个字没动**：分组只活在浏览器包里，所以页面的类型侧、
+  会话事件与所有计数都逐字不变。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.47] - 2026-11-26
 
 ### Changed / 变更

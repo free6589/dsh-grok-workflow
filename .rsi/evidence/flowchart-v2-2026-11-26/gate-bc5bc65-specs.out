@@ -1,0 +1,29 @@
+$ TMPDIR=$PWD/.tmp npx vitest run <8 progress+force-team specs>  (final tree bc5bc65)
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/worktrees/flowchart-v2
+
+(node:43) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 1500ms
+     ✓ records run-start, one row per subagent, then run-end  663ms
+     ✓ records which summary draft the run shipped, and nothing when no draft passed  308ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ✓ test/client.spec.ts (153 tests) 473ms
+ ✓ test/force-team.spec.ts (28 tests) 75ms
+ ✓ test/progress-flow.spec.ts (41 tests) 49ms
+ ✓ test/progress-tab.spec.ts (72 tests) 44ms
+ ✓ test/progress-connector.spec.ts (12 tests) 39ms
+ ✓ test/progress-lanes.spec.ts (38 tests) 33ms
+ ✓ test/progress-hint-absent.spec.ts (7 tests) 14ms
+
+ Test Files  8 passed (8)
+      Tests  365 passed (365)
+   Start at  09:49:12
+   Duration  4.60s (transform 807ms, setup 0ms, import 1.47s, tests 2.23s, environment 1ms)
+
+EXIT=0

@@ -3715,3 +3715,31 @@ https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.41 ——`isDra
 （本会话 `workspace-write`、`~/.dsh` 在工作区外，写探测只会得到只读）——**没写、没重载、没重启** 3080 上的实例，live 装哪一版本轮 `NOT_RUN`；
 真机 soak 本轮也没跑（改动的真机读数由 `.rsi/evidence/steering-reconnect-2026-11-26/` 覆盖）。证据
 `.rsi/evidence/release-0.13.41-2026-11-26/`（`gate-a64a50a.out` 23312 字节、`sha256 9ad02f92…420da6`）。）
+
+Last updated: 2026-11-26 10:10 +08:00（**进度页换成泳道矩阵，失败重试画进图；只动浏览器包（`CONFIRMED`）** —
+分支 **`feat/flowchart-v2`**，从 `e772cd6` 干净长出：九个泳道 / 重试提交（`922dc10` `3241a9a` `a80c8eb` `4d855e9`
+`a6c10c9` `3af6d4e` `06fc737` `2327aa0` `743ac3d`），产品尖端 **`743ac3d`**；`lib/client.js`
+**372480 字节、`sha256 e51daa66…3cff`**，且 `npm run build` 在这棵树上**零改动**（这九个提交自带构建产物，
+所以本分支**没有**单独的构建提交——不是漏了，是没有东西可建）。页面长这样：`ol.gw-progress-cols` 一列一条腿，
+列头仍是 `[data-gw-progress-node]`，工作腿下面挂 `ol.gw-progress-subs` → `li.gw-progress-sub`（一格 = 一个任务在这一列的那几次调用），
+**常显、不用点开**；对齐靠 `grid-template-rows: repeat(var(--gw-lanes),26px)` + `grid-row: <任务号>`，缺号留白。
+**失败重试落在点上**：`data-attempt="1..N"` 每行一颗点（各自 `data-state`），`N>1` 多一个 `第 {n} 遍` 角标
+（新键 `progress.flow.attempt`，键数 54 → 55），相邻两次尝试中前一行非 `completed` 时画一条 `3px,3px` 虚线重看线；
+格的状态仍是恢复规则（失败一次、第二次过了 → 格是绿的）。`src/progress-tab.ts` **一个字没改**——
+泳道只活在浏览器镜像里，代价是 §11 的「TS 与镜像双份 fixture」本块不适用（`D-166`）。
+**门禁（本分支自己跑的，尖端 `743ac3d`）**：`tsc -p tsconfig.json --noEmit` `EXIT=0`、`oxlint src test`
+`15 warnings / 0 errors`（185 文件）、七份进度 spec `339 passed`、**整仓 `npx vitest run` =
+`104 files / 2013 passed`（`EXIT=0`，87.90 s）**；`npm run build` 之后 `git status --short` 空。
+**`verify:lib` 是 `BLOCKED`**（`Cannot find module '/tmp/verify-lib-*/node_modules/typescript/bin/tsc'`，沙箱装不上依赖），
+`npm run ci` 整份 `NOT_RUN`（`AGENTS.md` §12）。**真机六次运行**（隔离 `web-clone`、端口 3391、真模型）：
+三态 等你点头 15.07 s / 进行中 15.39 s / 已完成 138.84 s；**失败后重试 → 已完成**（1 条重看线 + `第 2 遍` +
+点 `failed→done`）；**整轮失败页** `未通过`（2 条重看线、`还剩 6 步 / 共 10 步`、无按钮）；**取消页** `已取消`；
+逐 lane `top` 极差 **0.00 px**，窄屏 700/480 `scrollWidth === clientWidth`，六轮 `consoleErrors` / `pageErrors` 全空——
+这些读数是在**混合分支**上拍的（证据目录里以 `gate-bc5bc65-*` 命名的转录测的是那一棵树，尖端 `4def2a4`，
+现保留为 `backup/flowchart-v2-mixed-2026-11-26`），泳道那一半逐条对本分支成立。
+**本分支不含强制团队路由**（`D-167` 不在这一半）：服务端那个强制路由模块、它的开关、它的 spec、`D-167`
+与那条 CHANGELOG 都在**另一条分支**上（同一起点 `e772cd6` 长出，名字与文件清单见
+`.rsi/evidence/flowchart-v2-2026-11-26/README.md` 的「拆版之后」一节——那条反证 grep 的两个名字故意没写在这里，
+免得被自己的文档命中）。**红线**：`~/.dsh` 与 `~/.dsh/profiles` mtime 全程未变、
+3080 前后 401、未 push / 未打 tag / 未 bump / 未 publish、未合 `main`、没删 `backup/*`。证据
+`.rsi/evidence/flowchart-v2-2026-11-26/`（`README.md` 是索引）。）

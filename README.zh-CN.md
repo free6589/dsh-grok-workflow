@@ -334,7 +334,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` 依次运行 typecheck、lint、build 与**103 个文件 / 1948 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、消息路径的放行、交付路径、接单台、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、递归、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+`npm run ci` 依次运行 typecheck、lint、build 与**104 个文件 / 2013 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、消息路径的放行、交付路径、接单台、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、递归、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
 
 ## 安全与兼容性
 

@@ -1,0 +1,326 @@
+{
+ "headerText": "任务团队\n已完成",
+ "chip": {
+  "state": "done",
+  "text": "已完成"
+ },
+ "panelText": "任务团队\n已完成\n起点\n规划\n执行\n任务 1 · 计算12乘12\n检查\n任务 1 · 计算12乘12\n第 2 遍\n9:31\n检查\n任务 1 · 计算12乘12\n没过\n打开子会话\n9:31\n检查\n任务 1 · 计算12乘12\n过了\n打开子会话\n复核\n任务 1 · 计算12乘12\n规划\n第 2 次\n执行\n任务 2 · 在第一步结果上加1\n检查\n任务 2 · 在第一步结果上加1\n复核\n任务 2 · 在第一步结果上加1\n汇总\n第 1 稿\n汇总\n第 2 稿\n汇总\n第 3 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 13 步\n\n收下这版",
+ "counts": {
+  "cols": 13,
+  "subGroups": 6,
+  "cells": 6,
+  "plainWires": 17,
+  "retryWires": 1,
+  "attemptDots": 7,
+  "badges": 1,
+  "toggles": 11,
+  "guardian": 1,
+  "dock": "true"
+ },
+ "cols": [
+  {
+   "kind": "start",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 284,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "plan",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 377.61,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 471.23,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 564.84,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 658.47,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "plan",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 752.08,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "execute",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 845.7,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "check",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 939.31,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "review",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 1032.94,
+   "w": 81.6,
+   "h": 96
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 1126.55,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 1220.17,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "summarize",
+   "state": "done",
+   "current": "false",
+   "top": 138,
+   "left": 1313.78,
+   "w": 81.6,
+   "h": 32
+  },
+  {
+   "kind": "end",
+   "state": "done",
+   "current": "true",
+   "top": 138,
+   "left": 1407.39,
+   "w": 81.6,
+   "h": 32
+  }
+ ],
+ "cells": [
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "execute",
+   "aria": "任务 1 · 计算12乘12 过了",
+   "word": "任务 1 · 计算12乘12",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "done"
+    }
+   ],
+   "top": 176,
+   "left": 471.23,
+   "w": 81.6,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "check",
+   "aria": "任务 1 · 计算12乘12 过了",
+   "word": "任务 1 · 计算12乘12",
+   "badge": "第 2 遍",
+   "attempts": [
+    {
+     "n": "1",
+     "state": "failed"
+    },
+    {
+     "n": "2",
+     "state": "done"
+    }
+   ],
+   "top": 176,
+   "left": 564.84,
+   "w": 81.6,
+   "h": 26
+  },
+  {
+   "task": "1",
+   "lane": "1",
+   "ordinal": "1",
+   "state": "done",
+   "col": "review",
+   "aria": "任务 1 · 计算12乘12 过了",
+   "word": "任务 1 · 计算12乘12",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "done"
+    }
+   ],
+   "top": 176,
+   "left": 658.47,
+   "w": 81.6,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "execute",
+   "aria": "任务 2 · 在第一步结果上加1 过了",
+   "word": "任务 2 · 在第一步结果上加1",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "done"
+    }
+   ],
+   "top": 208,
+   "left": 845.7,
+   "w": 81.6,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "check",
+   "aria": "任务 2 · 在第一步结果上加1 过了",
+   "word": "任务 2 · 在第一步结果上加1",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "done"
+    }
+   ],
+   "top": 208,
+   "left": 939.31,
+   "w": 81.6,
+   "h": 26
+  },
+  {
+   "task": "2",
+   "lane": "2",
+   "ordinal": "2",
+   "state": "done",
+   "col": "review",
+   "aria": "任务 2 · 在第一步结果上加1 过了",
+   "word": "任务 2 · 在第一步结果上加1",
+   "badge": null,
+   "attempts": [
+    {
+     "n": "1",
+     "state": "done"
+    }
+   ],
+   "top": 208,
+   "left": 1032.94,
+   "w": 81.6,
+   "h": 26
+  }
+ ],
+ "lanes": [
+  {
+   "lane": "1",
+   "byCol": {
+    "execute": 176,
+    "check": 176,
+    "review": 176
+   },
+   "spread": 0
+  },
+  {
+   "lane": "2",
+   "byCol": {
+    "execute": 208,
+    "check": 208,
+    "review": 208
+   },
+   "spread": 0
+  }
+ ],
+ "retries": [
+  {
+   "d": "M300 51 L303 51",
+   "points": 2,
+   "dasharray": "3px, 3px",
+   "marker": "url(#gw-progress-arrow)"
+  }
+ ],
+ "footer": "还剩 0 步 / 共 13 步",
+ "scroll": {
+  "docScrollW": 1500,
+  "docClientW": 1500
+ },
+ "leafTexts": [
+  "任务团队",
+  "起点",
+  "规划",
+  "执行",
+  "任务 1 · 计算12乘12",
+  "检查",
+  "第 2 遍",
+  "9:31",
+  "没过",
+  "打开子会话",
+  "过了",
+  "复核",
+  "第 2 次",
+  "任务 2 · 在第一步结果上加1",
+  "汇总",
+  "第 1 稿",
+  "第 2 稿",
+  "第 3 稿",
+  "终点",
+  "Guardian 监控",
+  "监控结束",
+  "子任务存活判断预算 · 7200 秒",
+  "0 条处置记录",
+  "暂无处置记录",
+  "还剩 0 步 / 共 13 步",
+  "收下这版"
+ ]
+}

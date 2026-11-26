@@ -1,0 +1,60 @@
+{
+ "headerText": "任务团队\n等你点头",
+ "chip": {
+  "state": "waiting",
+  "text": "等你点头"
+ },
+ "panelText": "任务团队\n等你点头\n起点\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 2 步\n\n开工",
+ "counts": {
+  "cols": 2,
+  "subGroups": 0,
+  "cells": 0,
+  "plainWires": 2,
+  "retryWires": 0,
+  "attemptDots": 0,
+  "badges": 0,
+  "toggles": 0,
+  "guardian": 1,
+  "dock": "true"
+ },
+ "cols": [
+  {
+   "kind": "start",
+   "state": "done",
+   "current": "true",
+   "top": 138,
+   "left": 284,
+   "w": 596.5,
+   "h": 32
+  },
+  {
+   "kind": "end",
+   "state": "pending",
+   "current": "false",
+   "top": 138,
+   "left": 892.5,
+   "w": 596.5,
+   "h": 32
+  }
+ ],
+ "cells": [],
+ "lanes": [],
+ "retries": [],
+ "footer": "还剩 1 步 / 共 2 步",
+ "scroll": {
+  "docScrollW": 1500,
+  "docClientW": 1500
+ },
+ "leafTexts": [
+  "任务团队",
+  "起点",
+  "终点",
+  "Guardian 监控",
+  "监控中",
+  "子任务存活判断预算 · 7200 秒",
+  "0 条处置记录",
+  "暂无处置记录",
+  "还剩 1 步 / 共 2 步",
+  "开工"
+ ]
+}
