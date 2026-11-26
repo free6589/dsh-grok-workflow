@@ -1,0 +1,106 @@
+# Red lines, measured — stuck-hint block, 2026-11-26
+
+Everything below was run in this session (20:10–20:50, Asia/Singapore). Nothing in `~/.dsh` was
+written, the live instance on 3080 was never restarted, reloaded or reconfigured, and no commit,
+tag, push, npm publish or version bump happened.
+
+## 1. The write probe (must fail: the live home is read-only for this session)
+
+```
+20:29:14  $ ( : > ~/.dsh/.soak-probe )
+          bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+20:47:47  $ ( : > ~/.dsh/.soak-probe )
+          bash: line 1: /home/fish/.dsh/.soak-probe: Read-only file system
+          $ ls ~/.dsh/.soak-probe
+          ls: cannot access '/home/fish/.dsh/.soak-probe': No such file or directory
+```
+
+Both probes failed the same way, and the second one came after every run. The live home cannot be
+written to by mistake from this session.
+
+## 2. `~/.dsh` and `~/.dsh/profiles` mtimes
+
+```
+                                  20:29 (after the first two runs)        20:47 (teardown)
+~/.dsh                            2026-11-25 23:14:14.025606767          2026-11-25 23:14:14.025606767
+~/.dsh/profiles                   2026-11-22 16:59:46.687805286          2026-11-22 16:59:46.687805286
+~/.dsh/profiles/web               2026-11-26 19:41:49.334856619          2026-11-26 19:41:49.334856619
+~/.dsh/profiles/web/cordis.patch.yml  2026-11-26 08:40:55.161514610      2026-11-26 08:40:55.161514610
+```
+
+Identical at both readings, and every one of them predates the start of this block (20:10): the
+live profile was read (cloned from) and never written. The `profiles/web` mtime of 19:41 belongs to
+the release block's own auto-upgrade, not to this one.
+
+## 3. The live instance on 3080
+
+```
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/     # 20:29
+401
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/     # 20:47
+401
+$ ss -ltn | grep 3080
+LISTEN 0 511 100.111.111.88:3080     LISTEN 0 5 127.0.0.1:3080
+$ node -p "require('~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json').version"
+0.13.53        (unchanged by this block: the release block put it there at 19:41)
+```
+
+No restart, no reload, no settings write, no request other than the two status probes above. Port
+3080 was never used by this block.
+
+## 4. The isolated instance
+
+```
+$ ss -ltn | grep 3421      at 20:14, before the first boot:  nothing (connect refused)
+$ ss -ltn | grep 3421      while it served:                 LISTEN 127.0.0.1:3421
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3421/    → 401 (its own token gate)
+$ ss -ltn | grep 3421      at 20:50, after teardown:         nothing
+```
+
+Port 3421 was free at the start, so no fallback was needed. Six boots (one per pin change) on that
+port, all of them the clone: `DSH_HOME=$PWD/.tmp/stuck-hint/dsh-home dsh --profile web-clone`.
+
+## 5. Model keys
+
+`~/.dsh/bifrost.env` is sourced inside the launcher that starts the isolated server
+(`set -a; . ~/.dsh/bifrost.env; set +a`), so the key lives in that process only. No key value was
+printed, copied or written to any file; the one gateway probe (timeline.json → gatewayProbe) sent it
+as a bearer header and printed HTTP statuses only. `AGENT2API_API_KEY` is *not* set on this machine,
+which is why the `failed` state could be produced honestly.
+
+## 6. What was written, and where
+
+| Path | What |
+| --- | --- |
+| `.tmp/stuck-hint/**` | clone home (7753 files), tgz, workspace, browser shots, server logs, runner scripts — **deleted at teardown** |
+| `.rsi/evidence/stuck-hint-2026-11-26/**` | this evidence directory (the only thing this block leaves behind) |
+
+Product code, tests, `lib/`, `docs/`, `package.json`, `package-lock.json` and `CHANGELOG.md`: not
+written by this block. `npm run build` was run once and its output is byte-identical to the
+committed `lib/client.js` (install.txt), so the rebuild left the tree clean.
+
+## 7. Teardown, measured
+
+```
+$ ss -ltn | grep 3421        → nothing
+$ rm -rf .tmp/stuck-hint     → gone
+$ ls .tmp                    → npm-cache   (a concurrent block's npm cache, not this one's)
+$ git status --short
+ M .rsi/evidence/task-panel-2026-11-26/soak/raw-readings-phone.json
+?? .rsi/evidence/stuck-hint-2026-11-26/
+?? .rsi/evidence/task-panel-2026-11-26/soak/raw-readings-phone.CORRECTION.md
+```
+
+The two `task-panel-2026-11-26` lines are **not this block's**. Their mtimes settle it:
+
+```
+20:12:18  raw-readings-phone.json              (modified, not by this block)
+20:12:57  raw-readings-phone.CORRECTION.md     (new, not by this block)
+20:18:53  this block's first run
+20:27     this block's evidence directory was created
+```
+
+Both were written before this block had run anything, and this block never opened that directory.
+They belong to a concurrent block editing the older evidence directory. Everything this
+block wrote is inside `.rsi/evidence/stuck-hint-2026-11-26/` and `.tmp/` (gitignored, and now
+deleted).
