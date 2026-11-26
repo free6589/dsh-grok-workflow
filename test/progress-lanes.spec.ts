@@ -636,22 +636,80 @@ describe('lanes: the flow is a matrix of legs and tasks (追加 2)', () => {
   })
 
   it('gives a step its own control only while it has rows left of its own', () => {
-    // Every row of this run's legs named a task, so every row moved into a cell: the step has
-    // nothing of its own to open, and the cells are already on the page.
-    const lane = pageOf(laneRun())()
-    for (const step of stepsOf(lane)) {
-      expect(hooksOf(step, 'data-gw-progress-node-toggle'), 'a step with no rows keeps a control').toHaveLength(0)
-      expect(walkPruned(step, 'data-gw-progress-subs').filter((element) => Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-node-toggle')))
-        .toHaveLength(0)
+    const page = pageOf(laneRun())()
+    const columnOf = (tree: unknown, kind: string): Element => {
+      const column = columnsOf(tree).find((entry) => attr(entry, 'data-gw-progress-col') === kind)
+      expect(column, `the fixture drew no ${kind} column`).toBeDefined()
+      return column!
     }
-    // Same run with one row that names no task: that row stays on the step, so the step gets
-    // its control back — and the numbered row still lands in a cell.
+    const ownControls = (column: Element): number => walkPruned(column, 'data-gw-progress-subs')
+      .filter((element) => Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-node-toggle'))
+      .length
+    // 裁决 B: "a step keeps no control" holds for a **work leg whose every row named a task** —
+    // those rows all moved into cells, so the step has nothing of its own left to open.
+    for (const kind of ['execute', 'check']) {
+      const column = columnOf(page, kind)
+      expect(cellsOf(column).length, `${kind} drew no cells`).toBeGreaterThan(0)
+      expect(ownControls(column), `${kind} keeps a control after all of its rows moved into cells`).toBe(0)
+    }
+    // The plan leg's row names no task (`规划`), so it stays on the step: that declared call
+    // is readable only by opening the step, and losing the control would lose the row.
+    const plan = columnOf(page, 'plan')
+    expect(cellsOf(plan), 'the plan leg grew cells').toHaveLength(0)
+    expect(ownControls(plan), 'the plan leg lost the control of its own declared call').toBe(1)
+  })
+
+  it('gives a work leg its control back as soon as one of its rows names no task', () => {
+    // The same run with one task-less row: that row cannot go into a lane, so it stays on the
+    // step — the step has something of its own again, and the numbered row still lands in a
+    // cell beside it.
     const mixed = pageOf(mixedRun())()
-    const execute = columnsOf(mixed).find((column) => attr(column, 'data-gw-progress-col') === 'execute')!
-    expect(cellsOf(execute)).toHaveLength(1)
-    const own = walkPruned(execute, 'data-gw-progress-subs')
+    const execute = columnsOf(mixed).find((column) => attr(column, 'data-gw-progress-col') === 'execute')
+    expect(execute, 'the fixture drew no execute column').toBeDefined()
+    expect(cellsOf(execute!)).toHaveLength(1)
+    const own = walkPruned(execute!, 'data-gw-progress-subs')
       .filter((element) => Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-node-toggle'))
     expect(own, 'a step with a task-less row lost its control').toHaveLength(1)
+  })
+
+  it('gives the cells a control hook of their own, disjoint from the steps’', () => {
+    const page = pageOf(laneRun())()
+    // 裁决 A: 格子用 `data-gw-progress-sub-toggle`，步骤节点继续用
+    // `data-gw-progress-node-toggle`。One hook on two kinds of control would break the
+    // standing reading "number of node toggles = steps that still have rows of their own".
+    const placed = (hook: string): Array<{ element: Element, inCell: boolean }> => {
+      const out: Array<{ element: Element, inCell: boolean }> = []
+      const visit = (node: unknown, inCell: boolean): void => {
+        if (node === null || node === undefined || typeof node !== 'object') return
+        if (Array.isArray(node)) {
+          for (const child of node) visit(child, inCell)
+          return
+        }
+        const element = node as Element
+        if (!('type' in element) || !('props' in element)) return
+        if (Object.prototype.hasOwnProperty.call(element.props, hook)) out.push({ element, inCell })
+        const inside = inCell || Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-sub')
+        visit(element.children, inside)
+      }
+      visit(page, false)
+      return out
+    }
+    const nodeToggles = placed('data-gw-progress-node-toggle')
+    const cellToggles = placed('data-gw-progress-sub-toggle')
+    // Each hook sits where it belongs, and nowhere else.
+    expect(nodeToggles.filter((toggle) => toggle.inCell).map((toggle) => attr(toggle.element, 'data-gw-progress-node-toggle')))
+      .toEqual([])
+    expect(cellToggles.filter((toggle) => !toggle.inCell).map((toggle) => attr(toggle.element, 'data-gw-progress-sub-toggle')))
+      .toEqual([])
+    const cells = columnsOf(page).flatMap((column) => cellsOf(column))
+    expect(cells.length).toBeGreaterThan(0)
+    expect(cellToggles, 'not every cell has a control of its own').toHaveLength(cells.length)
+    // The two sets share no element, and no control carries both hooks.
+    const shared = nodeToggles.filter((toggle) => cellToggles.some((other) => other.element === toggle.element))
+    expect(shared.map((toggle) => attr(toggle.element, 'data-gw-progress-node-toggle'))).toEqual([])
+    const both = walk(page).filter((element) => ['data-gw-progress-node-toggle', 'data-gw-progress-sub-toggle']
+      .every((hook) => Object.prototype.hasOwnProperty.call(element.props, hook)))
+    expect(both, 'one control carries both hooks').toEqual([])
   })
 
   it('names each cell’s own call list after its column and its task', () => {
@@ -660,7 +718,7 @@ describe('lanes: the flow is a matrix of legs and tasks (追加 2)', () => {
     const targets: string[] = []
     for (const column of work) {
       for (const cell of cellsOf(column)) {
-        const toggle = hookOf(cell, 'data-gw-progress-node-toggle')
+        const toggle = hookOf(cell, 'data-gw-progress-sub-toggle')
         expect(attr(toggle, 'type')).toBe('button')
         expect(attr(toggle, 'aria-expanded')).toBe('false')
         expect(attr(toggle, 'aria-controls')).toMatch(/^gw-progress-sub-calls-\d+-[1-9]\d*$/u)
