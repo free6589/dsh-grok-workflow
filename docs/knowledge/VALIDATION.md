@@ -1,3 +1,13 @@
+## 0.13.54 发版门禁与远端结论（2026-11-27，记忆员 `gh` 实读 + 本树实测）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 远端 CI | `gh run view 45906804259 --log`（`main` @ `0b1b94e`） | **`success`**：Node 22 与 Node 24 皆 **`Test Files 105 passed (105)` / `Tests 2049 passed (2049)`** |
+| 远端 Release | `gh run list`（tag `v0.13.54` @ `0b1b94e`） | **`success`**：run **`45906832611`**（`1m29s`，`2026-11-26T22:45:53Z`）；Release **`Grok Workflow for DSH v0.13.54`** 已发布（`2026-11-26T22:47:16Z`），资产 `dsh-grok-workflow-0.13.54.tgz` **1042469** 字节 |
+| 本地全量（发版前，分支上） | `.tmp/full-suite-after-build.out`（本树遗留转录） | **`Test Files 105 passed (105)` / `Tests 2057 passed (2057)` / `101.47s`**（含发版分支新增用例；远端 `2049` 为 tag 树实测，两数皆照实记） |
+| 本地合流（发版前，分支上） | `.tmp/full-suite-after-merge.out`（本树遗留转录） | `1 failed \| 104 passed (105)` / `1 failed \| 2056 passed (2057)`——失败为 `test/client.spec.ts:494` 的 `lib/client.js` 字节比对（合流后未重建即测所致），重建后全绿见上一行；照实记，不掩盖 |
+| 主线身份 | `git rev-parse 'v0.13.54^{commit}'` + `git show-ref`（本树） | tag 对象 `7f71a4e` → **`0b1b94e`**；`main` = `origin/main` = **`0b1b94e`**；`package.json` **`0.13.54`** |
+
 ## 进度页横排分叉（`feat/task-fork`，HEAD `fe6d631`，无标签、版本仍 `0.13.53`）：隔离档案里真装真跑——七张读数（桌面 1500 三态、手机 390 三态、native-390 完成态）、**18 盏环 = 3 × 6**、**5 盏验**、完成态 `dock-fill` **0**、卡住那句每张都不存在、Mermaid 真值核对每张都对（首行 `flowchart LR`、节点/线计数与 DOM 相等、一个连通块、终点写作 `finish`）；门禁 `8 files / 331 passed`；**四条缺陷是真机截图抓到的**；`NOT_RUN`：原生手机进行中 / 等你点头 / `· 第 n 遍` / 深色主题 / 320 px / 读屏 / Firefox·Safari / 真 Mermaid 渲染器 / live 升级 — 2026-11-27 (`CONFIRMED`)
 
 **这一轮是什么**：`feat/task-fork` 把进度页换成一张横排分叉（七列、每张任务卡六环、每轮五验、接受动作删除）。本条目只记**真机读数、门禁与红线**；

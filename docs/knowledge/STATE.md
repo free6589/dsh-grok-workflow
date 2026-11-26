@@ -1,3 +1,6 @@
+Last updated: 2026-11-27 07:00 +08:00（**0.13.54 发版完成：四条合流 + 发版 + 远端双绿 + Release 已发布（`CONFIRMED`，本树实测 + `gh` 实读）** —
+分支 **`release/0.13.54`** 四条合流按序：**`7cc8db7`**（`feat/task-fork` 横排分叉）→ **`6bc62b0`**（`fix/mobile-overlap` 手机抽屉，手工融合）→ **`8c62233`**（`fix/readings-refresh` 证据订正）→ **`199b1a3`**（`fix/verdict-honest` 跳过记 `skipped`）；发版准备 **`f3bca3c`**（`chore(release): prepare v0.13.54`，`package.json` = **`0.13.54`**）；主线合流 **`0b1b94e`**（`Merge branch 'release/0.13.54'`，父 `c2351f2` + `f3bca3c`）；附注标签 **`v0.13.54`** 对象 `7f71a4e` 指向 `0b1b94e`。**远端门禁（`gh` 实读）**：CI run **`45906804259`**（`main`，`0b1b94e`）**`success`**——Node 22 与 Node 24 皆 **`105 passed (105)` / `2049 passed (2049)`**；Release run **`45906832611`**（`v0.13.54`）**`success`**，Release **`Grok Workflow for DSH v0.13.54`** 已发布（`2026-11-26T22:47:16Z`），资产 `dsh-grok-workflow-0.13.54.tgz` **1042469** 字节。以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 04:30 +08:00（**release/0.13.54 第二条合流：`fix/mobile-overlap` 手工融合进横排分叉，两边功能并存（`CONFIRMED`，本树实测）** —
 分支 **`release/0.13.54`**（worktree `/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-054`），基线 **`7cc8db7`**（已合 `feat/task-fork` 的 merge），被合 **`fix/mobile-overlap`** HEAD = **`a3b80c4`**。
 **操作者看到的两件事同时成立**：① 从左往右一张横排分叉（七列、每张任务卡六环、每轮五验、`flowchart LR`、无「收下这版」）；

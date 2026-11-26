@@ -5497,3 +5497,23 @@ spine 为空，pre-fix 形状会进脊柱。
   `pass + judged:true` 仍是唯一来自模型答案的组合；跳过与确定性否决都是 `judged:false`。
   **`NOT_RUN` 照实记**：真机隔离 soak（本块只跑确定性门禁与真实文件系统的路径用例，没有装进隔离 profile 跑一次跳过关单）。
 - **Evidence:** 见 `VALIDATION.md` 本条目；用例在 `test/block-supervisor.spec.ts`（29 例）与 `test/block-tools.spec.ts`（31 例）。
+
+## D-178 · 四条分支合入 `release/0.13.54` 时各让一位：`fix/mobile-overlap` 占 D-174、`feat/task-fork` 占 D-175、`fix/readings-refresh` 占 D-176、`fix/verdict-honest` 占 D-177；分支内原号保留，合入后以新号为准（2026-11-26，已发版 `v0.13.54`）
+
+- **Status:** `CONFIRMED`
+- **Date:** 2026-11-26
+- **Context:** 四条分支各自写记忆时都从 D-174 起编号（`fix/mobile-overlap` 先写 D-174，`feat/task-fork` 写 D-175、`fix/readings-refresh` 在分支内也写 D-174、`fix/verdict-honest` 在分支内也写 D-174），合入同一条发版分支时撞号。
+- **Decision:** 按合入顺序各让一位：`fix/mobile-overlap` 留 **D-174**；`feat/task-fork` 记 **D-175**；`fix/readings-refresh` 记 **D-176**（原分支内记 D-174）；`fix/verdict-honest` 记 **D-177**（原分支内记 D-174）。各分支文件内的原号不改写，只在合入记录里以新号引用。
+- **Alternatives rejected:** 回改各分支内的原号——会改写已落盘的证据引用链，不值得；另起不连续编号——破坏顺序可读性。
+- **Consequences:** 后续引用以 D-174–D-177 为准；读某分支原文时见到 D-174 需按分支名换算。
+- **Evidence:** 合流提交 `7cc8db7` / `6bc62b0` / `8c62233` / `199b1a3`；`D-176` / `D-177` 条内各自记着原号。
+
+## D-179 · `D-179` 编号顺延占位（本条即占位，无实体决策；2026-11-27，未发版）
+
+- **Status:** `CONFIRMED`
+- **Date:** 2026-11-27
+- **Context:** D-178 为融合让位决策占用后，`D-179` 为下一个未分配编号。先占位，避免后写者误用或跳号。
+- **Decision:** `D-179` 留给下一个真实决策；本条只占位，不携带决策内容。
+- **Alternatives rejected:** 留空不记——后写者无从知道 D-179 是否可用。
+- **Consequences:** 下一个决策从 D-180 起顺延时，需先确认 D-179 是否已被认领。
+- **Evidence:** 本文件 `grep -n "^## D-17"`（D-178 不存在、D-179 不存在，写下时实测）。

@@ -1,3 +1,11 @@
+## 2026-11-27 — 0.13.54 发版完成（发版收口记忆，非施工）**（主线 `0b1b94e` = 远端 `origin/main`；远端 CI `45906804259` success + Release `45906832611` success + Release 已发布；已合四条分支的工作树与 `.tmp/wt-release-054` 可删；`fix/resume-reuse` 仍是脏备份（`fe6d631`，未动），等用户裁决后再动；live 升级只记录、不执行）**
+
+- **From:** 发版收口记忆员（只写四个记忆文件，不碰代码/分支/工作树/live） · **To:** 下一个接手的人 / 清理工作树的人 / 做 live 升级的人（需另行授权）
+- **发版结论（`CONFIRMED`，本树 + `gh` 实读）**：四条合流 `7cc8db7` → `6bc62b0` → `8c62233` → `199b1a3`，发版准备 `f3bca3c`，主线合流 `0b1b94e`（父 `c2351f2` + `f3bca3c`），附注标签 `v0.13.54`（对象 `7f71a4e`）指向 `0b1b94e`；远端 CI `45906804259`（Node 22/24 皆 `105 / 2049`）与 Release `45906832611` 皆 `success`；Release `Grok Workflow for DSH v0.13.54` 已发布，资产 `1042469` 字节。
+- **可删（等执行者动手，本轮没删）**：已合四条分支的工作树（`feat/task-fork`、`.tmp/wt-mobile-overlap`、`fix/readings-refresh`、`.tmp/wt-verdict-honest`）+ `.tmp/wt-release-054`。删前确认 `git status` 干净且分支已合入 `main`。
+- **别动（等用户裁决）**：`fix/resume-reuse` 分支与 worktree（`.agents/worktrees/fix-resume-reuse`，仍指 `fe6d631`）是脏备份。涉及 `.tmp/` 里的东西（gitignored，不进 commit），去留由用户定。
+- **live 升级只记录、不执行**：本轮不碰 `~/.dsh`、不重载、不重启；升级需另行授权，另起一轮。
+
 ## 2026-11-27 — release/0.13.54 第二条合流（`fix/mobile-overlap` 手工融合成横排分叉）**（融合中未提交；门禁 `tsc 0 / oxlint 14w0e / 5 files 247 passed`；两边功能并存已由 spec 钉住**
 
 - **From:** 合流执行的这一块 · **To:** 主代理（验收 merge + 决定 mobile-overlap 分支去留的人）
