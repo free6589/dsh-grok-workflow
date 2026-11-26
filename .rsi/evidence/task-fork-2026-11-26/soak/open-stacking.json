@@ -1,0 +1,565 @@
+{
+ "note": "Stacking half of the same measurement (final bundle c6387e1b, done page, card t1 clicked once, isolated instance on 3412): each card's computed z-index/position, and document.elementsFromPoint at the centre of every call row. In both widths the topmost element at every row is the row itself, inside [data-gw-progress-node-calls], owner t1. `cardsOverlappingListBox` is the geometric overlap between the list's box and each closed card's box, i.e. these cards really are behind the list — the reason the background matters.",
+ "measuredOn": "final bundle c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186",
+ "deviceScaleFactor": 1,
+ "widths": {
+  "390": {
+   "chip": "已完成",
+   "pnodes": 17,
+   "edges": 24,
+   "innerWidth": 390,
+   "documentScrollWidth": 390,
+   "documentClientWidth": 390,
+   "openCard": {
+    "id": "t1",
+    "dataOpen": "true",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "backgroundImage": "none",
+    "opacity": "1",
+    "zIndex": "4",
+    "position": "absolute",
+    "borderColor": "rgb(15, 17, 21)",
+    "boxShadow": "none"
+   },
+   "siblingCards": [
+    {
+     "id": "start",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "plan",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1",
+     "open": "true",
+     "zIndex": "4",
+     "position": "absolute"
+    },
+    {
+     "id": "t2",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s1",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s4",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s7",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s2",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s6",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s8",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s3",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s5",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s9",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "sum",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "accept",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "end",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    }
+   ],
+   "rowHitTests": [
+    {
+     "point": {
+      "x": 263,
+      "y": 350
+     },
+     "rowText": "执行 任务 1 · 写 notes.md 安装步骤 做完 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "span",
+       "cls": "gw-progress-pnode-word",
+       "ownerCard": "t2",
+       "inCallList": false
+      },
+      {
+       "tag": "span",
+       "cls": "gw-progress-pnode-main",
+       "ownerCard": "t2",
+       "inCallList": false
+      },
+      {
+       "tag": "button",
+       "cls": "gw-progress-pnode-body",
+       "ownerCard": "t2",
+       "inCallList": false
+      }
+     ]
+    },
+    {
+     "point": {
+      "x": 263,
+      "y": 406
+     },
+     "rowText": "检查 任务 1 · 写 notes.md 安装步骤 过了 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-pnodes",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-graph",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-figure",
+       "ownerCard": null,
+       "inCallList": false
+      }
+     ]
+    },
+    {
+     "point": {
+      "x": 263,
+      "y": 462
+     },
+     "rowText": "复核 任务 1 · 写 notes.md 安装步骤 通过 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-pnodes",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-graph",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-figure",
+       "ownerCard": null,
+       "inCallList": false
+      }
+     ]
+    }
+   ],
+   "cardsOverlappingListBox": [
+    {
+     "id": "t2",
+     "overlap": {
+      "w": 240,
+      "h": 37
+     },
+     "inside": true
+    },
+    {
+     "id": "t3",
+     "overlap": {
+      "w": 240,
+      "h": 37
+     },
+     "inside": true
+    }
+   ]
+  },
+  "1500": {
+   "chip": "已完成",
+   "pnodes": 17,
+   "edges": 24,
+   "innerWidth": 1500,
+   "documentScrollWidth": 1500,
+   "documentClientWidth": 1500,
+   "openCard": {
+    "id": "t1",
+    "dataOpen": "true",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "backgroundImage": "none",
+    "opacity": "1",
+    "zIndex": "4",
+    "position": "absolute",
+    "borderColor": "rgb(15, 17, 21)",
+    "boxShadow": "none"
+   },
+   "siblingCards": [
+    {
+     "id": "start",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "plan",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1",
+     "open": "true",
+     "zIndex": "4",
+     "position": "absolute"
+    },
+    {
+     "id": "t2",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s1",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s4",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t1_s7",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s2",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s6",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t2_s8",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s3",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s5",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "t3_s9",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "sum",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "accept",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    },
+    {
+     "id": "end",
+     "open": null,
+     "zIndex": "auto",
+     "position": "absolute"
+    }
+   ],
+   "rowHitTests": [
+    {
+     "point": {
+      "x": 740,
+      "y": 351
+     },
+     "rowText": "1:02 执行 任务 1 · 写 notes.md 安装步骤 做完 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "span",
+       "cls": "gw-progress-pnode-word",
+       "ownerCard": "t2",
+       "inCallList": false
+      },
+      {
+       "tag": "span",
+       "cls": "gw-progress-pnode-main",
+       "ownerCard": "t2",
+       "inCallList": false
+      },
+      {
+       "tag": "button",
+       "cls": "gw-progress-pnode-body",
+       "ownerCard": "t2",
+       "inCallList": false
+      }
+     ]
+    },
+    {
+     "point": {
+      "x": 740,
+      "y": 407
+     },
+     "rowText": "1:02 检查 任务 1 · 写 notes.md 安装步骤 过了 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "button",
+       "cls": "gw-progress-pnode-body",
+       "ownerCard": "t3",
+       "inCallList": false
+      },
+      {
+       "tag": "li",
+       "cls": "gw-progress-pnode",
+       "ownerCard": "t3",
+       "inCallList": false
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-pnodes",
+       "ownerCard": null,
+       "inCallList": false
+      }
+     ]
+    },
+    {
+     "point": {
+      "x": 740,
+      "y": 463
+     },
+     "rowText": "1:03 复核 任务 1 · 写 notes.md 安装步骤 通过 打开子会话",
+     "topmost": {
+      "tag": "li",
+      "cls": "gw-progress-log-row",
+      "ownerCard": "t1",
+      "inCallList": true
+     },
+     "stack": [
+      {
+       "tag": "li",
+       "cls": "gw-progress-log-row",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-node-calls",
+       "ownerCard": "t1",
+       "inCallList": true
+      },
+      {
+       "tag": "ol",
+       "cls": "gw-progress-pnodes",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-graph",
+       "ownerCard": null,
+       "inCallList": false
+      },
+      {
+       "tag": "div",
+       "cls": "gw-progress-figure",
+       "ownerCard": null,
+       "inCallList": false
+      }
+     ]
+    }
+   ],
+   "cardsOverlappingListBox": [
+    {
+     "id": "t2",
+     "overlap": {
+      "w": 240,
+      "h": 56
+     },
+     "inside": true
+    },
+    {
+     "id": "t3",
+     "overlap": {
+      "w": 240,
+      "h": 56
+     },
+     "inside": true
+    }
+   ]
+  }
+ },
+ "consoleErrors": [],
+ "pageErrors": []
+}

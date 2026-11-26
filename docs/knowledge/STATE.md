@@ -1,3 +1,48 @@
+Last updated: 2026-11-27 01:20 +08:00（**进度页换成一张横排分叉图：七列、每张任务卡六环、每轮五验，用户点「收下这版」那个接受动作整个删掉；这一版在隔离档案里真装真跑过（`CONFIRMED`）** —
+分支 **`feat/task-fork`**（worktree `.agents/worktrees/feat-task-fork`），HEAD = **`fe6d631`** = `main` 尖端，本树自己读的身份：
+`git describe --tags --always` = **`v0.13.53-1-gfe6d631`**、`git tag --contains HEAD` 计数 **0**（这颗提交上没有标签）、
+`package.json` 版本 **`0.13.53`**——**没有合、没有推、没有打 tag、没有发版、没有抬版本**。
+**操作者看到的是**：从左往右一张分叉——**起点 → 规划（分叉）→ 任务 1 / 任务 2 … → 每条任务的子任务（横排分支）→ 汇合 → 验收 → 终点**。
+七列按这个顺序排开（没有记录的那一列就不画盒子）；每张任务卡自己带**六盏灯**（规划 / 执行 / 检查 / 复核 / 验收 / 汇总），验收那一列带**五盏验**（机器远端 / 模型复核 / 真机隔离 / 人验 / 对账）。
+**灯是记录的折叠，不是判断**：后来重试补上的那次失败是绿的，没人跑过的验是暗的——页面从不替事件流勾选任何一道验。
+图每次渲染都从这一轮自己的事件行重推，所以**重规划之后图自己长出它真走过的那张任务、那几条分支和线**，别的盒子一个字段不变。
+**接受不必再点**：dock 上只剩「开工」那一颗，`progress.dock.accept` 从两本字典删掉；验收成了图上的一个地方。
+结构来源仍是那份 Mermaid 文本，现在是 **`flowchart LR`**，**每一种状态都是一张连通的图**（没有任务卡时补一条 `plan → sum`），
+终点在文本里写作 `finish`，页面排的是解析回来的那份图（没有引任何画图库）。
+**门禁（本块收尾，本树自己跑）**：`tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`oxlint src test` **`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；
+八份进度相关 spec **`8 files / 331 passed`**（client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14）；
+**整仓套件与 `npm run ci` 是 `NOT_RUN`**（`AGENTS.md` §12：块内只跑碰到的 spec）。`progress.*` 键 **64 → 77**（+14 −1）。
+**浏览器包**：`lib/client.js` **422 685** 字节 / `sha256 c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186`，
+与 `src/client/index.js` 同哈希、`cmp` 空输出；`lib/index.js` **27 956** 字节 / `sha256 ac69070e…dfa2c32`，本块没碰它。
+**真机 soak（`CONFIRMED`）**：隔离档案（克隆 live 的 `web`、`DSH_HOME` 走 scratch、端口 **3412**、真模型、三个任务的真实工作流，收尾已拆），
+装进去的是 `file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz`（**1 033 214** 字节 / `sha256 b5b7d208…3c46` / 164 文件），
+读回 **`0.13.53`**、装好的 `lib/client.js` 与工作树同哈希、软链 **0** 个。**七张读数**：桌面 1500 进行中 **11 节点 / 12 边**、完成态 **17 / 24**、
+点开一颗节点 17 / 24（调用列表 **1** 行、亮线 **9** / 暗 **20**）；手机 390 三张同计数；外加一张 native-390 完成态 17 / 24。
+**18 盏环 = 3 张任务卡 × 6**、验收卡 **5 盏验**（`machine=done, model=done, isolated/human/ledger=pending`）、
+完成态 dock 里 `dock-fill` **0** 颗、卡住那句每张都没有；顶上那句进行中 `第 3 步，共 7 步 · 还剩约 …`、完成态 `第 7 步，共 7 步`。
+页面真值核对每张都对：`-source` 首行 `flowchart LR`、节点行 / 线行数与 DOM 相等、**一个连通块**、终点写作 `finish`；
+`document.scrollWidth === clientWidth` 两档成立、390 下图在自己内部横向滚（1078 / 383）；控制台 **0** / 页面异常 **0**；
+这一轮真的写出 `notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**。
+**四条缺陷是真机截图抓到的，不是套件先抓到的**（都在同一分支修掉、各补一条守卫）：① 「汇总」那颗盒子被裁成只剩「汇」；
+② 展开的调用行塌成一字一行；③ 邻居卡片盖住展开的列表（开卡补 `z-index`）；④ 列表透出背景（主题 token 死了，
+改成 `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测算出来 `rgb(255,255,255)`）。
+**套件在修之前是绿的——挡住这四条的是补上的守卫。**
+**红线（照实记，包括两条为别的原因动过的路径）**：`~/.dsh/profiles` **未变**（`2026-11-22 16:59:46`）；
+`~/.dsh` 变成 `2026-11-27 00:22:48`、`~/.dsh/profiles/web` 变成 `2026-11-27 01:01:27`——**都在本块进行期间变过，但不是本块的写**：
+会改文件的每一条命令都带 `DSH_HOME=<clone>`，变动的是 live 档案自己的设置写入加上另一个块的插件作业
+（`pnpm-lock.yaml` / `node_modules` / `.plugin-manager` 00:14:34、`package.json` 00:19:54、`cordis.yml` 00:20:53、
+`cordis.patch.yml` 00:41:08 与 01:01:27）；3080 根路径 **401 → 401**；live 里那份载荷的 sha 是 `1fb003f3…` **不是本块的**，
+live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有升级**）；隔离实例已停、scratch 全部删掉。
+**`NOT_RUN` 照实记**：原生手机上的**进行中**截图、等你点头态（`开工`）在真机上、分支上的 `· 第 n 遍`（三个任务都一次过）、
+深色主题、320 px、读屏软件、Firefox / Safari、真 Mermaid 渲染器、live 档案升级与重载 / 重启、整仓测试与 `npm run ci`。
+**这一版还留着三条要人接着做的**（逐条写在 `HANDOFF.md` 顶端那一节）：① **`feat/task-fork` 要有个去处**（合 / rebase / 删）并按 `AGENTS.md` §5 记下到期日；
+② `progress.flow.visit` 这颗键现在没有代码读它（访问号角标退场后只剩在字典里），删不删等裁决；
+③ 上面那串 `NOT_RUN` 的状态要补测。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 19:05 的 **`feat/task-panel` 那一轮**（竖排步骤树 + `flowchart TD`，已被本轮取代，
+它的 §25 与 `D-173` 仍记着当时的事实）；再往下是 17:15 的 `0.13.52` 发布收口、16:22 的 `0.13.51` 收口、16:10 的**批准目录那一轮**，以及更早各轮。
+`feat/task-fork` 这一轮**没有发版**，所以它不在发布线上，只在这一段里。它们的结论一字未改。）
+
 Last updated: 2026-11-26 19:05 +08:00（**进度页换成了任务面板：一句话 + 一张由 Mermaid 文本自己排出来的分支树 + 只在卡住时出现的一句；这一版在隔离档案里真装真跑了三次（`CONFIRMED`）** —
 分支 **`feat/task-panel`**（worktree `.tmp/wt-task-panel`），产品提交 **`45909bb`**（`feat(progress): the tab is a task panel — one sentence, a Mermaid-shaped tree, and where it is stuck`，
 10 文件 / **+5298 −4986**：`src/client/index.js` 与 `lib/client.js` 各 2020 行、用例 4 改 2 删 2 新），基线是 `main` 尖端 **`e44e26a`**（v0.13.52）。

@@ -1,0 +1,59 @@
+{
+ "note": "Background half of the same measurement: the DOM's computed background-color of the opened card's call list, and the design tokens that decide it. On the final bundle it computes to rgb(255, 255, 255) — opaque — because the rule now asks for var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas)) and this theme defines --dsw-alias-bg-layer-1: #fff. The two names the earlier rounds' rule asked for (--dsw-alias-bg-elevated, --dsw-alias-bg-l1) are still absent from this theme (null below), which is why that rule fell through to transparent.",
+ "measuredOn": "final bundle c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186",
+ "previousRoundsValue": {
+  "callsListBackgroundColor": "rgba(0, 0, 0, 0)",
+  "measuredOn": "bundle a33a1d4b (previous round), same point of the same page",
+  "note": "quoted from the previous round's measurement of that bundle; that bundle is deleted, so it was not re-measured here."
+ },
+ "widths": {
+  "390": {
+   "callsList": {
+    "selector": ".gw-progress-node-calls / [data-gw-progress-node-calls]",
+    "backgroundColor": "rgb(255, 255, 255)",
+    "backgroundImage": "none",
+    "opacity": "1",
+    "zIndex": "3",
+    "position": "absolute",
+    "borderColor": "rgba(0, 0, 0, 0.1)",
+    "boxShadow": "color(srgb 0.0588235 0.0666667 0.0823529 / 0.12) 0px 6px 16px 0px",
+    "box": {
+     "x": 143,
+     "y": 315,
+     "w": 240,
+     "h": 181
+    },
+    "tokenBackgroundLayer1": "#fff",
+    "tokenBackgroundBase": "#fff",
+    "tokenDeadElevated": null,
+    "tokenDeadL1": null,
+    "rowCount": 3
+   },
+   "openCardZIndex": "4"
+  },
+  "1500": {
+   "callsList": {
+    "selector": ".gw-progress-node-calls / [data-gw-progress-node-calls]",
+    "backgroundColor": "rgb(255, 255, 255)",
+    "backgroundImage": "none",
+    "opacity": "1",
+    "zIndex": "3",
+    "position": "absolute",
+    "borderColor": "rgba(0, 0, 0, 0.1)",
+    "boxShadow": "color(srgb 0.0588235 0.0666667 0.0823529 / 0.12) 0px 6px 16px 0px",
+    "box": {
+     "x": 620,
+     "y": 316,
+     "w": 240,
+     "h": 181
+    },
+    "tokenBackgroundLayer1": "#fff",
+    "tokenBackgroundBase": "#fff",
+    "tokenDeadElevated": null,
+    "tokenDeadL1": null,
+    "rowCount": 3
+   },
+   "openCardZIndex": "4"
+  }
+ }
+}
