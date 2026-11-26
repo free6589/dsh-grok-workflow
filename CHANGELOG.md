@@ -5,6 +5,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **Retired the dead `progress.flow.visit` key, marked every unnumbered branch with its `u1` card / 删掉已无人读的 `progress.flow.visit`，无号分支一律标出它属于 `u1` 那张卡** —
+  The visit badge left with the old edition and no code reads this key anymore, so both dictionaries drop it.
+  A run with work but no plan number shares one card (`u1`); its branches now carry `data-task="u1"`, so the markup
+  still says whose call each branch is.
+  **Upgrade note: nothing to migrate — records written before this version still read as they did; an old build
+  reading a new record skips the row it does not know (旧读新跳过) instead of failing the whole read, so no
+  downgrade is promised.**
+  / 访问号角标随旧版退场后，已没有任何代码再读这一键，两本字典一起删掉。没有任务号的工作共用 `u1` 一张卡，
+  它的分支现在都带 `data-task="u1"`，读标记的人仍能分清每条分支属于谁。
+  **升级须知：不用迁移任何东西——这个版本之前写下的记录照样读得出；旧构建读到新记录里不认识的行会跳过那一行
+  （旧读新跳过），而不是整单失败，所以不承诺降级。**
+
 ## [0.13.54] - 2026-11-27
 
 ### Changed / 变更

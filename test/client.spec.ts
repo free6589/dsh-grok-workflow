@@ -2260,7 +2260,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
   it('names every word the panel prints, and the copy the retired count line took with it', () => {
     // The page's own vocabulary, pinned as a set. The retired count line's own two keys
     // (`progress.flow.left`, `progress.flow.aria`) went with it — the step sentence replaced
-    // them — and the panel's eleven keys are the ones that arrived instead.
+    // them — and the panel's eleven keys are the ones that arrived instead. The visit badge
+    // retired with the old edition (no code reads it): its key left both dictionaries too.
     const zh = bundle.GROK_WORKFLOW_DICT['zh']!
     const en = bundle.GROK_WORKFLOW_DICT['en']!
     const flowKeys = Object.keys(zh).filter((key) => key.startsWith('progress.flow.')).sort()
@@ -2276,8 +2277,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
       'progress.flow.review',
       'progress.flow.start',
       'progress.flow.summarize',
-      'progress.flow.visit',
     ])
+    expect('progress.flow.visit' in zh, 'the visit badge is gone').toBe(false)
     expect('progress.flow.left' in zh, 'the count line is gone').toBe(false)
     expect('progress.flow.aria' in zh, 'the flow label is gone').toBe(false)
     expect(zh['progress.flow.attempt']).toBe('第 {n} 遍')
