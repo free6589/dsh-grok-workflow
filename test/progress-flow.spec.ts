@@ -299,6 +299,29 @@ function plannedRun(): ProgressRun {
   }
 }
 
+/**
+ * 执行走过任务 1/2/3，检查只走到 2/3.
+ *
+ * The shape that made "row = task" fail: an earlier task has no call in the later leg, so
+ * what matters is the task number, not the order the cells happen to appear in.
+ */
+function gapLaneRun(): ProgressRun {
+  return {
+    runId: 'r-flow-gap',
+    name: '任务团队 · 3 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'completed', 1),
+      member(3, '执行', '任务 2 · 写文档', 'completed', 2),
+      member(4, '执行', '任务 3 · 补测试', 'completed', 3),
+      member(5, '检查', '任务 2 · 写文档', 'completed', 4),
+      member(6, '检查', '任务 3 · 补测试', 'completed', 5),
+    ],
+    details: [],
+  }
+}
+
 /** 一条腿都没有计划任务号：this leg's rows stay on the step node, as they always did. */
 function plainRun(): ProgressRun {
   return {
@@ -735,6 +758,31 @@ describe('client progress tab: the wires are measured, never invented', () => {
     expect(measured.paths[1]).toEqual([[200, 51], [212, 51]])
   })
 
+  it('joins one task across two legs, never two neighbours of different tasks', () => {
+    // Where a row sits follows the contract's fixed numbers: a 32px head, a 6px gap, then a
+    // 26px cell every 32px. Task 2 and task 3 therefore sit at the same height in both legs,
+    // and task 1 — which only the first leg walked — has no partner to join.
+    const rowTop = (lane: number) => 32 + 6 + (lane - 1) * 32
+    const column = (x: number, lanes: ReadonlyArray<number>) => ({
+      x,
+      y: 0,
+      w: 200,
+      h: rowTop(3) + 26,
+      cells: lanes.map((lane) => ({ lane, x, y: rowTop(lane), w: 200, h: 26 })),
+    })
+    const measured = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      column(0, [1, 2, 3]),
+      column(212, [2, 3]),
+    ]).flow)
+    // head→head, then task 2 → task 2 and task 3 → task 3, each on its own line. A pairing
+    // by order would instead have drawn task 1 → task 2, which is the bug this pins.
+    expect(measured.paths).toEqual([
+      [[200, 16], [212, 16]],
+      [[200, rowTop(2) + 13], [212, rowTop(2) + 13]],
+      [[200, rowTop(3) + 13], [212, rowTop(3) + 13]],
+    ])
+  })
+
   it('elbows a lane pair that wrapped, and draws nothing on a host without layout', () => {
     // The second column wrapped onto the next row and sits to the right of the first: the
     // two cells share neither a row nor a column, so the line is an elbow — down, across,
@@ -751,6 +799,16 @@ describe('client progress tab: the wires are measured, never invented', () => {
     expect(lane[1]).toEqual([50, 91])
     expect(lane[2]).toEqual([350, 91])
     expect(lane[3]).toEqual([350, 118])
+
+    // Two tasks in both columns, one column wrapped below and to the right: each elbow lands
+    // on the cell with the same number, not on the cell that happens to be first.
+    const twoLanes = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 100, h: 102, cells: [{ lane: 1, x: 0, y: 38, w: 100, h: 26 }, { lane: 2, x: 0, y: 70, w: 100, h: 26 }] },
+      { x: 300, y: 100, w: 100, h: 102, cells: [{ lane: 1, x: 300, y: 138, w: 100, h: 26 }, { lane: 2, x: 300, y: 170, w: 100, h: 26 }] },
+    ]).flow)
+    expect(twoLanes.paths).toHaveLength(3)
+    expect(twoLanes.paths[1]).toEqual([[50, 64], [50, 101], [350, 101], [350, 138]])
+    expect(twoLanes.paths[2]).toEqual([[50, 96], [50, 133], [350, 133], [350, 170]])
 
     // A column directly under its neighbour is a plain vertical line, not an elbow.
     const below = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
@@ -913,6 +971,33 @@ describe('client progress tab: the plan tasks stand in their own lane', () => {
     expect(hooksOf(render(), 'data-gw-progress-sub-calls')).toHaveLength(0)
   })
 
+  it('keeps a task on its own line when an earlier leg skipped one', () => {
+    // The row is the task number, not the cell's position: the check leg walked only tasks
+    // 2 and 3, and they must still sit on the lines tasks 2 and 3 sit on in the execute
+    // leg — otherwise one horizontal line would point at two different tasks.
+    const page = pageOf(gapLaneRun())()
+    const lists = hookOf(page, 'data-gw-progress-cols')
+    expect((lists.props['style'] as Record<string, unknown>)['--gw-lanes']).toBe('3')
+
+    const rows = hooksOf(page, 'data-gw-progress-col').map((column) =>
+      hooksOf(column, 'data-gw-progress-sub').map((cell) => [
+        attr(cell, 'data-lane'),
+        (cell.props['style'] as Record<string, string>)['gridRow'],
+      ]))
+    expect(rows).toEqual([
+      [],
+      [],
+      [['1', '1'], ['2', '2'], ['3', '3']],
+      // No filler cell for task 1: the row is simply empty in this column.
+      [['2', '2'], ['3', '3']],
+      [],
+    ])
+    // The row count is a fixed grid, so an empty row still takes its 26px + 6px.
+    const rule = ruleWith('.gw-progress-subs')
+    expect(rule).toContain('grid-template-rows: repeat(var(--gw-lanes, 1), 26px)')
+    expect(rule).toContain('gap: 6px')
+  })
+
   it('gives no cell to the two ends, the plan or the summary', () => {
     const page = pageOf(finishedRun())()
     // finishedRun walks `任务 1` in execute and check only.
@@ -1045,11 +1130,12 @@ describe('client progress tab: the lane matrix, drawn to the contract’s number
     expect(cell).toContain('gap: 4px')
     expect(cell).toContain('font-size: 12px')
     expect(cell).toContain('border: 1px solid var(--dsw-alias-border-l2')
-    // The list is a plain column of cells, with no marker of its own.
-    const list = ruleOf('.gw-progress-subs')
+    // The list is one fixed 26px row per task number, so a task keeps its line in every
+    // leg that walked it; an empty row is left blank rather than filled.
+    const list = ruleWith('.gw-progress-subs')
     expect(list).toBeDefined()
-    expect(list).toContain('display: flex')
-    expect(list).toContain('flex-direction: column')
+    expect(list).toContain('display: grid')
+    expect(list).toContain('grid-template-rows: repeat(var(--gw-lanes, 1), 26px)')
     expect(list).toContain('gap: 6px')
     expect(list).toContain('list-style: none')
     // A title that does not fit is cut with an ellipsis, never pushed off the page.
