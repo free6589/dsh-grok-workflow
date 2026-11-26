@@ -18,7 +18,9 @@
  * "start" against a stale preview is caught.
  *
  * `verify` is outside that fingerprint on purpose (see `normalizeSplit`): it is
- * how the work is checked, not what the work is.
+ * how the work is checked, not what the work is. `root` is outside it for the same
+ * reason — it is the tree the work lives in, not the work — so the same split
+ * approved from another directory is still the same split, not an edited one.
  *
  * ## Why start checks in a fixed order
  *
@@ -68,6 +70,13 @@ export interface PreviewInput {
     verify?: {
         blockSupervisor?: boolean;
     };
+    /**
+     * The absolute directory this split is being approved in (the calling session's
+     * directory). Recorded on the preview and carried onto the row, so a close in a
+     * different session — or after a restart — resolves declared write paths against the
+     * tree the work really lives in. A relative or empty value is dropped, never refused.
+     */
+    root?: string;
     /** Clock override, in epoch milliseconds. */
     now?: number;
 }
@@ -121,7 +130,25 @@ export interface StoredPreview {
     verify?: {
         blockSupervisor?: boolean;
     };
+    /** The canonical directory this split was approved in, when one was recorded. */
+    root?: string;
 }
+/**
+ * The one rule for turning a directory into the value the ledger records.
+ *
+ * Only a non-empty absolute path is accepted, then it is canonicalised so two
+ * spellings of one tree compare equal: the real path when the directory exists (a
+ * symlinked checkout, a `..` in the middle), the resolved path when it does not,
+ * because a preview may be recorded before the tree is created. Everything else — a
+ * relative path, an empty string, a non-string — is `undefined`.
+ *
+ * Dropping instead of refusing is deliberate: a preview must stay total and cheap. A
+ * directory that cannot be named is not a reason to fail a split, and inventing one
+ * would record a fact nobody stated.
+ * @param value - the caller's directory, of unknown shape.
+ * @returns The canonical absolute directory, or `undefined` when none was given.
+ */
+export declare function canonicalDirectory(value: unknown): string | undefined;
 /**
  * Validate and normalize a proposed split. Pure: no disk, no memory, no clock.
  *

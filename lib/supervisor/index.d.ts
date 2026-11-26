@@ -56,6 +56,13 @@ export interface BlockSupervisorInput {
     judge?: boolean;
     /** Filesystem seam for the artifact check (tests inject a set of paths). */
     exists?: (path: string) => boolean;
+    /**
+     * The absolute directory the block was approved in, which the declared write paths
+     * are relative to. Absent means the deterministic checks resolve against the plugin
+     * process's cwd — the historical behaviour, kept for callers that have no session
+     * directory to give.
+     */
+    root?: string;
     signal?: AbortSignal;
     /** Ledger directory; defaults to the environment-aware block ledger dir. */
     dir?: string;
