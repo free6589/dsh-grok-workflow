@@ -226,9 +226,10 @@ export interface GrokWorkflowConfig {
      */
     blockIntake?: boolean;
     /**
-     * Forced team routing switch (`src/force-team.ts`), on by default. A load-time
-     * switch, not a live one: off registers no `agent/pre-step` listener, so it cannot
-     * be a `volatile()` field.
+     * Forced team routing switch (`src/force-team.ts`), on by default. It buys one fixed
+     * instruction appended to a message that asks for a team, and nothing more: an
+     * ignored instruction yields a normal answer. A load-time switch, not a live one: off
+     * registers no `agent/pre-step` listener, so it cannot be a `volatile()` field.
      */
     forceTeamRouting?: boolean;
 }
@@ -290,8 +291,9 @@ export interface ResolvedConfig {
      */
     blockIntake: boolean;
     /**
-     * Forced team routing switch, on by default. Off means the listener does not exist
-     * in this load — hence a plain field, not a live holder.
+     * Forced team routing switch, on by default. It buys the instruction on a message
+     * that asks for a team, and nothing else. Off means the listener does not exist in
+     * this load — hence a plain field, not a live holder.
      */
     forceTeamRouting: boolean;
     configVersion: number;

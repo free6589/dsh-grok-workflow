@@ -1,72 +1,62 @@
 /**
- * Forced team routing: a keyword in the user's turn buys a hard instruction, and a
- * turn that then answers alone gets one refusal.
+ * Forced team routing: a keyword in the user's turn buys a hard instruction, and
+ * nothing else.
  *
- * Two halves, one listener on `agent/pre-step` — the only admission point the Host
- * gives this plugin, and the only `agent/*` waterfall a plugin can still register.
- * There is no turn-end hook and no post-step hook in DSH 0.2.1-rc.2: `turn/end` is a
- * session *event* the loop writes, not a dispatch a listener can answer (the only
+ * One listener on `agent/pre-step` — the only admission point the Host gives this
+ * plugin, and the only `agent/*` waterfall a plugin can still register. There is no
+ * turn-end hook and no post-step hook in DSH 0.2.1-rc.2: `turn/end` is a session
+ * *event* the loop writes, not a dispatch a listener can answer (the only
  * pre-step-shaped dispatch in the installed tree is the one declared at
- * `@deepseek-ai/dsh-agent/lib/types/runtime-types.d.ts:333`). So both halves hang on
- * the same waterfall, and the difference between them is what they do to the
- * decision:
+ * `@deepseek-ai/dsh-agent/lib/types/runtime-types.d.ts:333`).
  *
- * 1. **Injection (rewrites `enter`).** When a user-authored message of the claimed
- *    batch asks for a team, the message handed to the model carries the same text
- *    plus one fixed instruction block. `next()` already produced the batch — its
- *    order, its ids, its runtime-context tail — so this listener maps over that
- *    list and changes exactly one thing per matched message: one more text block at
- *    the end. Nothing is rewritten, nothing is added to the session, no second
- *    message appears, and the user's own words stay a byte-identical prefix. That
- *    matters because `enter.messages` is the only writer for a claimed batch: a
- *    separate `session.append()` on top of it would be a second copy of the same
- *    words in the transcript (the P0-1 defect the old gate was fixed for).
- * 2. **The turn gate (replaces `enter` with `reject`).** A turn that matched and then
- *    asked for a second step without either writing a `tool-workflow/*` event or
- *    calling one of `TEAM_STARTING_TOOLS` was about to be worked alone. That step is
- *    refused once — `reject` is the only decision that reliably produces zero model
- *    calls — and the session gets one user-role row carrying the intake's bilingual
- *    refusal text, because a bare `reject` is invisible: the reader would see an
- *    empty turn and no reason (`src/intake.ts` is the one place that owns that
- *    wording).
+ * **Injection is the whole feature.** When a user-authored message of the claimed
+ * batch asks for a team, the message handed to the model carries the same text plus one
+ * fixed instruction block. `next()` already produced the batch — its order, its ids, its
+ * runtime-context tail — so this listener maps over that list and changes exactly one
+ * thing per matched message: one more text block at the end. Nothing is rewritten,
+ * nothing is added to the session, no second message appears, and the user's own words
+ * stay a byte-identical prefix. That matters because `enter.messages` is the only writer
+ * for a claimed batch: a separate `session.append()` on top of it would be a second copy
+ * of the same words in the transcript (the P0-1 defect the old gate was fixed for).
+ *
+ * **The refusal half is gone, and the deletion is the point (D-169).** Up to 0.13.48 a
+ * second half hung on this same waterfall: a turn that matched a keyword and then asked
+ * for a later step without having started a team was answered with `reject` — the only
+ * decision that reliably produces zero model calls — plus one user-role row carrying the
+ * intake's bilingual refusal text. Real-machine rounds showed what that half actually
+ * did: `turn/end` with reason `blocked`, a turn that ended with **no answer at all**, and
+ * a refusal row the page never renders. A feature whose failure mode is "the user gets
+ * nothing" is worse than the single-model answer it was trying to stop, so the brake was
+ * deleted rather than retuned. What is left cannot refuse anything: **a model that
+ * ignores the instruction still answers the turn normally.**
  *
  * Why the instruction is a command and not a suggestion. A suggestion is a piece of
- * advice competing with everything else in context, and the case this feature exists
- * for is precisely the one where the model has already decided to answer on its own:
- * advice loses that competition by construction, and the user who said "开团" gets a
+ * advice competing with everything else in context, and the case this feature exists for
+ * is precisely the one where the model has already decided to answer on its own: advice
+ * loses that competition by construction, and the user who said "开团" gets a
  * single-model answer anyway. The instruction therefore states a constraint on the
- * *shape* of the turn ("a single answer is not acceptable"), not a preference — and
- * the turn gate is what enforces it when the model ignores the constraint.
+ * *shape* of the turn ("a single answer is not acceptable"), not a preference. What it
+ * cannot do is enforce that shape: nothing in this plugin observes the turn after the step
+ * it rewrites, so the instruction is a lever, never a gate.
  *
  * Three rules keep this listener from becoming a second authority:
  *
  * - **Off is inert.** No `agent/pre-step` listener is registered when the load-time
  *   switch is off, so the chain a profile with `forceTeamRouting: false` carries is
- *   exactly the pre-feature chain. A switch turned off later (`/grok off`, or a live
- *   read of the same key) leaves the decision untouched — the identical object the
- *   loop proposed, not a copy that happens to match.
- * - **A brake never fires on evidence it cannot read.** An unreadable log is a
- *   warning and a pass, never a refusal: a gate that refuses a turn for a reason it
- *   cannot state is worse than the answer it was trying to stop.
- * - **One refusal per turn, and the turn is the whole scope.** The flag is in memory,
- *   keyed by session, and it is dropped the moment a turn shows a team or a turn
- *   boundary shows the flag has gone stale. Nothing here is durable state: a plugin
- *   reload loses a pending flag, which costs at most the one refusal it would have
- *   spent.
+ *   exactly the pre-feature chain. A switch turned off later (`/grok off`, or a live read
+ *   of the same key) leaves the decision untouched — the identical object the loop
+ *   proposed, not a copy that happens to match.
+ * - **A child's turn is not a user's turn.** A delegated session's "user" message is the
+ *   prompt its parent wrote, so a keyword there is the parent's task text and not a person
+ *   asking for a team; nothing is injected into it (`isDelegatedSession`).
+ * - **Only the loop's own batch, and at most one instruction per message.** Every rewrite
+ *   is a shallow copy of a message `next()` already produced: the batch keeps its length
+ *   and its order, an unmatched message is handed over as the very same object, and a
+ *   matched message gains one text block whatever the step it arrived on.
  */
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ResolvedConfig } from './types.js';
-declare module '@deepseek-ai/dsh-llm' {
-    interface MessageSourceMap {
-        /** The row this plugin writes when it refuses a turn for answering alone. */
-        'grok-workflow-force-team': {
-            kind: 'grok-workflow-force-team';
-        };
-    }
-}
-/** Source kind of the refusal row, so a transcript shows who wrote it. */
-export declare const FORCE_TEAM_SOURCE_KIND = "grok-workflow-force-team";
 /** Chinese keywords. Matched as substrings: Chinese does not separate words. */
 export declare const FORCE_TEAM_KEYWORDS_ZH: readonly ["开团", "组队", "分工"];
 /**
@@ -146,90 +136,19 @@ export declare function grokModeOn(session: Session | undefined, deploymentDefau
  * Whether this session is a delegated child rather than a conversation with a user.
  *
  * A child's "user" message is the prompt its parent wrote, so a keyword there is the
- * parent's task text, not a person asking for a team. Forcing a team inside a child
- * would nest teams and could refuse a child's own continuation step — the same reason
- * the narrow heartbeat listener never charges a beat to a child (`src/heartbeat-listen.ts`).
+ * parent's task text, not a person asking for a team, and an instruction in it would nest
+ * a team under the team that produced the child — the same reason the narrow heartbeat
+ * listener never charges a beat to a child (`src/heartbeat-listen.ts`).
  * @param session - the dispatch's session.
  * @returns true for a subagent-origin session or any session at delegation depth > 0.
  */
 export declare function isDelegatedSession(session: Session | undefined): boolean;
-/**
- * The tools a turn can start a team with, as the turn gate counts them.
- *
- * `grok_workflow` runs a workflow script through the engine, whose progress family
- * (`tool-workflow/*`) is written to the session while the run is alive.
- * `grok_open_block` is the block intake, and it writes its block to an on-disk JSONL
- * ledger (`src/block/store.ts`) and nothing to the session — so a block a turn opened
- * leaves no `tool-workflow/*` event, which is the defect this set exists to close: on
- * a real machine a model that formed its team through the intake was refused as if it
- * had started nothing.
- *
- * The rule is a named, exported set rather than an inline list so the next reader sees
- * which calls count, and the spec pins the membership.
- */
-export declare const TEAM_STARTING_TOOLS: readonly ["grok_workflow", "grok_open_block"];
-/**
- * Whether the given turn started a team since it opened.
- *
- * Two kinds of evidence, both read from the turn's own log and neither from a flag:
- *
- * - a `tool-workflow/*` event, the family a live workflow run writes;
- * - a `tool/call` to one of {@link TEAM_STARTING_TOOLS}.
- *
- * The second kind is not belt-and-braces: the block intake leaves no session event at
- * all (`grok_open_block` records its block in its own ledger and writes nothing here),
- * so the event family alone answered "no team" for a turn that had already opened a
- * block and started real work. The session log does record the call — `name` and
- * `turn` are in its `data` — and that is the evidence read below.
- * `undefined` means the log could not be read, which a caller must never turn into a
- * refusal.
- * @param session - the session whose log is read.
- * @param turn - the turn the question is about.
- * @returns true when a team event or a team-starting call followed this turn's
- * `turn/start`, false when neither did (or when this log never opened the turn),
- * `undefined` when unreadable.
- */
-export declare function teamStartedInTurn(session: Session | undefined, turn: number): boolean | undefined;
-/** A turn that matched a keyword and has not shown a team yet. */
-export interface TeamFlag {
-    /** Turn that matched. */
-    turn: number;
-    /** Step of that turn in which the match was seen. */
-    step: number;
-    /** Characters measured in the matched message, for the refusal's own count. */
-    chars: number;
-}
-/** What the turn gate decided about one dispatch. */
-export type TeamGateVerdict = 'none' | 'refuse' | 'stale';
-/**
- * The turn gate, as a pure function of the flag and the evidence.
- *
- * - `refuse` — the flagged turn asked for another step and its log shows no team:
- *   the one case this gate exists for.
- * - `stale` — the flag belongs to an earlier turn. The runtime offered no pre-step
- *   inside that turn (the model answered in one step and the turn closed), so the
- *   only remaining opportunity would be to refuse a *different, newer* message for
- *   what an older turn did. That refuses the wrong turn and eats a message, so the
- *   flag is dropped instead; the injection was that turn's only lever.
- * - `none` — no flag, a team was found, the flag was set by this very step, or the
- *   evidence could not be read.
- * @param input - the pending flag, the dispatch's position, and the evidence.
- * @returns the verdict, without side effects.
- */
-export declare function teamGateVerdict(input: {
-    flag: TeamFlag | undefined;
-    turn: number;
-    step: number;
-    teamStarted: boolean | undefined;
-}): TeamGateVerdict;
 /** Payload shape of one `agent/pre-step` dispatch (only the fields read here). */
 export interface ForceTeamPayload {
     agent?: {
         session?: Session;
     } | undefined;
     messages?: UserMessage[] | undefined;
-    turn?: number | undefined;
-    step?: number | undefined;
 }
 /** Dependencies of the listener. */
 export interface ForceTeamInput {

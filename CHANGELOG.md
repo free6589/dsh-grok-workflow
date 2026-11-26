@@ -9,24 +9,29 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Added / 新增
 
-- **Saying "form a team" now actually splits the work: a hard instruction is appended to that turn, and a turn that still answers alone gets refused once / 你说「开团」它就真的拆活并发执行，不再单条作答** —
+- **Saying "form a team" now comes with a hard instruction on that turn — and that is all it does / 你说「开团」时，那一轮会多一句硬指令——仅此而已** —
   When a message asks for a team — Chinese `开团` / `组队` / `分工`, or English `form a team` / `split the work` / `delegate`
-  (whole words; `delegated` does not match) — and grok mode is on, the plugin appends one fixed instruction to that turn's
-  user text. It does not rewrite what you wrote, writes no session event and shows nothing extra in the UI. If the same
-  turn then reaches a second step without having started a team at all — neither `grok_workflow` nor `grok_open_block`
-  was called — it is refused once, in the same bilingual four-line shape the intake already uses, so the model gets a
-  second chance to split the work instead of answering alone.
-  At most one refusal per turn, no loops; `/grok off` turns both halves off, and `forceTeamRouting` (default on) is the switch.
-  **Known limit, stated plainly**: there is no end-of-turn hook to hang a last-chance gate on, so a turn the model finishes
-  in a single step only gets the appended instruction — no second gate.
-  **Upgrade note: nothing to prepare — the feature is on by default and adds no key or schema.**
+  (whole words; `delegated` does not match) — and grok mode is on, one fixed instruction is appended to the user message
+  handed to the model. Your own words are untouched: it is the same message, with one extra block at its end.
+  **It does show in the UI.** The instruction is part of the message the model is handed, so it appears in the transcript
+  and inside the message bubble (the sidebar title is truncated). An earlier draft of this note promised "nothing extra in
+  the UI"; that was measured false on a real machine and is not repeated here.
+  **If the model ignores it, the turn answers normally — no refusal, no dead turn.** This version carries no gate: real-machine
+  rounds showed the old refusal ended turns with no answer at all, so that half was deleted rather than retuned.
+  **And nothing enforces the split**, because the plugin never gets told that a turn ended: the instruction is a lever,
+  not a rule.
+  At most one instruction per matched message, `/grok off` disables it, and `forceTeamRouting` (default on) is the switch.
+  **Upgrade note: nothing to prepare — it is on by default, and no existing key, default or stored record changes.**
   / 当一句话是在要团队——中文 `开团` / `组队` / `分工`，或英文 `form a team` / `split the work` / `delegate`（整词命中，
-  `delegated` 不算）——并且 grok 模式开着时，插件会往这一回合的用户文本尾部追加一句固定硬指令。它不改写你写的字、
-  不写会话事件、界面上也不多出任何东西。如果同一回合走到第二步还没起来任何团队——`grok_workflow` 与 `grok_open_block` 都没调过——就按接单台既有的四行双语形状
-  **拒一次**，让模型有机会真的拆活，而不是单条答完。每回合最多拒一次、不循环；`/grok off` 时两半都关，
-  开关是 `forceTeamRouting`（默认开）。**如实写一条已知边界**：仓库里没有「回合结束」hook 可以挂最后一班岗，
-  所以模型一步答完的回合只吃到那句追加指令——没有第二次门。
-  **升级须知：不用准备任何东西——功能默认开，不加键也不改 schema。**
+  `delegated` 不算）——并且 grok 模式开着时，插件会往交给模型的那条用户消息尾部追加一句固定硬指令。
+  你写的字原样保留：还是同一条消息，只是末尾多一个文本块。
+  **界面上是看得见的。** 这句指令属于交给模型的那条消息，所以它会出现在记录里，也会出现在消息气泡里（侧栏标题会被截断）。
+  这份说明早先写过「界面上不会多出任何东西」，真机实测是错的，不再这么写。
+  **模型如果无视它，这一轮就照常作答——不拒绝，也不会出现没有答案的一轮。** 这个版本里没有闸：真机几轮测下来，
+  原来那半会把回合终止成「没有答案」，所以那半是删掉的，不是调软的。
+  **而且没有任何东西强制执行拆活**，因为插件根本收不到「这一轮结束」的消息：这句指令是一根杠杆，不是一条规则。
+  每条命中的消息最多一句指令，`/grok off` 会关掉它，开关是 `forceTeamRouting`（默认开）。
+  **升级须知：不用准备任何东西——它默认开启，而且现有的键、默认值与已存记录都不变。**
 
 ### Upgrade note / 升级须知
 
@@ -34,12 +39,13 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   This version adds one routing switch, `forceTeamRouting`, and it ships **on**. No key, no setting, no default and no
   stored record changes: there is nothing to add, delete or reconfigure before upgrading, and no migration step. A profile
   that already runs 0.13.48 gets the feature the moment it loads this version, with no config edit — a message that asks
-  for a team is routed to a real team from the first turn after the upgrade. If you want the old behaviour back, turn the
-  switch off or use `/grok off`, which disables both halves; either way nothing you had stored is rewritten.
+  for a team carries the instruction from the first turn after the upgrade — which helps only if the model obeys it, and
+  nothing forces that. If you want the old behaviour back, turn the switch off or use `/grok off`; either way nothing you
+  had stored is rewritten.
   / 这个版本只多了一个路由开关 `forceTeamRouting`，而且是**默认开**。没有任何键、设置、默认值或已经存下来的记录发生变化：
   升级前没有东西要加、要删、要重配，也没有迁移步骤。已经在跑 0.13.48 的档案，装载这个版本的那一刻就有了新功能，不用改任何配置——
-  升级之后第一句要团队的话就会被真的拆成团队。如果你想回到旧行为，把这个开关关掉，或者用 `/grok off` 把两半一起关掉；
-  两种做法都不会改写你已经存下的任何东西。
+  升级之后第一句要团队的话就会带上那句指令——但它只在模型听话时有用，没有任何东西强制模型照做。如果你想回到旧行为，
+  把这个开关关掉，或者用 `/grok off` 关掉它；两种做法都不会改写你已经存下的任何东西。
 
 ## [0.13.48] - 2026-11-26
 

@@ -380,8 +380,10 @@ What a user message meets on that chain:
   batch, and only when the message asks for a team (开团 / 组队 / 分工, or the English
   `form a team` / `split the work` / `delegate` as whole words) in a session whose grok mode
   is on: it appends one fixed instruction block to the model-facing text — the user's own
-  words stay a byte-identical prefix and the message keeps its identity — and it refuses, once
-  per turn, a continuation step of that turn whose log shows no `tool-workflow/*` event. Off
+  words stay a byte-identical prefix and the message keeps its identity — and that append is
+  the only change it can make. It refuses nothing: the refusal half was deleted in **0.13.49**
+  (D-169) after real-machine rounds showed it ended turns with no answer at all, so a model
+  that ignores the instruction answers the turn normally, and nothing enforces the split. Off
   (`forceTeamRouting: false`) registers no listener at all;
 - **the intake's own observer** (`installHeartbeatBrakes`), which records a beat *after* the
   decision and never changes it.

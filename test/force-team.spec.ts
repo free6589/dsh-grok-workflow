@@ -3,23 +3,18 @@ import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import {
-  FORCE_TEAM_SOURCE_KIND,
   TEAM_INSTRUCTION_EN,
   TEAM_INSTRUCTION_ZH,
-  TEAM_STARTING_TOOLS,
   asksForTeam,
   installForceTeam,
   languageOf,
-  teamGateVerdict,
   teamInstruction,
-  teamStartedInTurn,
 } from '../src/force-team.js'
-import { refuseNonTeamTurn } from '../src/intake.js'
 import { setMode } from '../src/mode.js'
 import { DEFAULT_FORCE_TEAM_ROUTING, resolveConfig } from '../src/config.js'
 
 /**
- * The forced team route: keyword → hard instruction, and the one-shot turn gate.
+ * The forced team route: keyword → hard instruction, and nothing else.
  *
  * What is pinned here, and why each pin exists:
  *
@@ -35,10 +30,11 @@ import { DEFAULT_FORCE_TEAM_ROUTING, resolveConfig } from '../src/config.js'
  * - **The switch and the mode toggle both hold.** `forceTeamRouting: false` and a
  *   session that is not in grok mode are inert, and inert means the decision the loop
  *   proposed comes back unchanged (the same array), not a copy that happens to match.
- * - **The turn gate fires once, and only on evidence.** One reject per turn, only for
- *   the turn that carried the keyword, only when that turn's own log shows neither a
- *   `tool-workflow/*` event nor a `tool/call` to a team-starting tool — and never when
- *   the log cannot be read.
+ * - **No turn is ever refused.** The refusal half this route used to carry was deleted
+ *   (D-169) after real-machine rounds showed it ended turns with no answer at all. The
+ *   last describe pins the absence: a keyword turn that keeps stepping with no team
+ *   tool at all passes every step, no refusal row is ever appended, and the listener
+ *   never returns anything but the decision it was given.
  */
 
 /* ---------------------------------------------------------------- fixtures -- */
@@ -54,28 +50,6 @@ function headed(id: string): Session {
 
 function userMessage(text: string, kind = 'user'): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind } as never }) as UserMessage
-}
-
-/** Write a `tool-workflow/*` event the way the run's progress recorder does. */
-function runStartEvent(session: Session, runId = 'run-1'): void {
-  const raw = session as unknown as { append(type: string, data: Record<string, unknown>): unknown }
-  raw.append('tool-workflow/run-start', { runId, name: '任务团队 · 2 个任务' })
-}
-
-/** Log a `tool/call` the way the tool layer does: name and turn inside `data`. */
-function callEvent(session: Session, name: string, turn: number, step = 1): void {
-  session.append('tool/call', { turn, step, callId: `call_${name}` as never, name, arguments: '{}' })
-}
-
-/**
- * A log of exactly these events.
- *
- * Used for the shapes a real `Session.append` would refuse to write (a `tool/call`
- * with no `data`, a `name` that is not a string): the reader has to survive a log
- * written by something other than this build, not only a log this build wrote.
- */
-function logOf(events: Array<{ type: string, seq: number, data?: unknown }>): Session {
-  return { id: 'sess-log', ownEvents: () => events } as unknown as Session
 }
 
 /** Turn the session's grok mode on, the way `/grok on` does. */
@@ -317,15 +291,16 @@ describe('a keyword turn hands the model the same text plus the instruction', ()
   })
 
   it('stays out of a delegated child session', async () => {
-    // A child's user message is the prompt its parent wrote: forcing a team there
-    // would nest teams and could refuse the child's own continuation step.
+    // A child's user message is the prompt its parent wrote: the parent's task text is
+    // not a person asking for a team, and a child that got the instruction would nest
+    // teams under a team.
     const session = headed('sess-inject-child')
     Object.assign(session, { header: { origin: 'subagent', delegationDepth: 1 } })
     grokOn(session)
     const messages = [userMessage('开团把这三件事做完')]
     const { dispatch } = harness({ grokDefault: 'on' })
     expect(((await dispatch({ agent: { session }, messages, turn: 5, step: 1 })) as { messages: UserMessage[] }).messages).toBe(messages)
-    // And no flag was set, so the continuation step is not refused either.
+    // And a deeper child gets its continuation steps through as well.
     const deep = headed('sess-inject-depth')
     Object.assign(deep, { header: { origin: 'cli', delegationDepth: 2 } })
     grokOn(deep)
@@ -354,247 +329,75 @@ describe('a keyword turn hands the model the same text plus the instruction', ()
   })
 })
 
-/* ------------------------------------------------------------ turn gate -- */
+/* ------------------------------------------------------------- no refusal -- */
 
-describe('the turn gate refuses once, on evidence, and keeps the user text', () => {
-  /** A turn that opened with a keyword message and then asked for a second step. */
-  function flaggedTurn(session: Session, turn = 5): void {
-    session.append('turn/start', { turn })
-    session.append('user/message', userMessage('开团把这件事做完'), { surfaceOp: 'append' })
-    session.append('step/start', { turn, step: 1 })
-    session.append('step/end', { turn, step: 1 })
-  }
-
-  it('refuses the continuation step when the turn started no team', async () => {
-    const session = headed('sess-gate-refuse')
+/**
+ * The refusal half is gone, and its absence is the contract now.
+ *
+ * Real-machine rounds measured what the old gate did: a keyword turn that reached a
+ * later step without having started a team was answered with a refusal, and the turn
+ * ended with no answer at all (`turn/end` reason `blocked`) while the row the gate wrote
+ * never reached the page. So the brake was deleted rather than retuned (D-169). What is
+ * pinned below is that nothing replaced it: every step of a keyword turn enters, no
+ * refusal row is ever appended, and a step with nothing to instruct gets back the very
+ * decision the loop proposed.
+ */
+describe('no turn is ever refused, whatever the model does with the instruction', () => {
+  it('runs a keyword turn to its third step with no team tool at all', async () => {
+    const session = headed('sess-no-refusal-steps')
     grokOn(session)
     const { dispatch } = harness()
     const keywordMessage = userMessage('开团把这件事做完')
-    // Step 1: the injection happens and the turn is remembered.
-    const first = await dispatch({ agent: { session }, messages: [keywordMessage], turn: 5, step: 1 })
-    expect(first.kind).toBe('enter')
-    flaggedTurn(session)
+    const before = session.ownEvents().length
+    session.append('turn/start', { turn: 5 })
 
-    // Step 2: still no `tool-workflow/*` event — the model was about to work alone.
-    const second = await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })
-    expect(second.kind).toBe('reject')
+    expect((await dispatch({ agent: { session }, messages: [keywordMessage], turn: 5, step: 1 })).kind).toBe('enter')
+    // Steps 2 and 3 carry no keyword of their own and start no team: this is exactly
+    // the shape the old gate refused, and it has to simply run.
+    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })).kind).toBe('enter')
+    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 3 })).kind).toBe('enter')
+
+    const written = session.ownEvents().slice(before) as unknown as
+      Array<{ type: string, data?: { source?: { kind?: string } } }>
+    const refusalRows = written.filter(row => row.data?.source?.kind === 'grok-workflow-force-team')
+    expect(refusalRows, 'no refusal row is ever appended').toEqual([])
+    // The user's own row keeps its words: nothing here rewrites the transcript.
+    const userRows = written.filter(row => row.type === 'user/message') as unknown as
+      Array<{ type: string, data: UserMessage }>
+    for (const row of userRows) {
+      expect(texts(row.data).join('\n')).not.toContain('这一轮要的是团队')
+    }
   })
 
-  it('states the refusal in the intake shape, as a message the reader can see', async () => {
-    const session = headed('sess-gate-text')
+  it('never answers with anything but an `enter`', async () => {
+    const session = headed('sess-no-refusal-kinds')
+    grokOn(session)
+    const { dispatch } = harness()
+    session.append('turn/start', { turn: 5 })
+    const keyword = userMessage('开团把这件事做完')
+    // A keyword on the first step, a keyword on a later step, and a step with neither:
+    // the refusal decision is gone from this listener, so nothing may come back as one.
+    for (const payload of [
+      { messages: [keyword], turn: 5, step: 1 },
+      { messages: [keyword], turn: 5, step: 2 },
+      { messages: [], turn: 5, step: 3 },
+    ]) {
+      const decision = await dispatch({ agent: { session }, ...payload })
+      expect(decision.kind, `step ${payload.step}`).toBe('enter')
+    }
+  })
+
+  it('hands back the same decision object when a continuation step has nothing to instruct', async () => {
+    const session = headed('sess-no-refusal-identity')
     grokOn(session)
     const { dispatch } = harness()
     await dispatch({ agent: { session }, messages: [userMessage('组队做这件事')], turn: 5, step: 1 })
-    flaggedTurn(session)
-    const before = session.ownEvents().length
-    await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })
-
-    const written = session.ownEvents().slice(before)
-    expect(written, 'exactly one row is written').toHaveLength(1)
-    const row = written[0] as unknown as { type: string, data: UserMessage }
-    expect(row.type).toBe('user/message')
-    expect(row.data.source.kind).toBe(FORCE_TEAM_SOURCE_KIND)
-
-    const text = texts(row.data).join('\n')
-    const expected = refuseNonTeamTurn('组队做这件事'.length).text
-    expect(text).toBe(expected)
-    // The existing bilingual shape: English line, Chinese line, next action, both
-    // languages — four lines, no new apology sentence.
-    expect(text.split('\n')).toHaveLength(4)
-    expect(text).toContain('团队')
-    expect(text.toLowerCase()).toContain('team')
-  })
-
-  it('does not refuse when the turn started a team', async () => {
-    const session = headed('sess-gate-team')
-    grokOn(session)
-    const { dispatch } = harness()
-    await dispatch({ agent: { session }, messages: [userMessage('开团做这件事')], turn: 5, step: 1 })
-    flaggedTurn(session)
-    runStartEvent(session)
-    const before = session.ownEvents().length
-
-    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })).kind).toBe('enter')
-    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 3 })).kind).toBe('enter')
-    expect(session.ownEvents().length, 'no refusal row is written').toBe(before)
-  })
-
-  it('refuses at most once per turn', async () => {
-    const session = headed('sess-gate-once')
-    grokOn(session)
-    const { dispatch } = harness()
-    await dispatch({ agent: { session }, messages: [userMessage('分工做这件事')], turn: 5, step: 1 })
-    flaggedTurn(session)
-    const before = session.ownEvents().length
-    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })).kind).toBe('reject')
-    const afterFirst = session.ownEvents().length
-    expect(afterFirst - before, 'one refusal row').toBe(1)
-    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 3 })).kind).toBe('enter')
-    expect(session.ownEvents().length, 'the second continuation writes nothing').toBe(afterFirst)
-  })
-
-  it('drops a stale flag instead of refusing an unrelated later turn', async () => {
-    const session = headed('sess-gate-stale')
-    grokOn(session)
-    const { dispatch } = harness()
-    await dispatch({ agent: { session }, messages: [userMessage('开团做这件事')], turn: 5, step: 1 })
-    // The turn answered alone and ended; the runtime offered no second pre-step, so
-    // the next opportunity belongs to a different, unrelated message.
-    session.append('turn/end', { turn: 5, reason: { kind: 'completed' } })
-    const before = session.ownEvents().length
-    expect((await dispatch({ agent: { session }, messages: [], turn: 6, step: 1 })).kind).toBe('enter')
-    expect(session.ownEvents().length).toBe(before)
-  })
-
-  it('keeps a steering message that arrived on the refused step', async () => {
-    const session = headed('sess-gate-keep')
-    grokOn(session)
-    const { dispatch } = harness()
-    await dispatch({ agent: { session }, messages: [userMessage('开团做这件事')], turn: 5, step: 1 })
-    flaggedTurn(session)
-    const steering = userMessage('顺便把第二个项目也算上')
-    const before = session.ownEvents().length
-    expect((await dispatch({ agent: { session }, messages: [steering], turn: 5, step: 2 })).kind).toBe('reject')
-    const rows = session.ownEvents().slice(before) as unknown as { type: string, data: UserMessage }[]
-    const kept = rows.filter(row => row.type === 'user/message').map(row => row.data)
-    expect(kept.map(message => texts(message).join('\n'))).toEqual(['顺便把第二个项目也算上', refuseNonTeamTurn('开团做这件事'.length).text])
-  })
-
-  it('never refuses when the session log cannot be read', async () => {
-    const unreadable = {
-      id: 'sess-gate-unreadable',
-      header: { origin: 'cli' },
-      ownEvents: () => { throw new Error('log unavailable') },
-      append: () => { throw new Error('log unavailable') },
-    }
-    const { dispatch, warnings } = harness()
-    await dispatch({ agent: { session: unreadable as unknown as Session }, messages: [userMessage('开团')], turn: 5, step: 1 })
-    expect((await dispatch({ agent: { session: unreadable as unknown as Session }, messages: [], turn: 5, step: 2 })).kind).toBe('enter')
-    expect(warnings().length).toBeGreaterThan(0)
-  })
-})
-
-/* -------------------------------------------------------------- evidence -- */
-
-describe('the turn evidence is read from the session log, not assumed', () => {
-  it('finds a team only after the turn opened', () => {
-    const session = headed('sess-evidence')
-    // A run that finished before this turn began is not this turn's team.
-    runStartEvent(session, 'run-before')
-    session.append('turn/start', { turn: 7 })
-    expect(teamStartedInTurn(session, 7)).toBe(false)
-    runStartEvent(session, 'run-this-turn')
-    expect(teamStartedInTurn(session, 7)).toBe(true)
-    expect(teamStartedInTurn(session, 8), 'a later turn has no team yet').toBe(false)
-  })
-
-  it('reports "unknown" rather than "no team" when the log cannot be read', () => {
-    const unreadable = { ownEvents: () => { throw new Error('nope') } }
-    expect(teamStartedInTurn(unreadable as unknown as Session, 1)).toBeUndefined()
-    // Unknown must never become a refusal: a brake that fires on unreadable evidence
-    // refuses turns for a reason it cannot state.
-    expect(teamGateVerdict({ flag: { turn: 5, step: 1, chars: 2 }, turn: 5, step: 2, teamStarted: undefined })).toBe('none')
-  })
-})
-
-/* ------------------------------------------------------ widened evidence -- */
-
-/**
- * The measured defect: the block intake is a team start with no session event.
- *
- * `grok_open_block` writes its block to an on-disk ledger (`src/block/store.ts`) and
- * records nothing in the session, so a turn that opened a block carried no
- * `tool-workflow/*` event at all — and the gate refused a turn that had already
- * started real work. The session log does record the call itself, with `name` and
- * `turn` in its `data`, and that is the evidence these cases pin.
- */
-describe('a team-starting tool call counts as the team this turn started', () => {
-  it('pins the two tools a turn can start a team with', () => {
-    expect([...TEAM_STARTING_TOOLS]).toEqual(['grok_workflow', 'grok_open_block'])
-  })
-
-  it('accepts a `grok_open_block` call as this turn\'s team', () => {
-    const session = headed('sess-evidence-block')
-    session.append('turn/start', { turn: 9 })
-    expect(teamStartedInTurn(session, 9)).toBe(false)
-    callEvent(session, 'grok_open_block', 9)
-    expect(teamStartedInTurn(session, 9)).toBe(true)
-  })
-
-  it('accepts a `grok_workflow` call as this turn\'s team', () => {
-    const session = headed('sess-evidence-workflow')
-    session.append('turn/start', { turn: 9 })
-    callEvent(session, 'grok_workflow', 9)
-    expect(teamStartedInTurn(session, 9)).toBe(true)
-  })
-
-  it('does not accept a call to any other tool', () => {
-    const session = headed('sess-evidence-bash')
-    session.append('turn/start', { turn: 9 })
-    callEvent(session, 'bash', 9)
-    // A near miss is not a member of the set: the match is the whole tool name.
-    callEvent(session, 'grok_open_block_preview', 9)
-    expect(teamStartedInTurn(session, 9)).toBe(false)
-  })
-
-  it('still accepts a `tool-workflow/*` event', () => {
-    const session = headed('sess-evidence-run')
-    session.append('turn/start', { turn: 9 })
-    runStartEvent(session)
-    expect(teamStartedInTurn(session, 9)).toBe(true)
-  })
-
-  it('does not accept a team call recorded in another turn', () => {
-    const session = headed('sess-evidence-other-turn')
-    // Before this turn opened: a call the previous turn made.
-    callEvent(session, 'grok_workflow', 8)
-    session.append('turn/start', { turn: 9 })
-    // After it opened, but carrying the earlier turn: the `turn` field decides, so
-    // ordering alone cannot be what accepts it.
-    callEvent(session, 'grok_open_block', 8)
-    expect(teamStartedInTurn(session, 9)).toBe(false)
-  })
-
-  it('reads a malformed call as no evidence, without throwing', () => {
-    const session = logOf([
-      { type: 'turn/start', seq: 1, data: { turn: 4 } },
-      { type: 'tool/call', seq: 2, data: null },
-      { type: 'tool/call', seq: 3 },
-      { type: 'tool/call', seq: 4, data: { turn: 4, name: null } },
-      { type: 'tool/call', seq: 5, data: { turn: '4', name: 'grok_workflow' } },
-      { type: 'tool/call', seq: 6, data: { turn: 4, name: 42 } },
-      { type: 'tool/call', seq: 7, data: 'not an object' },
-    ])
-    expect(teamStartedInTurn(session, 4)).toBe(false)
-  })
-
-  it('does not refuse a turn that opened a block', async () => {
-    // The defect end to end: the model did what the instruction asked — it formed a
-    // team through the intake — and the gate refused the next step anyway.
-    const session = headed('sess-gate-block')
-    grokOn(session)
-    const { dispatch } = harness()
-    await dispatch({ agent: { session }, messages: [userMessage('开团把这件事做完')], turn: 5, step: 1 })
     session.append('turn/start', { turn: 5 })
-    callEvent(session, 'grok_open_block', 5)
-    const before = session.ownEvents().length
-    expect((await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 })).kind).toBe('enter')
-    expect(session.ownEvents().length, 'no refusal row is written').toBe(before)
-  })
-})
-
-/* ------------------------------------------------------------------ gate -- */
-
-describe('the gate decision is a pure function of the flag and the evidence', () => {
-  const flag = { turn: 5, step: 1, chars: 6 }
-
-  it('holds its four answers', () => {
-    expect(teamGateVerdict({ flag: undefined, turn: 5, step: 2, teamStarted: false })).toBe('none')
-    expect(teamGateVerdict({ flag, turn: 5, step: 2, teamStarted: false })).toBe('refuse')
-    expect(teamGateVerdict({ flag, turn: 5, step: 2, teamStarted: true })).toBe('none')
-    expect(teamGateVerdict({ flag, turn: 6, step: 1, teamStarted: false })).toBe('stale')
-    // The same step that set the flag never refuses itself.
-    expect(teamGateVerdict({ flag, turn: 5, step: 1, teamStarted: false })).toBe('none')
+    const given = { kind: 'enter', messages: [] } as Decision
+    const decision = await dispatch({ agent: { session }, messages: [], turn: 5, step: 2 }, async () => given)
+    // Identity, not equality: an inert step must not stand between the user and the
+    // model at all, and a copy that happens to match would be a second authority.
+    expect(decision).toBe(given)
   })
 })
 
