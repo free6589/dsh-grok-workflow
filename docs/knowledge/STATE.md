@@ -3910,3 +3910,21 @@ Last updated: 2026-11-26 10:20 +08:00（**强制团队路由：命中就注入�
 
 （合并补记 2026-11-26：这一半已在 `release/0.13.49` 上与 `main` 的 `a5dfc75` 合并（`--no-ff`），所以本条里
 「未合 `main` / 未 push / 未打 tag / 未 bump」只描述合并之前；合流后的门禁读数见本轮记忆，版本抬升与发版由后续块负责。）
+
+Last updated: 2026-11-26 17:00 +08:00（**卡片批准在账本里有了自己的来源：`question-reply`（`CONFIRMED`，真机两轮对照）** —
+分支 **`fix/card-approval`**，worktree `.agents/worktrees/fix-card-approval`，从 `main` 的 **`226d673`** 干净长出；
+功能提交 **`b0c3f5d`**（16 文件 / +165 −24：`src/block/types.ts`、`store.ts`、`preview.ts`、`tools.ts` 四处源码 + 两份 spec + `lib/` 十个构建产物，
+源码与 `lib/` 在同一个提交里）。
+行为：`userMessagesSince()` 从 `string[]` 改成 `{ text, kind }[]`——`text` 照旧喂 `startBlock` 的逐字校验，`kind` 说明这条消息是打字回合还是卡片答案；
+`start` 在「调用方声明（或默认）`user` 且逐字命中的第一条消息是卡片答案」时把来源改记 **`question-reply`**，其余声明原样保留。
+`ApprovalKind` 与两处校验集合各加一个成员。**D-137 的两道闸没动**：卡片只认「问在预览之后」的那一次，`quote` 仍只取 `selected` / `custom`。
+老行（`kind:"user"`）照读、照验、照显示，没有迁移、没有改写历史字节（`D-172`）。
+**真机两轮**（隔离 `web-clone`、端口 3411、真模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、提问工具 `mode: timed`）：
+改前那一行 `"approval":{"kind":"user","quote":"确认"}`，改后同脚本同一行变成 `"approval":{"kind":"question-reply","quote":"确认"}`，块都照常开。
+**门禁（本分支自己跑的，尖端 `b0c3f5d`）**：`tsc -p tsconfig.json --noEmit` `EXIT=0`、`oxlint src test` `15 warnings / 0 errors`（187 文件）、
+三份块 spec `145 passed (145)`（`3 files`）、`npm run build` 第二次之后 `git status --short` 里没有 `src/` 与 `lib/` 的改动。
+**`npm run ci` / 整仓 `npx vitest run` / `verify:lib` = `NOT_RUN`**（`AGENTS.md` §12）；**`BLOCKED` 无**。
+**一处照实记**：改后那一轮第一次装包时相对路径算错（落进一个多余目录，克隆仍是旧包），第一次「改后」读数仍是 `kind:"user"`；
+删掉多余目录、重装、重启、重跑才拿到 `question-reply`，那条旧读数作为第二条「改前」对照留在证据里，没有删。
+证据目录 `.rsi/evidence/card-approval-2026-11-26/`（`README.md` 是索引）。**红线**：`~/.dsh` 三个 mtime 全早于会话且跑完未变、
+3080 前后 `401`、未 push / 未打 tag / 未 bump / 未 publish、未合 `main`；soak 的临时 home 收尾时删除。）

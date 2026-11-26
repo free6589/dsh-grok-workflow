@@ -1,0 +1,17 @@
+event: user/message   seq 46   time 1795682716907 (2026-11-26T08:45:16.907Z)
+data keys: source, content, role, id
+
+source object (verbatim JSON):
+{"kind":"user-question-reply","callId":"call_01a2170329ac758d9ef70fd4232f3e5c|fc_01a2170329ac758d9ef70fd4232f3e5c","outcome":"answered"}
+
+content block types: text
+
+THE TEXT PART, COMPLETE AND VERBATIM (one JSON string as the Host wrote it):
+{"kind":"answer_to_pending_question","tool":"ask_user_question","callId":"call_01a2170329ac758d9ef70fd4232f3e5c|fc_01a2170329ac758d9ef70fd4232f3e5c","questions":[{"id":"q1","question":"这一单可以开工吗？","header":"确认","options":[{"label":"确认"},{"label":"再看看"}]}],"answers":[{"id":"q1","selected":["确认"],"custom":"就按这个来"}]}
+
+the ask that this answers: seq 30, name ask_user_question, callId call_01a2170329ac758d9ef70fd4232f3e5c|fc_01a2170329ac758d9ef70fd4232f3e5c
+arguments as the model sent them:
+{"questions":[{"header":"确认","id":"q1","options":[{"label":"确认"},{"label":"再看看"}],"question":"这一单可以开工吗？"}]}
+
+the call it enabled: seq 48, name grok_open_block, callId call_01a21707ed047426a708338bd0dfd63e|fc_01a21707ed047426a708338bd0dfd63e
+{"approval":{"kind":"user","quote":"确认"},"mode":"start","preview_id":"bp-f20b636a-7a97-48bf-b7af-2365d6e3afe2","split_hash":"990d993733c4bdaf745696c8a62a542bfd2cdd843b1dc26d9e083961e3c6c685"}

@@ -5,6 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **A block opened by tapping a question card now says so in its record: the approval is kept as `question-reply` instead of
+  a typed "yes" / 点问题卡片开的块，记录里现在写明「这是点卡片点的」：批准的来源记成 `question-reply`，不再和打字确认混在一起** —
+  Answering a question card is a nod, and it has counted as one since the earlier fix — but the record it left behind was
+  indistinguishable from a typed reply, so nobody reading the record later could tell a card from a sentence. The record now
+  names the card as its own kind, keeps your own words as the quote (the label you ticked or the text you typed, never the
+  question the model asked), and still only counts a card for a question that was asked after the preview it approves.
+  A typed turn is still recorded as `user`, and a caller that declared another source keeps what it declared.
+  **Upgrade note: nothing to migrate — records written before this version still read, validate and display exactly as they
+  did, and no stored byte is rewritten.**
+  / 回答一张问题卡片就是点头，这一点在上一版就已经算数了；但它留下的记录和打字回一句分不开，事后看记录的人没法
+  分辨这是点的卡片还是打的一句话。现在记录里把卡片单独标成一种来源，原话仍然只记你自己说的话（你勾的那个选项、
+  或你打的字，绝不是模型问的那句话），而且仍然只认「这张卡问在预览之后」的那一次。
+  打字回一句仍然记成 `user`；调用方自己声明的其它来源，就按它声明的记。
+  **升级须知：不用迁移任何东西——这个版本之前写下的记录照样读得出、验得过、显示得跟以前一样，已经落盘的字节一个都不改。**
+
 ## [0.13.51] - 2026-11-26
 
 ### Changed / 变更

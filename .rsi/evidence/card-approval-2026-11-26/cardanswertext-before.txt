@@ -1,0 +1,54 @@
+What `cardAnswerText()` yields today (the build before this block's change)
+=======================================================================
+
+Measured 2026-11-26 16:47 +08:00 on branch `fix/card-approval` (base `226d673`,
+the tree that produced `lib/block/tools.js` sha256
+`2cc0f7719532f2eb39688018fea042c8c7ca26db625eec864f7db9fa4a595d0d`).
+
+How it was measured, and what that covers: `cardAnswerText()` is module-private, so
+this was read through the **registered tool** — the real `apply()`, cordis context,
+`ToolRuntime`, real `Session` and the real ledger under `.tmp/` — with a synthetic
+card-answer event carrying the payload named below. The probe drove `grok_open_block`
+`start` three ways per payload: a quote equal to the expected joined text (accepted
+means the joined text is exactly that, since the match is `String.includes`), a quote
+with the parts reordered (tells the order), and a quote taken from the model's own
+question text (tells whether the batch leaked through). The "before" event in
+`event.txt` is a real capture from a live isolated instance; these three payload
+readings are the *helper's* behaviour, taken through the real code path, not from a
+hand-copied function.
+
+The reading is the error code: `not-approval` means the quote **was** found in the
+joined text (the includes test passed; only `isApproveAnswer` refused a phrase that is
+not a bare yes), `approval-required` means it was **not** found.
+
+(a) the real payload, `answers:[{"id":"q1","selected":["确认"],"custom":"就按这个来"}]`
+
+    quote "确认 就按这个来"        -> REFUSED code=not-approval   (found: joined text is exactly this)
+    quote "就按这个来 确认"        -> REFUSED code=approval-required (not found: selected comes first)
+    quote "这一单可以开工吗？"      -> REFUSED code=approval-required (question text does not leak)
+
+    => yields "确认 就按这个来"
+
+(b) only `custom`, `answers:[{"id":"q1","selected":[],"custom":"就按这个来"}]`
+
+    quote "就按这个来"              -> REFUSED code=not-approval   (found)
+    quote "answer_to_pending_question" -> REFUSED code=approval-required (not found: not a raw fallback)
+
+    => yields "就按这个来"
+
+(c) `answers:[{"id":"q1","selected":[]}]` (nothing picked, nothing typed)
+
+    quote "answer_to_pending_question" -> REFUSED code=not-approval (found: raw fallback)
+    quote "确认"                     -> STARTED block=eb6e5a9c-c5bb-4ff2-80ab-7483c4b1b62a
+    (the raw JSON still carries the model's question and its option labels, so "确认"
+     matches it even though the user picked nothing)
+
+    => yields the raw JSON text (this is the documented fallback for an unparsable or
+       empty payload; it is the one hole `cardAnswerText()` still leaves open)
+
+Exact command (probe spec deleted after the reading; the case that matters is kept in
+`test/block-tools.spec.ts` from this block on):
+
+    TMPDIR=$PWD/.tmp npx vitest run test/zz-probe-cardtext.spec.ts
+    -> Tests 3 passed (one printed-only ledger case failed to find the file it printed;
+       the eleven readings above are the whole output)

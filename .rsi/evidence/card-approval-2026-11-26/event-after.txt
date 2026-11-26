@@ -1,0 +1,12 @@
+after the fix, same script, same clone, same model route (build lib/block/tools.js sha256 b84a48c2…a49371)
+
+event user/message seq 36 time 1795683481599 (2026-11-26T08:58:01.599Z)
+source: {"kind":"user-question-reply","callId":"call_01a217120a32747c81c0995eb6c19784|fc_01a217120a32747c81c0995eb6c19784","outcome":"answered"}
+
+THE TEXT PART, COMPLETE AND VERBATIM:
+{"kind":"answer_to_pending_question","tool":"ask_user_question","callId":"call_01a217120a32747c81c0995eb6c19784|fc_01a217120a32747c81c0995eb6c19784","questions":[{"id":"q1","question":"这一单可以开工吗？","options":[{"label":"确认"},{"label":"再看看"}]}],"answers":[{"id":"q1","selected":["确认"],"custom":"就按这个来"}]}
+
+the start it enabled: seq 38, grok_open_block
+{"approval":{"kind":"user","quote":"确认"},"mode":"start","preview_id":"bp-60a6cdf1-2602-472b-800b-fbd376e66b95","split_hash":"990d993733c4bdaf745696c8a62a542bfd2cdd843b1dc26d9e083961e3c6c685"}
+
+ledger row written by that start: this session's line in ledger-after.jsonl (the third line)

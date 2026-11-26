@@ -5083,3 +5083,46 @@ spine 为空，pre-fix 形状会进脊柱。
   证明它们不是空过：把 `main` 的 `checks.ts` 单独编译出来喂同样三份 fixture，三处缺陷全部复现（`路径不存在` / `范围 ⊆ 批准` / 只有 warning）。
   **`NOT_RUN` 照实记：** 整仓 `npx vitest run`（`AGENTS.md` §12 把块内门禁收在被改的 spec 上）、`npm run ci`、
   块工具的真机 soak、以及 live 档案升级——这四项本块都没有跑。
+
+## D-172 · 账本要分得清「点的卡片」和「打的一句话」：卡片批准记成 `question-reply`，原话仍只留用户自己的字（2026-11-26，`fix/card-approval`，worktree `.agents/worktrees/fix-card-approval`，基线 `main` 尖端 **`226d673`**；**未合、未推、未打 tag、版本仍是 `0.13.51`**）
+
+- **Date:** 2026-11-26
+- **Context:** D-137 让「点问题卡片」算成用户的点头，但它只改了**准入**（卡片答案要过两道闸：`callId` 指向的提问必须问在预览之后、
+  只取 `selected` / `custom`），账本那一格没动：`grok_open_block` 的 `start` 把 `approval.kind` 一律落成调用方声明或默认的 `"user"`。
+  真机读数摆在那儿（`.rsi/evidence/card-approval-2026-11-26/ledger-before.jsonl`）：卡片答案进了会话、块也开了，
+  行上却是 `"approval":{"kind":"user","quote":"确认"}`——**事后读这一行的人分不出这是点的卡片还是打的一句话**。
+  而 `quote` 本身分不出：两种方式留下的都是「确认」两个字。
+- **Decision:**
+  1. **来源集合加一个成员。** `ApprovalKind` 变为 `preview | user | question-reply | request | operator | policy`，
+     三处校验集合（`src/block/types.ts`、`src/block/store.ts`、`src/block/preview.ts`）同步。除此之外没有第二种校验。
+  2. **谁来定这个值：工具层，按「这句话是从哪条消息里找到的」。** `userMessagesSince()` 原来只回 `string[]`，现在回
+     `{ text, kind }[]`——`text` 喂给 `startBlock` 的逐字校验（签名不变，`preview.spec.ts` 的直接调用一个字没改），
+     `kind` 由来源决定（`startsTurn` → `user`，`isQuestionReplySource` → `question-reply`）。
+     `startBlock` 的入参仍由调用方给 `kind`，所以**落盘规则只有一条**：调用方声明的是 `user`（含不声明时的默认），
+     而逐字命中的那条消息是卡片答案，则改记 `question-reply`；其余声明（`request` / `operator` / `policy` / `preview`）**原样保留**。
+  3. **并列时按第一条命中的消息算。** 校验本身是 `messages.some(逐字包含)`，但归属取 `find` 的第一条：
+     先打了「确认」再点卡片，这一行就是 `user`——**宁可少标一次卡片，也不把一句打字的话改标成卡片**。
+- **Alternatives rejected:**
+  - **把 `quote` 改成带前缀（如 `card:确认`）。** 那就动了逐字匹配的契约：`quote` 是用户在会话里说过的原话，改它等于让账本里的引文
+    不再出现在会话里，且所有既有行与所有读它的地方都得跟着改。**来源是来源，引文是引文**，两者分开记。
+  - **让 `userMessagesSince` 直接返回 `{text, kind}` 并把它整个塞进 `startBlock`，由 `startBlock` 自己定 kind。**
+    入参类型要改、`preview.spec.ts` 的 12 处直接调用要改、`startBlock` 从此要理解「消息来源」——这是把一个展示层的归类
+    塞进账本写入函数，收益为零。
+  - **只改账本写入、让 `kind` 由模型自己声明成 `question-reply`。** 模型看不到 `source.kind`，它能声明的只是它以为的；
+    真机这一轮的 `arguments` 就是 `{"kind":"user",...}`。**可由事实决定的东西不能交给猜。**
+  - **给老行做迁移，把 `user` 改写成 `question-reply`。** 账本只追加、不改写历史字节；而且老行里根本没有「这条答案是不是卡片」的信息，
+    改写只能靠猜。老行照旧读、照旧显示 `user`——那时候的记录确实说不清，如实留着比伪造准。
+- **Consequences / 已知边界（照实记）：**
+  1. **`question-reply` 是新增的合法值，旧构建读到会跳过那一行**（存储层读路是「不认识就跳过并记 `skipped`」，这是既有的宽容策略）。
+     方向是单向的：新构建读老行没问题（`user` 还在集合里），老构建读新行会少一行。发布说明里不承诺降级。
+  2. **`cardAnswerText()` 的空答案兜底没动。** `selected: []` 且没有 `custom` 时它回落到整段 JSON（测量见
+     `cardanswertext-before.txt` 的 (c)：那时连「确认」都能从模型自己的选项标签里匹配上）。**这是 D-137 留下的口子，本块不修**：
+     它属于「答案里一个字都没有」的边界，改它要动逐字匹配的兜底语义，得单独一条决定。
+  3. **`sourceMessageId` 仍不由本层填写。** 卡片消息有 `id`，工具层拿不到「哪条消息命中的」以外的信息时不硬编。
+  4. **只有 `user` 会被改记。** 调用方如果自己声明 `preview`，即使命中的是卡片也保持 `preview`——本块只解决「默认值说不清」这一件事。
+- **Evidence:** 分支 `fix/card-approval`（worktree `.agents/worktrees/fix-card-approval`，基线 `226d673`）：
+  源码 + 用例提交 **`b0c3f5d`**（16 文件 / +165 −24：源码 4 + 用例 2 + `lib/` 10）、本条记忆与证据提交紧随其后。
+  真机两轮同脚本对照（隔离 `web-clone`、端口 3411、真模型）：改动前账本 `kind:"user"`、改动后 `kind:"question-reply"`，
+  逐字在 `.rsi/evidence/card-approval-2026-11-26/ledger-after.jsonl`（三行：前 / 又一次前 / 后）。
+  块内门禁：`tsc -p tsconfig.json --noEmit` `EXIT=0`、`oxlint src test` `15 warnings / 0 errors`（187 文件）、
+  三份块 spec `145 passed`。**`npm run ci`、整仓 `npx vitest run`、`verify:lib` 都是 `NOT_RUN`**（`AGENTS.md` §12：块内只跑被改的 spec）。
