@@ -297,6 +297,28 @@ describe('client progress tab: the retired geometry is gone, not hidden', () => 
     }
   })
 
+  it('styles the matrix vocabulary, and nothing older than it', () => {
+    // The matrix's own names, in one place: an extra class on the page would be a mark
+    // nobody agreed to, and the retry round added exactly two (`gw-progress-sub-dots` and
+    // `gw-progress-sub-badge`).
+    const styled = styledClasses()
+    for (const className of [
+      'gw-progress-cols',
+      'gw-progress-col',
+      'gw-progress-subs',
+      'gw-progress-sub',
+      'gw-progress-sub-dots',
+      'gw-progress-sub-dot',
+      'gw-progress-sub-badge',
+      'gw-progress-sub-word',
+      'gw-progress-sub-calls',
+    ]) {
+      expect(styled, `${className} is not styled`).toContain(className)
+    }
+    // …and the retired task-band prefix still may not hide inside any of them.
+    for (const token of styled) expect(token).not.toContain('gw-progress-task')
+  })
+
   it('keeps no measurement, no zoom factor and no settle arithmetic in the source', () => {
     // The spine's own geometry helpers are code facts, not just DOM facts: a leftover would
     // keep reading a structure that is gone.

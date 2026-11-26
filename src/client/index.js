@@ -359,6 +359,8 @@ window.__ModuleLoader__.load({
       'progress.flow.end': 'End',
       'progress.flow.visit': 'Visit {n}',
       'progress.flow.draft': 'Draft {n}',
+      // How many times one task was tried in one leg (contract 追加 8.4).
+      'progress.flow.attempt': 'Attempt {n}',
       'progress.flow.left': '{left} steps left / {total} total',
       'progress.flow.aria': 'Run flow',
       // The state words a node speaks and never prints (`aria-label`).
@@ -594,6 +596,8 @@ window.__ModuleLoader__.load({
       'progress.flow.end': '终点',
       'progress.flow.visit': '第 {n} 次',
       'progress.flow.draft': '第 {n} 稿',
+      // 一个任务在一条腿里试了几遍（契约追加 8.4）。
+      'progress.flow.attempt': '第 {n} 遍',
       'progress.flow.left': '还剩 {left} 步 / 共 {total} 步',
       'progress.flow.aria': '进度流程图',
       // 节点只说、不印的状态词（aria-label）。
@@ -3932,6 +3936,9 @@ window.__ModuleLoader__.load({
       '.gw-progress-flow { position: relative; box-sizing: border-box; display: block; width: 100%; min-width: 0; margin: 14px 0 0; padding: 0 4px; }',
       '.gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
       '.gw-progress-wires > path { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 1.5; }',
+      // A retry step is dashed, and it takes the same border token as every other wire:
+      // the line says "tried again", never "this state" — the attempt's dot says that.
+      '.gw-progress-wires > path[data-gw-progress-retry] { stroke-dasharray: 3 3; stroke: var(--dsw-alias-border-l2, currentColor); }',
       '.gw-progress-cols { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 0; }',
       // One column is one leg. Equal widths and a 6px cell pitch are what puts one task
       // number on the same line in every leg that walked it: the matrix needs no measuring.
@@ -3984,8 +3991,19 @@ window.__ModuleLoader__.load({
       // leaves that row empty instead of sliding its cells up.
       '.gw-progress-subs { display: grid; grid-template-rows: repeat(var(--gw-lanes, 1), 26px); gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }',
       '.gw-progress-sub { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 4px; height: 26px; min-width: 0; max-width: 100%; padding: 3px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; font-size: 12px; background-color: transparent; }',
+      // Every attempt gets its own dot, in the cell's one row: a retry costs no height.
+      '.gw-progress-sub-dots { display: inline-flex; align-items: center; gap: 3px; flex: none; }',
       '.gw-progress-sub-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }',
+      // A dot's colour is its own attempt's state, never the cell's: two dots in one cell can
+      // disagree with each other while the cell says what the task finally did.
+      '.gw-progress-sub .gw-progress-sub-dot[data-state="done"] { background: var(--dsw-alias-state-success-primary); animation: none; }',
+      '.gw-progress-sub .gw-progress-sub-dot[data-state="doing"] { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }',
+      '.gw-progress-sub .gw-progress-sub-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); animation: none; }',
+      '.gw-progress-sub .gw-progress-sub-dot[data-state="failed"], .gw-progress-sub .gw-progress-sub-dot[data-state="blocked"], .gw-progress-sub .gw-progress-sub-dot[data-state="cancelled"] { background: var(--dsw-alias-state-warn-primary); animation: none; }',
       '.gw-progress-sub-word { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+      // How many attempts, beside the task's name. It is a count, so it takes the quiet
+      // label colour and no state of its own.
+      '.gw-progress-sub-badge { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }',
       // The same five states, the same five tokens: a cell is coloured exactly like the leg
       // it hangs under, so the matrix reads as one figure and not as two vocabularies.
       '.gw-progress-sub[data-state="done"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background-color: transparent; background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent)); }',
@@ -4066,6 +4084,7 @@ window.__ModuleLoader__.load({
       // "current", so a reader who asked for less motion loses nothing.
       '@media (prefers-reduced-motion: reduce) {',
       '  .gw-progress-node[data-state="doing"] .gw-progress-node-dot, .gw-progress-chip[data-state="running"] .gw-progress-chip-dot, .gw-progress-sub[data-state="doing"] .gw-progress-sub-dot { animation: none; }',
+      '  .gw-progress-sub .gw-progress-sub-dot[data-state="doing"] { animation: none; }',
       '}',
       // Below 720px the matrix reflows: two columns a row, and the measured lines follow
       // them with an elbow. Nothing is hidden, because the wires are the topology.
@@ -4194,7 +4213,7 @@ window.__ModuleLoader__.load({
     }
 
     /** A flow with no measured wires: what a host without layout renders. */
-    const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, paths: [] }
+    const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, paths: [], retries: [] }
 
     /**
      * Measure the wires between neighbouring columns and between the tasks of one lane.
@@ -4229,16 +4248,27 @@ window.__ModuleLoader__.load({
       const inside = (element, selector) => (element !== null && element !== undefined && typeof element.querySelectorAll === 'function'
         ? Array.from(element.querySelectorAll(selector))
         : [])
+      const attributeOf = (element, name) => {
+        if (element === null || element === undefined) return undefined
+        if (typeof element.getAttribute === 'function') {
+          const value = element.getAttribute(name)
+          if (value !== undefined && value !== null) return String(value)
+        }
+        const data = element.dataset
+        if (data !== undefined && data !== null) {
+          const key = name.replace(/^data-/, '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
+          if (data[key] !== undefined) return String(data[key])
+        }
+        return undefined
+      }
       const laneOf = (element, fallback) => {
-        const raw = element === null || element === undefined || typeof element.getAttribute !== 'function'
-          ? undefined
-          : element.getAttribute('data-lane')
-        const value = Number(raw)
+        const value = Number(attributeOf(element, 'data-lane'))
         return Number.isInteger(value) && value > 0 ? value : fallback + 1
       }
       // A column is a leg: its head is the step node, and the cells under it are the plan
       // tasks it walked. A host that only exposes the heads still measures the chain.
       const columns = []
+      const attempts = []
       for (const column of Array.from(flow.querySelectorAll('[data-gw-progress-col]'))) {
         const heads = inside(column, '[data-gw-progress-node]')
         const head = measure(heads.length === 0 ? column : heads[0])
@@ -4249,6 +4279,13 @@ window.__ModuleLoader__.load({
           const cell = measure(cells[index])
           if (cell === undefined) continue
           lanes.set(laneOf(cells[index], index), cell)
+          // The dots of one cell are its attempts, left to right. A retry is a real
+          // adjacency: the attempt that failed and the one that followed it.
+          const dots = inside(cells[index], '[data-attempt]')
+          const marks = (dots.length === 0 ? inside(cells[index], '.gw-progress-sub-dot') : dots)
+            .map((dot) => ({ rect: measure(dot), state: attributeOf(dot, 'data-state') }))
+            .filter((entry) => entry.rect !== undefined)
+          if (marks.length > 1) attempts.push(marks)
         }
         columns.push({ head, lanes })
       }
@@ -4259,7 +4296,17 @@ window.__ModuleLoader__.load({
           if (head !== undefined) columns.push({ head, lanes: new Map() })
         }
       }
-      if (columns.length < 2) return EMPTY_PROGRESS_WIRES
+      // A host that reports the dots but not the cells they sit in still says which attempts
+      // followed which: one row of dots, in order. The real page always has the columns, and
+      // this path only runs when none of its cells were found.
+      if (attempts.length === 0 && !columns.some((column) => column.lanes.size > 0)) {
+        const loose = inside(flow, '[data-attempt]')
+        const marks = (loose.length === 0 ? inside(flow, '.gw-progress-sub-dot') : loose)
+          .map((dot) => ({ rect: measure(dot), state: attributeOf(dot, 'data-state') }))
+          .filter((entry) => entry.rect !== undefined)
+        if (marks.length > 1) attempts.push(marks)
+      }
+      if (columns.length === 0 && attempts.length === 0) return EMPTY_PROGRESS_WIRES
       const points = []
       const round = (value) => Math.round(value)
       const join = (from, to) => {
@@ -4294,6 +4341,21 @@ window.__ModuleLoader__.load({
         const midY = round((fromY + toY) / 2)
         points.push([[fromX, fromY], [fromX, midY], [toX, midY], [toX, toY]])
       }
+      const retries = []
+      for (const marks of attempts) {
+        for (let index = 0; index + 1 < marks.length; index += 1) {
+          // Only a failed attempt is retried: a green one had nothing to try again.
+          if (marks[index].state === undefined || marks[index].state === 'done') continue
+          const from = marks[index].rect
+          const to = marks[index + 1].rect
+          const overlapTop = Math.max(from.top, to.top)
+          const overlapBottom = Math.min(from.bottom, to.bottom)
+          const mid = overlapBottom - overlapTop > 0
+            ? round((overlapTop + overlapBottom) / 2 - frame.top)
+            : round(((from.top + from.bottom + to.top + to.bottom) / 4) - frame.top)
+          retries.push([[round(from.right - frame.left), mid], [round(to.left - frame.left), mid]])
+        }
+      }
       for (let index = 0; index + 1 < columns.length; index += 1) {
         join(columns[index].head, columns[index + 1].head)
         // The same task in the two neighbouring legs: the line that says "this task was
@@ -4303,7 +4365,7 @@ window.__ModuleLoader__.load({
           if (next !== undefined) join(rect, next)
         }
       }
-      return { width: Math.round(frame.width), height: Math.round(frame.height), paths: points }
+      return { width: Math.round(frame.width), height: Math.round(frame.height), paths: points, retries }
     }
 
     /**
@@ -4317,13 +4379,19 @@ window.__ModuleLoader__.load({
       if (left === right) return true
       if (left === undefined || right === undefined) return false
       if (left.width !== right.width || left.height !== right.height) return false
-      if (left.paths.length !== right.paths.length) return false
-      for (let index = 0; index < left.paths.length; index += 1) {
-        const one = left.paths[index]
-        const other = right.paths[index]
-        if (one.length !== other.length) return false
-        for (let point = 0; point < one.length; point += 1) {
-          if (one[point][0] !== other[point][0] || one[point][1] !== other[point][1]) return false
+      return sameProgressWireList(left.paths, right.paths) && sameProgressWireList(left.retries, right.retries)
+    }
+
+    /** Whether two wire lists are the same segments, point for point. */
+    function sameProgressWireList(left, right) {
+      const one = Array.isArray(left) ? left : []
+      const other = Array.isArray(right) ? right : []
+      if (one.length !== other.length) return false
+      for (let index = 0; index < one.length; index += 1) {
+        if (one[index].length !== other[index].length) return false
+        for (let point = 0; point < one[index].length; point += 1) {
+          if (one[index][point][0] !== other[index][point][0]) return false
+          if (one[index][point][1] !== other[index][point][1]) return false
         }
       }
       return true
@@ -4432,7 +4500,17 @@ window.__ModuleLoader__.load({
         style: { gridRow: String(sub.taskNumber) },
         'aria-label': [sub.title, stateWord].filter((part) => part !== '').join(' '),
       },
-      h('span', { key: 'dot', className: 'gw-progress-sub-dot', 'aria-hidden': 'true' }),
+      // One dot per attempt, in `seq` order, each coloured by its own row: a task that
+      // failed once and then passed reads as a green cell with an amber dot and a green one
+      // — the recovery rule paints the cell, never the attempt (contract 追加 8.1).
+      h('span', { key: 'dots', className: 'gw-progress-sub-dots' },
+        sub.members.map((member, attempt) => h('span', {
+          key: `dot:${member.seq}`,
+          className: 'gw-progress-sub-dot',
+          'data-attempt': String(attempt + 1),
+          'data-state': progressRowState(member),
+          'aria-hidden': 'true',
+        }))),
       // The title is a tooltip on the word itself and nothing else: the cell adds no
       // sentence of its own (contract 追加 5).
       h('span', {
@@ -4441,6 +4519,13 @@ window.__ModuleLoader__.load({
         'data-gw-progress-sub-word': true,
         title: sub.title,
       }, sub.title),
+      // How many attempts, once "one" is no longer the whole story. The count is the cell's
+      // own row count: the number of calls that tried this task in this leg.
+      sub.members.length > 1 ? h('span', {
+        key: 'badge',
+        className: 'gw-progress-sub-badge',
+        'data-gw-progress-sub-badge': true,
+      }, t('progress.flow.attempt', { n: sub.members.length })) : null,
       sub.members.length === 0 ? null : h('button', {
         key: 'toggle',
         type: 'button',
@@ -4610,6 +4695,14 @@ window.__ModuleLoader__.load({
       wires.paths.map((points, index) => h('path', {
         key: `wire:${index}`,
         d: progressWireLine(points),
+        'marker-end': 'url(#gw-progress-arrow)',
+      })),
+      // A retry step is dashed: it says "this attempt was tried again", and its colour is
+      // still the border token — the attempt's own dot carries the state.
+      (Array.isArray(wires.retries) ? wires.retries : []).map((points, index) => h('path', {
+        key: `retry:${index}`,
+        d: progressWireLine(points),
+        'data-gw-progress-retry': true,
         'marker-end': 'url(#gw-progress-arrow)',
       }))),
       h('ol', {

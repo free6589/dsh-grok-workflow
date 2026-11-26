@@ -74,7 +74,14 @@ interface Bundle {
     css: string
     fold: (records: ReadonlyArray<Record<string, unknown>>) => ProgressRun[]
     /** The wire layer's maths, driven with measured boxes so the geometry is testable. */
-    measureWires: (flow: unknown) => { width: number, height: number, paths: Array<Array<[number, number]>> }
+    measureWires: (flow: unknown) => {
+      width: number
+      height: number
+      /** Wires between neighbouring columns and between one task's cells. */
+      paths: Array<Array<[number, number]>>
+      /** The dashed steps between two attempts of one task, drawn in the same layer. */
+      retries: Array<Array<[number, number]>>
+    }
     deriveProgressFlow: (run: ProgressRun) => {
       state: string
       nodes: Array<{ key: string, kind: string, ordinal: number, state: string }>
@@ -319,6 +326,59 @@ function gapLaneRun(): ProgressRun {
       member(6, '检查', '任务 3 · 补测试', 'completed', 5),
     ],
     details: [],
+  }
+}
+
+/**
+ * 失败后重试中：one task, one leg, two calls — the first failed, the second still open.
+ *
+ * Both rows carry the same phase and the same label with no visit number, which is the
+ * shape a retry inside one task takes: they belong to one cell, and the cell must show both
+ * attempts instead of letting the recovery rule paint the whole cell green.
+ */
+function retryRunningRun(): ProgressRun {
+  return {
+    runId: 'r-flow-retry-running',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'failed', 1),
+      member(3, '执行', '任务 1 · 修复登录', undefined, 2),
+    ],
+    details: [],
+  }
+}
+
+/** 重试通过：the failed first attempt, then the one that passed. */
+function retryPassedRun(): ProgressRun {
+  return {
+    runId: 'r-flow-retry-passed',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'failed', 1),
+      member(3, '执行', '任务 1 · 修复登录', 'completed', 2),
+    ],
+    details: [],
+    stopReason: 'completed',
+  }
+}
+
+/** 重试再失败：both attempts failed — the cell stays amber, and both dots say so. */
+function retryFailedRun(): ProgressRun {
+  return {
+    runId: 'r-flow-retry-failed',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '规划助手', '规划', 'completed', 0),
+      member(2, '执行', '任务 1 · 修复登录', 'failed', 1),
+      member(3, '执行', '任务 1 · 修复登录', 'failed', 2),
+    ],
+    details: [],
+    stopReason: 'error',
   }
 }
 
@@ -712,7 +772,8 @@ describe('client progress tab: the wires are measured, never invented', () => {
    * The measurement asks a column for the boxes it holds, which is the DOM relationship the
    * page has; nothing here is derived from a CSS rule.
    */
-  type Lane = { lane: number, x: number, y: number, w: number, h: number }
+  type Dot = { attempt: number, state: string, x: number, y: number, w: number, h: number }
+  type Lane = { lane: number, x: number, y: number, w: number, h: number, dots?: ReadonlyArray<Dot> }
   type Column = { x: number, y: number, w: number, h: number, cells?: ReadonlyArray<Lane> }
 
   function matrix(columns: ReadonlyArray<Column>): { flow: unknown } {
@@ -725,9 +786,16 @@ describe('client progress tab: the wires are measured, never invented', () => {
       right: r.x + r.w,
       bottom: r.y + r.h,
     })
+    const dot = (one: Dot) => ({
+      getBoundingClientRect: () => box(one),
+      getAttribute: (name: string) => (name === 'data-attempt' ? String(one.attempt)
+        : name === 'data-state' ? one.state
+          : undefined),
+    })
     const cell = (lane: Lane) => ({
       getBoundingClientRect: () => box(lane),
       getAttribute: (name: string) => (name === 'data-lane' ? String(lane.lane) : undefined),
+      querySelectorAll: () => (lane.dots ?? []).map(dot),
     })
     return {
       flow: {
@@ -756,6 +824,35 @@ describe('client progress tab: the wires are measured, never invented', () => {
     expect(measured.paths).toHaveLength(2)
     expect(measured.paths[0]).toEqual([[200, 16], [212, 16]])
     expect(measured.paths[1]).toEqual([[200, 51], [212, 51]])
+  })
+
+  it('draws one short dashed step between two attempts when the first one failed', () => {
+    // One cell, two attempts: 6px dots 3px apart, the first amber and the second green.
+    // The retry line joins the two dots and nothing else — a straight segment, not a wire
+    // between columns, and it is reported separately so the renderer can dash it.
+    const dotOf = (attempt: number, state: string, x: number) => ({ attempt, state, x, y: 44, w: 6, h: 6 })
+    const twice = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 80, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26, dots: [dotOf(1, 'failed', 8), dotOf(2, 'done', 17)] }] },
+    ]).flow)
+    expect(twice.retries).toEqual([[[14, 47], [17, 47]]])
+    // Nothing else is drawn: one column, so there is no neighbouring column to join.
+    expect(twice.paths).toEqual([])
+
+    // An attempt that passed is not retried: green → whatever follows gets no line.
+    const passed = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 80, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26, dots: [dotOf(1, 'done', 8), dotOf(2, 'done', 17)] }] },
+    ]).flow)
+    expect(passed.retries).toEqual([])
+
+    // One attempt, one dot: nothing to join.
+    const once = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(matrix([
+      { x: 0, y: 0, w: 200, h: 80, cells: [{ lane: 1, x: 0, y: 38, w: 200, h: 26, dots: [dotOf(1, 'done', 8)] }] },
+    ]).flow)
+    expect(once.retries).toEqual([])
+
+    // A host without layout draws neither wires nor retry steps, and does not throw.
+    const flat = { querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }) }
+    expect(progress.measureWires(flat).retries).toEqual([])
   })
 
   it('joins one task across two legs, never two neighbours of different tasks', () => {
@@ -1094,6 +1191,120 @@ describe('client progress tab: colour is the state', () => {
   })
 })
 
+describe('client progress tab: a retry is drawn, not swallowed', () => {
+  /** The dots of one cell, in the order they are drawn. */
+  function dotsOf(cell: Element): Element[] {
+    return walk(cell).filter((element) => classesOf(element).includes('gw-progress-sub-dot'))
+  }
+
+  /** The one cell of a run whose only work leg walked one task. */
+  function cellOf(run: ProgressRun): Element {
+    const cells = hooksOf(pageOf(run)(), 'data-gw-progress-sub')
+    expect(cells, 'the run must draw exactly one cell').toHaveLength(1)
+    return cells[0]!
+  }
+
+  it('keeps one dot per attempt, in order, each coloured by its own row', () => {
+    // 重试通过: the cell is green because the task passed, and the amber first attempt is
+    // still on the figure — that is the whole point of the round.
+    const cell = cellOf(retryPassedRun())
+    expect(attr(cell, 'data-state')).toBe('done')
+    const dots = dotsOf(cell)
+    expect(dots.map((dot) => [attr(dot, 'data-attempt'), attr(dot, 'data-state')])).toEqual([
+      ['1', 'failed'],
+      ['2', 'done'],
+    ])
+    // A dot is decoration: no word, and it is skipped by a screen reader.
+    for (const dot of dots) {
+      expect(attr(dot, 'aria-hidden')).toBe('true')
+      expect(texts(dot)).toEqual([])
+    }
+
+    // 失败后重试中: the second attempt has not settled, so it is the blue dot — while the
+    // cell stays amber, because a failure a running retry has not cleared yet is current.
+    const running = cellOf(retryRunningRun())
+    expect(attr(running, 'data-state')).toBe('failed')
+    expect(dotsOf(running).map((dot) => attr(dot, 'data-state'))).toEqual(['failed', 'doing'])
+
+    // 重试再失败: no recovery to paint over, so both dots and the cell are amber.
+    const failed = cellOf(retryFailedRun())
+    expect(attr(failed, 'data-state')).toBe('failed')
+    expect(dotsOf(failed).map((dot) => attr(dot, 'data-state'))).toEqual(['failed', 'failed'])
+  })
+
+  it('says how many attempts a cell took, and stays silent when there was only one', () => {
+    // N > 1: one badge, in the reader's own words, counted by the cell's rows.
+    const retried = cellOf(retryPassedRun())
+    const badge = hookOf(retried, 'data-gw-progress-sub-badge')
+    expect(classesOf(badge)).toEqual(['gw-progress-sub-badge'])
+    expect(textOf(badge)).toBe(zh('progress.flow.attempt', { n: 2 }))
+    expect(textOf(badge)).toBe('第 2 遍')
+
+    // N === 1: one attempt is the normal case, and the normal case carries no word.
+    const once = hooksOf(pageOf(plannedRun())(), 'data-gw-progress-sub')[0]!
+    expect(dotsOf(once)).toHaveLength(1)
+    expect(attr(dotsOf(once)[0]!, 'data-attempt')).toBe('1')
+    expect(hooksOf(once, 'data-gw-progress-sub-badge')).toHaveLength(0)
+    // The badge is the only new word on the page, and it exists in both languages.
+    const en = bundle.GROK_WORKFLOW_INTERNALS.translator('en')
+    expect(en('progress.flow.attempt', { n: 2 })).toBe('Attempt 2')
+  })
+
+  it('stops the reader where the retry is, on the leg the retry belongs to', () => {
+    // The open attempt is the newest row of a cell in the execute column: the highlight
+    // stays on that column, and the count line keeps counting steps.
+    const page = pageOf(retryRunningRun())()
+    const columns = hooksOf(page, 'data-gw-progress-col')
+    expect(columns.map((column) => attr(column, 'data-current'))).toEqual(['false', 'false', 'true', 'false'])
+    expect(attr(columns[2]!, 'data-gw-progress-col')).toBe('execute')
+    expect(textOf(hookOf(page, 'data-gw-progress-left'))).toBe(zh('progress.flow.left', { left: 1, total: 4 }))
+    // The same page once the retry passed: nothing is being worked, so nothing is current
+    // but the end, and the count says no step is left.
+    const done = pageOf(retryPassedRun())()
+    expect(hooksOf(done, 'data-gw-progress-col').map((column) => attr(column, 'data-current')))
+      .toEqual(['false', 'false', 'false', 'true'])
+    expect(textOf(hookOf(done, 'data-gw-progress-left'))).toBe(zh('progress.flow.left', { left: 0, total: 4 }))
+  })
+
+  it('draws the failure page and the cancelled page with the same marks and no new sentence', () => {
+    // 整轮失败页: the same figure, the same hooks, the amber cell and both amber dots.
+    const failed = pageOf(retryFailedRun())()
+    expect(texts(hookOf(failed, 'data-gw-progress-chip'))).toEqual([zh('progress.chip.failed')])
+    expect(pageTexts(failed)).toEqual([
+      '任务团队 · 1 个任务',
+      zh('progress.chip.failed'),
+      zh('progress.flow.start'),
+      zh('progress.flow.plan'),
+      zh('progress.flow.execute'),
+      '任务 1 · 修复登录',
+      zh('progress.flow.attempt', { n: 2 }),
+      zh('progress.flow.end'),
+      // The reader's place is the broken leg, so the step after it stays counted and
+      // unreached — the same reading a failed page always had.
+      zh('progress.flow.left', { left: 1, total: 4 }),
+    ])
+
+    // 取消页: an engine `cancelled` is the engine's word, on the dots and on the legs.
+    const cancelled = pageOf({
+      ...retryRunningRun(),
+      stopReason: 'cancelled',
+      members: [
+        member(1, '规划助手', '规划', 'completed', 0),
+        member(2, '执行', '任务 1 · 修复登录', 'cancelled', 1),
+      ],
+    })()
+    const cells = hooksOf(cancelled, 'data-gw-progress-sub')
+    expect(cells.map((cell) => attr(cell, 'data-state'))).toEqual(['cancelled'])
+    expect(dotsOf(cells[0]!).map((dot) => attr(dot, 'data-state'))).toEqual(['cancelled'])
+    expect(texts(hookOf(cancelled, 'data-gw-progress-chip'))).toEqual([zh('progress.chip.cancelled')])
+    // No sentence anywhere: the footer is still the one count line.
+    expect(texts(hookOf(cancelled, 'data-gw-progress-left'))).toEqual([zh('progress.flow.left', { left: 0, total: 4 })])
+    for (const tree of [failed, cancelled]) {
+      expect(hooksOf(tree, 'data-gw-progress-node')).toHaveLength(4)
+    }
+  })
+})
+
 describe('client progress tab: the lane matrix, drawn to the contract’s numbers', () => {
   it('sizes a step node 32px tall with a 10px radius, and the two ends as capsules', () => {
     const node = ruleOf('.gw-progress-node')
@@ -1237,6 +1448,50 @@ describe('client progress tab: the lane matrix, drawn to the contract’s number
     expect(attr(hookOf(marker, 'd'), 'fill')).toBe('var(--dsw-alias-border-l2, currentColor)')
     // Every wire points at it; the source says so once, for all of them.
     expect(SOURCE).toContain("'marker-end': 'url(#gw-progress-arrow)'")
+  })
+
+  it('puts every attempt in the cell’s one row, and dashes the step between two', () => {
+    // The dots sit in one 6px row with a 3px gap, and the cell keeps its 26px: an extra
+    // attempt costs no height, so "row = task" survives a retry.
+    const dots = ruleWith('.gw-progress-sub-dots')
+    expect(dots, 'the dots have no container rule').toBeDefined()
+    expect(dots).toContain('display: inline-flex')
+    expect(dots).toContain('gap: 3px')
+    expect(ruleOf('.gw-progress-sub')).toContain('height: 26px')
+
+    // Each dot is coloured by its own attempt, so one cell can hold amber and green.
+    const states: Array<[string, string]> = [
+      ['done', '--dsw-alias-state-success-primary'],
+      ['doing', '--dsw-alias-state-business-primary'],
+      ['failed', '--dsw-alias-state-warn-primary'],
+      ['blocked', '--dsw-alias-state-warn-primary'],
+      ['cancelled', '--dsw-alias-state-warn-primary'],
+    ]
+    for (const [state, token] of states) {
+      const dot = ruleWith(`.gw-progress-sub .gw-progress-sub-dot[data-state="${state}"]`)
+      expect(dot, `no per-attempt dot rule for ${state}`).toBeDefined()
+      expect(dot).toContain(token)
+    }
+    expect(ruleWith('.gw-progress-sub .gw-progress-sub-dot[data-state="pending"]')).toContain('inset 0 0 0 1px')
+
+    // The attempt count is a badge: 11px, no colour of its own, never a second sentence.
+    const badge = ruleWith('.gw-progress-sub-badge')
+    expect(badge, 'the attempt badge has no rule').toBeDefined()
+    expect(badge).toContain('font-size: 11px')
+    expect(badge).toContain('flex: none')
+    expect(badge).toContain('var(--dsw-alias-label-secondary')
+    expect(badge).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+
+    // The retry step is dashed and drawn in the border token — the line never carries a
+    // state, and no new animation came with it. It is a rule on a hook, not a new class.
+    const retry = ruleWith('.gw-progress-wires > path[data-gw-progress-retry]')
+    expect(retry, 'the retry step has no rule').toBeDefined()
+    expect(retry).toContain('stroke-dasharray: 3 3')
+    expect(retry).toContain('stroke: var(--dsw-alias-border-l2')
+    expect(SOURCE).toContain("'data-gw-progress-retry': true")
+    expect(progress.css).not.toMatch(/@keyframes\s+(?!gw-progress-breathe|gw-progress-pulse)/)
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+    expect(progress.css).not.toContain('overflow-x')
   })
 
   it('wraps the columns on a narrow screen and still connects them', () => {

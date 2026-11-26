@@ -2215,6 +2215,30 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(flow.total).toBe(flow.nodes.length)
   })
 
+  it('names every word the flow prints, and the one the retry badge added', () => {
+    // The page's own vocabulary, pinned as a set: a key added anywhere else would show up
+    // here, and the attempt badge is the only word this round added (contract 追加 8.4).
+    const zh = bundle.GROK_WORKFLOW_DICT['zh']!
+    const en = bundle.GROK_WORKFLOW_DICT['en']!
+    const flowKeys = Object.keys(zh).filter((key) => key.startsWith('progress.flow.')).sort()
+    expect(flowKeys).toEqual([
+      'progress.flow.aria',
+      'progress.flow.attempt',
+      'progress.flow.check',
+      'progress.flow.draft',
+      'progress.flow.end',
+      'progress.flow.execute',
+      'progress.flow.left',
+      'progress.flow.plan',
+      'progress.flow.review',
+      'progress.flow.start',
+      'progress.flow.summarize',
+      'progress.flow.visit',
+    ])
+    expect(zh['progress.flow.attempt']).toBe('第 {n} 遍')
+    expect(en['progress.flow.attempt']).toBe('Attempt {n}')
+  })
+
   it('mirrors the shipped draft as the draft number and the row that carried it', () => {
     const { flow } = flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
     expect(flow.final).toEqual({ draft: 1, seq: 4 })
@@ -2516,6 +2540,32 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(hooksOf(opened, 'data-gw-progress-log-row')).toHaveLength(0)
     expect(hooksOf(opened, 'data-gw-progress-node-rejected').map((row) => texts(row).join(' ')))
       .toEqual(['第 2 稿全被退回', '卡在复核', `最后不过：${reason}`])
+  })
+
+  it('draws a retry as two dots and a count, and leaves a single attempt unmarked', () => {
+    // 重试通过: the same task, the same leg, one failed call and one that passed. The cell
+    // is green because the task passed; the amber attempt stays on the figure.
+    const retried = flowOf([
+      [1, '规划助手', '规划', 'completed'],
+      [2, '执行', '任务 1 · 修复登录', 'failed'],
+      [3, '执行', '任务 1 · 修复登录', 'completed'],
+    ], { stopReason: 'completed' })
+    expect(retried.flow.nodes[2]!.subs!.map((sub) => [sub.taskNumber, sub.members.length, sub.state]))
+      .toEqual([[1, 2, 'done']])
+    const page = pageOf(retried.run)
+    const cells = hooksOf(page, 'data-gw-progress-sub')
+    expect(cells).toHaveLength(1)
+    const dots = walk(cells[0]!).filter((element) => element.props['className'] === 'gw-progress-sub-dot')
+    expect(dots.map((dot) => [dot.props['data-attempt'], dot.props['data-state']])).toEqual([['1', 'failed'], ['2', 'done']])
+    expect(texts(hooksOf(cells[0]!, 'data-gw-progress-sub-badge')[0]!)).toEqual(['第 2 遍'])
+
+    // 一次就过: one dot, numbered 1, and no badge — the normal case carries no word.
+    const once = pageOf(flowOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' }).run)
+    for (const cell of hooksOf(once, 'data-gw-progress-sub')) {
+      expect(walk(cell).filter((element) => element.props['className'] === 'gw-progress-sub-dot')
+        .map((dot) => dot.props['data-attempt'])).toEqual(['1'])
+      expect(hooksOf(cell, 'data-gw-progress-sub-badge')).toHaveLength(0)
+    }
   })
 
   it('lets a shipped draft outrank the rejected claim the same stream carries', () => {
