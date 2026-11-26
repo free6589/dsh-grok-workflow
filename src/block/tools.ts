@@ -28,6 +28,7 @@ import {
   appendBlockRow,
   blockLedgerDir,
   blocksFile,
+  canonicalDirectory,
   getBlockRow,
   isApproveAnswer,
   previewBlocks,
@@ -110,6 +111,41 @@ function sessionIdOf(agent: Agent): string {
   const text = id === undefined ? '' : String(id)
   if (text === '') throw new BlockToolError('invalid', '这个 agent 没有会话 id，账本无法归属')
   return text
+}
+
+/**
+ * The directory this caller's work belongs to — its session directory.
+ *
+ * Two sources, in this order, because neither is always there and only one of them
+ * is authoritative when both are:
+ *
+ * 1. the host's working-directory service, which holds the session's *effective*
+ *    directory including a committed `cd`. It is read inside `try`/`catch` because
+ *    cordis isolate guards throw on a service this profile does not register, and a
+ *    missing directory service must never break a block;
+ * 2. the session header's original `cwd`, which is what the session was created in.
+ *    It survives a restart but never follows a later `cd`.
+ *
+ * Both are untrusted input: only a non-empty absolute string survives, canonicalised
+ * by the same rule a preview's root uses (`canonicalDirectory`), so the value written
+ * at preview time and the fallback read at close time are one spelling of one tree.
+ * @param ctx - the plugin context, for the host service.
+ * @param agent - the calling agent, for its session.
+ * @returns The canonical absolute directory, or `undefined` when none was resolved.
+ */
+function sessionDirOf(ctx: Context, agent: Agent): string | undefined {
+  const session = agent.session as Session | undefined
+  try {
+    const service = (ctx as { workingDirectory?: { get(session: Session): unknown } }).workingDirectory
+    if (service !== undefined && session !== undefined) {
+      const fromService = canonicalDirectory(service.get(session))
+      if (fromService !== undefined) return fromService
+    }
+  } catch {
+    // No working-directory service in this profile (or a guarded read): fall through
+    // to the header, which is the one copy every session is created with.
+  }
+  return canonicalDirectory(session?.header?.cwd)
 }
 
 /**
@@ -435,6 +471,10 @@ export function registerBlockTools(deps: BlockToolDeps): void {
         if (objective === '') throw new BlockToolError('invalid', 'preview 需要 objective')
         const blocks = Array.isArray(args.blocks) ? args.blocks as unknown as Parameters<typeof previewBlocks>[0]['blocks'] : []
         if (blocks.length === 0) throw new BlockToolError('invalid', 'preview 至少需要一个块')
+        // The directory is recorded here, at the moment the user is asked to approve
+        // the split, because this is the only moment the approval directory is known
+        // for certain: the close may happen in another session, or after a restart.
+        const root = sessionDirOf(ctx, agent)
         try {
           const preview = previewBlocks({
             sessionId,
@@ -443,6 +483,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
             ...Array.isArray(args.constraints) ? { constraints: args.constraints as string[] } : {},
             ...Array.isArray(args.nonGoals) ? { nonGoals: args.nonGoals as string[] } : {},
             ...args.verify === undefined ? {} : { verify: args.verify as { blockSupervisor?: boolean } },
+            ...root === undefined ? {} : { root },
             now: nowMs(),
           })
           return {
@@ -615,6 +656,14 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       if (row === undefined) throw new BlockToolError('not-found', `账本里没有块 ${blockId}`)
       const block = blockOf(row, selectorOf(args))
       const tasks = tasksOf(Array.isArray(args.tasks) ? args.tasks as unknown as TaskInput[] : undefined, block)
+      // No task split at all is not a small hand-in, it is an unchecked one: nothing
+      // claims the acceptance criteria and nothing names an artifact, so every
+      // deterministic check would pass vacuously and the judge would be asked to bless
+      // an empty scope. `tasksOf` still falls back to the block's own tasks, so a second
+      // close of an accepted block — which carries the split it was judged on — works.
+      if (tasks.length === 0) {
+        throw new BlockToolError('invalid', '关单必须报任务拆法（tasks）：这一块名下也没有旧拆法；没有任务就没有产物与范围可核对')
+      }
       const verify = args.verify as { blockSupervisor?: boolean } | undefined
       // The judge default was fixed at order time, not at hand-off: the switch the
       // caller set on `grok_open_block` rides on the row (`BlockRow.verify`), so a
@@ -624,6 +673,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       const wanted = row.verify?.blockSupervisor !== false
       const judge = verify?.blockSupervisor ?? wanted
       if (!judge) logger.warn(`block ${blockId}: 本次未过监工（verify.blockSupervisor=false），只跑了确定性检查`)
+      const rowRoot = row.root ?? sessionDirOf(ctx, agent)
 
       const outcome = await runBlockSupervisor({
         ctx,
@@ -634,6 +684,10 @@ export function registerBlockTools(deps: BlockToolDeps): void {
         block,
         handoff,
         tasks,
+        // The row's own directory wins: it is the tree the split was approved in, and a
+        // close may arrive from a session standing somewhere else (or after a restart).
+        // Only a row written before this field existed falls back to this session.
+        ...rowRoot === undefined ? {} : { root: rowRoot },
         ...args.override === undefined ? {} : { override: args.override as { who: string, why: string } },
         judge,
         ...deps.now === undefined ? {} : { now: deps.now() },

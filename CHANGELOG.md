@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **Closing a block now looks for its files in the folder the work was approved in — even from another session, or after a restart / 关单现在去「当初批准这块活时所在的文件夹」里核对文件——换一个会话、甚至重启之后也一样** —
+  When you approve a block, the plugin now remembers which folder you approved it in, and a hand-in checks the reported
+  files there instead of in whatever folder the plugin itself happened to be started from. Before this, a hand-in could be
+  refused with "that file does not exist" for a file that really was sitting there — and the same folder reached by a
+  shortcut (a link) could be read as a different place, so a perfectly correct hand-in was called out of scope.
+  Since the folder is written into the record, the answer no longer depends on where you hand the block in: the same
+  session, another session, or a session after a restart all get the same answer.
+  **A hand-in that reports no task breakdown is now refused instead of being waved through** — no tasks means nothing to
+  check against, so it is turned back at the door rather than passed on.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed, and blocks approved before this
+  version simply behave the way they always did.**
+  / 你批准一块活的时候，插件会记住你是在哪个文件夹里批准的；这块活交工时，它就去那个文件夹里核对报上来的文件，
+  而不是去插件自己被启动时碰巧站着的地方找。在这之前，文件明明就在那儿，交工却会被判「这个文件不存在」；
+  同一个文件夹换条近路走（用链接绕过去）还会被判成别的地方，于是交得好好的也被说成超出了批准范围。
+  因为这个文件夹被写进了记录，答案就不再取决你在哪儿交工：同一个会话、换一个会话、重启之后的会话，得到的都是同一个答案。
+  **交工时一条任务都没拆的，现在会被直接退回，不再放过去**——没有任务就没有东西可核对，所以它在门口就被拦下，而不是往下传。
+  **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；这个版本之前批准的块，行为就是它一直以来的样子。**
+
 ## [0.13.50] - 2026-11-26
 
 ### Changed / 变更

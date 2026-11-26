@@ -1,3 +1,29 @@
+Last updated: 2026-11-26 16:10 +08:00（**关单改成按「批准时的目录」读产物、两边都规范化；没报任务拆法不再算过（`CONFIRMED`）** —
+分支 **`fix/supervisor-paths`**，worktree **`.agents/worktrees/fix-supervisor-paths`**，基线 `main` 尖端 **`c6248f8`**；
+**未 push、未打 tag、版本仍是 `0.13.50`、没碰 `~/.dsh` 与在跑的实例**。三条提交：源码 + 用例 **`08dd95d`**（8 文件 / +572 −19）、
+`lib/` 重建 **`3598eaa`**（22 文件 / +242 −25）、记忆提交紧随其后。缺陷一句话：六道确定性检查把任务声明的写路径当成
+「相对插件进程当前所在的目录」，所以目录 X 里批准的块会被答 `路径不存在`，而范围比较比的是两条原始字符串，
+绕一次符号链接的同一个目录被判成块外；**而且没有任何地方记下批准目录**，重启或换会话交工都无从恢复。
+修法是**在点头那一刻把目录记下来**：`previewBlocks` 规范化后记到预览 → `startBlock` 搬到 `BlockRow.root`
+（**不在 `splitHash` 里**，在 `rowHash` 里）→ `grok_close_block` 用 `row.root ?? sessionDirOf(ctx, agent)`
+（先问宿主 working-directory 服务、再退到会话 header 的 `cwd`）→ `runBlockSupervisor` 透传 `root` →
+`runDeterministicChecks` 把相对声明 join 到它上面、存在性与范围两边都 `canonical`，**判词里仍写调用方原来的拼法**。
+第二条规则：**一份空的有效拆法现在是硬拒**——工具侧 `BlockToolError('invalid', …)`（不写判词行、不调模型），
+检查侧同样一条叫 `任务拆法` 的否决，所以 workflow 路径与直接调 API 的调用方也过不去；`tasksOf` 仍回退到块自己的拆法，
+已接受块的第二次交工照常能走。**门禁（本机实测，`npm run build` 之后依次跑）**：`npm run build` `EXIT=0`、
+`client bundle: 386534 bytes → lib/client.js`（**与 `src/client/index.js` 逐字节相同**）、
+`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**、`npx oxlint src test` **`15 warnings / 0 errors`（187 文件）**、
+`TMPDIR=$PWD/.tmp npx vitest run` 六份 `block-*.spec.ts` → **`6 passed (6)` / `193 passed (193)`**
+（supervisor 26 / tools 29 / preview 93 / ledger 20 / flag 11 / flag-baseline 14）；被改的两份 spec 从 **43 条**长到 **55 条**；
+`node scripts/verify-lib.mjs`（`lib` 提交之后）读到 **`lib/ at 3598eaa is the build of src/ at 3598eaa (293 files, byte-identical)`**。
+**两处照实记的边界**：① `canonical()` 在「没有 `root` 且路径相对」时原样返回（注入 seam 的用例靠它逐字节不变），
+反过来「绝对声明 + 没有 `root`」现在会先 `realpath`——一处真的收窄，全仓没有 spec 钉过那条旧字符串；
+② `src/supervisor/verdict.ts` 那句 `（这次交工没有报任务拆法）` 的提示文案**还在但已不可达**（第 1 道检查先否决），
+留着是因为导出的 `supervisorPrompt` 仍可被塞空拆法，删它超出本块范围。**`NOT_RUN` 四条**：整仓 `npx vitest run`（`AGENTS.md` §12）、
+`npm run ci`、块工具真机 soak、live 档案升级。细节见 `D-171`、`VALIDATION.md` 同日条目、`HANDOFF.md` 同日段落。）
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 15:30 的 **`0.13.50` 发布收口**那一轮，它的读数与结论未改动。）
+
 Last updated: 2026-11-26 15:30 +08:00（**`0.13.50` 已发布并收口；这一版发出去的就是「手机上的进度图变成一棵树」**：发布提交 **`55a8afdaac6511dd1e1a84227e11b7dcbfe32d2b`**（`chore(release): prepare v0.13.50`，**单父 `4278ccd`**，8 文件 / **+24 −22**——`CHANGELOG.md`、`README.md`、`README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js` 各 1–6 行），**`main` 是从 `33c170b` 快进过去的、没有 merge 提交**（`33c170b` → `4278ccd` 功能分支唯一提交 → `55a8afd` 发布提交）；现在 **`main` = `origin/main` = 发布提交 = 标签剥出的提交 = `55a8afd`**。附注标签 **`v0.13.50`** 对象 **`8d07914432851377ad460aa85d296f11296b77c9`** → 剥出 `55a8afd`、消息 `Grok Workflow for DSH v0.13.50`、`tagger` 时刻 **2026-11-26 15:26:08 +0800**；推送输出 `33c170b..55a8afd  release/0.13.50 -> main` 与 `* [new tag]         v0.13.50 -> v0.13.50`，**没有 force-push、没有移动任何已发布标签**（推前推后各读一次 `git ls-remote --tags origin`：`v0.13.45` `ca4a42c6…`、`v0.13.46` `a1f0f85d…`→`84f64c8c…`、`v0.13.47` `d74e06ee…`→`63d039b6…`、`v0.13.48` `d3d98b94…`→`391e0a69…`、`v0.13.49` `639c6c8c…`→`88adda89…` 五条逐字未变）。**发布门禁只有一份，是本轮唯一一次整份门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在 `55a8afd` 的干净树上 → **`GATE_EXIT=0`**（转录末行）、`Test Files 105 passed (105)` / `Tests 2045 passed (2045)` / `Duration 86.34s`、`Found 15 warnings and 0 errors.`、`lib/ at 55a8afd is the build of src/ at 55a8afd (293 files, byte-identical)`、`client bundle: 386534 bytes → lib/client.js`；转录 **`.rsi/evidence/release-0.13.50-2026-11-26/gate-release-55a8afd.out`**（**373 行 / 22004 字节 / `sha256 07bdb64d43652bb5c4629494e5cf88d22c4433b89ddfa2a6f351e86365e64c07`**），收口这一轮自己逐行读过、并另外自己跑了一遍 `node scripts/verify-lib.mjs` 读到 **`VERIFY_LIB_EXIT=0`**（同一句 `293 files, byte-identical`，跑完 `git status` 仍空）。**两个远端 run 都 `completed success`**：CI **`45775313465`**（`push` / `main` / `55a8afd`）、Release **`45775329492`**（`push` / `v0.13.50` / `55a8afd`）；**GitHub Release** `Grok Workflow for DSH v0.13.50`（<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.50>，非 draft、非 prerelease、`targetCommitish main`、`publishedAt 2026-11-26T07:27:38Z`，正文 **29 行 / 3234 字节**，唯一资产 `dsh-grok-workflow-0.13.50.tgz` = **1015152** 字节、`digest sha256:50b191cdec86d338efa063a6088896bb00c1e05ca2800ec9ce9664f8edbf5719`；比 `0.13.49` 的 1009915 字节**多 5237**）。用例 `2034 → 2045`（**+11**）、客户端 bundle `372480 → 386534`（**+14054**）、`lib/` 文件数 `293 → 293`。**本机收尾**：`.tmp/wt-mobile-tree` 已移除、`fix/flowchart-mobile-tree` 已用 `-d` 删掉（`was 4278ccd`，先让主检出 `git merge --ff-only origin/main` 追上 `55a8afd` 才删得掉）、主检出已对齐到 `55a8afd`；`.tmp/wt-release-0.13.50` 与 `release/0.13.50` 在**这一颗记忆提交推上去之后**才移除 / 删除——worktree 删不掉自己脚下的目录，所以顺序只能这样。**`NOT_RUN` 两条**：收口这一轮**没有重跑真机 soak**（手机上看得到的行为由上一块 `.rsi/evidence/mobile-tree-2026-11-26/` 的模拟屏读数覆盖——**不是真手机**，真机那一格仍是 `NOT_RUN`）、也没有重跑第二遍整份门禁（`AGENTS.md` §12）；npm publish `NOT_RUN`（本仓库不发 npm）。**`BLOCKED` 一条**：`AGENTS.md` §13 的 live 档案升级——`~/.dsh` 在工作区外、本会话 `workspace-write`，探测 `: > ~/.dsh/.release-probe-0.13.50` 被拒（`Read-only file system`），**没重试绕过、没重载、没重启、没写 `~/.dsh`**；live 那条插件行读作浮动的 `github:free6589/dsh-grok-workflow`。**有写权限的人要做的（一条）**：把 live 档案那条插件行钉到**确切的 `v0.13.50`**（绝不用浮动范围、`latest` 或分支名），读回版本必须是 **`0.13.50`**，读不回就**回滚那一行**并报出回滚后的版本。
 
 （以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 14:58 的**手机树排版**那一轮——它写的「≤720px 换成树、>720px 一个字没动」在本轮重读仍成立，也是这一版随发布带出去的东西；它那句「这条分支自己零提交、全部改动还在工作树里」**是失实的**（改动实际是提交 `4278ccd`），本轮已就地改正这一个说法，其余结论一字未动。再往下是 13:41 的 `0.13.49` 发布收口、13:36 的 `D-169` 更正、12:24 的「`0.13.49` 备好、门禁绿、故意没发」、`0.13.48` 发版收口等更早的条目。）

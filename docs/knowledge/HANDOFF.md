@@ -1,3 +1,26 @@
+## 2026-11-26 — **关单改为按「批准时的目录」读产物、空拆法硬拒**（分支 `fix/supervisor-paths`，提交 `08dd95d` + `3598eaa` + 记忆提交）；**块内门禁绿，剩下两件事**
+
+- **From:** 本块的检查那一半（`agent-213/supervisor-checks`）· **To:** 合并这条分支的人 / 下一个接手关单判定的人
+- **这条分支现在是什么（`CONFIRMED`）**：从 `main` 尖端 **`c6248f8`** 长出，三条提交：源码 + 用例 **`08dd95d`**、
+  `lib/` 重建 **`3598eaa`**、本条记忆提交紧随其后。**未推、未打 tag、版本仍是 `0.13.50`**，没碰 `~/.dsh` 与在跑的实例。
+  改的是 `BlockRow` 多一个 `root`（批准目录，**不在 `splitHash` 里**、在 `rowHash` 里）、`grok_open_block` / `grok_close_block` 记与读它、
+  `runDeterministicChecks` 把相对声明 join 到它上面并把存在性/范围两边都规范化，外加「空拆法不再算过」的两道拒绝。契约见 `D-171`。
+- **跑过什么（`CONFIRMED`）**：`npm run build` `EXIT=0`（`386534 bytes`，浏览器包逐字节不变）、`tsc --noEmit` `EXIT=0`、
+  `oxlint src test` `15 warnings / 0 errors`（187 文件）、六份 `block-*` spec **`6 files / 193 passed`**、
+  `verify:lib` 读到 `lib/ at 3598eaa is the build of src/ at 3598eaa (293 files, byte-identical)`。
+- **没跑什么（`NOT_RUN`）**：整仓 `npx vitest run`、`npm run ci`、块工具的真机 soak、live 档案升级（`AGENTS.md` §12）。
+
+### 交给下一个人的两件事（**都没做，不是做了没记**）
+
+1. **监工模型在这条路上仍然没有真机验证。** 本块只证明了确定性那半（六道检查 + 空拆法）看得见新目录、判得出范围；
+   `grok_close_block` 里真正的模型判断（`src/supervisor/verdict.ts` 那条腿）**一次都没有在真机上跑过**，
+   也没有装进隔离档案做一次「批准→交工→判词」的完整回合。要收这条，得在隔离 `DSH_HOME` 里装包、用真会话走一遍。
+2. **`src/supervisor/verdict.ts:108` 那句 `（这次交工没有报任务拆法）` 还在。** 通过 `runBlockSupervisor` 它**已经不可达**
+   （第 1 道检查先否决，模型不会被问到），留着是因为导出的 `supervisorPrompt` 仍可被人直接塞一份空拆法。
+   删它不在本块范围内；谁动手请连它的用例一起看，别只删文案。
+
+（以下为本轮之前的记录，原样保留：紧接下面是 2026-11-26 的 **`0.13.50` 发布收口**那一轮与它留下的六条未修项。）
+
 ## 2026-11-26 — **`0.13.50` 已发布并收口**（发布提交 `55a8afd`，附注标签 `v0.13.50` 对象 `8d079144…`、`main` 从 `33c170b` 快进，两个远端 run 都 success）；**审计留下的六条未修项照实留在这里，一条都没改代码**
 
 - **From:** 收口施工者（`agent-211/closer`）· **To:** 下一个接手进度页 / 手机排版的人

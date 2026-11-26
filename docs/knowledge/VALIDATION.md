@@ -1,3 +1,41 @@
+## 关单按批准目录读产物 + 空拆法硬拒（`fix/supervisor-paths`，基线 `c6248f8`）：门禁四格全绿、六份 `block-*` spec **`6 files / 193 passed`**、`verify:lib` **`byte-identical`**；**整仓套件 / `npm run ci` / 真机 soak / live 升级四项 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：修两件事，都在「关单判定」这条路上。① 六道确定性检查原来把任务声明的写路径当成
+「相对插件进程当前所在的目录」，于是目录 X 里批准的块会被答 `路径不存在`；范围比较又拿两条原始字符串比，
+绕一次符号链接的同一个目录被判成块外。② 一份空的（或没报的）任务拆法原来只落一条 warning、照样能过。
+修法见 `D-171`；这一轮只跑本块自己的门禁，不做整份。
+
+**门禁（`CONFIRMED`，本机 worktree `.agents/worktrees/fix-supervisor-paths`，按执行顺序）**
+
+| 命令 | 结果 | 说明 |
+| --- | --- | --- |
+| `npm run build` | `EXIT=0`，`client bundle: 386534 bytes → lib/client.js` | `tsc -p tsconfig.build.json` + `build-client.mjs`；浏览器包与 `src/client/index.js` **分别 `cmp` 过，逐字节相同**，`lib/client.js` 不在改动清单里 |
+| `npx tsc -p tsconfig.json --noEmit` | **`TSC_EXIT=0`** | 无输出 |
+| `npx oxlint src test` | **`Found 15 warnings and 0 errors.`（187 文件 / 96 规则，45 ms）** | 与 `0.13.50` 发布门禁同一读数（15/0）；这 15 条都在本块没碰的文件里，本块改过的四个文件单独跑是 `0 warnings / 0 errors` |
+| `TMPDIR=$PWD/.tmp npx vitest run test/block-supervisor.spec.ts test/block-tools.spec.ts test/block-preview.spec.ts test/block-ledger.spec.ts test/block-flag.spec.ts test/block-flag-baseline.spec.ts` | **`Test Files 6 passed (6)` / `Tests 193 passed (193)`**（`EXIT=0`，14.34 s） | 逐份：`block-supervisor` **26**、`block-tools` **29**、`block-preview` **93**、`block-ledger` **20**、`block-flag` **11**、`block-flag-baseline` **14** |
+| `node scripts/verify-lib.mjs`（在 `lib` 提交之后跑） | **`lib/ at 3598eaa is the build of src/ at 3598eaa (293 files, byte-identical)`**，`VERIFY_LIB_EXIT=0` | 它把 `HEAD` 在临时目录里重建再比，所以只能排在 `lib` 提交之后；跑完 `git status` 无残留 |
+
+**用例账（`CONFIRMED`）**：被改的两份 spec 从 **43 条**（`block-supervisor` 20 + `block-tools` 23）长到 **55 条**（26 + 29），
+新增的六条在 `block-supervisor.spec.ts` 里，全部走**真文件系统**（`mkdtempSync` 根目录、真目录、真符号链接、默认真 `exists`），
+没有 mock、没有注入路径集合：根被 join 上去、符号链接两侧规范化后判为范围内、真不同则照旧判块外、
+空拆法与省略拆法各一条否决（`engine.startCalls.length === 0`、判词文件正好长一行）、
+以及「没有 `root` 时相对路径逐字节到 seam」这条兼容钉子。
+
+**不是空过（`CONFIRMED`，对照实验）**：把 `main` 版 `checks.ts` 单独编译出来，喂给同样三份 fixture，
+三处缺陷全部复现——目录 X 里真存在的 `notes/a.md:1` 被判 `路径不存在`、`link/a.md` 对批准范围 `real` 被判 `范围 ⊆ 批准`、
+`tasks: []` 只得到那条 warning 而没有 `任务拆法` 否决。对照实验的临时文件已删除，`.tmp/` 里不留东西。
+
+**照实留白（`NOT_RUN` / 边界）**
+
+- **整仓 `npx vitest run` `NOT_RUN`**：`AGENTS.md` §12 把块内门禁收在被改的 spec 上，整份留给发布提交那一次。
+- **`npm run ci` `NOT_RUN`**：同上，含它里面的 `verify:lib` 与全量套件。
+- **块工具的真机 soak `NOT_RUN`**：没有在隔离档案里装包、也没有真会话关单；这条路的真机形态没量过。
+- **live 档案升级 `NOT_RUN`**：本块不发版、不碰 `~/.dsh`。
+- **一条已不可达但还在的文案**：`src/supervisor/verdict.ts` 的 `（这次交工没有报任务拆法）`——通过 `runBlockSupervisor` 已经走不到（第 1 道检查先否决），
+  但导出的 `supervisorPrompt` 仍可被塞空拆法，所以留着；**没有删**，也不需要为本块删。
+- **一处真的收窄**：绝对声明 + 没有 `root` 时，交 seam 之前会先 `realpath`。全仓只有 `block-supervisor.spec.ts` 注入 `exists`，
+  且声明路径都是相对的，所以没有用例被这条改变；但它是行为变化，记在这里而不是藏起来。
+
 ## `0.13.50` **发出去并收口**：发布提交 `55a8afd`、`main` 从 `33c170b` 快进、附注标签 `v0.13.50` 对象 `8d079144…`、两个远端 run 都 success、Release 资产 **1015152** 字节（比 `0.13.49` **+5237**）；发布门禁在 `55a8afd` 的干净树上 **`GATE_EXIT=0`**（`105 files / 2045 passed` / `86.34s`），收口这一轮自己另跑一遍 `verify:lib` 读到 **`VERIFY_LIB_EXIT=0`**；**真机 soak `NOT_RUN`**（行为由上一块的模拟屏读数覆盖）、**live 档案升级 `BLOCKED`**、npm publish `NOT_RUN` — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`0.13.50` 的收口。功能本身没在这一轮写——要发的东西是上一块的「手机上的进度图变成一棵树」

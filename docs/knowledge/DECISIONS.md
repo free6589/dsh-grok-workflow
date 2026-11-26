@@ -5025,3 +5025,61 @@ spine 为空，pre-fix 形状会进脊柱。
   `1 failed | 340 passed (341)`（唯一的红是「包没重建」那一句）、重建后整仓 `105 files / 2045 passed`、
   `client bundle: 386534 bytes`（`lib/client.js` 与 `src/client/index.js` 同哈希）。契约见 `DESIGN-progress-tab.md` §24，
   本决定另在 `STATE.md` / `VALIDATION.md` / `HANDOFF.md` 三处留了同一天的记录。
+
+## D-171 · 关单按**批准时的目录**读产物、存在性与范围两边都规范化；没报任务拆法不再是过（2026-11-26，`fix/supervisor-paths`，worktree `.agents/worktrees/fix-supervisor-paths`，基线 `main` 尖端 **`c6248f8`**；**未合、未推、未打 tag、版本仍是 `0.13.50`**）
+
+- **Date:** 2026-11-26
+- **Context:** 六道确定性检查一直把任务声明的写路径当成「相对插件进程当前所在的目录」。插件进程站在哪里，取决于宿主怎么起它，
+  跟「用户在哪个目录里批准了这一块」没有关系。真机上因此出现两个错判，而且是同一个根因的两面：
+  ① **产物被报「不存在」**——在目录 X 批准的块，交工时对 `src/foo.ts` 答 `路径不存在`，而那个文件真的在 X 底下；
+  ② **范围被判「不在批准范围内」**——范围比较拿的是两条**原始字符串**，所以同一个目录绕一次符号链接的写法
+  （`link/a.md` 对 `real/a.md`）被判成块外，虽然两个拼法指的是同一个文件。
+  更要紧的是：**没有任何地方记下批准目录**。所以重启之后、或换一个会话交工，这条信息**无法恢复**——不是「恢复得不准」，是根本无从恢复。
+- **Decision:**
+  1. **在「问用户点头」那一刻把目录记到账本上。** `previewBlocks` 用 `canonicalDirectory()` 把调用方的会话目录规范化后挂在预览上
+     （只接受非空绝对路径；相对路径、空串、非字符串一律**丢弃而不是拒绝**——预览必须保持廉价且总能用，一个说不清的目录不是否掉拆法的理由）；
+     `startBlock` 再原样搬到 `BlockRow.root`。该字段**不在 `splitHash` 里**（哈希回答「哪份活」，目录回答「哪棵树」），
+     而在 `rowHash` 里，所以被手改会照常被读出来。没有目录的预览**不带这个键**，老行逐字节不变。
+  2. **交工时优先读行上的目录。** `grok_close_block` 用 `row.root ?? sessionDirOf(ctx, agent)`：行上的目录赢，
+     因为那才是这块活被批准的地方；只有这条字段出现之前写下的老行才退回本会话目录。
+     `sessionDirOf` 先问宿主的 working-directory 服务（含已提交的 `cd`，读在 `try`/`catch` 里，档案没注册这个服务也不能炸），
+     再退到会话 header 的 `cwd`（重启后还在，但跟不上后来的 `cd`），两者都过同一把规范化尺子，所以两处写出来的是同一个树的同一个拼法。
+     `runBlockSupervisor` 把 `root` 透传给 `runDeterministicChecks`。
+  3. **检查里只在两处用它，且两边都规范化。** 存在性候选 = `canonical(resolveDeclared(root, base))`；
+     范围比较 = `isInside(canonical(resolveDeclared(root, 声明)), canonical(resolveDeclared(root, 批准)))`。
+     判词里**仍然引用调用方原来的拼法**——规范化的绝对路径是检查器自己的工作值，绝不写进 `criterion` / `evidence`。
+     模块保持纯：没有输入变更，没有新依赖（只用 `node:fs` / `node:path`）。
+  4. **一条任务都没拆，两条路都不算过。** 工具侧 `throw BlockToolError('invalid', …)`（不写判词行、不调模型）；
+     检查侧同样是一条叫 `任务拆法` 的否决（`evidence` 是 `0 条任务`）。原来那个「只按块自己的验收检查」的
+     `warnings.push` 删除。`tasksOf` 仍然回退到块自己的拆法，所以**已接受块的第二次交工**（带着当初被判过的那份拆法）照常能走。
+- **Alternatives rejected:**
+  - **继续用 `process.cwd()`，只加规范化。** 规范化只能修好第 ② 面；第 ① 面（目录根本不是那个）与重启后无从恢复，规范化一无所救。
+  - **让每个工具调用方各自传一个绝对路径，账本不记。** 那等于把「批准时的目录」这条事实交给每个调用方各自记一遍；
+    换会话交工就没人传得出来，而「换会话交工」正是这个 bug 的真机形态之一。
+  - **把 `root` 算进 `splitHash`。** 那么 `cd` 之后重新预览同一份拆法会算成另一份活，幂等规则失效、账本多出一行「改了」的假记录。
+    目录是活所在的树，不是活本身，和 `verify` 同一个理由放在指纹之外。
+  - **相对路径的目录也收下（用 `process.cwd()` 补齐）。** 那正好把本 bug 的错答案当成事实写进账本，比不记更坏。
+  - **空拆法只在工具侧拒。** workflow 路径与直接调 API 的调用方不走工具层，它们会绕过唯一那道闸；所以检查侧也要一条自己的否决。
+- **Consequences / 已知边界（照实记）：**
+  1. **`canonical()` 在「没有 `root` 且路径是相对的」时原样返回**，不做 `realpath`。这是**为了兼容**：`realpathSync.native('src/block/tools.ts')`
+     会返回绝对路径，而仓库里所有注入 `exists` seam 的用例都靠那条字符串逐字节不变。代价是这一支没有规范化收益。
+  2. **反过来是收窄：绝对声明 + 没有 `root` 时，现在会先 `realpath` 再交给 seam。** 全仓没有任何 spec 钉过那条旧字符串
+     （`grep 'exists:' test/*.spec.ts` 只有 `block-supervisor.spec.ts` 一处注入），所以没有用例被这条打破；但这是一处真的行为收窄，不藏。
+  3. **`src/supervisor/verdict.ts` 里那句 `（这次交工没有报任务拆法）` 的提示文案还在。** 通过 `runBlockSupervisor` 它已经**不可达**
+     （第 1 道检查先否决），留着是因为导出的 `supervisorPrompt` 仍然可以被人塞一份空拆法，而删它超出本块范围。**照实记，没有删。**
+  4. **`root` 不在 `splitHash` 里，所以 `cd` 之后重新预览同一份拆法仍然返回第一行、带着第一行的 `root`。** 这是既有的幂等规则，本块没有改它。
+  5. **`BlockRow.root` 是新字段，老行没有它。** 老行的交工退回本会话目录，也就是「老行为」；没有做数据迁移（账本只追加，不改写历史行）。
+- **Evidence:** 分支 `fix/supervisor-paths`（worktree `.agents/worktrees/fix-supervisor-paths`，基线 `main` 尖端 **`c6248f8`**）：
+  源码 + 用例提交 **`08dd95d`**（8 文件 / +572 −19）、`lib/` 重建提交 **`3598eaa`**（22 文件 / +242 −25）、本条记忆提交紧随其后。
+  **本块自己没有推、没打 tag、没抬版本**（仍是 `0.13.50`），也没碰 `~/.dsh` 与在跑的实例。
+  门禁（本机实测）：`npm run build` `EXIT=0`、`client bundle: 386534 bytes → lib/client.js`（浏览器包与 `src/client/index.js` **逐字节相同**，
+  `cmp` 空输出，`lib/client.js` 不在改动清单里）；`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；
+  `npx oxlint src test` **`Found 15 warnings and 0 errors.`（187 文件 / 96 规则）**；
+  `TMPDIR=$PWD/.tmp npx vitest run` 六份 `block-*.spec.ts` → **`6 passed (6)` / `193 passed (193)`**
+  （`block-supervisor` 26 / `block-tools` 29 / `block-preview` 93 / `block-ledger` 20 / `block-flag` 11 / `block-flag-baseline` 14）。
+  被改的两份 spec 自己从 **43 条**（20 + 23）长到 **55 条**（26 + 29）。`node scripts/verify-lib.mjs` 在 `lib` 提交之后读到
+  **`lib/ at 3598eaa is the build of src/ at 3598eaa (293 files, byte-identical)`**（`VERIFY_LIB_EXIT=0`）。
+  新用例全部**真文件系统**（`mkdtempSync` 根、真目录、真符号链接、默认真 `exists`），没有 mock；另做了一次**对照实验**
+  证明它们不是空过：把 `main` 的 `checks.ts` 单独编译出来喂同样三份 fixture，三处缺陷全部复现（`路径不存在` / `范围 ⊆ 批准` / 只有 warning）。
+  **`NOT_RUN` 照实记：** 整仓 `npx vitest run`（`AGENTS.md` §12 把块内门禁收在被改的 spec 上）、`npm run ci`、
+  块工具的真机 soak、以及 live 档案升级——这四项本块都没有跑。

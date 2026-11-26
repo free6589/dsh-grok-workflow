@@ -115,6 +115,20 @@ export interface BlockRow {
     sessionId: string;
     objective: string;
     splitHash: string;
+    /**
+     * The absolute, canonical session directory this split was approved in.
+     *
+     * A declared write path is relative to the directory the user approved the split
+     * in, not to wherever the plugin process happens to stand — the host may stand in
+     * another checkout, and a restart loses any cwd it had. Recording the directory on
+     * the row is what lets a close in another session (or after a restart) resolve a
+     * path like `notes/a.md` against the tree the work really lives in.
+     *
+     * Absent on rows written before this field existed, and when no directory could be
+     * resolved. It is deliberately not part of `splitHash` (the hash answers "which
+     * work", not "which tree") and is inside `rowHash` automatically.
+     */
+    root?: string;
     approval: BlockApproval;
     blocks: BlockEntry[];
     /**
