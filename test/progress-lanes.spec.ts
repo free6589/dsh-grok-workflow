@@ -20,10 +20,10 @@ import { describe, expect, it } from 'vitest'
  *    (every §21 hook intact), and a work column carries one `[data-gw-progress-sub]` per
  *    plan task — present without being opened, because the task row is the drawing.
  * 3. **The geometry (追加 3).** Height, radius, gaps and the state gradient are literal
- *    numbers, not taste: 32px steps, 26px cells, 10px radius, 999px capsules at the ends,
- *    12px columns, 6px cells, `12% → 5%` of the state token, `pending` the only dashed and
- *    the only ungradiented state, overlays absolute, no sideways scroller, no literal
- *    colour, no error token.
+ *    numbers, not taste: 32px steps with a 10px radius, 26px cells with a **6px** radius,
+ *    999px capsules at the two ends, 12px columns, 6px between cells, `12% → 5%` of the
+ *    state token, `pending` the only dashed and the only ungradiented state, overlays
+ *    absolute, no sideways scroller, no literal colour, no error token.
  * 4. **The wires (追加 4).** Direction is a marker (`#gw-progress-arrow`), and a pair of
  *    neighbours that wrapped is drawn as a three-segment elbow instead of being dropped —
  *    the one place this block deliberately departs from §21.
@@ -880,7 +880,10 @@ describe('lanes: the geometry is fixed by numbers (追加 3)', () => {
     expect(step.body).toContain('box-sizing: border-box')
     const cell = ruleOf('.gw-progress-sub')
     expect(cell.body).toContain('height: 26px')
-    expect(styleOf('gw-progress-sub')).toContain('border-radius: 10px')
+    // 6px, not 10px: a 26px box given a 10px radius is 77% of its own half-height, which
+    // reads as a pill. The cell is a block; the step node keeps 10px and the ends keep 999px.
+    expect(styleOf('gw-progress-sub')).toContain('border-radius: 6px')
+    expect(styleOf('gw-progress-sub'), 'a cell rounded like a step reads as a pill').not.toContain('border-radius: 10px')
   })
 
   it('keeps the two ends as capsules while the steps are rounded rectangles', () => {
