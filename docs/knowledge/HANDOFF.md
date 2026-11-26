@@ -1,4 +1,4 @@
-## 2026-11-26 — `0.13.49` 的回合闸门**已删、只留注入**（分支 `release/0.13.49` 尖端 `0bc617f`，`main` 仍 `a5dfc75`）：操作者的决定已经下了并施工完毕，**剩下的是发版五步 + 一次 live 钉版本**；`npm run ci`、tag、push、Release run、live 升级**一步都还没跑**
+## 2026-11-26 — `0.13.49` 的回合闸门**已删、只留注入**（分支 `release/0.13.49` 尖端 `0bc617f`，`main` 仍 `a5dfc75`）：操作者的决定已经下了并施工完毕，**服从路径也在真机上走通了**（一句 `确认` 之后真起了团队、答出两个数），**剩下的是发版五步 + 一次 live 钉版本**；`npm run ci`、tag、push、Release run、live 升级**一步都还没跑**
 
 - **From:** 记忆施工者（`agent-209/memory`）· **To:** 派单层（发版五步）/ 本机能写 `~/.dsh` 的人（live 钉版本）
 - **这一轮做完的**：
@@ -12,12 +12,20 @@
      定向 7 份 spec **119 passed**、整仓 **`105 files / 2034 passed`** / `66.90s`、`client bundle: 372480 bytes`、
      `verify:lib` 在 `e7ecfab` 上 `293 files, byte-identical`。
   4. **真机 soak 跑完并留证**（克隆 live web、`DSH_HOME=.tmp/soak-cut/dsh-home`、端口 3392、抓包 18190→18088、真模型）：
-     **7 个会话、拒绝行 0 条、`blocked` 0 条**、旧的死法没再出现（A1 走到第 5 步）；注入仍在（480 字节、原话是字节前缀、对照轮 0）。
-     原件在 `.rsi/evidence/force-team-cut-2026-11-26/`（259 行 `README.md`）。
+     **同一装置追加两轮，共 14 个会话、拒绝行 0 条、`blocked` 0 条、13 条 `turn/end` 全是 `completed`**、旧的死法没再出现
+     （A1 走到第 5 步）；注入仍在（480 字节、原话是字节前缀、对照轮 0）。**补记 G 把服从路径也证到了**：
+     `session-518372ad-665d-4abf-b025-c891fc46adf1` 里一句 `确认` → `block_id 456899bb-…` → `plan-30d80f25` / `plan-1840af41`
+     → 两个子代理跑完 → 两次 `veto` 后 `pass` → 答出 **README.md 397 行 / CHANGELOG.md 4476 行**（与 `wc -l` 逐字相同），
+     15 步 / 14 次工具调用、两个 `turn/end` 都 `completed`；`run-start` / `run-end` / `agent-start` / `agent-end` / `tool-workflow/*` 全 0
+     （团队走「块 + 子代理」那条路，不是 workflow 引擎）。
+     原件在 `.rsi/evidence/force-team-cut-2026-11-26/`——**证据提交 `995161f`**（97 文件 / 7.0M，`README.md` 433 行；
+     日志目录已由 `sessions/` 改名为 `session-logs/`，因为 `.gitignore` 忽略任何 `sessions/`）。
   5. 记录写完：`DECISIONS.md` 的 **`D-169`**（`D-167` 第 2 条与 `D-168` 从此失效，两条原样留作历史）、`VALIDATION.md` 与 `STATE.md` 各新一条。
-- **没做到的（照实说，别升级成「验过」）**：**「开团 → 真团队 → 给出数字」这半没有证到**——5 个关键词回合都只到
-  `grok_open_block` 的接单预览（A2 `bp-6bd71c12-…`、E `bp-a7edd454-…`），`grok_workflow` 一次没调、`tool-workflow/*` 0 条、
-  没有任何块被认领。续轮（回一句「确认」看团队真跑起来）装置做不到，`NOT_RUN`。
+- **仍然留白的一条（`NOT_RUN`，别改写成「验过」）**：拿 **A2 那条已存会话**去「确认」这条路线**不成立**——补记 F 试过一次，
+  隔离档案里运行时把 `storages/workspace.json` 的 `sessionIds` 改写成新会话 id，恢复进去的 `session-b6a3f106-…` 被丢掉、
+  侧边栏里没有它，那句「确认」落进了一个新会话（`session-a7d42f5d-…`，2 步、停在 `ask_user_question`、无 `turn/end`）。
+  按派单「只试一次」停手；走通的是补记 G 那条**在同一个活着的会话里说确认**。要复现续轮，得在跑着的那一页里发第二句，
+  不能靠搬档案复活会话。
 - **下一件事，一条一件，照顺序做**：
   1. **发版第 1 步 —— 跑整份门禁**：在**发布提交**的干净树上跑一次 `TMPDIR=$PWD/.tmp npm run ci`，必须 `GATE_EXIT=0`。
      本轮 `NOT_RUN`（`AGENTS.md` §12：块内只跑 `typecheck + lint + 碰到的 spec`）。
