@@ -1,0 +1,168 @@
+{
+ "note": "Three live runs were needed, not one: the first drove the desktop captures; the second was driven from a phone context but its browser was stopped mid-run (the run itself still wrote the three files); the third is the phone run whose session every phone/tablet shot comes from. Each is timestamped; nothing here is estimated.",
+ "environment": {
+  "commit": "45909bb",
+  "profile": "web-clone (clone of ~/.dsh/profiles/web)",
+  "home": ".tmp/soak-panel/dsh-home (deleted at teardown)",
+  "workspace": ".tmp/soak-panel/work (deleted at teardown)",
+  "port": 3411,
+  "url": "http://127.0.0.1:3411/?token=<redacted>",
+  "node": "v26.8.1",
+  "npm": "11.19.0",
+  "dsh": "0.2.2-rc.3",
+  "installedPlugin": "dsh-grok-workflow 0.13.52 from .tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz",
+  "modelPins": {
+   "roles.planner": "bifrost-responses/opencode-go/muse-spark-1.3-contributor (as cloned)",
+   "roles.worker": "repinned from agent2api/deepseek-v4.1-flash + agent2api/glm-5.3-flash to bifrost-responses/opencode-go/muse-spark-1.3-contributor (this machine has no AGENT2API_API_KEY)",
+   "roles.verifier": "repinned to bifrost-responses/opencode-go/muse-spark-1.3-contributor",
+   "roles.synthesizer": "bifrost-responses/opencode-go/muse-spark-1.3-contributor (as cloned)",
+   "roles.supervisor": "repinned to bifrost-responses/opencode-go/muse-spark-1.3-contributor",
+   "guardianModel": "repinned to bifrost-responses/opencode-go/muse-spark-1.3-contributor",
+   "agent-default-model": "bifrost-responses/opencode-go/muse-spark-1.3-contributor, effort max (as cloned)",
+   "staleConfigRemoved": "grok-workflow config key `mode: triage` (this plugin no longer reads `mode`; config.ts lists it as removed)"
+  },
+  "prompt": "the exact one line the block specifies (用 grok_workflow 工具跑一个工作流…)"
+ },
+ "runA_desktop": {
+  "sent": "2026-11-26T18:36:09.256+08:00",
+  "progressTabOpenedAfterSeconds": 0.59,
+  "desktopRunning": {
+   "file": "soak/desktop-1500-running.png",
+   "chip": "进行中",
+   "line": "第 6 步，共 7 步 · 还剩约 25 秒",
+   "note": "kept image is the last overwrite of a harness guard bug: the sampler re-shot every iteration, so the surviving frame is from t≈127.7 s, still running, not the 12 s one"
+  },
+  "desktopDone": {
+   "file": "soak/desktop-1500-done.png",
+   "chip": "已完成",
+   "line": "第 7 步，共 7 步",
+   "atSeconds": 129.81
+  },
+  "interactions": {
+   "nodeId": "execute_t1",
+   "firstClick": {
+    "calls": 1,
+    "traceActive": 5,
+    "traceDim": 19,
+    "file": "soak/desktop-1500-node-open.png"
+   },
+   "secondClick": {
+    "calls": 0,
+    "traceActive": 0,
+    "traceDim": 0,
+    "file": "soak/desktop-1500-trace.png",
+    "note": "one click toggles BOTH the call list and the trace: the brief expected the second click to keep the list open and trace it; measured behaviour closes the list and drops the trace"
+   },
+   "thirdClick": {
+    "calls": 1,
+    "traceActive": 5,
+    "traceDim": 19,
+    "file": "soak/desktop-1500-trace-open.png"
+   }
+  },
+  "filesWritten": [
+   "notes.md 90 B",
+   "test.txt 6 B",
+   "third.txt 4 B"
+  ]
+ },
+ "runB_phone_aborted": {
+  "sent": "2026-11-26T18:39:24+08:00",
+  "stoppedAt": "2026-11-26T18:41 (browser closed)",
+  "why": "the 390 px tab strip offered only 对话/轨迹; the 进度 view was not reachable that way and the sampler gave up after 40 s. The run itself was already writing its files (notes.md/test.txt/third.txt rewritten 18:39), so nothing about the page is inferred from it; it is superseded by run C.",
+  "produced": "nothing used as evidence"
+ },
+ "runC_phone": {
+  "sent": "2026-11-26T18:46:46.977+08:00",
+  "progressViewOpenedAfterSeconds": 0.85,
+  "how": "the tab strip's 更多会话视图 overflow menu → 进度 (at 390 px the tab itself is not in the strip)",
+  "phoneRunning": {
+   "file": "soak/phone-390-running.png",
+   "chip": "进行中",
+   "line": "第 2 步，共 3 步",
+   "atSeconds": 11.08,
+   "pnodes": 6,
+   "edges": 7
+  },
+  "phoneDone": {
+   "file": "soak/phone-390-done.png",
+   "chip": "已完成",
+   "line": "第 7 步，共 7 步",
+   "atSeconds": 149.27,
+   "pnodes": 16,
+   "edges": 21
+  },
+  "tap": {
+   "nodeId": "execute_t1",
+   "calls": 1,
+   "traceActive": 5,
+   "traceDim": 19,
+   "file": "soak/phone-390-trace.png"
+  },
+  "resized": [
+   "360x800 → soak/phone-360-done.png (720x1600 px)",
+   "700x900 → soak/tablet-700-done.png (1400x1800 px)"
+  ]
+ },
+ "reCapture_widths": {
+  "when": "2026-11-26T18:50+08:00",
+  "why": "the 360 and 700 shots taken right after the tap still carried the opened call list; this pass opens the same finished session and only resizes, so both shots are the plain done state (calls 0).",
+  "produced": [
+   "soak/phone-360-done.png",
+   "soak/tablet-700-done.png"
+  ]
+ },
+ "breakpointProbe": {
+  "when": "2026-11-26T18:44+08:00",
+  "measured": "visible [role=tab] tabs on the same session: 700/600/500 px → 对话,轨迹,进度 ; 420/390/360 px → 对话,轨迹 only, and the string 进度 exists nowhere in the DOM",
+  "consequence": "at phone widths the panel is reachable only through the strip's 更多会话视图 menu; that is the path every phone shot here took"
+ },
+ "sessionsSeen": "4 rows in the sidebar after the runs (1 新会话 + run A + run B + run C)",
+ "gate": "see gate-45909bb.out (tsc 0, oxlint 14 warnings 0 errors, vitest 326 passed / 8 files)",
+ "console": {
+  "consoleErrors": [],
+  "pageErrors": []
+ },
+ "desktopSidebarDump": [
+  "插件",
+  "定时任务",
+  "自动化任务",
+  "网页版",
+  "SDLC",
+  "更多",
+  "全部模型",
+  "全部比例",
+  "普通生图",
+  "素材库",
+  "无限画布",
+  "电商模式预览",
+  "图片转 PPT",
+  "文生图",
+  "图生图",
+  "增强",
+  "自动",
+  "1:1 方图",
+  "3:4 标准竖图",
+  "4:3 标准横图",
+  "9:16 竖屏",
+  "2:3 竖图",
+  "3:2 横图",
+  "16:9 宽屏",
+  "21:9 超宽屏",
+  "自动",
+  "1K",
+  "2K",
+  "4K",
+  "1 张",
+  "2 张",
+  "3 张",
+  "4 张",
+  "自动",
+  "标准",
+  "高清",
+  "bifrost/agnes/agnes-image-2.5-flash",
+  "开始生成",
+  "＋上传幻灯片图片拖入或选择 PNG / JPG / WebP，最多12张，每张20MB",
+  "生成可编辑 PPT"
+ ]
+}

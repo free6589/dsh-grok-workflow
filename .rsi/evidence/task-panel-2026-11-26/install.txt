@@ -1,0 +1,77 @@
+$ git rev-parse HEAD
+45909bb486b9eb6d45464114c5557e951caab9a0
+$ git rev-parse --short HEAD
+45909bb
+$ git status --short          # at the start of this block: nothing but the evidence dir was mine
+(empty at 18:25; see redline.txt §4 for the three doc edits a concurrent block made at 18:32-18:36)
+$ git describe --tags --always
+v0.13.52-2-g45909bb          (2 commits after the v0.13.52 tag; no tag is on this commit)
+$ git tag --contains HEAD | wc -l
+0
+$ node -v ; npm -v ; dsh --version
+v26.8.1
+11.19.0
+0.2.2-rc.3
+$ npm run build
+> dsh-grok-workflow@0.13.52 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+client bundle: 399448 bytes → lib/client.js
+$ stat -c '%s %n' lib/client.js src/client/index.js
+399448 lib/client.js
+399448 src/client/index.js
+$ sha256sum lib/client.js src/client/index.js
+4f87307233954fc08937e618e902f6583e638dd6d9a686e4eec1209111f0eeb1  lib/client.js
+4f87307233954fc08937e618e902f6583e638dd6d9a686e4eec1209111f0eeb1  src/client/index.js
+$ cmp lib/client.js src/client/index.js && echo IDENTICAL
+IDENTICAL
+$ git status --short          # the rebuild changed nothing: lib/ matches the commit
+(empty)
+$ npm_config_cache=$PWD/.tmp/soak-panel/npm-cache npm pack --pack-destination .tmp/soak-panel
+dsh-grok-workflow-0.13.52.tgz   (1.0 MB, 164 files, unpacked 3.2 MB)
+$ stat -c '%s %n' .tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz
+1025655 .tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz
+$ sha256sum .tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz
+1554571b6ce414c0a3f2fe670118ac1786f7bf6aa981b5669c58c3387c0eac3d
+$ node -p "require('./package.json').version"
+0.13.52
+$ sha256sum lib/index.js
+ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32  lib/index.js
+
+# Installed into the isolated profile (never the live one)
+$ DSH_HOME=$PWD/.tmp/soak-panel/dsh-home dsh plugin --profile web-clone add file:$PWD/.tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz
+✓ Lockfile passes supply-chain policies (verified 7h ago)
+Progress: resolved 29, reused 27, downloaded 1, added 31, done
+[WARN] Issues with peer dependencies found.
+dependencies:
++ dsh-system-prompt-design link:../../../../../../../../dsh-system-md
+Done in 2.6s using pnpm v12.4.2
+$ node -p "require('<profile>/package.json').dependencies['dsh-grok-workflow']"
+file:/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-task-panel/.tmp/soak-panel/dsh-grok-workflow-0.13.52.tgz
+    (the pin the install wrote: this exact tgz, not a range, not a link)
+$ ls <profile>/node_modules/dsh-grok-workflow
+CHANGELOG.md cordis.patch.yml docs lib LICENSE node_modules package.json README.md README.zh-CN.md
+
+$ node -p "require('<profile>/node_modules/dsh-grok-workflow/package.json').version"
+0.13.52
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/client.js
+4f87307233954fc08937e618e902f6583e638dd6d9a686e4eec1209111f0eeb1   ← equals the worktree
+$ sha256sum <profile>/node_modules/dsh-grok-workflow/lib/index.js
+ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32   ← equals the worktree
+$ find <profile>/node_modules/dsh-grok-workflow -type l | wc -l
+0
+$ readlink -f <profile>/node_modules/dsh-grok-workflow
+/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-task-panel/.tmp/soak-panel/dsh-home/profiles/web-clone/node_modules/dsh-grok-workflow
+    (a real copy inside the clone, not a link back into the worktree)
+
+# Boot (profile named web-clone; `dsh web` abbreviates to --profile web, so the profile is
+# selected once, not twice)
+$ DSH_HOME=$PWD/.tmp/soak-panel/dsh-home dsh --profile web-clone --no-open --port 3411
+dsh web: http://127.0.0.1:3411/?token=<redacted>
+    (BIFROST_VIRTUAL_KEY exported into that process from ~/.dsh/bifrost.env; the key is not
+     in any file this round wrote)
+
+# What the boot log said about bundles, verbatim (the parts that matter)
+workspace ...                      no schema error this round (the clone's workspace record carries createdAt/updatedAt)
+serena  (mcp toolCallTimeoutMs 180000): fails to start in this sandbox —
+    OSError: [Errno 30] Read-only file system: '/home/fish/.serena/logs/2026-11-26'
+    failOnStartupError is false, so the instance boots without it. Not caused by this change.

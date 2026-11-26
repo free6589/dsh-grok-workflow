@@ -1287,3 +1287,211 @@ div.gw-progress-flow[data-gw-progress-flow]                坐标原点（既有
 - **不取代**：§23.2 的 DOM 顺序（`flow > wires + cols > col > (node, subs > sub)`）与全部钩子、
   §23.5 的尝试点与 `第 N 遍`、§23.6 的三种终态、§23.7 的文案增量。DOM 里**没有**新增元素，
   只多了一个属性，所以文案键数仍是 55。
+
+## 25. 任务面板：一句话 + 一张由 Mermaid 文本自己画出来的图 + 只在卡住时出现的一句（2026-11-26，`feat/task-panel`）
+
+**§21–§24 被本节取代**（泳道矩阵、手机两轨树、第一版流程图三样都退场）；§22 的退回事实链（标记 → 读回 → 事件）仍然成立，
+它的界面出口挪到了「汇总」节点**点开后的调用行**（§25.1 第 3 条、§25.8）。本节写的是**页面现在是什么**，
+事实来源与状态口径仍由 §21.2 / §22 继续管。
+
+本节全部 `CONFIRMED` 的部分：源码 `src/client/index.js` 的镜像与渲染、`test/progress-panel.spec.ts`（25）与
+`test/progress-panel-model.spec.ts`（31）、`test/client.spec.ts` 里被改写的页面形状用例（条数没变：153 → 153，
+其中 7 条标题重写、其余按 1:1 承接；块里记的「25 条」我没有逐条数出来，见 §25.9），
+**隔离档案里的真装真跑**（`.rsi/evidence/task-panel-2026-11-26/`，12 条读数，见 §25.9），
+以及审稿稿 `.rsi/evidence/task-panel-2026-11-26/mockup/task-panel.html` 的几何自检（`.tmp/mock/geometry.json`、`shots/measurements.json`）。
+裁决条目见 `D-173`。**真机读到的是「进行中 / 已完成 + 点击」四态四宽度；「等你点头 / 未通过 / 已取消」与卡住那句的文字是 `NOT_RUN`**（§25.9）。
+
+### 25.1 三区（`CONFIRMED`）
+
+| 区 | 元素 | 说什么 |
+| --- | --- | --- |
+| 头 | `header.gw-progress-bar` › 运行名 + 五态胶囊 + `p.gw-progress-line` | `第 N 步，共 M 步`；能量出来时接 ` · 还剩约 …` |
+| 图 | `div.gw-progress-graph` › `svg.gw-progress-wires` + `ol.gw-progress-pnodes` | 每一步一颗节点，步走过的计划任务各挂一条分支；边指方向 |
+| 卡住 | `p.gw-progress-stuck[role="status"]` | 一句，**只在真的卡住时存在**；不卡住就没有这个元素、也不留空位 |
+
+- 顺序固定：头 → 图 → 卡住那句 → Guardian 卡 → footer（dock）。用例逐条钉「卡住那句在图之后、Guardian 之前」。
+- **头那句话就是原来那行计数**：`at` / `total` / `remaining` 全沿用 `deriveProgressFlow()`，
+  删掉的是 `progress.flow.left`（`还剩 N 步 / N steps left`）那一行本身，不是它的数。
+- **汇总节点的裁决出口**：一颗没有一个调用、但带着「每一稿都被退回」的汇总节点**也可开**（`openable`），
+  点开的行里写着退回了几稿、最后卡在哪道门（§22.5 的三条事实原样搬进列表：`drafts` / `stage` / `reason` 三行，
+  `data-gw-progress-node-rejected` 带上这三个值，`drafts` 那一行用琥珀 token）。`model` 策略下这颗节点一个调用都没有，
+  只认调用就会让这条判决无处可读。
+- **定稿那一行**：`flow.final` 原样带进 `graph.final`，点开的列表按 `seq` 标出闸门**真正交的那一行**，不另猜一次。
+
+### 25.2 DOM 与钩子（`CONFIRMED`，用例与真机都按这些找）
+
+```text
+header.gw-progress-bar[data-gw-progress-bar]
+  span.gw-progress-run[data-gw-progress-run]                 运行名（title 同文，长名省略）
+  span.gw-progress-chip[data-gw-progress-chip="<state>"][data-state]  role="status"，五态
+  p.gw-progress-line[data-gw-progress-line][title=<eta 依据 | 无>]
+div.gw-progress-graph[data-gw-progress-graph][data-gw-progress-source="<mermaid 全文>"]
+      role="group" aria-label=progress.panel.graph；width/height 由版面算出
+  svg.gw-progress-wires[data-gw-progress-wires]              aria-hidden；<defs><marker id="gw-progress-arrow">
+    path[data-gw-progress-edge][data-from][data-to][data-kind="chain|branch|join"][data-trace="active|dim"]
+  ol.gw-progress-pnodes[data-gw-progress-pnodes]
+    li.gw-progress-pnode[data-gw-progress-pnode="<id>"]
+       data-kind / data-state / data-current="true|false" / data-ordinal / data-task（仅任务）/ data-trace（仅被点亮的）
+      button.gw-progress-pnode-body[data-gw-progress-pnode-open="<id>"]   openable 时；aria-expanded / aria-controls
+      div.gw-progress-pnode-body                                          不可开时（同样的盒子，只是一个记号）
+        span.gw-progress-pnode-dot                                       aria-hidden
+        span.gw-progress-pnode-word[data-gw-progress-pnode-word]         title=全名
+        span.gw-progress-pnode-badge[data-gw-progress-pnode-badge]       第 N 遍（任务，>1 才有）/ 第 N 稿（汇总）/ 第 N 次（重复访问的腿，>1 才有）
+        span.gw-progress-pnode-dots（仅任务）                             aria-hidden 容器
+          span.gw-progress-pnode-attempt[data-attempt="1..N"][data-state]
+          span.gw-progress-pnode-retry                                   失败那次与下一次之间的虚线
+      ol.gw-progress-node-calls[data-gw-progress-node-calls="<id>"][id="gw-progress-calls-<id>"]
+         › 既有 ProgressLogRow 行（+ 汇总节点的退回行）
+p.gw-progress-stuck[data-gw-progress-stuck]                   role="status"
+```
+
+- **`-pnode-body` / `-pnode-dots` / `-pnode-attempt` / `-pnode-retry` 是 class，不是 `data-` 钩子**；
+  点上的两次尝试靠 `data-attempt` + `data-state` 读，重试那一段靠 class 读（它是装饰，没有语义可读）。
+- **节点的可开与否写在控件上，不写在节点上**：`openable` 才渲染 `button` 并带 `-pnode-open`；
+  不可开的节点是 `div`，`aria-label` 仍说「词 + 角标 + 状态词」。所以「节点 toggle 数 = 还有杂行的步骤数」这条老读法
+  不再成立（也没有 toggle 了），新的读法是「`-pnode-open` 数 = 真能点开的节点数」。
+- **被点亮的线才有 `data-trace`**：没点开时每条边都没有这个属性（不是 `dim`），「没人问过」与「被压暗」在 DOM 里也分得开。
+- **`-source` 带的就是那份 Mermaid 全文**：一整段 `flowchart TD`，含中文标签；它是结构来源，不是注释。
+
+### 25.3 模型（`CONFIRMED`）
+
+| 名字 | 在哪一半 | 做什么 |
+| --- | --- | --- |
+| `deriveProgressFlow()` | 类型侧 + 镜像 | 老口径：走腿、算 `at` / `total` / `remaining`、聚合状态、`final`。**本节一个字没改它** |
+| `derivePanelGraph(run, t)` | 镜像 | 图模型：腿节点 + 任务分支节点 + 边 + 头部句子 + `stuck`；末尾用 `panelMermaid()` 把文本写进 `graph.mermaid` |
+| `panelMermaid(graph)` | 镜像 | 写 `flowchart TD`：一节点一行、一边一行、两空格缩进 |
+| `parsePanelMermaid(text)` | 镜像 | 读回本页写得出的子集；别的一律忽略；指向未声明节点的边丢掉 |
+| `layoutPanelGraph(parsed, sizes, width)` | 镜像 | 分层、居中、堆叠判定、每颗盒子的坐标、每条边的 `d` |
+| `panelEdgeKey(from, to)` | 镜像 | 一条边的键（`\u0000` 连接），点亮的集合按它比对 |
+| `panelTraceNodes(graph, traced)` | 镜像 | 点亮哪些节点：它自己 + 与它相连的那些，**全部从 `graph.edges` 派生** |
+| `panelTraceEdges(graph, traced)` | 镜像 | 点亮哪些边；其余标 `dim` |
+| `openable` | 镜像 | 有调用 **或** 带着全被退回的裁决；决定 `button` 与 `div` |
+| `final` | 两边 | 闸门交的那一行（`{ draft, seq }`），只用来标定稿 |
+
+- **`derivePanelGraph()` 不新增事件、不改折叠、不改数字**：它是呈现层的分组（一条腿 → 它走过的任务），
+  与 §23.1 同一条边界——`src/progress-tab.ts` 一个字没改。
+- **label 在这里解析**（`t` 是读者自己的字典），因为 Mermaid 文本是结构来源，它必须带着读者会看见的词；
+  **计划任务的标题是 recorder 写的原文**，不缩、不译、不改写。
+- **id 规则**：一条腿是 `kind`，重复访问是 `kind_<ordinal>`；一条任务分支是 `<腿id>_t<任务号>`；
+  两端叫 `start` / `end`——**只有文本里把 `end` 写成 `finish`**（`end` 关 `subgraph`），解析回来仍是 `end`。
+
+### 25.4 文案（`CONFIRMED`；中英同键，缺一即失败）
+
+| 键 | 中文 | English |
+| --- | --- | --- |
+| `progress.panel.step` | `第 {at} 步，共 {total} 步` | `Step {at} of {total}` |
+| `progress.panel.eta` | `还剩约 {time}` | `about {time} left` |
+| `progress.panel.etaBasis` | `按 {n} 个已完成步骤的实测耗时推算` | `from the {n} finished steps actually measured` |
+| `progress.panel.stuck.failed` | `卡在 {at}：{role} 第 {n} 遍没过` | `Stuck at {at}: attempt {n} of {role} did not pass` |
+| `progress.panel.stuck.blocked` | `卡在 {at}：这一步没有回报` | `Stuck at {at}: this step never reported back` |
+| `progress.panel.stuck.rejected` | `卡在 {at}：{n} 稿全被退回` | `Stuck at {at}: every draft was rejected ({n})` |
+| `progress.panel.durationSec` | `{s} 秒` | `{s}s` |
+| `progress.panel.durationMin` | `{m} 分 {s} 秒` | `{m}m {s}s` |
+| `progress.panel.durationHour` | `{h} 小时 {m} 分` | `{h}h {m}m` |
+| `progress.panel.trace` | `看线` | `Trace its wires` |
+| `progress.panel.graph` | `任务图` | `Task graph` |
+
+- **十一颗新键**，`progress.*` 键数 **55 → 64**。
+- **删掉的两颗**：`progress.flow.left`（`还剩 N 步`——顶上那句话接替它）与 `progress.flow.aria`（图的标签——`progress.panel.graph` 接替它）。
+  两颗都进了 `test/i18n-parity.spec.ts` 的删除清单，两本字典里都不许再出现。
+- **页面上没有第二套句子**：叶子文本只有运行名、状态词、腿词、任务标题、`第 N 遍` / `第 N 稿` / `第 N 次` 三种角标、头部那一句、
+  卡住那一句、Guardian 自己的话、dock 按钮与「已填进输入框」那一句。`progress.panel.trace` **只做悬停提示**，
+  不进任何 `aria-label`、也从不印在页面上。
+
+### 25.5 布局数字（`CONFIRMED`：常量 + 用例断言；效果图那一档是审稿稿实测）
+
+| 东西 | 桌面（≥ 720 px） | 堆叠（< 720 px，或某一层比容器宽） |
+| --- | --- | --- |
+| 兄弟间距 | `12px`（`PANEL_PNODE_GAP_X`） | —（一卡一行） |
+| 层间距 | `44px`（`PANEL_PNODE_GAP_Y`） | `30px`（`PANEL_PNODE_STACK_GAP_Y`） |
+| 卡与卡 | — | `26px`（`PANEL_PNODE_STACK_GAP`）；分叉横杆就画在这段空档里，离卡片 `8px` |
+| 侧槽 | — | 卡左右**各留 24px**（`PANEL_RAIL_GUTTER`），轨在 `12px` 内侧（`PANEL_RAIL_INSET`） |
+| 竖线 | 直落 / 一次折弯 | 茎 `12px`（`PANEL_RAIL_STEM`）、挂角 `8px`（`PANEL_RAIL_HOOK`） |
+| 拐角 | `8px` 圆角，且不超过所连两段的一半（`panelSmoothStep` / `panelPolyline`） | 同左 |
+| 盒子 | 腿 = 容器整宽、高由 CSS 定（`min-height: 32px`）；任务 `min-height: 34px` | 卡宽 = 宽 − 2×24 |
+
+- **两侧都留槽是刻意的**：分叉走左槽、汇合走右槽，所以没有任何一条竖线需要穿过卡片才够得着自己的目标
+  （审稿稿 9 组状态×宽度自检：`bodyCrossings` 全是 **0**，箭头落在目标上边缘 **12/12、16/16、1/1**）。
+- **断点只有一个数**：`720`。宽度不可量时先用 `PANEL_DEFAULT_WIDTH = 720`；某一层比容器还宽时**那一层**也走堆叠。
+- **盒子尺寸是量出来的**：`.gw-progress-pnode` 的内联样式只给 `left` / `top` / `width`，**高度留给内容**
+  （`height: auto`），量到之后再排一次。第一帧用默认尺寸（stadium `80×32`、任务 `max(120, min(260, 28+13×字数))×34`、
+  腿 `max(96, min(220, 24+14×字数))×32`）。
+
+### 25.6 状态词汇：红色不是一个词（`CONFIRMED`）
+
+| `data-state` | 词（`progress.plan.*`） | token |
+| --- | --- | --- |
+| `done` | 过了 | `--dsw-alias-state-success-primary` |
+| `doing` | 在做（当前那颗，呼吸） | `--dsw-alias-state-business-primary` |
+| `pending` | 等着（**唯一虚线、唯一空心点、无渐变**） | `--dsw-alias-state-idle-primary` |
+| `failed` | 没过 | `--dsw-alias-state-warn-primary` |
+| `blocked` | 没过（同一个词） | `--dsw-alias-state-warn-primary` |
+| `cancelled` | 没做 | `--dsw-alias-state-warn-primary` |
+
+- **`--dsw-alias-state-error-primary` 整张样式表一次都不出现**（用例逐条断言）：没过是琥珀，不是错。
+- 每颗尝试点**只看它自己那一行**：失败一次、第二次过了 = 一颗琥珀 + 一颗绿，节点自己是绿的；重试那一段是 `1px` 虚线。
+- `prefers-reduced-motion: reduce` 下呼吸动画关掉（`animation: none`）。
+- **状态由点、边框、词一起说**，连线**从不**承载状态（线只有方向：箭头 + `border-l2`）。
+
+### 25.7 诚实边界（`CONFIRMED`）
+
+1. **估算只能量出来**：`mean(已跑完步骤自己的跨度) × 还剩几步`，一分钟以下取 `5s`、以上取 `10s`；
+   **一步没量到、或者没有剩余步 → 不打印**（连 `title` 都没有）。可见句子里不说方法，只有悬停说（`progress.panel.etaBasis`）。
+2. **没有百分比、没有通过率**：全页文本里不出现 `%`，也不出现「通过率 / 预计 / 剩余 / 大约 / ETA」。用例七态逐条钉。
+3. **不从计划推任何东西**：事件流里没有计划，所以「步」= 一条腿的一次访问，不拿任务数当分母。
+4. **没卡住就没有元素**：卡住那句不是「空着」，是**不存在**；取消的运行也不算卡住（胶囊已经说了）。
+5. **一句话都不解释页面**：`title` / `aria-label` 里的字都短于 60 字、不带句末标点——工具提示可以点名一条腿，
+   但不能变成一段关于页面的说明。
+
+### 25.8 两个交互（`CONFIRMED`）
+
+- **一次点击两件事**：摊开/收起这颗节点的调用（`opened`），并把跟它有关的线点亮（`traced`）。
+- **同时只点亮一颗**：`traced` 是单值；点另一颗，线就搬到那一颗身上（不是两颗一起亮）。
+- **可以同时摊开好几颗**：`opened` 是列表；点别的节点不收起已经开着的。
+- **空白处只取消线**：图形容器自己的点击清 `traced`，**不清 `opened`**——摊开的调用是读者的位置。
+- **冒泡的点击不读第二次**：容器只在 `event.target === event.currentTarget` 时动作，节点自己的点击不会被当成「点空白」。
+- **两个都不写**：用例把门面调用记下来，除 dock 那颗按钮（`setDraft`，不 `send`）之外一次服务调用都没有。
+
+### 25.9 验证指针与没验的（`CONFIRMED` / `NOT_RUN`）
+
+- **门禁（本轮同树实测）**：`npx tsc -p tsconfig.json --noEmit` `EXIT=0`；`npx oxlint src test`
+  `Found 14 warnings and 0 errors.`（187 文件 / 96 规则）；八份进度 spec **`8 files / 326 passed`**
+  （client 153 + panel 25 + panel-model 31 + connector 15 + hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14，
+  逐行在 `.rsi/evidence/task-panel-2026-11-26/gate-45909bb.out`）；整仓 `TMPDIR=$PWD/.tmp npx vitest run`
+  **`105 files / 2030 passed`**（转录 `.rsi/evidence/task-panel-2026-11-26/suite-45909bb.out`，尾段逐字，`Test Files 105 passed (105)` / `Tests 2030 passed (2030)` 都在里面）；
+  `cmp lib/client.js src/client/index.js` 空输出，两份都是 **399448 字节**。
+- **用例分工**：`test/progress-panel.spec.ts`（25）管页面形状与两个交互（三区顺序、金额与数字边界、点开、点亮、清空、dock）；
+  `test/progress-panel-model.spec.ts`（31）管模型与样式（分层、居中、侧轨、穿卡、Mermaid 往返、ETA 四种情形、`stuck` 三级、
+  无字面色值、红色缺席、断点换行）。被删的两份各 45 / 40 条，条目级承接关系写在 `progress-panel.spec.ts` 的文件头。
+- **真机（`CONFIRMED`，隔离档案真装真跑；数字全在 `.rsi/evidence/task-panel-2026-11-26/soak/readings.json`）**：
+  装进去的是 `45909bb` 打出来的 tgz（**1 025 655** 字节 / `sha256 1554571b…eac3d`），隔离 home `.tmp/soak-panel/dsh-home`、
+  端口 **3411**、Node v26.8.1 / npm 11.19.0 / dsh 0.2.2-rc.3；装好的副本读回 **`0.13.52`**、`lib/client.js` 与工作树同哈希、
+  软链 **0** 个。**跑了三次**：桌面 1500×1600 **129.8 s**（进行中 / 已完成 / 三次点击）、390 px 一次作废、
+  390 px 再来一次 **149.3 s**（手机进行中 / 已完成 / 点按）。**12 条读数**：`scrollWidth == clientWidth` 四档全成立
+  （1500 / 700 / 390 / 360）、`[data-current="true"]` **每态 1 颗**、三次会话 `consoleErrors: []` / `pageErrors: []`；
+  完成态 **16 节点 / 21 条线**，桌面进行中 16 / 21 且那行字是 `第 6 步，共 7 步 · 还剩约 25 秒`，
+  手机进行中 6 / 7 且**没有**「还剩约」（那时还没有一步能量完），完成态 `第 7 步，共 7 步`；
+  **卡住那句在每一态每一宽度都不存在**（这一轮没有失败、没有没回报、没有被退稿，按设计它不该出现）；
+  底部按钮完成态 `收下这版`、进行中为空。**页面自己的真值核对每行都对**：`-source` 首行 `flowchart TD`、
+  以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等（6=6 / 7=7、16=16 / 21=21），完成态源文本 38 行存在 `soak/mermaid-done.txt`。
+- **两个交互（量到的）**：点第一颗任务节点 → 调用列表 0→**1**、`[data-trace="active"]` **5**（2 边 + 3 节点）/ `dim` **19**；
+  **第二次点同一颗 → 0 / 0 / 0**；第三次 → 回到 1 与 5 / 19。**一次点击同时开关列表与线**（见「口径」）。
+- **口径要照实测读**：块里的说明写「再点一次只取消线」，实测是**列表也一起收起**。§25.8 说的「空白处只取消线、摊开的列表留着」
+  仍然成立（那是容器的点击），但**节点自己的第二次点击不是**——这两件事在真机上是分开的，别混着读。
+- **窄屏的一条宿主观察（不是本节的规则）**：同一会话探针 **700 / 600 / 500 px 标签条有 `对话,轨迹,进度`；
+  420 / 390 / 360 px 只剩 `对话,轨迹`，整份 DOM 里连「进度」两个字都没有**——它退到右侧的**更多会话视图**菜单里，
+  手机与平板那几张图都从那里进去。这是宿主标签条的行为，本节照实记，不当作本页要修的东西。
+- **版面观察（记录，不判对错）**：展开的调用列表浮在邻居上——手机上压在「任务 2 · 写 test.txt」那张卡上、
+  桌面 1500 遮住「检查」的一部分；字仍读得出，`scrollWidth == clientWidth` 也成立。
+- **审稿稿**：`.rsi/evidence/task-panel-2026-11-26/mockup/task-panel.html`（**审稿用，不上线**；它是在 `.tmp/mock/` 里做出来的，那里现在只是构建位置）。几何自检跑的是 **9 组**状态×宽度
+  （1440 / 390 / 360 × 进行中 / 已完成 / 等你点头），截图另有 10 张（多一张 1440 带点亮的、一张展开 Mermaid 源码的）：
+  9 组里**穿过卡片身体的竖线 0 条**、`scrollWidth === clientWidth` 在 1440 / 390 / 360 三档全成立、
+  **被切标签 0 个**、连线数 12 / 16 / 1 与箭头数一一相等。几何自检在 `.tmp/mock/geometry.json`（把每条路径拆成线段算的，
+  不是看图）。
+  **稿子里那块可见的 `Mermaid 源码` 只是审稿时拿来对着图核字的，产物不显示它**——产物只把文本挂在 `-source` 属性上。
+  稿子里的示例文本把终点写成 `end`（需求样例的写法），**产物的写法是 `finish`**（真机读数里以 `end` 开头的行是 0 条）。
+- **`NOT_RUN`：** ①「等你点头」态（发出后 **0.59 s** 进度页就已是「进行中」，那个窗口没硬造）；
+  ② **卡住那句在真机上的文字**（要读它得制造一次没过的尝试 / 没回报的一步 / 被退稿的汇总，这一轮没有）；
+  ③ **未通过 / 已取消 / 出错**三态；④ **421–499 px** 之间的宽度（只探了 420 与 500 两侧）；
+  ⑤ **live 档案升级 / 重载 / 重启**（红线：live 里那份插件仍读作 `0.13.48`）；⑥ 读屏软件实测；⑦ Firefox / Safari；
+  ⑧ 真 Mermaid 渲染器（这台机器上没有，也不联网——真机核的是「文本与 DOM 数得一样」，不是「渲染出来一样」）。

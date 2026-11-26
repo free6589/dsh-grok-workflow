@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>进度 · 任务面板（审稿稿）</title>
+<style>
+/* ============================================================================
+   Host tokens — local fallbacks only.
+   The real page gets these from DSH; this block is the single place in this
+   file where a literal colour lives. Values are the DSH light palette.
+   ========================================================================== */
+:root{
+  --dsw-alias-label-primary:#0f1115;
+  --dsw-alias-label-secondary:#61666b;
+  --dsw-alias-border-l2:rgba(0,0,0,.10);
+  --dsw-alias-bg-layer-2:#ffffff;
+  --dsw-alias-bg-elevated:#ffffff;
+  --dsw-alias-state-success-primary:#22c55e;
+  --dsw-alias-state-business-primary:#4176e6;
+  --dsw-alias-state-warn-primary:#f59e0b;
+  --dsw-alias-state-idle-primary:#d4d4d4;
+  --dsw-font-family-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --dsw-font-family-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+
+  /* Review chrome only — never used inside the product frame. */
+  --mock-page:#eef0f3;
+  --mock-panel:#f7f8fa;
+  --mock-ink:#2f3237;
+  --mock-ink-soft:#6f747b;
+  --mock-line:#c6cad0;
+  --mock-on:#dfe3e9;
+  --mock-frame-shadow:0 1px 2px rgba(15,17,21,.06),0 6px 20px rgba(15,17,21,.07);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+/* The review page may scroll, but never sideways: the measured widths below
+   depend on this being true for the mock document as well as the product. */
+html{overflow-x:hidden;scrollbar-width:none}
+html::-webkit-scrollbar{display:none}
+body{
+  background:var(--mock-page);
+  color:var(--mock-ink);
+  font-family:var(--dsw-font-family-sans);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ============================== review chrome ============================= */
+.mock-bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;
+  max-width:100%;padding:10px 14px;
+  border-bottom:1px dashed var(--mock-line);
+  background:var(--mock-panel);
+}
+.mock-tag{
+  flex:none;padding:1px 6px;border:1px dashed var(--mock-line);border-radius:5px;
+  color:var(--mock-ink-soft);font-family:var(--dsw-font-family-mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;
+}
+.mock-group{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0}
+.mock-label{color:var(--mock-ink-soft);font-size:12px}
+.mock-btn{
+  padding:3px 9px;border:1px solid var(--mock-line);border-radius:7px;
+  background:var(--mock-panel);color:var(--mock-ink);
+  font:inherit;font-size:12px;line-height:1.5;cursor:pointer;white-space:nowrap;
+}
+.mock-btn:hover{background:var(--mock-on)}
+.mock-btn[aria-pressed="true"]{background:var(--mock-ink);border-color:var(--mock-ink);color:var(--mock-panel)}
+.mock-btn:focus-visible{outline:2px solid var(--mock-ink);outline-offset:2px}
+.mock-note{
+  flex:1 1 260px;min-width:0;margin:0;
+  color:var(--mock-ink-soft);font-size:12px;
+}
+
+.mock-stage{display:flex;justify-content:center;padding:18px 0 28px}
+.mock-frame{
+  width:min(100%,var(--frame-w,720px));
+  border:1px solid var(--mock-line);border-radius:12px;
+  background:var(--dsw-alias-bg-layer-2);
+  box-shadow:var(--mock-frame-shadow);
+  overflow:hidden;
+}
+
+/* ================================ product ================================= */
+.gw-progress{
+  display:flex;flex-direction:column;width:100%;min-width:0;
+  padding:16px 16px 26px;
+  background:var(--dsw-alias-bg-layer-2);
+  color:var(--dsw-alias-label-primary);
+  font-family:var(--dsw-font-family-sans);
+  font-size:13px;line-height:1.55;
+  max-width:720px;margin:0 auto;
+}
+@media (max-width:559px){
+  .gw-progress{padding:12px 12px 22px}
+}
+
+/* zone 1 — the run's own chrome, then one measured sentence */
+.gw-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 2px 9px;border-bottom:1px solid var(--dsw-alias-border-l2);
+}
+.gw-run{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:13px;font-weight:600;color:var(--dsw-alias-label-secondary);
+}
+.gw-chip{
+  display:inline-flex;align-items:center;gap:6px;flex:none;height:24px;padding:0 10px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:999px;
+  background:color-mix(in srgb,var(--dsw-alias-state-idle-primary) 12%,transparent);
+  color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:600;white-space:nowrap;
+}
+.gw-chip-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor}
+.gw-chip[data-state="waiting"]{
+  border-color:var(--dsw-alias-state-business-primary);
+  background:var(--dsw-alias-state-business-primary);
+  color:var(--dsw-alias-bg-layer-2);
+}
+.gw-chip[data-state="running"]{
+  border-color:color-mix(in srgb,var(--dsw-alias-state-business-primary) 45%,transparent);
+  background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 10%,transparent);
+  color:var(--dsw-alias-state-business-primary);
+}
+.gw-chip[data-state="running"] .gw-chip-dot{animation:gw-pulse 1.7s ease-in-out infinite}
+.gw-chip[data-state="done"]{
+  border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary) 45%,transparent);
+  background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 10%,transparent);
+  color:var(--dsw-alias-state-success-primary);
+}
+.gw-line{
+  margin:0;padding:9px 2px 0;
+  font-size:12px;color:var(--dsw-alias-label-secondary);
+  font-variant-numeric:tabular-nums;
+}
+
+/* zone 2 — the flow chart */
+.gw-graph{position:relative;margin:6px 0 0;min-width:0}
+.gw-wires{position:absolute;inset:0;display:block;overflow:visible;pointer-events:none}
+.gw-wires path[data-edge]{
+  fill:none;
+  stroke:color-mix(in srgb,var(--dsw-alias-label-secondary) 52%,transparent);
+  stroke-width:1.5;
+  transition:opacity .12s ease,stroke .12s ease,stroke-width .12s ease;
+}
+.gw-wires polygon[data-arrow]{
+  fill:color-mix(in srgb,var(--dsw-alias-label-secondary) 52%,transparent);
+  stroke:none;
+  transition:opacity .12s ease,fill .12s ease;
+}
+/* 点分支看线: the clicked node's own wires stay, everything else steps back. */
+.gw-graph[data-trace] .gw-wires path[data-edge]{opacity:.22}
+.gw-graph[data-trace] .gw-wires polygon[data-arrow]{opacity:.22}
+.gw-graph[data-trace] .gw-wires path[data-edge][data-lit]{
+  opacity:1;stroke:var(--dsw-alias-state-business-primary);stroke-width:2.5;
+}
+.gw-graph[data-trace] .gw-wires polygon[data-arrow][data-lit]{
+  opacity:1;fill:var(--dsw-alias-state-business-primary);
+}
+
+.gw-cols{position:relative;display:block;margin:0;padding:0;list-style:none}
+.gw-wrap{position:absolute;top:0;left:0;width:max-content;max-width:100%;z-index:2}
+.gw-wrap[data-sel="1"]{z-index:6}
+
+/* one node — a dot, a word, an optional count */
+.gw-node{
+  display:flex;align-items:center;gap:6px;
+  width:100%;min-width:0;margin:0;padding:0 10px;
+  height:32px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:10px;
+  background-color:transparent;background-image:none;
+  color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:13px;text-align:left;
+}
+button.gw-node{cursor:pointer}
+button.gw-node:focus-visible{
+  outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;
+}
+.gw-node[data-kind="end"]{border-radius:999px}
+.gw-node-dot{
+  display:inline-block;flex:none;width:7px;height:7px;border-radius:50%;
+  background:var(--dsw-alias-state-idle-primary);
+}
+.gw-node-word{
+  min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-weight:600;
+}
+.gw-node-badge{
+  flex:none;font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary);
+  white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+
+/* the five states, the existing vocabulary, nowhere red */
+.gw-node[data-state="done"]{
+  border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary) 45%,transparent);
+  background-image:linear-gradient(180deg,
+    color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,transparent),
+    color-mix(in srgb,var(--dsw-alias-state-success-primary) 5%,transparent));
+}
+.gw-node[data-state="done"] .gw-node-dot{background:var(--dsw-alias-state-success-primary)}
+.gw-node[data-state="done"] .gw-node-word{color:var(--dsw-alias-state-success-primary)}
+.gw-node[data-state="doing"]{
+  border-color:var(--dsw-alias-state-business-primary);
+  background-image:linear-gradient(180deg,
+    color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent),
+    color-mix(in srgb,var(--dsw-alias-state-business-primary) 5%,transparent));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-state-business-primary) 18%,transparent);
+}
+.gw-node[data-state="doing"] .gw-node-dot{
+  background:var(--dsw-alias-state-business-primary);
+  animation:gw-breathe 1.7s ease-in-out infinite;
+}
+.gw-node[data-state="doing"] .gw-node-word{color:var(--dsw-alias-state-business-primary)}
+.gw-node[data-state="pending"]{border-style:dashed}
+.gw-node[data-state="pending"] .gw-node-dot{
+  background:transparent;box-shadow:inset 0 0 0 1px var(--dsw-alias-state-idle-primary);
+}
+.gw-node[data-state="pending"] .gw-node-word{color:var(--dsw-alias-label-secondary)}
+.gw-node[data-state="failed"],
+.gw-node[data-state="blocked"],
+.gw-node[data-state="cancelled"]{
+  border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 50%,transparent);
+  background-image:linear-gradient(180deg,
+    color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,transparent),
+    color-mix(in srgb,var(--dsw-alias-state-warn-primary) 5%,transparent));
+}
+.gw-node[data-state="failed"] .gw-node-dot,
+.gw-node[data-state="blocked"] .gw-node-dot,
+.gw-node[data-state="cancelled"] .gw-node-dot{background:var(--dsw-alias-state-warn-primary)}
+.gw-node[data-state="failed"] .gw-node-word,
+.gw-node[data-state="blocked"] .gw-node-word,
+.gw-node[data-state="cancelled"] .gw-node-word{color:var(--dsw-alias-state-warn-primary)}
+
+.gw-wrap[data-sel="1"] .gw-node{box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-state-business-primary) 45%,transparent)}
+
+/* a task card: the task's name, one dot per attempt, a count when it took more */
+.gw-node[data-kind="card"]{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 6px;align-items:center;
+  height:auto;min-height:46px;padding:6px 9px;border-radius:10px;
+}
+.gw-card-name{
+  grid-column:1;min-width:0;font-size:12px;font-weight:600;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.gw-card-badge{
+  grid-column:2;flex:none;font-size:11px;font-weight:500;
+  color:var(--dsw-alias-label-secondary);white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.gw-card-dots{grid-column:1/-1;display:flex;align-items:center;gap:2px;min-height:9px}
+.gw-dot{
+  display:inline-block;flex:none;width:7px;height:7px;border-radius:50%;
+  background:var(--dsw-alias-state-idle-primary);
+}
+.gw-dot[data-attempt="passed"]{background:var(--dsw-alias-state-success-primary)}
+.gw-dot[data-attempt="failed"]{background:var(--dsw-alias-state-warn-primary)}
+.gw-dot[data-attempt="doing"]{
+  background:var(--dsw-alias-state-business-primary);
+  animation:gw-breathe 1.7s ease-in-out infinite;
+}
+.gw-dot[data-attempt="pending"]{
+  background:transparent;box-shadow:inset 0 0 0 1px var(--dsw-alias-state-idle-primary);
+}
+.gw-card-arc{display:block;flex:none;width:12px;height:11px;overflow:visible}
+.gw-card-arc path{
+  fill:none;stroke:var(--dsw-alias-state-warn-primary);stroke-width:1;
+  stroke-dasharray:2 2;stroke-linecap:round;
+}
+.gw-node[data-kind="card"][data-state="done"] .gw-card-name{color:var(--dsw-alias-state-success-primary)}
+.gw-node[data-kind="card"][data-state="doing"] .gw-card-name{color:var(--dsw-alias-state-business-primary)}
+.gw-node[data-kind="card"][data-state="pending"] .gw-card-name{color:var(--dsw-alias-label-secondary)}
+.gw-node[data-kind="card"][data-state="failed"] .gw-card-name,
+.gw-node[data-kind="card"][data-state="blocked"] .gw-card-name,
+.gw-node[data-kind="card"][data-state="cancelled"] .gw-card-name{color:var(--dsw-alias-state-warn-primary)}
+
+/* a node's calls, floating under it so the row does not move */
+.gw-calls{
+  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  z-index:20;width:max-content;min-width:158px;max-width:min(240px,80vw);
+  margin:0;padding:2px 0;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:10px;
+  background:var(--dsw-alias-bg-elevated);
+  box-shadow:
+    0 2px 6px color-mix(in srgb,var(--dsw-alias-label-primary) 10%,transparent),
+    0 10px 24px color-mix(in srgb,var(--dsw-alias-label-primary) 12%,transparent);
+}
+.gw-calls[hidden]{display:none}
+.gw-calls-list{margin:0;padding:0;list-style:none}
+.gw-calls-row{
+  display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:baseline;
+  padding:5px 9px;font-size:12px;
+}
+.gw-calls-row + .gw-calls-row{border-top:1px solid var(--dsw-alias-border-l2)}
+.gw-calls-t{color:var(--dsw-alias-label-secondary);font-family:var(--dsw-font-family-mono);font-size:11px}
+.gw-calls-g{min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gw-calls-w{flex:none;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.gw-calls-row[data-state="done"] .gw-calls-w{color:var(--dsw-alias-state-success-primary)}
+.gw-calls-row[data-state="doing"] .gw-calls-w{color:var(--dsw-alias-state-business-primary);font-weight:600}
+.gw-calls-row[data-state="failed"] .gw-calls-w,
+.gw-calls-row[data-state="blocked"] .gw-calls-w{color:var(--dsw-alias-state-warn-primary);font-weight:600}
+
+/* the graph's own text form, for the Mermaid renderers the plugin already ships */
+.gw-mermaid{margin:12px 0 0;padding:0 2px}
+.gw-mermaid summary{
+  font-size:12px;color:var(--dsw-alias-label-secondary);cursor:pointer;
+  padding:3px 0;list-style-position:inside;
+}
+.gw-mermaid summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.gw-mermaid pre{
+  margin:6px 0 0;padding:10px 12px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:10px;
+  background:color-mix(in srgb,var(--dsw-alias-label-secondary) 5%,transparent);
+  color:var(--dsw-alias-label-primary);
+  font-family:var(--dsw-font-family-mono);font-size:11px;line-height:1.6;
+  overflow-x:auto;
+}
+
+/* zone 3 — the one sentence that only exists while something is stuck */
+.gw-stuck{
+  margin:10px 0 0;padding:8px 10px;
+  border:1px solid color-mix(in srgb,var(--dsw-alias-state-warn-primary) 45%,transparent);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 10%,transparent);
+  color:var(--dsw-alias-label-primary);
+  font-size:12px;overflow-wrap:anywhere;
+}
+.gw-stuck b{font-weight:600;color:var(--dsw-alias-state-warn-primary)}
+
+/* existing chrome — the Guardian lane, four tiles, kept as it is */
+.gw-guardian{
+  margin:14px 0 0;padding:10px 12px;
+  border:1px solid color-mix(in srgb,var(--dsw-alias-state-success-primary) 28%,var(--dsw-alias-border-l2));
+  border-radius:14px;
+  background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 5%,transparent);
+}
+.gw-guardian[data-state="active"]{
+  border-color:color-mix(in srgb,var(--dsw-alias-state-business-primary) 40%,var(--dsw-alias-border-l2));
+  background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 6%,transparent);
+}
+.gw-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.gw-tile{
+  display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px 8px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:10px;
+  background:color-mix(in srgb,var(--dsw-alias-state-idle-primary) 6%,transparent);
+}
+.gw-tile[data-wide]{grid-column:1/-1;padding:0;border-color:transparent;background:transparent}
+.gw-tile-label{
+  font-size:10px;font-weight:600;letter-spacing:.06em;
+  color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere;
+}
+.gw-tile-value{
+  font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary);
+  overflow-wrap:anywhere;
+}
+.gw-guardian[data-state="active"] .gw-tile-value[data-tone="status"],
+.gw-guardian .gw-tile-value[data-tone="active"]{color:var(--dsw-alias-state-business-primary)}
+.gw-guardian .gw-tile-value[data-tone="finished"]{color:var(--dsw-alias-state-success-primary)}
+.gw-findings{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.gw-findings li{
+  display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-width:0;padding:6px 8px;
+  border-inline-start:3px solid var(--dsw-alias-state-warn-primary);
+  border-radius:7px;
+  background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 5%,transparent);
+  font-size:11px;
+}
+.gw-findings li[data-action="rescue"]{
+  border-inline-start-color:var(--dsw-alias-state-success-primary);
+  background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 5%,transparent);
+}
+.gw-finding-label{font-weight:600}
+.gw-finding-action{color:var(--dsw-alias-label-secondary)}
+
+/* existing chrome — the dock: one button, or nothing */
+.gw-foot{
+  display:flex;flex-direction:column;gap:8px;margin:16px 0 0;padding:12px 2px 0;
+  border-top:1px solid var(--dsw-alias-border-l2);
+}
+.gw-dock{
+  display:block;width:100%;height:40px;
+  border:0;border-radius:12px;
+  background:var(--dsw-alias-state-business-primary);
+  color:var(--dsw-alias-bg-layer-2);
+  font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+}
+.gw-dock:hover{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 85%,var(--dsw-alias-label-primary))}
+.gw-dock:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:3px}
+
+/* ============================== phone layout ============================== */
+/* Single column: one node per layer, cards stacked under their leg, labels wrap
+   instead of being cut, and nothing reaches past the column. */
+.gw-progress[data-mode="mobile"] .gw-wrap{width:100%;left:0 !important}
+.gw-progress[data-mode="mobile"] .gw-wrap[data-kind="card"]{padding-left:24px;padding-right:24px}
+.gw-progress[data-mode="mobile"] .gw-node{height:auto;min-height:32px}
+.gw-progress[data-mode="mobile"] .gw-node-word,
+.gw-progress[data-mode="mobile"] .gw-card-name{
+  white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;
+}
+.gw-progress[data-mode="mobile"] .gw-node[data-kind="card"]{min-height:44px}
+
+@keyframes gw-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes gw-breathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.72);opacity:.55}}
+@media (prefers-reduced-motion:reduce){
+  .gw-chip[data-state="running"] .gw-chip-dot,
+  .gw-node[data-state="doing"] .gw-node-dot,
+  .gw-dot[data-attempt="doing"]{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="mock-bar" role="region" aria-label="审稿工具（不属于页面本身）">
+  <span class="mock-tag">审稿工具</span>
+  <div class="mock-group" role="group" aria-label="运行状态">
+    <span class="mock-label">状态</span>
+    <button type="button" class="mock-btn" data-pick-state="running" aria-pressed="true">进行中</button>
+    <button type="button" class="mock-btn" data-pick-state="done" aria-pressed="false">已完成</button>
+    <button type="button" class="mock-btn" data-pick-state="waiting" aria-pressed="false">等你点头</button>
+  </div>
+  <div class="mock-group" role="group" aria-label="页面宽度">
+    <span class="mock-label">宽度</span>
+    <button type="button" class="mock-btn" data-pick-width="1440" aria-pressed="true">桌面 1440</button>
+    <button type="button" class="mock-btn" data-pick-width="390" aria-pressed="false">手机 390</button>
+    <button type="button" class="mock-btn" data-pick-width="360" aria-pressed="false">手机 360</button>
+  </div>
+  <p class="mock-note">点一个方块：它调过谁就摊开在下面，相关的线加粗、别的线让开；再点一次或点空白处取消。</p>
+</div>
+
+<div class="mock-stage">
+  <div class="mock-frame" id="frame" style="--frame-w:720px">
+    <section class="gw-progress" id="product" data-mode="desktop"></section>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ========================================================================
+     1 · The fixture. One run, three states. Durations are the run's own.
+     ====================================================================== */
+  var RUN_NAME = '任务团队 · 3 个任务';
+  var POSTS = ['建表', '写测试', '写文档'];
+  var LEGS = [
+    { id: 'plan', word: '规划' },
+    { id: 'execute', word: '执行' },
+    { id: 'check', word: '检查' },
+    { id: 'review', word: '复核' },
+    { id: 'summarize', word: '汇总' }
+  ];
+  function postLabel(n) { return '任务 ' + n + ' · ' + POSTS[n - 1]; }
+
+  var RUNS = {
+    // 第 4 步 / 7 步，还剩 3 分 45 秒: 规划 20 秒 + 执行 2 分 10 秒 → 均值 1 分 15 秒 × 还剩 3 步
+    running: {
+      started: true,
+      chip: { state: 'running', word: '进行中' },
+      legs: {
+        plan: { state: 'done', sec: 20, calls: [['21:30', '规划', '过了']] },
+        execute: {
+          state: 'done', sec: 130,
+          calls: [['21:31', '执行', '过了'], ['21:33', '执行', '过了']],
+          cards: [
+            { n: 1, state: 'done', attempts: ['passed'], calls: [['21:31', '执行', '过了']] },
+            { n: 2, state: 'done', attempts: ['passed'], calls: [['21:33', '执行', '过了']] }
+          ]
+        },
+        check: {
+          state: 'doing',
+          calls: [['21:35', '检查', '过了'], ['21:38', '检查', '没过'], ['21:39', '检查', '在跑']],
+          cards: [
+            { n: 1, state: 'done', attempts: ['passed'], calls: [['21:35', '检查', '过了']] },
+            { n: 2, state: 'doing', attempts: ['failed', 'doing'], calls: [['21:38', '检查', '没过'], ['21:39', '检查', '在跑']] }
+          ]
+        },
+        review: { state: 'pending' },
+        summarize: { state: 'pending' }
+      },
+      stuck: { node: postLabel(2), role: '检查', round: 1 },
+      dock: null,
+      guardian: {
+        state: 'active', status: '监控中', budgetSec: 300, count: 1,
+        findings: [{ label: '检查 · 任务 2', action: '已记录异常 · 继续运行', tone: 'observe' }]
+      }
+    },
+
+    done: {
+      started: true,
+      chip: { state: 'done', word: '已完成' },
+      legs: {
+        plan: { state: 'done', sec: 20, calls: [['21:30', '规划', '过了']] },
+        execute: {
+          state: 'done', sec: 130,
+          calls: [['21:31', '执行', '过了'], ['21:33', '执行', '过了'], ['21:34', '执行', '过了']],
+          cards: [
+            { n: 1, state: 'done', attempts: ['passed'], calls: [['21:31', '执行', '过了']] },
+            { n: 2, state: 'done', attempts: ['passed'], calls: [['21:33', '执行', '过了']] },
+            { n: 3, state: 'done', attempts: ['passed'], calls: [['21:34', '执行', '过了']] }
+          ]
+        },
+        check: {
+          state: 'done',
+          calls: [['21:36', '检查', '过了'], ['21:36', '检查', '没过'], ['21:37', '检查', '过了']],
+          cards: [
+            { n: 1, state: 'done', attempts: ['passed'], calls: [['21:36', '检查', '过了']] },
+            { n: 2, state: 'done', attempts: ['failed', 'passed'], calls: [['21:36', '检查', '没过'], ['21:37', '检查', '过了']] },
+            { n: 3, state: 'done', attempts: ['passed'], calls: [['21:37', '检查', '过了']] }
+          ]
+        },
+        review: { state: 'done', calls: [['21:38', '复核', '过了']] },
+        summarize: { state: 'done', calls: [['21:39', '汇总', '过了']] }
+      },
+      stuck: null,
+      dock: { word: '收下这版' },
+      guardian: {
+        state: 'finished', status: '监控结束', budgetSec: 300, count: 1,
+        findings: [{ label: '检查 · 任务 2', action: '已记录异常 · 继续运行', tone: 'observe' }]
+      }
+    },
+
+    waiting: {
+      started: false,
+      chip: { state: 'waiting', word: '等你点头' },
+      legs: {},
+      stuck: null,
+      dock: { word: '开工' },
+      guardian: null
+    }
+  };
+
+  var STATE_WORD = { done: '已过', doing: '在跑', pending: '没到', failed: '没过', blocked: '没过', cancelled: '没过' };
+  var RESULT_STATE = { '过了': 'done', '没过': 'failed', '在跑': 'doing', '没到': 'pending' };
+
+  /* ========================================================================
+     2 · The model: nodes, groups, edges, the count line, the ETA.
+     ====================================================================== */
+  function legBadge(leg, spec) {
+    if (!spec.runs || spec.runs < 2) return '';
+    return '第 ' + spec.runs + (leg.id === 'review' ? ' 稿' : ' 次');
+  }
+
+  function buildModel(run) {
+    var nodes = [];
+    var groups = [];   // consecutive groups; every node of one group feeds every node of the next
+    var chain = [];    // the step chain the count line counts: 起点 + legs + 终点
+
+    nodes.push({
+      id: 'start', kind: 'end', label: '起点',
+      state: run.started ? 'done' : 'doing',
+      calls: [], full: run.started ? '已过' : '在跑'
+    });
+    chain.push('start');
+    groups.push(['start']);
+
+    LEGS.forEach(function (leg) {
+      var spec = run.legs[leg.id];
+      if (!spec) return;
+      nodes.push({
+        id: leg.id, kind: 'leg', label: leg.word, state: spec.state,
+        calls: spec.calls || [], badge: legBadge(leg, spec),
+        full: STATE_WORD[spec.state]
+      });
+      chain.push(leg.id);
+      groups.push([leg.id]);
+      if (spec.cards && spec.cards.length) {
+        var ids = spec.cards.map(function (card) {
+          var id = leg.id + '_t' + card.n;
+          nodes.push({
+            id: id, kind: 'card', label: postLabel(card.n), parent: leg.id,
+            state: card.state, attempts: card.attempts,
+            calls: card.calls || [],
+            badge: card.attempts.length > 1 ? '第 ' + card.attempts.length + ' 遍' : '',
+            full: STATE_WORD[card.state]
+          });
+          return id;
+        });
+        groups.push(ids);
+      }
+    });
+
+    var lastLeg = LEGS.filter(function (leg) { return run.legs[leg.id]; }).pop();
+    var endState = lastLeg && run.legs[lastLeg.id].state === 'done' ? 'done' : 'pending';
+    nodes.push({ id: 'end', kind: 'end', label: '终点', state: endState, calls: [], full: STATE_WORD[endState] });
+    chain.push('end');
+    groups.push(['end']);
+
+    var edges = [];
+    for (var g = 0; g + 1 < groups.length; g += 1) {
+      groups[g].forEach(function (from) {
+        groups[g + 1].forEach(function (to) { edges.push({ from: from, to: to }); });
+      });
+    }
+    return { nodes: nodes, groups: groups, edges: edges, chain: chain, run: run };
+  }
+
+  /** 第 N 步，共 M 步 · 还剩约 … — the mean of the finished steps, times what is left. */
+  function countLine(model) {
+    var run = model.run;
+    var byId = indexById(model);
+    var total = model.chain.length;
+    var step = model.chain.length - 1;
+    for (var i = 0; i < model.chain.length; i += 1) {
+      if (byId[model.chain[i]].state !== 'done') { step = i; break; }
+    }
+    var left = total - (step + 1);
+    var secs = LEGS.map(function (leg) { return run.legs[leg.id]; })
+      .filter(function (spec) { return spec && typeof spec.sec === 'number'; })
+      .map(function (spec) { return spec.sec; });
+    var line = '第 ' + (step + 1) + ' 步，共 ' + total + ' 步';
+    if (secs.length && left > 0) {
+      var mean = Math.round(secs.reduce(function (a, b) { return a + b; }, 0) / secs.length);
+      line += ' · 还剩约 ' + clock(mean * left);
+    }
+    return line;
+  }
+
+  function clock(sec) {
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    if (m === 0) return s + ' 秒';
+    if (s === 0) return m + ' 分';
+    return m + ' 分 ' + s + ' 秒';
+  }
+
+  function indexById(model) {
+    var map = {};
+    model.nodes.forEach(function (n) { map[n.id] = n; });
+    return map;
+  }
+
+  /* ========================================================================
+     3 · Geometry: ELK-style layers (desktop) or one column (phone), then the
+     xyflow smoothstep wires between the measured boxes.
+     ====================================================================== */
+  var RADIUS = 8;
+  var NODE_GAP = 12;      // between siblings of one group
+  var LAYER_GAP = 38;     // between two layers
+  var ROW_GAP = 30;       // between two layers on a phone
+  var CARD_GAP = 26;      // between two cards of the same leg on a phone
+  var GUTTER = 24;        // a phone card leaves this much free on both sides
+  var RAIL = 12;          // the fork trunk sits on the left, the join trunk on the right
+  var HOOK = 8;           // the short drop that lands on a card's own edge
+  var PAD = 4;
+
+  function fmt(v) { return Math.round(v * 100) / 100; }
+
+  /** An orthogonal polyline with rounded corners — every corner gets `r`. */
+  function orthPath(points, r) {
+    var p = [];
+    points.forEach(function (pt, i) {
+      if (i === 0) { p.push(pt); return; }
+      var prev = p[p.length - 1];
+      if (Math.abs(pt[0] - prev[0]) > 0.01 || Math.abs(pt[1] - prev[1]) > 0.01) p.push(pt);
+    });
+    if (p.length < 2) return '';
+    var d = 'M' + fmt(p[0][0]) + ',' + fmt(p[0][1]);
+    for (var i = 1; i < p.length - 1; i += 1) {
+      var a = p[i - 1], b = p[i], c = p[i + 1];
+      var l1 = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      var l2 = Math.hypot(c[0] - b[0], c[1] - b[1]);
+      var rr = Math.min(r, l1 / 2, l2 / 2);
+      if (!(rr > 0.5)) { d += ' L' + fmt(b[0]) + ',' + fmt(b[1]); continue; }
+      var p1 = [b[0] + (a[0] - b[0]) / l1 * rr, b[1] + (a[1] - b[1]) / l1 * rr];
+      var p2 = [b[0] + (c[0] - b[0]) / l2 * rr, b[1] + (c[1] - b[1]) / l2 * rr];
+      d += ' L' + fmt(p1[0]) + ',' + fmt(p1[1]) +
+           ' Q' + fmt(b[0]) + ',' + fmt(b[1]) + ' ' + fmt(p2[0]) + ',' + fmt(p2[1]);
+    }
+    var last = p[p.length - 1];
+    d += ' L' + fmt(last[0]) + ',' + fmt(last[1]);
+    return d;
+  }
+
+  /** The closed arrowhead at the target, pointing along the last segment. */
+  function arrowPoints(tip, from) {
+    var dx = tip[0] - from[0], dy = tip[1] - from[1];
+    var len = Math.hypot(dx, dy) || 1;
+    dx /= len; dy /= len;
+    var back = 7, half = 3.4;
+    var bx = tip[0] - dx * back, by = tip[1] - dy * back;
+    var ox = -dy * half, oy = dx * half;
+    return [[tip[0], tip[1]], [bx + ox, by + oy], [bx - ox, by - oy]]
+      .map(function (pt) { return fmt(pt[0]) + ',' + fmt(pt[1]); }).join(' ');
+  }
+
+  /* ========================================================================
+     4 · Rendering
+     ====================================================================== */
+  var product = document.getElementById('product');
+  var frame = document.getElementById('frame');
+  var stateKey = 'running';
+  var frameWidth = 1440;
+  var selected = null;
+  var graphEl = null;
+  var wires = [];   // { el, arrow, from, to }
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function ariaFor(node) {
+    var bits = [node.label, node.full || STATE_WORD[node.state]];
+    if (node.calls.length) bits.push(node.calls.length + ' 次调用');
+    return bits.join('，');
+  }
+
+  function buildNode(node) {
+    var wrap = el('div', 'gw-wrap');
+    wrap.setAttribute('data-wrap', node.id);
+    wrap.setAttribute('data-kind', node.kind);
+
+    var openable = node.calls.length > 0;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gw-node';
+    btn.setAttribute('data-node', node.id);
+    btn.setAttribute('data-kind', node.kind);
+    btn.setAttribute('data-state', node.state);
+    btn.setAttribute('aria-label', ariaFor(node));
+    if (openable) btn.setAttribute('aria-expanded', 'false');
+    else btn.setAttribute('data-trace-only', 'true');
+
+    // A card carries one dot per attempt instead of the leg's single state dot.
+    if (node.kind !== 'card') {
+      var stateDot = el('span', 'gw-node-dot');
+      stateDot.setAttribute('aria-hidden', 'true');
+      btn.appendChild(stateDot);
+    }
+
+    if (node.kind === 'card') {
+      var name = el('span', 'gw-card-name', node.label);
+      name.setAttribute('data-label', node.id);
+      btn.appendChild(name);
+      if (node.badge) btn.appendChild(el('span', 'gw-card-badge', node.badge));
+
+      var dots = el('span', 'gw-card-dots');
+      dots.setAttribute('aria-hidden', 'true');
+      node.attempts.forEach(function (attempt, i) {
+        if (i > 0 && node.attempts[i - 1] === 'failed') dots.appendChild(buildArc());
+        var dot = el('span', 'gw-dot');
+        dot.setAttribute('data-attempt', attempt);
+        dots.appendChild(dot);
+      });
+      btn.appendChild(dots);
+    } else {
+      var word = el('span', 'gw-node-word', node.label);
+      word.setAttribute('data-label', node.id);
+      btn.appendChild(word);
+      if (node.badge) btn.appendChild(el('span', 'gw-node-badge', node.badge));
+    }
+
+    wrap.appendChild(btn);
+    wrap.appendChild(buildCalls(node));
+    return wrap;
+  }
+
+  /** A failed attempt followed by another one: a short dashed hop inside the card. */
+  function buildArc() {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'gw-card-arc');
+    svg.setAttribute('viewBox', '0 0 10 10');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M1 8 Q5 1.5 9 8');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function buildCalls(node) {
+    var box = el('div', 'gw-calls');
+    box.setAttribute('data-calls', node.id);
+    box.hidden = true;
+    var list = el('ul', 'gw-calls-list');
+    node.calls.forEach(function (row) {
+      var li = el('li', 'gw-calls-row');
+      li.setAttribute('data-state', RESULT_STATE[row[2]] || 'pending');
+      li.appendChild(el('span', 'gw-calls-t', row[0]));
+      li.appendChild(el('span', 'gw-calls-g', row[1]));
+      li.appendChild(el('span', 'gw-calls-w', row[2]));
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  function buildHeader(run) {
+    var head = el('header', 'gw-bar');
+    var name = el('span', 'gw-run', RUN_NAME);
+    name.setAttribute('data-label', 'run-name');
+    name.title = RUN_NAME;
+    head.appendChild(name);
+    var chip = el('span', 'gw-chip');
+    chip.setAttribute('data-state', run.chip.state);
+    chip.setAttribute('role', 'status');
+    var dot = el('span', 'gw-chip-dot');
+    dot.setAttribute('aria-hidden', 'true');
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(run.chip.word));
+    head.appendChild(chip);
+    return head;
+  }
+
+  function buildStuck(run) {
+    if (!run.stuck) return null;
+    var p = el('p', 'gw-stuck');
+    p.setAttribute('data-stuck', 'true');
+    p.appendChild(document.createTextNode('卡在 '));
+    p.appendChild(el('b', null, run.stuck.node));
+    p.appendChild(document.createTextNode('：' + run.stuck.role + ' 第 ' + run.stuck.round + ' 遍没过'));
+    return p;
+  }
+
+  function buildGuardian(g) {
+    if (!g) return null;
+    var box = el('aside', 'gw-guardian');
+    box.setAttribute('data-guardian', g.state);
+    box.setAttribute('data-state', g.state);
+    box.setAttribute('aria-label', 'Guardian 监控');
+    var tiles = el('div', 'gw-tiles');
+
+    var t1 = el('div', 'gw-tile');
+    t1.appendChild(el('span', 'gw-tile-label', 'Guardian 监控'));
+    var v1 = el('span', 'gw-tile-value', g.status);
+    v1.setAttribute('role', 'status');
+    v1.setAttribute('data-tone', g.state);
+    t1.appendChild(v1);
+    tiles.appendChild(t1);
+
+    var t2 = el('div', 'gw-tile');
+    t2.appendChild(el('span', 'gw-tile-label', '子任务存活判断预算'));
+    t2.appendChild(el('span', 'gw-tile-value', g.budgetSec + ' 秒'));
+    tiles.appendChild(t2);
+
+    var t3 = el('div', 'gw-tile');
+    t3.appendChild(el('span', 'gw-tile-label', '处置记录'));
+    t3.appendChild(el('span', 'gw-tile-value', g.count + ' 条'));
+    tiles.appendChild(t3);
+
+    var t4 = el('div', 'gw-tile');
+    t4.setAttribute('data-wide', 'true');
+    var ul = el('ul', 'gw-findings');
+    g.findings.forEach(function (f) {
+      var li = el('li');
+      li.setAttribute('data-action', f.tone);
+      li.appendChild(el('span', 'gw-finding-label', f.label));
+      li.appendChild(el('span', 'gw-finding-action', f.action));
+      ul.appendChild(li);
+    });
+    t4.appendChild(ul);
+    tiles.appendChild(t4);
+    box.appendChild(tiles);
+    return box;
+  }
+
+  function buildDock(dock) {
+    if (!dock) return null;
+    var foot = el('footer', 'gw-foot');
+    var btn = el('button', 'gw-dock', dock.word);
+    btn.type = 'button';
+    btn.setAttribute('data-dock', dock.word);
+    foot.appendChild(btn);
+    return foot;
+  }
+
+  function escMermaid(text) { return String(text).replace(/"/g, '#quot;'); }
+
+  /** The same picture, in the one text form Mermaid renderers the plugin ships can read. */
+  function mermaidSource(model) {
+    var lines = ['flowchart TD'];
+    model.nodes.forEach(function (n) {
+      var label = escMermaid(n.label);
+      var shape = n.kind === 'end' ? '(["' + label + '"])' : n.kind === 'card' ? '("' + label + '")' : '["' + label + '"]';
+      lines.push('  ' + n.id + shape);
+    });
+    model.edges.forEach(function (e) { lines.push('  ' + e.from + ' --> ' + e.to); });
+    return lines.join('\n');
+  }
+
+  function buildMermaid(model) {
+    var details = el('details', 'gw-mermaid');
+    details.setAttribute('data-mermaid', 'true');
+    var summary = el('summary', null, 'Mermaid 源码');
+    details.appendChild(summary);
+    var pre = el('pre');
+    pre.textContent = mermaidSource(model);
+    details.appendChild(pre);
+    return details;
+  }
+
+  /* ---------------------------------------------------------------- render */
+  function render() {
+    var run = RUNS[stateKey];
+    var model = buildModel(run);
+    selected = null;
+    wires = [];
+
+    product.textContent = '';
+    // The layout mode is decided by the space the page actually has, not by the
+    // switcher's label: the phone breakpoint is a width, so measure the width.
+    var mode = product.clientWidth > 0 && product.clientWidth < 560 ? 'mobile' : 'desktop';
+    product.setAttribute('data-mode', mode);
+
+    product.appendChild(buildHeader(run));
+    product.appendChild(el('p', 'gw-line', countLine(model)));
+
+    graphEl = el('div', 'gw-graph');
+    graphEl.setAttribute('data-graph', mode);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'gw-wires');
+    svg.setAttribute('aria-hidden', 'true');
+    graphEl.appendChild(svg);
+    var cols = el('div', 'gw-cols');
+    graphEl.appendChild(cols);
+    product.appendChild(graphEl);
+
+    var wraps = {};
+    var order = [];
+    model.groups.forEach(function (group) {
+      group.forEach(function (id) {
+        order.push(id);
+      });
+    });
+    var byId = indexById(model);
+    order.forEach(function (id) {
+      var wrap = buildNode(byId[id]);
+      wraps[id] = wrap;
+      cols.appendChild(wrap);
+    });
+
+    // measure, place, then draw: nothing is painted between these steps.
+    var boxes = {};
+    order.forEach(function (id) {
+      var wrap = wraps[id];
+      var btn = wrap.firstChild;
+      boxes[id] = {
+        wrapW: wrap.offsetWidth,
+        wrapH: wrap.offsetHeight,
+        w: btn.offsetWidth,
+        h: btn.offsetHeight,
+        dx: btn.offsetLeft,
+        dy: btn.offsetTop
+      };
+    });
+
+    var canvasW = Math.max(0, cols.clientWidth || product.clientWidth - 32);
+    var placed = mode === 'mobile'
+      ? placeColumn(model, boxes, canvasW)
+      : placeLayers(model, boxes, canvasW);
+
+    // Which card of its own leg this is: the phone tree alternates the side it
+    // enters each sibling on, so a three-card branch shows three connections.
+    var ctx = { index: {}, size: {}, width: canvasW };
+    model.groups.forEach(function (group) {
+      group.forEach(function (id, i) {
+        ctx.index[id] = i;
+        ctx.size[id] = group.length;
+      });
+    });
+
+    var height = 0;
+    order.forEach(function (id) {
+      wraps[id].style.left = placed[id].wrapLeft + 'px';
+      wraps[id].style.top = placed[id].wrapTop + 'px';
+      height = Math.max(height, placed[id].top + placed[id].h);
+    });
+    var graphH = Math.ceil(height + PAD * 2);
+    graphEl.style.height = graphH + 'px';
+    svg.setAttribute('width', String(canvasW));
+    svg.setAttribute('height', String(graphH));
+    svg.setAttribute('viewBox', '0 0 ' + canvasW + ' ' + graphH);
+    var svgNS = 'http://www.w3.org/2000/svg';
+
+    model.edges.forEach(function (edge, i) {
+      var a = placed[edge.from];
+      var b = placed[edge.to];
+      var route = mode === 'mobile'
+        ? routeColumn(edge, a, b, byId, ctx)
+        : routeLayer(a, b);
+      var path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('data-edge', String(i));
+      path.setAttribute('data-from', edge.from);
+      path.setAttribute('data-to', edge.to);
+      path.setAttribute('d', orthPath(route.points, RADIUS));
+      var arrow = document.createElementNS(svgNS, 'polygon');
+      arrow.setAttribute('data-arrow', String(i));
+      arrow.setAttribute('data-from', edge.from);
+      arrow.setAttribute('data-to', edge.to);
+      arrow.setAttribute('points', arrowPoints(route.tip, route.preTip));
+      svg.appendChild(path);
+      svg.appendChild(arrow);
+      wires.push({ el: path, arrow: arrow, from: edge.from, to: edge.to });
+    });
+
+    product.appendChild(buildMermaid(model));
+    var stuck = buildStuck(run);
+    if (stuck) product.appendChild(stuck);
+    var guardian = buildGuardian(run.guardian);
+    if (guardian) product.appendChild(guardian);
+    var dock = buildDock(run.dock);
+    if (dock) product.appendChild(dock);
+
+    bindGraph();
+  }
+
+  /* Desktop: longest-path layers, siblings side by side, a group centred on its parent. */
+  function placeLayers(model, boxes, canvasW) {
+    var placed = {};
+    var byId = indexById(model);
+    var parents = {};
+    model.edges.forEach(function (e) {
+      if (!parents[e.to]) parents[e.to] = [];
+      if (parents[e.to].indexOf(e.from) < 0) parents[e.to].push(e.from);
+    });
+
+    var y = PAD;
+    model.groups.forEach(function (group) {
+      var rowH = 0;
+      group.forEach(function (id) { rowH = Math.max(rowH, boxes[id].h); });
+      var widths = group.map(function (id) { return boxes[id].w; });
+      var totalW = widths.reduce(function (a, b) { return a + b; }, 0) + NODE_GAP * (group.length - 1);
+      var centre = canvasW / 2;
+      var anchor = parents[group[0]];
+      if (anchor && anchor.length) {
+        var sum = 0;
+        anchor.forEach(function (pid) {
+          sum += placed[pid].left + placed[pid].w / 2;
+        });
+        centre = sum / anchor.length;
+      }
+      var left = centre - totalW / 2;
+      left = Math.max(PAD, Math.min(left, canvasW - PAD - totalW));
+      group.forEach(function (id, i) {
+        var w = boxes[id].w;
+        placed[id] = {
+          left: left, top: y, w: w, h: boxes[id].h,
+          wrapLeft: left - boxes[id].dx, wrapTop: y - boxes[id].dy
+        };
+        left += w + NODE_GAP;
+      });
+      y += rowH + LAYER_GAP;
+    });
+    return placed;
+  }
+
+  /* Phone: one node per row, cards inset so a rail fits beside them. */
+  function placeColumn(model, boxes, canvasW) {
+    var placed = {};
+    var y = PAD;
+    var rows = [];
+    // Siblings of one group sit closer than two layers do, so the cards read as
+    // one leg's branch instead of as six equal steps.
+    model.groups.forEach(function (group) {
+      group.forEach(function (id, i) {
+        rows.push({ id: id, gap: i === group.length - 1 ? ROW_GAP : CARD_GAP });
+      });
+    });
+    rows.forEach(function (row) {
+      var b = boxes[row.id];
+      placed[row.id] = {
+        left: b.dx, top: y, w: b.w, h: b.h,
+        wrapLeft: 0, wrapTop: y - b.dy
+      };
+      y += b.h + row.gap;
+    });
+    return placed;
+  }
+
+  function routeLayer(a, b) {
+    var sx = a.left + a.w / 2, sy = a.top + a.h;
+    var tx = b.left + b.w / 2, ty = b.top;
+    if (Math.abs(sx - tx) < 0.6) {
+      return { points: [[sx, sy], [tx, ty]], tip: [tx, ty], preTip: [sx, sy] };
+    }
+    var mid = sy + (ty - sy) / 2;
+    return { points: [[sx, sy], [sx, mid], [tx, mid], [tx, ty]], tip: [tx, ty], preTip: [tx, mid] };
+  }
+
+  /**
+   * Phone routing: a side-rail tree.
+   *
+   * Every card leaves a 24 px gutter on both sides, so two trunks fit down the
+   * column — the fork trunk on the left, the join trunk on the right — and no
+   * vertical ever runs through a card. A card is entered on its own top edge:
+   * the fork bar is drawn in the gap above it, then drops 8 px onto the edge,
+   * and the side it lands on alternates (left, right, left …), so three cards
+   * under one leg read as three separate connections instead of one blur.
+   */
+  function routeColumn(edge, a, b, byId, ctx) {
+    var from = byId[edge.from];
+    var to = byId[edge.to];
+    var aCx = a.left + a.w / 2;
+    var bCx = b.left + b.w / 2;
+
+    // fork: leg bottom centre → 12 px stem → left trunk → bar in the gap → 8 px onto the top edge
+    if (from.kind === 'leg' && to.kind === 'card') {
+      var index = ctx.index[to.id] || 0;
+      var cornerX = index % 2 === 0 ? b.left + HOOK : b.left + b.w - HOOK;
+      var stemY = a.top + a.h + 12;
+      var tapY = b.top - HOOK;
+      return {
+        points: [[aCx, a.top + a.h], [aCx, stemY], [RAIL, stemY], [RAIL, tapY], [cornerX, tapY], [cornerX, b.top]],
+        tip: [cornerX, b.top], preTip: [cornerX, tapY]
+      };
+    }
+
+    // join: 8 px off the bottom edge → right trunk → bar → 12 px into the next leg's top centre
+    if (from.kind === 'card' && to.kind !== 'card') {
+      var outX = a.left + a.w - HOOK;
+      var downY = a.top + a.h + HOOK;
+      var joinRail = ctx.width - RAIL;
+      var busY = b.top - 12;
+      return {
+        points: [[outX, a.top + a.h], [outX, downY], [joinRail, downY], [joinRail, busY], [bCx, busY], [bCx, b.top]],
+        tip: [bCx, b.top], preTip: [bCx, busY]
+      };
+    }
+
+    // Everything else is a neighbouring row and takes a plain vertical elbow.
+    var same = Math.abs(aCx - bCx) < 0.6;
+    if (same && b.top > a.top) {
+      return { points: [[aCx, a.top + a.h], [bCx, b.top]], tip: [bCx, b.top], preTip: [aCx, a.top + a.h] };
+    }
+    var mid = a.top + a.h + 12;
+    return {
+      points: [[aCx, a.top + a.h], [aCx, mid], [RAIL, mid], [RAIL, b.top - 12], [bCx, b.top - 12], [bCx, b.top]],
+      tip: [bCx, b.top], preTip: [bCx, b.top - 12]
+    };
+  }
+
+  /* ========================================================================
+     5 · Interaction: open a node's calls, light its wires, clear on背景.
+     ====================================================================== */
+  function bindGraph() {
+    graphEl.addEventListener('click', function (event) {
+      var btn = event.target.closest('button[data-node]');
+      // The empty part of the chart is the "never mind" target, exactly like the
+      // page background is once the click leaves the chart.
+      if (!btn) {
+        if (selected !== null) clearSelection();
+        return;
+      }
+      event.stopPropagation();
+      toggle(btn.getAttribute('data-node'));
+    });
+  }
+
+  function toggle(id) {
+    if (selected === id) { clearSelection(); return; }
+    selected = id;
+    graphEl.setAttribute('data-trace', id);
+
+    var wraps = graphEl.querySelectorAll('.gw-wrap');
+    Array.prototype.forEach.call(wraps, function (wrap) {
+      var isSel = wrap.getAttribute('data-wrap') === id;
+      wrap.setAttribute('data-sel', isSel ? '1' : '0');
+      var btn = wrap.querySelector('button[data-node]');
+      var calls = wrap.querySelector('.gw-calls');
+      if (!btn || !calls) return;
+      var show = isSel && btn.hasAttribute('aria-expanded');
+      btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      calls.hidden = !show;
+      if (show) placeCalls(wrap, calls, btn);
+    });
+
+    wires.forEach(function (w) {
+      var lit = w.from === id || w.to === id;
+      if (lit) { w.el.setAttribute('data-lit', '1'); w.arrow.setAttribute('data-lit', '1'); }
+      else { w.el.removeAttribute('data-lit'); w.arrow.removeAttribute('data-lit'); }
+    });
+  }
+
+  /** Keep the floating list inside the column, however narrow the node is. */
+  function placeCalls(wrap, calls, btn) {
+    calls.style.marginLeft = '0px';
+    var hostRect = graphEl.getBoundingClientRect();
+    var boxRect = calls.getBoundingClientRect();
+    var overflowRight = boxRect.right - hostRect.right;
+    var overflowLeft = hostRect.left - boxRect.left;
+    var shift = 0;
+    if (overflowRight > 0) shift = -overflowRight;
+    if (overflowLeft > 0) shift = overflowLeft;
+    if (shift !== 0) calls.style.marginLeft = Math.round(shift) + 'px';
+  }
+
+  function clearSelection() {
+    selected = null;
+    graphEl.removeAttribute('data-trace');
+    Array.prototype.forEach.call(graphEl.querySelectorAll('.gw-wrap'), function (wrap) {
+      wrap.setAttribute('data-sel', '0');
+      var btn = wrap.querySelector('button[data-node]');
+      var calls = wrap.querySelector('.gw-calls');
+      if (btn && btn.hasAttribute('aria-expanded')) btn.setAttribute('aria-expanded', 'false');
+      if (calls) calls.hidden = true;
+    });
+    wires.forEach(function (w) { w.el.removeAttribute('data-lit'); w.arrow.removeAttribute('data-lit'); });
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!graphEl) return;
+    if (graphEl.contains(event.target)) return;
+    if (selected !== null) clearSelection();
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && selected !== null) clearSelection();
+  });
+
+  /* ========================================================================
+     6 · Review chrome
+     ====================================================================== */
+  function setWidth(width) {
+    frameWidth = width;
+    frame.style.setProperty('--frame-w', width + 'px');
+    product.style.maxWidth = width >= 560 ? '720px' : 'none';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pick-width]'), function (btn) {
+      btn.setAttribute('aria-pressed', String(Number(btn.getAttribute('data-pick-width')) === width));
+    });
+    render();
+  }
+
+  function setState(key) {
+    stateKey = key;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pick-state]'), function (btn) {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-pick-state') === key));
+    });
+    render();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pick-state]'), function (btn) {
+    btn.addEventListener('click', function () { setState(btn.getAttribute('data-pick-state')); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pick-width]'), function (btn) {
+    btn.addEventListener('click', function () { setWidth(Number(btn.getAttribute('data-pick-width'))); });
+  });
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    if (resizeTimer !== null) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { resizeTimer = null; render(); }, 120);
+  });
+
+  product.style.maxWidth = '720px';
+  render();
+}());
+</script>
+</body>
+</html>

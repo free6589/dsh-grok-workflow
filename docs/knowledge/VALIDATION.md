@@ -1,3 +1,49 @@
+## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：`45909bb`（`feat(progress): the tab is a task panel …`）把进度页换成任务面板——顶上一句话、中间一张由 Mermaid 文本自己排出来的分支图、底下一句只在卡住时出现。本条目只记**真机读数与门禁**；契约见 `DESIGN-progress-tab.md` §25，裁决见 `D-173`。**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮一个字节没改**（soak 那一路只读），也没 commit / push / tag / bump / publish。
+
+**身份（本轮自己 `git rev-parse --short HEAD` / `git describe --tags --always` / `git tag --contains HEAD` / `node -p version` 各读一次）**：HEAD = **`45909bb`**、`git describe` = **`v0.13.52-2-g45909bb`**、`git tag --contains HEAD` 计数 **0**（这颗提交上没有任何标签）、`package.json` 版本 **`0.13.52`**、`main` 尖端 **`e44e26a`**。打包：`dsh-grok-workflow-0.13.52.tgz` = **1 025 655** 字节 / `sha256 1554571b6ce414c0a3f2fe670118ac1786f7bf6aa981b5669c58c3387c0eac3d`（164 文件、解包 3.2 MB）；浏览器包 **399 448** 字节 / `sha256 4f87307233954fc08937e618e902f6583e638dd6d9a686e4eec1209111f0eeb1`，`lib/client.js` 与 `src/client/index.js` 同哈希（`cmp` 空输出），`npm run build` 重跑后 `git status` 仍为空（构建可复现）；`lib/index.js` = `sha256 ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32`。装进隔离 profile 的那份读回 **`0.13.52`**、两个 sha256 与工作树相同、插件目录内软链 **0** 个、`readlink -f` 落回 clone 自己（全是 `install.txt` 里的逐字输出）。环境：隔离 home **`.tmp/soak-panel/dsh-home`**（从 `~/.dsh/profiles/web` 克隆，**7745 文件 / 5 链接 / 抹除凭据后 5/5 逐字节相等**）、一次性工作区 `.tmp/soak-panel/work`、端口 **3411**（开跑前实测空闲）、Node **v26.8.1** / npm **11.19.0** / dsh **0.2.2-rc.3**。
+
+**跑了三次，只有一套能当证据**：A 桌面 1500×1600 **129.8 s** 完成（running / done / 两次点击）；B 390 px **中途掐掉**——这个宽度下标签条只有「对话 / 轨迹」，采样器 40 s 后放弃（工作流本身在服务端仍跑完并写了文件，**这一跑不作证据**）；C 390 px **149.3 s** 完成，从标签条右侧的**更多会话视图**菜单进「进度」，手机与平板那几张图都出自这一跑。三次发出去的是同一句话，三个文件**真的写出来了**：`notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**。
+
+| 读数（`soak/readings.json`，12 条） | 宽 | 态 | 节点 / 线 | `scrollWidth == clientWidth` | 调用列表 | 亮线 / 暗线 | 那句话 | 卡住那句 | 底部 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `desktop-1500-running` | 1500 | 进行中 | 16 / 21 | 1500 = 1500 | 0 | 0 / 0 | 第 6 步，共 7 步 · **还剩约 25 秒** | 无 | —（空） |
+| `desktop-1500-done` / `-before-click` | 1500 | 已完成 | 16 / 21 | 1500 = 1500 | 0 | 0 / 0 | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `desktop-1500-node-open`（第一次点 `execute_t1`） | 1500 | 已完成 | 16 / 21 | 1500 = 1500 | **1** | **5 / 19** | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `desktop-1500-trace`（**第二次**点同一颗） | 1500 | 已完成 | 16 / 21 | 1500 = 1500 | **0** | **0 / 0** | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `desktop-1500-node-open-again`（**第三次**） | 1500 | 已完成 | 16 / 21 | 1500 = 1500 | **1** | **5 / 19** | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `phone-390-running` | 390 | 进行中 | 6 / 7 | 390 = 390 | 0 | 0 / 0 | 第 2 步，共 3 步（**没有**「还剩约」） | 无 | —（空） |
+| `phone-390-done` / `-before-tap` | 390 | 已完成 | 16 / 21 | 390 = 390 | 0 | 0 / 0 | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `phone-390-trace`（手指点一次分支） | 390 | 已完成 | 16 / 21 | 390 = 390 | **1** | **5 / 19** | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `phone-360-done` | 360 | 已完成 | 16 / 21 | 360 = 360 | 0 | 0 / 0 | 第 7 步，共 7 步 | 无 | 收下这版 |
+| `tablet-700-done` | 700 | 已完成 | 16 / 21 | 700 = 700 | 0 | 0 / 0 | 第 7 步，共 7 步 | 无 | 收下这版 |
+
+- **每一行都是「它旁边那张图」同一刻从 DOM 读的**，没有一行是推算的（`readings.json` 的 `note` 逐字这么写）。
+- **`[data-current="true"]` 12 条都是 1**：正在走的那一步只有一颗。
+- **「还剩约」在两处量出来了**：桌面进行中 `还剩约 25 秒`（已跑完 6 步的实测均值外推），手机进行中 `第 2 步，共 3 步` **没有**这半句（那时还没有一步能整步量完）；完成态两档都只有 `第 7 步，共 7 步`。
+- **卡住那句在每一态、每一宽度都不存在**（`[data-gw-progress-stuck]` 计数 0）：这一轮没有没过的一次尝试、没有没回报的一步、也没有被退稿的汇总，按设计它就不该出现——**它出现过是什么样子，本轮没拍到**（见下面的 `NOT_RUN`）。
+- **底部按钮**：完成态 `收下这版`；进行中 dock 为空（这一轮不请你点）。
+
+**页面自己的真值检查（在同一份 JSON 里）**：`[data-gw-progress-graph]` 的 `data-gw-progress-source` 首行**每一条都是 `flowchart TD`**；**以 `end` 开头的行 0 条**（终点写作 `finish`，规则是 `finish(["终点"])`）；把这份 Mermaid 的节点行与线行解析出来数一遍，与 DOM 的 `[data-gw-progress-pnode]` / 边数**每一次都相等**（运行中 6 = 6、7 = 7；完成态 16 = 16、21 = 21，`nodeCountsAgree` / `edgeCountsAgree` 全 `true`）。完成态那份源文本逐字存在 `soak/mermaid-done.txt`：**38 行 = 头 1 + 节点 16 + 线 21**，起终点是胶囊 `(["…"])`、任务是圆角 `("…")`、腿是方框 `["…"]`，与页面画出来的形状一致。
+
+**两个交互（真手上量到的）**：点第一颗任务节点 → 调用列表 0 → **1**，同时 `[data-trace="active"]` **5**（2 条边 + 3 颗节点）、`dim` **19**；**第二次点同一颗 → 列表 0 / 亮 0 / 暗 0**；第三次点 → 回到 1 与 5 / 19。也就是说**一次点击同时开关「列表」与「线」**（见下面的口径纠正）。手机那一次是同一颗节点、同样的 `calls 1 / trace 5 / dim 19`。
+
+**门禁**：`npx tsc -p tsconfig.json --noEmit` → `exit 0`（无输出）；`npx oxlint src test` → **`Found 14 warnings and 0 errors.`**；`npx vitest run` 八份进度相关 spec → **`8 files / 326 passed`**、`exit 0`（`client 153 + progress-panel 25 + progress-panel-model 31 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14`，逐行在转录里）。整仓套件：`TMPDIR=$PWD/.tmp npx vitest run` → **`105 files / 2030 passed`**，转录 **`.rsi/evidence/task-panel-2026-11-26/suite-45909bb.out`**（本轮自己跑、自己落盘，尾段逐字，`Test Files 105 passed (105)` / `Tests 2030 passed (2030)` / `Duration 95.79s` 都在里面）。
+
+**红线（`redline.txt` 是原文）**：`( : > ~/.dsh/.soak-probe )` 开跑前与收尾各一次都是 **`Read-only file system`**，探针文件不存在；`~/.dsh`、`~/.dsh/profiles`、`~/.dsh/profiles/web` 三个 mtime **前（18:25:33）后（18:56）逐字节相同**（`2026-11-25 23:14:14.025` / `2026-11-22 16:59:46.687` / `2026-11-26 11:22:40.166`）；3080 根路径 **401 → 401**；live 里那份插件仍读作 **`0.13.48`**（**没有升级**）；隔离实例 3411 收尾已停（`ss -ltn` 无监听），`.tmp/soak-panel/`、tgz、npm 缓存、gate 的 `TMPDIR` 全部删掉。**一次越界命令照实记**：定位 `--profile` 被拒时有一条命令没带 `DSH_HOME` 就跑，`dsh web --help` 试图写 `~/.dsh/profiles/web/cordis.yml`，被只读挂载挡成 `EROFS`——**没写进去**（mtime 为证），之后每条命令都显式指向 clone。
+
+**口径要纠正的一处（照着实测说，不照着说明书写）**：块里的说明写的是「再点同一颗 → 保留列表、点亮线」。**实测不是这样**：一次点击**同时**开关列表与线，所以第二次点下去是「列表收起 + 线全灭」。这是这一版的开关语义，不是脚本失败；`desktop-1500-trace.png` 拍的就是第二次点完的样子，`desktop-1500-trace-open.png` 是第三次。
+
+**观察到的三条限制（记录，不判对错）**：
+1. **进度页在窄屏不在标签条上**：同一会话探针量到 **700 / 600 / 500 px 时标签条有 `对话,轨迹,进度` 三个页签；420 / 390 / 360 px 时只有 `对话,轨迹`，整份 DOM 里连「进度」两个字都没有**——它退到了右侧的**更多会话视图**菜单里，手机和平板那几张图都是从那里进去的。这是宿主标签条的行为，本轮照实记，不当作本插件要修的东西。
+2. **展开的调用列表浮在邻居上**：手机上浮在两条分支之间、与「任务 2 · 写 test.txt」那张卡叠在一起（`phone-390-trace.png`）；桌面 1500 展开时遮住「检查」节点的一部分（`desktop-1500-node-open.png`）。字都读得出，`scrollWidth == clientWidth` 也成立，**叠压是真的**。
+3. **两档补拍的取景**：`phone-360-done.png` 与 `tablet-700-done.png` 是在 390 那一页上改视口补拍的，浏览器保留原滚动位置，所以两张都停在树的中段、顶部那行字不在画面里；**读数（同一刻读的）完整**，缺的是取景。
+
+**`NOT_RUN`（一条不藏）**：① **「等你点头」态**——发出后 **0.59 s** 进度页就挂上了「进行中」，没硬造那个窗口；② **`[data-gw-progress-stuck]` 那句话的文本**——一路顺利，它按设计从未出现；要读它需要一次没过的尝试 / 没回报的一步 / 被退稿的汇总，本轮没制造；③ **未通过 / 已取消 / 出错**三态；④ **421–499 px 之间的宽度**（只探了 420 与 500 两侧，断点位置没逐像素找）；⑤ **live 档案升级 / 重载 / 重启**（红线）；⑥ **「收下这版」点下去之后输入框里出现什么**（只验了按钮存在与文案，没点）；⑦ **读屏软件实测**、**Firefox / Safari**（只在 Chromium 里跑过）。
+
+**证据：** `.rsi/evidence/task-panel-2026-11-26/`——`README.md`（跑了什么、每张图是什么、每条读数从哪来、偏差与留白）、`install.txt`（构建 / 打包 / 安装 / 引导的逐字输出与哈希）、`clone.txt`（克隆报告）、`redline.txt`（只读探针、三个 mtime、3080、那次越界命令）、`timeline.json`（三次运行时刻、模型钉法、断点探针、点击序列）、`gate-45909bb.out`（tsc / oxlint / vitest 逐字）、`suite-45909bb.out`（整仓套件逐字尾段）、`soak/readings.json`（12 条读数 + 真值检查 + 控制台）、`soak/raw-*.json`、`soak/*.png`（10 张）、`soak/mermaid-done.txt`、`soak/done-dom.json`、四个采集脚本。
+
 ## `0.13.52` **发出去并收口**：合并提交 `ebc5f37`、发布提交 `9cc2e43`、`main` 从 `226d673` 快进、附注标签 `v0.13.52` 对象 `9c7ebe3c…`、两个远端 run 都 success、Release 资产 **1021062** 字节（比 `0.13.51` **+1229**）；发布门禁在 `9cc2e43` 上 **`GATE_EXIT=0`**（`105 files / 2060 passed` / `101.40s`，转录 **412 行 / 25120 字节 / `sha256 d1171a72…`**）；**第二遍门禁 / 真机 soak / npm publish `NOT_RUN`**、**live 档案升级 `BLOCKED`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`0.13.52` 的发布收口。**产品代码一行没写、门禁没有重跑**（`AGENTS.md` §12）——这一版发出去的东西
