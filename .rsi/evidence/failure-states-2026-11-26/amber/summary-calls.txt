@@ -1,0 +1,30 @@
+# the summary node, opened by clicking its own detail control
+
+node state: failed
+node aria-label: 汇总 第 3 稿 没过
+toggle aria-expanded: true
+rejected rows: 3
+  [drafts] 第 3 稿全被退回
+  [stage] 卡在检查
+  [reason] 最后不过：the polish uses a list instead of plain prose
+
+# the rows inside the node, one per line
+- 8:01
+汇总·第3稿
+汇总
+做完
+打开子会话
+- 第 3 稿全被退回
+- 卡在检查
+- 最后不过：the polish uses a list instead of plain prose
+
+# the node list, verbatim
+
+8:01
+汇总·第3稿
+汇总
+做完
+打开子会话
+第 3 稿全被退回
+卡在检查
+最后不过：the polish uses a list instead of plain prose

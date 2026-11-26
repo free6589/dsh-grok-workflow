@@ -1,0 +1,84 @@
+{
+ "url": "http://127.0.0.1:3522/?token=<redacted>",
+ "scenario": "failed",
+ "sentAt": 1795651191033,
+ "timeline": [
+  {
+   "t": 478,
+   "chip": "",
+   "nodes": [],
+   "logRows": 0
+  },
+  {
+   "t": 9093,
+   "chip": "等你点头",
+   "nodes": [
+    "起点:done",
+    "终点:pending"
+   ],
+   "logRows": 0
+  },
+  {
+   "t": 9758,
+   "chip": "进行中",
+   "nodes": [
+    "起点:done",
+    "规划:doing",
+    "终点:pending"
+   ],
+   "logRows": 0
+  },
+  {
+   "t": 96250,
+   "chip": "未通过",
+   "nodes": [
+    "起点:done",
+    "规划:done",
+    "执行:done",
+    "检查:failed",
+    "复核:done",
+    "执行:done",
+    "检查:failed",
+    "复核:done",
+    "汇总:done",
+    "终点:failed"
+   ],
+   "logRows": 0
+  }
+ ],
+ "saved": {
+  "waiting": {
+   "atSec": 9.758,
+   "nodes": 2
+  },
+  "dockStart": {
+   "button": "开工",
+   "composer": "确认",
+   "filled": ""
+  },
+  "running": {
+   "atSec": 9.846,
+   "nodes": 3
+  },
+  "failed": {
+   "atSec": 97.845,
+   "chip": "未通过",
+   "nodes": 10,
+   "dock": "none"
+  },
+  "summary": {
+   "state": "done",
+   "aria": "汇总 第 1 稿 过了",
+   "expanded": "true",
+   "callsText": "8:00\n汇总·第1稿\n汇总\n交卷\n打开子会话",
+   "rows": [
+    "8:00\n汇总·第1稿\n汇总\n交卷\n打开子会话"
+   ],
+   "rejected": []
+  },
+  "dockAccept": {
+   "button": null
+  }
+ },
+ "stopCandidates": null
+}

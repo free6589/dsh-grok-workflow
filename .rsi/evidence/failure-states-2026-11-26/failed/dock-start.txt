@@ -1,0 +1,22 @@
+# the 开工 button on the waiting page, clicked at the moment it was on screen
+
+button text: "开工"
+composer after click: "确认"
+status line under the button: (window already closed; line not readable)
+
+# the waiting page, verbatim, at the moment of the click
+
+任务团队
+等你点头
+起点
+终点
+Guardian 监控
+监控中
+子任务存活判断预算 · 7200 秒
+0 条处置记录
+
+暂无处置记录
+
+还剩 1 步 / 共 2 步
+
+开工

@@ -1,3 +1,63 @@
+## `fix/failure-states` 真机三态：琥珀汇总节点 / 整轮失败页 / 被取消页三张 1500 宽截图 + 逐字文本 + 钩子读数 + 两颗按钮的输入框读数；**产品代码一个字没改**、**块内门禁 `NOT_RUN`**（无可门禁的代码）、**未合 `main` / 未 push / 未打 tag / 未发版** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：只补证据，不改产品。三条 `NOT_RUN` 一次拍死：琥珀汇总节点、失败/取消两态、点按钮后输入框里是什么。
+三态逐字读下来**没有一处产品缺陷**，所以 `src/` / `test/` / `lib/` / `package.json` / `CHANGELOG` 一个字没动。
+
+**装置与身份（`CONFIRMED`）**：
+
+| 项 | 读数 | 出处 |
+| --- | --- | --- |
+| 分支 / 起点 | `fix/failure-states` ← `main` `f7dda97`（worktree `.tmp/wt-failure-states`） | `git log --oneline -1` |
+| 包的摘要 | `dsh-grok-workflow-0.13.46.tgz` **989319 字节**、`sha256 a74e51855b8f0c89ab73d63d7ec8f630446ad6a2de1e2ad6228d0be5ac9635a9` | `sha256sum` / `wc -c` |
+| 这个摘要等于什么 | **与 `v0.13.46` 发布资产逐字节相同** | 发布记忆里的 `sha256:a74e5185…` |
+| 装好的 `lib/` | `script.js 233d327e…2e22`、`index.js 201f6788…28b7d6`、`client.js 8607babd…94b1`，三份与工作树同哈希 | `soak/installed-lib-sha256.txt` |
+| 版本读回 | `0.13.46`（三份 scratch 档案同值） | `node -p …version` |
+| 克隆 | `parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、凭据抹 1 行 | `soak/clone-report.txt` |
+| 实例 | 三个 scratch 实例 `127.0.0.1:3521`（琥珀）/ `:3522`（失败）/ `:3524`（取消），live 3080 全程没碰 | `soak/redlines.txt` |
+
+**三态（同一构建、三次真实运行；截图 1500×1600）**：
+
+| 状态 | 胶囊 | 琥珀节点 | 步数 | 按钮 | 出处 |
+| --- | --- | --- | --- | --- | --- |
+| 琥珀汇总（`f6d01950`） | `已完成` | 三颗汇总里**第三颗** `data-state=failed`、`aria-label="汇总 第 3 稿 没过"`；展开三行逐字 `第 3 稿全被退回` / `卡在检查` / `最后不过：the polish uses a list instead of plain prose` | `还剩 1 步 / 共 13 步` | `收下这版` | `amber/` |
+| 整轮失败（`fd62c7fd`） | `未通过` | 两颗 `检查` + `终点` 转琥珀 | `还剩 6 步 / 共 10 步` | **无**（dock `none`） | `failed/` |
+| 被取消（`872022b2`） | `已取消` | `规划 没做` + `终点 没做` 转琥珀 | `还剩 0 步 / 共 3 步` | **无**（dock `none`） | `cancelled/` |
+
+**报告侧逐字（同一跑，聊天侧，`soak/report-*.txt`）**：琥珀那一跑
+`Summary review: check=fail verify=pass drafts=3 reason=the polish uses a list instead of plain prose · rejected: draft 3 (check: …)`；
+失败那一跑 `Grok workflow: FAILED` / `Plan: planner; 2 task(s); 0 verified` / `Failures: 2 infrastructure`，
+两次尝试各一行 `Attempt N — route … — judge re-fired — not passed`，`add_one` 因船长结束计划而 `blocked`
+（`no attempt taken, no retry spent`），**而那一跑的汇总反而是 `check=pass verify=pass drafts=1`**（判腿死了不影响汇总腿）；
+被取消那一跑 `run-end stopReason=cancelled`，工具结果逐字 `Error: grok_workflow cancelled: … finished tasks are kept,
+unfinished ones are marked, and resending the same request continues from here`。
+
+**两颗按钮的输入框读数（`CONFIRMED`）**：
+
+| 页面 | 按钮 | 点完输入框 | 按钮下状态行 | 副作用 |
+| --- | --- | --- | --- | --- |
+| 等你点头（三次都抓了） | `开工` | **`确认`** | 读不到（窗口在读数前就关了） | 没代发 |
+| 已完成 + 琥珀 | `收下这版` | **`确认`** | **`已填进输入框，按发送`** | 没代发 |
+| 未通过 / 已取消 | —— | —— | —— | 页面上**没有按钮** |
+
+**装置事实（`CONFIRMED`，省下一个人一次弯路）**：先试「在提示词里让模型自己写一句假引用」，模型的推理逐字是
+`Rejecting the injected file reference to preserve data fidelity and avoid hallucination.`，那一跑汇总腿落在
+`[format-error]`（没交结构化结果）、`summary.review` 为空——**「一稿都没写出来」不是「每一稿都被退回」**，
+页面正确地什么都不标。改成**改响应**（`MODE=rewrite-draft`：只替换 `structured_output` 里的 `summary`）之后，
+三稿才全被退回。**界面事实**：一跑里汇总可以被访问多次（三颗），**判词只挂在闸门停下的那一颗上**，
+前两颗仍是绿的 `过了`。
+
+**控制台**：三跑 `{"consoleErrors": [], "pageErrors": []}`。
+
+**`NOT_RUN` 四条**：① `开工` 按钮下那行状态字（等你点头只活不到一秒）；② 窄屏 / 折叠 / 其它节点；
+③ 判腿在超时 / 掉线 / 5xx 族上的失败页；④ live 档案升级（红线）。**块内门禁 `NOT_RUN`**：这一轮没有代码改动。
+
+**红线（`soak/redlines.txt`）**：`~/.dsh`（`2026-11-25 23:14:14`）、`profiles`（`2026-11-22 16:59:46`）、
+`profiles/web` 与 `cordis.patch.yml`（`2026-11-25 23:04:40`）、`.credentials.yaml`（`2026-11-14 22:47`）mtime
+全在本会话之前；写探测 `Read-only file system`；3080 前后都是 401；scratch 用完整棵删除。
+**两条观察照实记（不是本会话干的）**：live 档案现在装着 `0.13.46`（`pnpm-lock.yaml` 解析到 `…/tar.gz/f7dda97a…`，
+即 `main` 尖端）——以前每轮写的「live 仍 `0.13.39`」作废；但那一行仍是浮动依赖、`mode: triage` 也还在，
+`AGENTS.md` §13 的「钉到确切 tag」仍欠着。
+
 ## `0.13.46` 发版收口：唯一一份门禁（发布树 `84f64c8`）`GATE_EXIT=0`（`103 files / 1948 tests`、转录 388 行 / 23373 字节），发布身份、两个远端 run、Release 与资产都复核过；这一版只有文档与证据、**没有行为变化**；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.46` 已经出去（tag 推了、Release 建了、资产在），

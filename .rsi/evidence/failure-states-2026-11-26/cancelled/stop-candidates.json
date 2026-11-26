@@ -1,0 +1,412 @@
+[
+  {
+    "tag": "BUTTON",
+    "text": "DSH 本地构建\n0.2.2-rc.3-6b72",
+    "aria": "新建会话",
+    "title": "",
+    "cls": "hHd-Xa_brand hHd-Xa_wide",
+    "visible": true,
+    "x": 126,
+    "y": 36
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "收起侧边栏",
+    "title": "",
+    "cls": "hHd-Xa_iconButton hHd-Xa_toggle",
+    "visible": true,
+    "x": 258,
+    "y": 36
+  },
+  {
+    "tag": "BUTTON",
+    "text": "会话",
+    "aria": "会话",
+    "title": "返回当前会话界面",
+    "cls": "b_2mXG_sessionTab",
+    "visible": true,
+    "x": 59,
+    "y": 85
+  },
+  {
+    "tag": "BUTTON",
+    "text": "生图",
+    "aria": "生图",
+    "title": "AI 生图面板（gpt-image-2 / glm-image / grok-imagine-image / nanobanana / seedream 系列）",
+    "cls": "b_2mXG_sessionTab",
+    "visible": true,
+    "x": 146,
+    "y": 85
+  },
+  {
+    "tag": "BUTTON",
+    "text": "新会话",
+    "aria": "新建会话",
+    "title": "",
+    "cls": "hHd-Xa_newSession",
+    "visible": true,
+    "x": 211,
+    "y": 85
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "导入 DeepSeek 会话",
+    "title": "",
+    "cls": "YAnzGa_trigger YAnzGa_wide",
+    "visible": true,
+    "x": 249,
+    "y": 85
+  },
+  {
+    "tag": "BUTTON",
+    "text": "插件",
+    "aria": "插件",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 132
+  },
+  {
+    "tag": "BUTTON",
+    "text": "定时任务",
+    "aria": "定时任务",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 166
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "从侧边栏取消固定定时任务",
+    "title": "",
+    "cls": "hHd-Xa_panelUnpin",
+    "visible": true,
+    "x": 255,
+    "y": 166
+  },
+  {
+    "tag": "BUTTON",
+    "text": "自动化任务",
+    "aria": "自动化任务",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 200
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "从侧边栏取消固定自动化任务",
+    "title": "",
+    "cls": "hHd-Xa_panelUnpin",
+    "visible": true,
+    "x": 255,
+    "y": 200
+  },
+  {
+    "tag": "BUTTON",
+    "text": "网页版",
+    "aria": "网页版",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 234
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "从侧边栏取消固定网页版",
+    "title": "",
+    "cls": "hHd-Xa_panelUnpin",
+    "visible": true,
+    "x": 255,
+    "y": 234
+  },
+  {
+    "tag": "BUTTON",
+    "text": "SDLC",
+    "aria": "SDLC",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 268
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "从侧边栏取消固定SDLC",
+    "title": "",
+    "cls": "hHd-Xa_panelUnpin",
+    "visible": true,
+    "x": 255,
+    "y": 268
+  },
+  {
+    "tag": "BUTTON",
+    "text": "更多",
+    "aria": "更多",
+    "title": "",
+    "cls": "hHd-Xa_panelRow",
+    "visible": true,
+    "x": 140,
+    "y": 302
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "搜索会话",
+    "title": "",
+    "cls": "bhn1Oq_searchButton",
+    "visible": true,
+    "x": 193,
+    "y": 346
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "视图选项",
+    "title": "",
+    "cls": "bhn1Oq_iconButton bhn1Oq_wide",
+    "visible": true,
+    "x": 225,
+    "y": 346
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "添加工作区",
+    "title": "",
+    "cls": "bhn1Oq_iconButton",
+    "visible": true,
+    "x": 257,
+    "y": 346
+  },
+  {
+    "tag": "BUTTON",
+    "text": "待办",
+    "aria": "打开个人待办",
+    "title": "打开个人待办",
+    "cls": "dsh-personal-todo-trigger",
+    "visible": true,
+    "x": 140,
+    "y": 1523
+  },
+  {
+    "tag": "BUTTON",
+    "text": "设置",
+    "aria": "设置",
+    "title": "",
+    "cls": "VOzbGW_trigger",
+    "visible": true,
+    "x": 140,
+    "y": 1569
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1 个子智能体",
+    "aria": "1 个子智能体",
+    "title": "",
+    "cls": "ZKlsPq_trigger",
+    "visible": true,
+    "x": 659,
+    "y": 25
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "更多操作",
+    "title": "",
+    "cls": "_button_1ulci_2 _ghost_1ulci_46 _sm_1ulci_28 wSkVaW_headerMe",
+    "visible": true,
+    "x": 1438,
+    "y": 25
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "打开右侧边栏",
+    "title": "",
+    "cls": "_button_1ulci_2 _ghost_1ulci_46 _sm_1ulci_28 _1kL45W_button",
+    "visible": true,
+    "x": 1474,
+    "y": 25
+  },
+  {
+    "tag": "BUTTON",
+    "text": "对话",
+    "aria": "",
+    "title": "",
+    "cls": "wSkVaW_tab",
+    "visible": true,
+    "x": 321,
+    "y": 58
+  },
+  {
+    "tag": "BUTTON",
+    "text": "轨迹",
+    "aria": "",
+    "title": "",
+    "cls": "wSkVaW_tab",
+    "visible": true,
+    "x": 379,
+    "y": 58
+  },
+  {
+    "tag": "BUTTON",
+    "text": "进度",
+    "aria": "",
+    "title": "",
+    "cls": "wSkVaW_tab wSkVaW_tabActive",
+    "visible": true,
+    "x": 437,
+    "y": 58
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "更多会话视图",
+    "title": "",
+    "cls": "_button_1ulci_2 _ghost_1ulci_46 _sm_1ulci_28 wSkVaW_viewsMor",
+    "visible": true,
+    "x": 481,
+    "y": 58
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "详情",
+    "title": "详情",
+    "cls": "gw-progress-node-toggle",
+    "visible": true,
+    "x": 434,
+    "y": 154
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "添加文件或调用指令",
+    "title": "",
+    "cls": "uV2eYG_add",
+    "visible": true,
+    "x": 502,
+    "y": 1504
+  },
+  {
+    "tag": "BUTTON",
+    "text": "工作区内修改",
+    "aria": "访问模式，当前：工作区内修改",
+    "title": "",
+    "cls": "iWlSmW_trigger",
+    "visible": true,
+    "x": 591,
+    "y": 1504
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "这个会话自动接着跑",
+    "title": "这个会话自动接着跑",
+    "cls": "",
+    "visible": true,
+    "x": 753,
+    "y": 1547
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "这个会话自动迭代",
+    "title": "这个会话自动迭代",
+    "cls": "",
+    "visible": true,
+    "x": 871,
+    "y": 1547
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "为这个会话打开或关闭 grok 工作流",
+    "title": "为这个会话打开或关闭 grok 工作流",
+    "cls": "",
+    "visible": true,
+    "x": 1013,
+    "y": 1547
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "选择模型，当前 muse-spark-1.3(oc)，推理等级 Max",
+    "title": "muse-spark-1.3(oc) · Max",
+    "cls": "_7KE1Ra_trigger",
+    "visible": true,
+    "x": 1176,
+    "y": 1547
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "开始录音",
+    "title": "",
+    "cls": "_button_1ulci_2 _ghost_1ulci_46 _sm_1ulci_28 ddpbLW_trigger",
+    "visible": true,
+    "x": 1225,
+    "y": 1547
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "停止生成",
+    "title": "",
+    "cls": "uV2eYG_primary",
+    "visible": true,
+    "x": 1268,
+    "y": 1545
+  },
+  {
+    "tag": "BUTTON",
+    "text": "32K tok·缓存命中 86%",
+    "aria": "32K tok · 缓存命中 86%",
+    "title": "",
+    "cls": "bOPqQW_pill",
+    "visible": true,
+    "x": 853,
+    "y": 1585
+  },
+  {
+    "tag": "BUTTON",
+    "text": "6%",
+    "aria": "上下文已用 6%",
+    "title": "",
+    "cls": "JObwrW_trigger",
+    "visible": true,
+    "x": 977,
+    "y": 1585
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "1 个子智能体运行中 · 用 grok_workflow 工具跑一个小活",
+    "title": "",
+    "cls": "tikaflow-model-fix-floating-button",
+    "visible": true,
+    "x": 313,
+    "y": 821
+  },
+  {
+    "tag": "BUTTON",
+    "text": "",
+    "aria": "打开模型优化设置卡片",
+    "title": "",
+    "cls": "tikaflow-model-fix-floating-button",
+    "visible": true,
+    "x": 313,
+    "y": 779
+  }
+]

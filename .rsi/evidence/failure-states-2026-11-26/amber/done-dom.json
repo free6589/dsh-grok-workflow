@@ -1,0 +1,157 @@
+{
+  "mounted": true,
+  "chipText": "已完成",
+  "chipState": "done",
+  "left": "还剩 1 步 / 共 13 步",
+  "nodes": [
+    {
+      "key": "flow:start",
+      "kind": "start",
+      "ordinal": "0",
+      "state": "done",
+      "current": "false",
+      "aria": "起点 过了",
+      "word": "起点",
+      "badge": "",
+      "toggle": false
+    },
+    {
+      "key": "flow:0:plan:1",
+      "kind": "plan",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "规划 过了",
+      "word": "规划",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:1:execute:1",
+      "kind": "execute",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "执行 过了",
+      "word": "执行",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:2:check:1",
+      "kind": "check",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "检查 过了",
+      "word": "检查",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:3:review:1",
+      "kind": "review",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "复核 过了",
+      "word": "复核",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:4:plan:2",
+      "kind": "plan",
+      "ordinal": "2",
+      "state": "done",
+      "current": "false",
+      "aria": "规划 第 2 次 过了",
+      "word": "规划",
+      "badge": "第 2 次",
+      "toggle": true
+    },
+    {
+      "key": "flow:5:execute:1",
+      "kind": "execute",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "执行 过了",
+      "word": "执行",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:6:check:1",
+      "kind": "check",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "检查 过了",
+      "word": "检查",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:7:review:1",
+      "kind": "review",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "复核 过了",
+      "word": "复核",
+      "badge": "",
+      "toggle": true
+    },
+    {
+      "key": "flow:8:summarize:1",
+      "kind": "summarize",
+      "ordinal": "1",
+      "state": "done",
+      "current": "false",
+      "aria": "汇总 第 1 稿 过了",
+      "word": "汇总",
+      "badge": "第 1 稿",
+      "toggle": true
+    },
+    {
+      "key": "flow:9:summarize:2",
+      "kind": "summarize",
+      "ordinal": "2",
+      "state": "done",
+      "current": "false",
+      "aria": "汇总 第 2 稿 过了",
+      "word": "汇总",
+      "badge": "第 2 稿",
+      "toggle": true
+    },
+    {
+      "key": "flow:10:summarize:3",
+      "kind": "summarize",
+      "ordinal": "3",
+      "state": "failed",
+      "current": "true",
+      "aria": "汇总 第 3 稿 没过",
+      "word": "汇总",
+      "badge": "第 3 稿",
+      "toggle": true
+    },
+    {
+      "key": "flow:end",
+      "kind": "end",
+      "ordinal": "0",
+      "state": "done",
+      "current": "false",
+      "aria": "终点 过了",
+      "word": "终点",
+      "badge": "",
+      "toggle": false
+    }
+  ],
+  "logRows": 0,
+  "guardianBlocks": 4,
+  "dockState": "accept",
+  "dockText": "收下这版\n\n已填进输入框，按发送",
+  "dockButton": "收下这版",
+  "text": "任务团队\n已完成\n起点\n规划\n执行\n检查\n复核\n规划\n第 2 次\n执行\n检查\n复核\n汇总\n第 1 稿\n汇总\n第 2 稿\n汇总\n第 3 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 13 步\n\n收下这版\n\n已填进输入框，按发送"
+}
