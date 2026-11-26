@@ -357,10 +357,24 @@ window.__ModuleLoader__.load({
       'progress.flow.review': 'Review',
       'progress.flow.summarize': 'Summarize',
       'progress.flow.end': 'End',
+      // The acceptance is a place the run reaches, not a leg a call speaks as.
+      'progress.flow.accept': 'Accept',
       'progress.flow.visit': 'Visit {n}',
       'progress.flow.draft': 'Draft {n}',
       // How many times one task was tried in one leg (contract 追加 8.4).
       'progress.flow.attempt': 'Attempt {n}',
+      // The six lights every task card carries, and the five the run is verified against.
+      'progress.ring.plan': 'Plan',
+      'progress.ring.execute': 'Execute',
+      'progress.ring.check': 'Check',
+      'progress.ring.review': 'Review',
+      'progress.ring.accept': 'Accept',
+      'progress.ring.summarize': 'Summarize',
+      'progress.verify.machine': 'Remote machine',
+      'progress.verify.model': 'Model review',
+      'progress.verify.isolated': 'Isolated real machine',
+      'progress.verify.human': 'Human review',
+      'progress.verify.ledger': 'Ledger reconciliation',
       // The task panel: the one sentence under the title, the stuck line, the three duration
       // shapes, and the two labels the graph itself carries (its reader name, and the name of
       // the control that opens a node's wires).
@@ -375,6 +389,9 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h}h {m}m',
       'progress.panel.trace': 'Trace its wires',
       'progress.panel.graph': 'Task graph',
+      // What the two rows of lights on a card are called, when a card names them at all.
+      'progress.panel.rings': 'Six stages',
+      'progress.panel.checks': 'Five checks',
       // The state words a node speaks and never prints (`aria-label`).
       'progress.plan.waiting': 'Waiting',
       'progress.plan.running': 'Doing',
@@ -398,7 +415,6 @@ window.__ModuleLoader__.load({
       'progress.final.rejectedStage': 'Held at {stage}',
       'progress.final.rejectedReason': 'Last failure: {reason}',
       'progress.dock.start': 'Start',
-      'progress.dock.accept': 'Accept this version',
       'progress.dock.fill': 'yes',
       'progress.dock.filled': 'Filled the box; press send',
       // What the redesign keeps: the row capsule, the per-task chain, the guardian lane.
@@ -606,10 +622,24 @@ window.__ModuleLoader__.load({
       'progress.flow.review': '复核',
       'progress.flow.summarize': '汇总',
       'progress.flow.end': '终点',
+      // 验收是这一轮走到的一个地方，不是谁说出来的一条腿。
+      'progress.flow.accept': '验收',
       'progress.flow.visit': '第 {n} 次',
       'progress.flow.draft': '第 {n} 稿',
       // 一个任务在一条腿里试了几遍（契约追加 8.4）。
       'progress.flow.attempt': '第 {n} 遍',
+      // 每个任务卡上的六盏灯，以及这一轮被拿来验的五盏。
+      'progress.ring.plan': '规划',
+      'progress.ring.execute': '执行',
+      'progress.ring.check': '检查',
+      'progress.ring.review': '复核',
+      'progress.ring.accept': '验收',
+      'progress.ring.summarize': '汇总',
+      'progress.verify.machine': '机器远端',
+      'progress.verify.model': '模型复核',
+      'progress.verify.isolated': '真机隔离',
+      'progress.verify.human': '人验',
+      'progress.verify.ledger': '对账',
       // 任务面板：标题下那一句、卡住那一句、三种时长写法，以及图自己的读屏名与节点控件的名字。
       'progress.panel.step': '第 {at} 步，共 {total} 步',
       'progress.panel.eta': '还剩约 {time}',
@@ -622,6 +652,9 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h} 小时 {m} 分',
       'progress.panel.trace': '看线',
       'progress.panel.graph': '任务图',
+      // 卡上两排灯各自叫什么（卡自己不点名，只有读屏与悬停用得上）。
+      'progress.panel.rings': '六环',
+      'progress.panel.checks': '五验',
       // 节点只说、不印的状态词（aria-label）。
       'progress.plan.waiting': '等着',
       'progress.plan.running': '在做',
@@ -644,7 +677,6 @@ window.__ModuleLoader__.load({
       'progress.final.rejectedStage': '卡在{stage}',
       'progress.final.rejectedReason': '最后不过：{reason}',
       'progress.dock.start': '开工',
-      'progress.dock.accept': '收下这版',
       'progress.dock.fill': '确认',
       'progress.dock.filled': '已填进输入框，按发送',
       // 本轮保留的：行胶囊、任务内链、Guardian 侧栏。
@@ -3818,67 +3850,125 @@ window.__ModuleLoader__.load({
     /** The width the panel starts from before it has measured its own column. */
     const PANEL_DEFAULT_WIDTH = 720
 
-    /** Below this the graph is one column, whatever the labels measure. */
-    const PANEL_STACK_WIDTH = 720
-
-    /** Sibling gap in a row, and the two vertical gaps a layer change can take. */
-    const PANEL_PNODE_GAP_X = 12
-    const PANEL_PNODE_GAP_Y = 44
-    // A phone's siblings sit closer than two layers do (26 / 30), so one leg's branches read
-    // as one branch: the gap is also where a fork's bar is drawn, 8 px above the card.
-    const PANEL_PNODE_STACK_GAP = 26
-    const PANEL_PNODE_STACK_GAP_Y = 30
+    /**
+     * The gap between two columns, and between two cards stacked inside one column.
+     *
+     * The column gap is also where every wire turns: its centre is the one x a fork's or a
+     * join's vertical run may occupy, which is what draws the bar over the branches. Every
+     * wire changes column by exactly one gap, so no vertical has to cross a card.
+     */
+    const PANEL_COLUMN_GAP = 48
+    const PANEL_SIBLING_GAP = 14
 
     /**
-     * The side rails a stacked card leaves for the wires.
+     * The band under the figure a wire takes when it has to skip a column.
      *
-     * A card in a column keeps a 24 px gutter on **both** sides, so two trunks fit down the
-     * column at once — the fork trunk on the left, the join trunk on the right — and no
-     * vertical ever has to cross a card to reach its own. The legs and the two ends stay full
-     * width: they are the trunk line, not a branch hanging off it.
+     * A vertical run may only stand in a column gap, and a skipped column offers none — so an
+     * edge that jumps a level (a task with nothing recorded under it, say) goes under the
+     * whole figure instead of through the cards it passes.
      */
-    const PANEL_RAIL_GUTTER = 24
-    const PANEL_RAIL_INSET = 12
-    /** The stem a wire takes before it turns, and the short drop that lands on a card's edge. */
-    const PANEL_RAIL_STEM = 12
-    const PANEL_RAIL_HOOK = 8
+    const PANEL_BYPASS = 10
 
-    /**
-     * The id of one flow step: the leg's own kind on its first visit, `<kind>_<visit>` after.
-     *
-     * A mermaid id may carry no other character, and a repeated leg needs an id of its own —
-     * the second `执行` is a second step, not the first one drawn twice. The two ends are
-     * places, so they are called what they are.
-     */
-    function progressPanelLegId(node) {
-      if (node.kind === 'start' || node.kind === 'end') return node.kind
-      return node.ordinal > 1 ? `${node.kind}_${node.ordinal}` : node.kind
-    }
-
-    /** A plan task's node id: the leg it hangs off, plus the task's own number. */
-    function progressPanelTaskId(legId, taskNumber) {
-      return `${legId}_t${taskNumber}`
-    }
-
-    /** Every row one flow step walked — its own, and the ones that hang under its tasks. */
-    function progressPanelStepRows(node) {
-      const rows = [...node.members]
-      for (const sub of node.subs === undefined ? [] : node.subs) rows.push(...sub.members)
-      return rows
+    /** The width band and the one-row height of each shape the mermaid text can draw. */
+    const PANEL_BOX = {
+      stadium: { min: 88, max: 120, h: 32 },
+      round: { min: 160, max: 240, h: 56 },
+      rect: { min: 110, max: 190, h: 30 },
     }
 
     /**
-     * How long one step really took, or `undefined` when the stream cannot say.
+     * A card that carries a second row is taller than its shape alone says.
      *
-     * `max(endedAt) - min(startedAt)` over its calls, and only for a step that finished with
-     * every call carrying both stamps: a step with one call still running has no duration
-     * yet, and measuring only the part that settled would make the estimate short in exactly
-     * the case a reader wants it.
+     * The second row is one of two things: the six ring lights a task carries (or 验收's five
+     * checks), or a capsule's own badge. Either way the height has to be known before the page
+     * measured anything, because the wires land on the boxes the defaults stand in for.
      */
-    function progressPanelSpan(node) {
-      if (node.kind === 'start' || node.kind === 'end') return undefined
-      if (node.state !== 'done') return undefined
-      const rows = progressPanelStepRows(node)
+    const PANEL_LIGHT_HEIGHT = 56
+    const PANEL_BADGE_ROW_HEIGHT = 48
+
+    /**
+     * The seven levels the fork is drawn in, left to right: 起点 → 规划 → 任务 → 子任务 →
+     * 汇合 → 验收 → 终点.
+     *
+     * A level is a column of the picture and a step number in the one sentence above it: the
+     * headline's `at` is the level the reader stands on, which is why `total` is a constant
+     * rather than a count of the calls somebody recorded (contract §26).
+     */
+    const PANEL_LEVELS = 7
+
+    /** The six lights every task card carries, in the order the operator's brief draws them. */
+    const PANEL_RING_KEYS = ['plan', 'execute', 'check', 'review', 'accept', 'summarize']
+
+    /** The five verification lights the acceptance card carries, in reading order. */
+    const PANEL_CHECK_KEYS = ['machine', 'model', 'isolated', 'human', 'ledger']
+
+    /**
+     * The words that light the three screens no leg word says.
+     *
+     * `machine` and `model` are read off the leg table (`检查` / `复核`), so only the screens a
+     * run reports in its own words need a list of their own: a label or a phase that carries
+     * one of these lights that light. A Latin word matches as a prefix, because the runs write
+     * `soak` and `reconciliation` beside the Chinese words; a CJK word matches anywhere, the
+     * boundary rule `progressPhaseCarriesToken` already applies.
+     */
+    const PANEL_CHECK_SCREENS = {
+      isolated: ['真机', '隔离', 'soak', 'isolated'],
+      human: ['人验', '人工', 'human'],
+      ledger: ['对账', '核对', 'reconcil'],
+    }
+
+    /** Whether one recorded string carries one of these words. */
+    function panelScreenCarries(text, tokens) {
+      const haystack = typeof text === 'string' ? text.toLowerCase() : ''
+      if (haystack === '') return false
+      for (const token of tokens) {
+        const needle = token.toLowerCase()
+        if (!/[a-z0-9]/i.test(needle)) {
+          if (haystack.indexOf(needle) !== -1) return true
+          continue
+        }
+        let from = 0
+        for (;;) {
+          const at = haystack.indexOf(needle, from)
+          if (at === -1) break
+          if (!progressWordChar(at === 0 ? '' : haystack.slice(at - 1, at))) return true
+          from = at + 1
+        }
+      }
+      return false
+    }
+
+    /** The word one call speaks as: its leg's word, or its own label when it names no leg. */
+    function panelRowWord(row, say) {
+      const leg = progressFlowLegOf(row.label)
+      if (leg === undefined) return typeof row.label === 'string' ? row.label : ''
+      return say(PROGRESS_FLOW_WORD_KEY[leg])
+    }
+
+    /** Recorded order: the engine's own sequence, which is the one order every box reads. */
+    function panelRecordedOrder(left, right) {
+      return left.seq - right.seq
+    }
+
+    /**
+     * How long one level really took, or `undefined` when the stream cannot say.
+     *
+     * `max(endedAt) - min(startedAt)` over the level's own rows, and only for a level whose
+     * every box settled: a column still being walked has no duration yet, and measuring only
+     * the part that settled would make the estimate short in exactly the case a reader wants
+     * it. A level that drew no row has nothing to measure.
+     * @param nodes - the picture's nodes.
+     * @param level - the column to measure.
+     * @returns the span in ms, or `undefined`.
+     */
+    function progressPanelSpan(nodes, level) {
+      const inLevel = nodes.filter((node) => node.level === level)
+      if (inLevel.length === 0) return undefined
+      const rows = []
+      for (const node of inLevel) {
+        if (node.state !== 'done') return undefined
+        for (const row of node.calls) rows.push(row)
+      }
       if (rows.length === 0) return undefined
       let first = Infinity
       let last = -Infinity
@@ -3900,25 +3990,26 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The remaining time, from the steps that were actually measured.
+     * The remaining time, from the levels that were actually measured.
      *
-     * The mean of the measured spans times the steps still ahead. No measured step, or
-     * nothing left to walk, means no estimate at all: the page says nothing rather than
+     * The mean of the measured level spans times the levels still ahead. No measured level,
+     * or nothing left to walk, means no estimate at all: the page says nothing rather than
      * inventing a number, and the visible sentence never says how the number was obtained —
      * only its tooltip does.
-     * @param flow - the derived flow.
+     * @param nodes - the picture's nodes.
+     * @param remaining - how many levels are still ahead of the reader.
      * @returns `{ ms, basis }`, or `undefined` when nothing was measured.
      */
-    function progressPanelEta(flow) {
-      if (!(flow.remaining > 0)) return undefined
+    function progressPanelEta(nodes, remaining) {
+      if (!(remaining > 0)) return undefined
       const spans = []
-      for (const node of flow.nodes) {
-        const span = progressPanelSpan(node)
+      for (let level = 0; level < PANEL_LEVELS; level += 1) {
+        const span = progressPanelSpan(nodes, level)
         if (span !== undefined) spans.push(span)
       }
       if (spans.length === 0) return undefined
       const mean = spans.reduce((sum, span) => sum + span, 0) / spans.length
-      return { ms: progressPanelRounded(mean * flow.remaining), basis: spans.length }
+      return { ms: progressPanelRounded(mean * remaining), basis: spans.length }
     }
 
     /** A duration in one of three shapes: seconds, minutes, hours. */
@@ -3954,13 +4045,13 @@ window.__ModuleLoader__.load({
      * Why the run stopped moving, if it did.
      *
      * A cancelled run is not stuck — the chip already says cancelled — so it yields nothing.
-     * Otherwise the first step, in graph order, whose calls still carry an unrecovered
-     * failure is where the reader is held; a task branch is examined with its own rows and
-     * is the more specific answer when it has one. Only when nothing failed does a `blocked`
-     * step (a run that ended over a row it never settled) count, and only after that the
-     * summary verdict of a gate that turned every draft back.
+     * Otherwise the first box, in the picture's own order, whose calls still carry an
+     * unrecovered failure is where the reader is held; a task card is examined with its own
+     * rows and is the more specific answer when it has one. Only when nothing failed does a
+     * `blocked` box (a run that ended over a row it never settled) count, and only after that
+     * the summary verdict of a gate that turned every draft back.
      * @param run - folded run facts.
-     * @param steps - the graph's nodes, each with the flow step number it belongs to.
+     * @param steps - the boxes that hold a whole unit's rows, each with its step number.
      * @returns the stuck verdict, or `undefined` when nothing is stuck.
      */
     function progressPanelStuck(run, steps) {
@@ -3987,110 +4078,345 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The panel's one model: the steps, the branches under them, the edges between them and
-     * the sentences above and below the picture.
+     * The rows the picture owns, in recorded order, with the guardian's own call taken out.
      *
-     * It builds on `deriveProgressFlow` and changes none of its rules — the same walk, the
-     * same `at`, the same `total`. What it adds is the shape the page draws: a plan task is
-     * a node of its own, hanging off the leg that walked it, and every edge says which way
-     * the run moved. Labels are resolved here, through the reader's own dictionary, because
-     * the mermaid text is the structural source of truth and has to carry the words a reader
-     * would see.
+     * The guardian's call is not a leg of the work — it has a panel of its own — and every
+     * other row lands in exactly one box's calls, so no declared call can vanish from the
+     * figure (contract §26).
+     */
+    function panelRows(run) {
+      const rows = []
+      for (const row of run.members) {
+        if (progressIsGuardianCard(typeof row.label === 'string' ? row.label : '')) continue
+        rows.push(row)
+      }
+      return rows.sort(panelRecordedOrder)
+    }
+
+    /** The one id a task card is drawn with: its plan number, or the one group with none. */
+    function panelTaskId(number) {
+      return number === undefined ? 'u1' : `t${number}`
+    }
+
+    /**
+     * Which box every row belongs to.
+     *
+     * A row that names a leg belongs to that leg: `执行` / `检查` / `复核` rows are the work
+     * and hang under a plan task, `规划` rows are the plan, `汇总` rows are the summary. A row
+     * that names no leg keeps its place instead of vanishing — before the first work row it is
+     * part of the plan, after the last one it is part of the summary, and between two work
+     * rows it belongs to the task of the row in front of it, which is the box the run had
+     * reached when it declared the call (the rule `deriveProgressFlow` already applies).
+     *
+     * Work rows group by the plan task their **phase** names — one group per number, in number
+     * order, then at most one group for the work that names no number at all. The phase is the
+     * grouping fact and never a leg.
+     * @param rows - the picture's rows, in recorded order.
+     * @returns `{ plan, sum, tasks }`, with `tasks` in drawing order.
+     */
+    function panelBoxRows(rows) {
+      const work = []
+      const plan = []
+      const sum = []
+      for (const row of rows) {
+        const leg = progressFlowLegOf(row.label)
+        if (leg === 'execute' || leg === 'check' || leg === 'review') work.push(row)
+        else if (leg === 'plan') plan.push(row)
+        else if (leg === 'summarize') sum.push(row)
+      }
+      const firstSum = sum.length === 0 ? undefined : sum[0].seq
+      // The unlabelled rows behind one work row, by that row's `seq`: they ride in its task.
+      const loose = new Map()
+      for (const row of rows) {
+        if (progressFlowLegOf(row.label) !== undefined) continue
+        let ahead
+        let behind
+        for (const other of work) {
+          if (other.seq < row.seq) ahead = other
+          else { behind = other; break }
+        }
+        if (ahead !== undefined && behind !== undefined) {
+          const riding = loose.get(ahead.seq)
+          if (riding === undefined) loose.set(ahead.seq, [row])
+          else riding.push(row)
+          continue
+        }
+        if (behind !== undefined) { plan.push(row); continue }
+        if (ahead !== undefined) { sum.push(row); continue }
+        // No work row at all: the summary is the only box that can come after anything.
+        if (firstSum === undefined || row.seq < firstSum) plan.push(row)
+        else sum.push(row)
+      }
+      const numbered = new Map()
+      const unnumbered = []
+      for (const row of work) {
+        const riding = loose.get(row.seq) === undefined ? [] : loose.get(row.seq)
+        const number = progressTaskNumber(row.phase)
+        if (number === undefined) { unnumbered.push(row, ...riding); continue }
+        const group = numbered.get(number)
+        if (group === undefined) numbered.set(number, [row, ...riding])
+        else group.push(row, ...riding)
+      }
+      const tasks = [...numbered.keys()]
+        .sort((left, right) => left - right)
+        .map((number) => ({ id: panelTaskId(number), number, rows: numbered.get(number).sort(panelRecordedOrder) }))
+      if (unnumbered.length > 0) {
+        tasks.push({ id: panelTaskId(undefined), number: undefined, rows: unnumbered.sort(panelRecordedOrder) })
+      }
+      return { plan: plan.sort(panelRecordedOrder), sum: sum.sort(panelRecordedOrder), tasks }
+    }
+
+    /**
+     * One task card's own name: the phase the recorder wrote, verbatim.
+     *
+     * A plan task's title is its own name, so nothing here shortens, translates or re-words
+     * it; a group that carries no phase at all falls back to the leg word of its first call.
+     */
+    function panelTaskLabel(rows, say) {
+      for (const row of rows) {
+        if (typeof row.phase === 'string' && row.phase.trim() !== '') return row.phase
+      }
+      return panelRowWord(rows[0], say)
+    }
+
+    /**
+     * The six lights of one task card.
+     *
+     * The plan light and the summary light are the run's, and every card carries the same
+     * pair: those two stages happen once, around the tasks, not inside them. The three work
+     * lights are folded from the card's own rows by **label only** — a phase never binds a
+     * leg — and the acceptance light is built from the two gates it accepts: a broken gate
+     * holds the card whatever the other one says.
+     * @param rows - the task's own calls.
+     * @param planState - the plan box's state.
+     * @param sumState - the summary box's state.
+     * @param ended - whether the run stopped.
+     * @returns the six lights, in the operator's order.
+     */
+    function panelRings(rows, planState, sumState, ended) {
+      const fold = (leg) => {
+        const own = rows.filter((row) => progressFlowLegOf(row.label) === leg)
+        return own.length === 0 ? 'pending' : progressNodeState(own, ended)
+      }
+      const check = fold('check')
+      const review = fold('review')
+      const accept = check === 'failed' || check === 'blocked' || review === 'failed' || review === 'blocked'
+        ? 'failed'
+        : check === 'done' && review === 'done'
+          ? 'done'
+          : check === 'doing' || review === 'doing' ? 'doing' : 'pending'
+      const state = {
+        plan: planState,
+        execute: fold('execute'),
+        check,
+        review,
+        accept,
+        summarize: sumState,
+      }
+      return PANEL_RING_KEYS.map((key) => ({ key, state: state[key] }))
+    }
+
+    /**
+     * One light of the five verifications, folded over the rows that report it.
+     *
+     * Only a recorded row lights a light: the page never ticks a verification the stream did
+     * not report, so a screen nobody ran stays dark rather than being assumed passed. The
+     * order is the contract's — nothing declared is dark, anything still open is `doing`, a
+     * set that settled with no failure still current is `done`, and one such failure is
+     * `failed`.
+     * @param rows - the rows that report this screen.
+     * @returns one of the page's five state words.
+     */
+    function panelCheckState(rows) {
+      if (rows.length === 0) return 'pending'
+      if (rows.some((row) => row.outcome === undefined)) return 'doing'
+      const recovered = progressRecoveredFailures(rows)
+      if (rows.some((row) => row.outcome === 'failed' && !recovered.has(row.seq))) return 'failed'
+      return 'done'
+    }
+
+    /**
+     * The five verification lights, read off the run's own rows and nothing else.
+     *
+     * The machine screen is the check leg and the model screen is the review leg, so those
+     * two are read off the leg table. The other three are reported in the run's own words, on
+     * a label or a phase, and carry no leg of their own.
+     * @param rows - the picture's rows.
+     * @returns the five lights, in reading order.
+     */
+    function panelChecks(rows) {
+      const carrying = (tokens) => rows.filter((row) => panelScreenCarries(row.label, tokens) || panelScreenCarries(row.phase, tokens))
+      const reported = {
+        machine: rows.filter((row) => progressFlowLegOf(row.label) === 'check'),
+        model: rows.filter((row) => progressFlowLegOf(row.label) === 'review'),
+        isolated: carrying(PANEL_CHECK_SCREENS.isolated),
+        human: carrying(PANEL_CHECK_SCREENS.human),
+        ledger: carrying(PANEL_CHECK_SCREENS.ledger),
+      }
+      return PANEL_CHECK_KEYS.map((key) => ({ key, state: panelCheckState(reported[key]) }))
+    }
+
+    /**
+     * The panel's one model: a left-to-right fork from the start to the end.
+     *
+     * Seven levels, one per column of the picture — the start, the plan, one card per plan
+     * task, one branch per call a task made, the summary, the acceptance and the end — and
+     * every box and every wire derived from the run's own recorded rows. Nothing is remembered
+     * from an earlier render, so a replanned run draws the tasks it really walked and the
+     * picture changes with the events (contract §26).
+     *
+     * Labels are resolved here, through the reader's own dictionary, because the mermaid text
+     * is the structural source of truth and has to carry the words a reader would see.
      * @param run - folded run facts.
      * @param t - translator for the leg words; a task's own title is printed verbatim.
      * @returns the panel model, with `mermaid` filled in from the model it was built from.
      */
     function derivePanelGraph(run, t) {
       const say = typeof t === 'function' ? t : translator(FALLBACK_LOCALE)
-      const flow = deriveProgressFlow(run)
-      const nodes = []
-      // The steps in flow order, each with the branch ids it owns. The edges are drawn from
-      // this list, so an edge can only ever join nodes the picture really has.
-      const steps = []
-      // Every node in drawing order, each with the flow step it belongs to: a task is looked
-      // at as closely as the leg above it, and it is the more specific answer when it has one.
-      const order = []
-      flow.nodes.forEach((node, index) => {
-        const id = progressPanelLegId(node)
-        const current = index === flow.at - 1
-        const calls = [...node.members].sort((left, right) => left.seq - right.seq)
-        const label = say(PROGRESS_FLOW_WORD_KEY[node.kind] === undefined ? 'progress.flow.start' : PROGRESS_FLOW_WORD_KEY[node.kind])
-        const entry = {
-          id,
-          kind: node.kind,
-          leg: node.kind,
-          label,
-          // The current step is drawn as being worked even when nothing settled there: it is
-          // the one state the renderer decides instead of deriving, exactly as before.
-          state: current && node.state === 'pending' ? 'doing' : node.state,
-          current,
-          ordinal: node.ordinal,
-          attempts: [],
-          calls,
-          // A node with nothing to declare still has something to say when the gate turned
-          // every draft back: the verdict rides in the same opened list, so the summary node
-          // a `model` strategy left without a call is a control all the same.
-          openable: calls.length > 0 || node.rejected !== undefined,
-          ...node.rejected === undefined ? {} : { rejected: node.rejected },
-        }
-        nodes.push(entry)
-        order.push({ node: entry, at: index + 1 })
-        const branches = []
-        for (const sub of node.subs === undefined ? [] : node.subs) {
-          const rows = [...sub.members].sort((left, right) => left.seq - right.seq)
-          const taskId = progressPanelTaskId(id, sub.taskNumber)
-          const task = {
-            id: taskId,
-            kind: 'task',
-            leg: node.kind,
-            // The task's title is the phase the recorder wrote, verbatim: it is a plan
-            // task's own name, so nothing here shortens, translates or re-words it.
-            label: sub.title,
-            state: sub.state,
+      const ended = run.stopReason !== undefined
+      const state = !ended
+        ? (run.members.length === 0 ? 'waiting' : 'running')
+        : run.stopReason === 'completed' ? 'done' : run.stopReason === 'cancelled' ? 'cancelled' : 'failed'
+      // The two ends report the run's own fact. While it is still moving they are a place it
+      // has not reached, which is what `pending` says.
+      const endState = !ended
+        ? 'pending'
+        : run.stopReason === 'completed' ? 'done' : run.stopReason === 'cancelled' ? 'cancelled' : 'failed'
+      const rows = panelRows(run)
+      const boxes = panelBoxRows(rows)
+      // A shipped draft wins over a rejected claim: the recorder never writes both, a
+      // hand-written stream could, and the page must not deny a draft the run really shipped.
+      const rejected = run.summaryFinalDraft === undefined ? run.summaryRejected : undefined
+      const planState = boxes.plan.length > 0
+        ? progressNodeState(boxes.plan, ended)
+        // The task cards are the recorded evidence that a plan ran, so a plan with no call of
+        // its own is not "unreached" once there is work under it.
+        : boxes.tasks.length > 0 ? 'done' : 'pending'
+      const sumState = rejected !== undefined
+        ? 'failed'
+        : boxes.sum.length > 0
+          ? progressNodeState(boxes.sum, ended)
+          : ended ? endState : 'pending'
+      const checks = panelChecks(rows)
+      const tasks = boxes.tasks.map((task) => ({
+        id: task.id,
+        kind: 'task',
+        level: 2,
+        label: panelTaskLabel(task.rows, say),
+        state: progressNodeState(task.rows, ended),
+        current: false,
+        calls: task.rows,
+        openable: task.rows.length > 0,
+        rings: panelRings(task.rows, planState, sumState, ended),
+      }))
+      // One branch per call a task made, in the task's own order: the k-th call of one leg is
+      // the k-th attempt at it, which is what the branch prints past the first.
+      const subs = []
+      for (const task of boxes.tasks) {
+        const seen = new Map()
+        for (const row of task.rows) {
+          const leg = progressFlowLegOf(row.label)
+          const attempt = (seen.has(leg) ? seen.get(leg) : 0) + 1
+          seen.set(leg, attempt)
+          const word = panelRowWord(row, say)
+          subs.push({
+            id: `${task.id}_s${row.seq}`,
+            kind: 'sub',
+            level: 3,
+            label: attempt > 1 ? `${word} · ${say('progress.flow.attempt', { n: attempt })}` : word,
+            state: progressRowState(row),
             current: false,
-            ordinal: sub.taskNumber,
-            taskNumber: sub.taskNumber,
-            attempts: rows.map((row) => ({ seq: row.seq, state: progressRowState(row) })),
-            calls: rows,
-            openable: rows.length > 0,
-          }
-          nodes.push(task)
-          order.push({ node: task, at: index + 1 })
-          branches.push(taskId)
-        }
-        steps.push({ node: entry, at: index + 1, branches })
-      })
-      const edges = []
-      for (let index = 0; index + 1 < steps.length; index += 1) {
-        const left = steps[index]
-        const right = steps[index + 1]
-        if (left.branches.length === 0) {
-          edges.push({ from: left.node.id, to: right.node.id, kind: 'chain' })
-          continue
-        }
-        // A leg that walked plan tasks is a fan: out of the leg into each task it walked,
-        // and out of each task into the step that follows — the shape the run really took,
-        // not one stroke through the middle of it.
-        for (const branch of left.branches) {
-          edges.push({ from: left.node.id, to: branch, kind: 'branch' })
-          edges.push({ from: branch, to: right.node.id, kind: 'join' })
+            calls: [row],
+            openable: true,
+            subtask: {
+              taskId: task.id,
+              ...task.number === undefined ? {} : { taskNumber: task.number },
+              seq: row.seq,
+              leg,
+              attempt,
+            },
+          })
         }
       }
-      const eta = progressPanelEta(flow)
+      const nodes = [
+        { id: 'start', kind: 'start', level: 0, label: say('progress.flow.start'), state: 'done', current: false, calls: [], openable: false },
+        { id: 'plan', kind: 'plan', level: 1, label: say('progress.flow.plan'), state: planState, current: false, calls: boxes.plan, openable: boxes.plan.length > 0 },
+        ...tasks,
+        ...subs,
+        {
+          id: 'sum',
+          kind: 'summarize',
+          level: 4,
+          label: say('progress.flow.summarize'),
+          state: sumState,
+          current: false,
+          calls: boxes.sum,
+          // A summary with nothing to declare still has something to say when the gate turned
+          // every draft back: the verdict rides in the same opened list.
+          openable: boxes.sum.length > 0 || rejected !== undefined,
+          ...rejected === undefined ? {} : { rejected },
+        },
+        { id: 'accept', kind: 'accept', level: 5, label: say('progress.flow.accept'), state: endState, current: false, calls: [], openable: false, checks },
+        { id: 'end', kind: 'end', level: 6, label: say('progress.flow.end'), state: endState, current: false, calls: [], openable: false },
+      ]
+      // The rows one box owns, by `seq`. A branch is written after its task, so the branch is
+      // the answer for a row both of them carry: it is one call and says exactly which one is
+      // open where the card could only say "somewhere in here".
+      const owners = new Map()
+      for (const node of nodes) {
+        for (const row of node.calls) owners.set(row.seq, node)
+      }
+      const open = rows.find((row) => row.outcome === undefined)
+      let place = open === undefined ? undefined : owners.get(open.seq)
+      if (place === undefined && ended) {
+        place = nodes.find((node) => node.state === 'failed' || node.state === 'blocked')
+      }
+      // Nothing declared and nothing ended: the start is where this run is, not the end it has
+      // not reached. A run between two calls stands at the end it has not reached either.
+      if (place === undefined) place = rows.length === 0 ? nodes[0] : nodes[nodes.length - 1]
+      for (const node of nodes) node.current = node.id === place.id
+      const edges = [{ from: 'start', to: 'plan', kind: 'chain' }]
+      // A run with no task card has nothing between the plan and the summary, and the two
+      // places still have to be one picture: a waiting run must not draw as two halves that
+      // float apart. With a task card present the fork owns that gap and this edge is not
+      // emitted, so the rule "no other edges" still holds.
+      if (tasks.length === 0) edges.push({ from: 'plan', to: 'sum', kind: 'chain' })
+      for (const task of tasks) edges.push({ from: 'plan', to: task.id, kind: 'fork' })
+      for (const task of tasks) {
+        const branches = subs.filter((sub) => sub.subtask.taskId === task.id)
+        // A task that recorded no call still reaches the summary: its card is the whole of
+        // what it walked, and a fork with no branch under it would end in mid-air.
+        if (branches.length === 0) edges.push({ from: task.id, to: 'sum', kind: 'join' })
+        for (const branch of branches) {
+          edges.push({ from: task.id, to: branch.id, kind: 'branch' })
+          edges.push({ from: branch.id, to: 'sum', kind: 'join' })
+        }
+      }
+      edges.push({ from: 'sum', to: 'accept', kind: 'chain' }, { from: 'accept', to: 'end', kind: 'chain' })
+      const at = place.level + 1
+      const total = PANEL_LEVELS
+      const remaining = total - at
+      const eta = progressPanelEta(nodes, remaining)
+      const shipped = run.summaryFinalDraft === undefined ? undefined : progressShippedRow(run.members, run.summaryFinalDraft)
       const graph = {
-        state: flow.state,
+        state,
         mermaid: '',
         nodes,
         edges,
-        headline: { at: flow.at, total: flow.total, ...eta === undefined ? {} : { eta } },
-        at: flow.at,
-        total: flow.total,
-        remaining: flow.remaining,
-        // Carried through unchanged: the opened call list marks the row the gate shipped,
-        // and it must mark the same row the flow named rather than a second guess at it.
-        ...flow.final === undefined ? {} : { final: flow.final },
+        checks,
+        headline: { at, total, remaining, ...eta === undefined ? {} : { eta } },
+        at,
+        total,
+        remaining,
+        // Carried through: the opened call list marks the row the gate shipped, and it has to
+        // mark the row the run named rather than a second guess at it.
+        ...shipped === undefined ? {} : { final: { draft: run.summaryFinalDraft, seq: shipped.seq } },
       }
-      const stuck = progressPanelStuck(run, order)
+      // A branch is one call and cannot see a retry, so the verdict is read off the boxes that
+      // hold a whole unit's rows: there a failure a later attempt replaced is not current.
+      const stuck = progressPanelStuck(run, nodes
+        .filter((node) => node.kind !== 'sub')
+        .map((node) => ({ node, at: node.level + 1 })))
       if (stuck !== undefined) graph.stuck = stuck
       // Filled from the model it was built from, so the text and the picture cannot disagree:
       // the page lays out the parsed text, not this object.
@@ -4132,11 +4458,18 @@ window.__ModuleLoader__.load({
       return String(value === undefined || value === null ? '' : value).replace(/"/g, '#quot;').replace(/\s*\r?\n\s*/g, ' ')
     }
 
+    /**
+     * The kinds the text draws as a stadium: the two ends and the three places the run stands
+     * between them. A fork point, a gathering point and the gate a reader has to look at are
+     * places, and the shape says so before the words are read.
+     */
+    const PANEL_MERMAID_STADIUM = new Set(['start', 'plan', 'summarize', 'accept', 'end'])
+
     /** One node definition, in the shape its kind calls for. */
     function panelMermaidNode(node) {
       const id = panelMermaidId(panelMermaidIdFor(node.id))
       const label = panelMermaidLabel(node.label)
-      if (node.kind === 'start' || node.kind === 'end') return `${id}(["${label}"])`
+      if (PANEL_MERMAID_STADIUM.has(node.kind)) return `${id}(["${label}"])`
       if (node.kind === 'task') return `${id}("${label}")`
       return `${id}["${label}"]`
     }
@@ -4146,10 +4479,14 @@ window.__ModuleLoader__.load({
      *
      * One node per line, then one edge per line, two-space indented: the page parses this
      * text back and lays the parsed graph out, so the figure a reader sees and the text a
-     * reader (or a test) can read cannot drift apart.
+     * reader (or a test) can read cannot drift apart. The fork runs left to right, which is
+     * the direction the picture reads in.
+     *
+     * The lights, the checks and the attempt numbers are decoration and stay out of the text:
+     * every box and every wire a reader can see is in it, and nothing else is.
      */
     function panelMermaid(graph) {
-      const lines = ['flowchart TD']
+      const lines = ['flowchart LR']
       for (const node of graph.nodes) lines.push(`  ${panelMermaidNode(node)}`)
       for (const edge of graph.edges) lines.push(`  ${panelMermaidId(panelMermaidIdFor(edge.from))} --> ${panelMermaidId(panelMermaidIdFor(edge.to))}`)
       return lines.join('\n')
@@ -4168,11 +4505,14 @@ window.__ModuleLoader__.load({
      * Only that subset: a `flowchart <dir>` header, `%%` comments, blank lines, the three
      * node shapes and `a --> b` edges. Anything else is ignored rather than guessed at, and
      * an edge naming a node nobody declared is dropped — a route to nowhere is not a step.
+     * The header's direction is stored but not obeyed: the panel has one drawing, and it runs
+     * left to right whatever the text says. A direction the reader cannot see is exactly the
+     * kind of drift this file refuses to have — the text `panelMermaid` writes is `LR`.
      * @param text - the mermaid source.
-     * @returns the parsed graph, with `direction` defaulting to `TD`.
+     * @returns the parsed graph, with `direction` defaulting to `LR`.
      */
     function parsePanelMermaid(text) {
-      const parsed = { direction: 'TD', nodes: [], edges: [] }
+      const parsed = { direction: 'LR', nodes: [], edges: [] }
       const source = String(text === undefined || text === null ? '' : text)
       for (const raw of source.split(/\r?\n/)) {
         const line = raw.trim()
@@ -4200,40 +4540,75 @@ window.__ModuleLoader__.load({
       return parsed
     }
 
-    /** The default box of one node, for the render before anything has been measured. */
-    function panelDefaultSize(node) {
-      const length = typeof node.label === 'string' ? node.label.length : 0
-      if (node.shape === 'stadium') return { w: 80, h: 32 }
-      if (node.shape === 'round') return { w: Math.max(120, Math.min(260, 28 + 13 * length)), h: 34 }
-      return { w: Math.max(96, Math.min(220, 24 + 14 * length)), h: 32 }
-    }
-
-    /** One node's box: what the page measured, else the default its shape calls for. */
-    function panelNodeSize(node, sizes) {
-      const given = sizes === undefined || sizes === null ? undefined : sizes[node.id]
-      if (given !== undefined && Number.isFinite(given.w) && Number.isFinite(given.h) && given.w > 0 && given.h > 0) {
-        return { w: Math.round(given.w), h: Math.round(given.h) }
-      }
-      return panelDefaultSize(node)
+    /** A width kept inside the band its shape allows. */
+    function panelClampWidth(value, band) {
+      return Math.max(band.min, Math.min(band.max, Math.round(value)))
     }
 
     /**
-     * Longest-path layers over the parsed graph.
+     * The default box of one node, for the render before anything has been measured.
+     *
+     * The shape says which of the three cards it is — a capsule (起点, 规划, 汇总, 验收, 终点),
+     * a task card, or a sub box — and the width grows with the label inside the band that card
+     * allows, so a figure drawn on a host without layout still reads as the fork it is.
+     */
+    function panelDefaultSize(node) {
+      const band = PANEL_BOX[node.shape] === undefined ? PANEL_BOX.rect : PANEL_BOX[node.shape]
+      const length = typeof node.label === 'string' ? node.label.length : 0
+      const base = node.shape === 'stadium' ? 24 : node.shape === 'round' ? 30 : 24
+      const per = node.shape === 'stadium' ? 13 : node.shape === 'round' ? 12 : 11
+      return { w: panelClampWidth(base + per * length, band), h: band.h }
+    }
+
+    /**
+     * One node's box: what the page measured, else the default its shape calls for.
+     *
+     * `floors` names the cards whose second row is a fact about the model rather than about the
+     * text — the ring lights, the checks, a capsule's badge — and gives each the height it
+     * needs before the page measured anything: that row is part of the card, not a decoration
+     * drawn over it, so the wire has to land on the height a reader will see.
+     * @param node - one parsed node.
+     * @param sizes - measured boxes by node id.
+     * @param floors - the least height of each card that carries a second row, by node id.
+     * @returns the box, clamped to the band its shape allows.
+     */
+    function panelNodeSize(node, sizes, floors) {
+      const band = PANEL_BOX[node.shape] === undefined ? PANEL_BOX.rect : PANEL_BOX[node.shape]
+      const fallback = panelDefaultSize(node)
+      const given = sizes === undefined || sizes === null ? undefined : sizes[node.id]
+      const known = given !== undefined && Number.isFinite(given.w) && Number.isFinite(given.h) && given.w > 0 && given.h > 0
+      const least = floors !== undefined && floors !== null && floors.has(node.id) ? floors.get(node.id) : fallback.h
+      return {
+        w: panelClampWidth(known ? given.w : fallback.w, band),
+        h: Math.max(known ? Math.round(given.h) : fallback.h, least),
+      }
+    }
+
+    /**
+     * Longest-path columns over the parsed graph: one column per step of the fork.
      *
      * Kahn's order is what makes "longest path" a single pass: every edge into a node is
      * settled before that node is visited. An edge that points backwards — it can only be in
      * a graph somebody typed by hand — is ignored instead of walked, so a cycle costs the
-     * layout a missing row rather than an endless loop. Nodes keep parse order inside a
-     * layer, so a run's steps read left to right in the order they happened.
+     * layout a misplaced card rather than an endless loop. Nodes keep parse order inside a
+     * column, so the branches of one fork read from top to bottom in the order they happened.
+     *
+     * The text may hold two components: a run that has planned and not yet worked gets no
+     * edge from the plan to the summary, because nothing connects them yet. A component is
+     * placed to the right of the one before it rather than on top of it, so the summary stands
+     * after the part of the run that led to it instead of in the start's own column.
      * @param parsed - the parsed graph.
-     * @returns the node ids of each layer, top to bottom.
+     * @returns the node ids of each column, left to right.
      */
     function panelLayers(parsed) {
       const parsedAt = new Map(parsed.nodes.map((node, index) => [node.id, index]))
       const next = new Map(parsed.nodes.map((node) => [node.id, []]))
+      const both = new Map(parsed.nodes.map((node) => [node.id, []]))
       const incoming = new Map(parsed.nodes.map((node) => [node.id, 0]))
       for (const edge of parsed.edges) {
         next.get(edge.from).push(edge.to)
+        both.get(edge.from).push(edge.to)
+        both.get(edge.to).push(edge.from)
         incoming.set(edge.to, incoming.get(edge.to) + 1)
       }
       const queue = parsed.nodes.filter((node) => incoming.get(node.id) === 0).map((node) => node.id)
@@ -4256,6 +4631,32 @@ window.__ModuleLoader__.load({
           if (rank.get(target) <= rank.get(id)) continue
           depth.set(target, Math.max(depth.get(target), depth.get(id) + 1))
         }
+      }
+      const seen = new Set()
+      let floor = 0
+      for (const node of parsed.nodes) {
+        if (seen.has(node.id)) continue
+        const component = []
+        const stack = [node.id]
+        seen.add(node.id)
+        while (stack.length > 0) {
+          const id = stack.pop()
+          component.push(id)
+          for (const other of both.get(id)) {
+            if (seen.has(other)) continue
+            seen.add(other)
+            stack.push(other)
+          }
+        }
+        let first = Infinity
+        let last = -Infinity
+        for (const id of component) {
+          first = Math.min(first, depth.get(id))
+          last = Math.max(last, depth.get(id))
+        }
+        const shift = floor - first
+        for (const id of component) depth.set(id, depth.get(id) + shift)
+        floor = last + shift + 1
       }
       const layers = []
       for (const id of visited) {
@@ -4347,187 +4748,96 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * One edge between two nodes of a row: out of the source's bottom centre, onto the
-     * target's top centre.
+     * One wire: out of the source's right edge, into the target's left edge.
      *
-     * A shared x is a straight drop. Otherwise the line drops, turns once at the midpoint of
-     * the gap, and turns again onto its target — the smoothstep the canvas uses, with an 8 px
-     * corner that can never be longer than the two runs it joins.
-     */
-    function panelSmoothStep(sx, sy, tx, ty) {
-      if (Math.round(sx * 100) === Math.round(tx * 100)) return `M ${panelNumber(sx)} ${panelNumber(sy)} L ${panelNumber(tx)} ${panelNumber(ty)}`
-      const my = sy + (ty - sy) / 2
-      const radius = Math.min(8, Math.abs(tx - sx) / 2, (ty - sy) / 2)
-      const side = tx > sx ? 1 : -1
-      return [
-        `M ${panelNumber(sx)} ${panelNumber(sy)}`,
-        `L ${panelNumber(sx)} ${panelNumber(my - radius)}`,
-        `Q ${panelNumber(sx)} ${panelNumber(my)} ${panelNumber(sx + side * radius)} ${panelNumber(my)}`,
-        `L ${panelNumber(tx - side * radius)} ${panelNumber(my)}`,
-        `Q ${panelNumber(tx)} ${panelNumber(my)} ${panelNumber(tx)} ${panelNumber(my + radius)}`,
-        `L ${panelNumber(tx)} ${panelNumber(ty)}`,
-      ].join(' ')
-    }
-
-    /**
-     * One edge inside a stacked layer: the two side rails, never a line through a card.
+     * The run is horizontal, so the shape is always the same — right, across the gap, up or
+     * down, in — and the turn happens at the gap's centre. Every wire crossing that gap turns
+     * at the same x, which is what draws the bar a fork or a join reads as. Nothing vertical
+     * ever stands beside a card, so no wire can cross one.
      *
-     * The shape is the mock's, measured at 390 and 360 over nine fixtures: a fork leaves the
-     * leg's bottom centre, takes a 12 px stem, runs down the **left** rail, and turns into the
-     * gap above its card to land on that card's own top edge — 8 px in from the left corner on
-     * an even sibling and 8 px in from the right on an odd one, so three cards under one leg
-     * read as three connections instead of one blur. A join is the mirror image on the right
-     * rail: off the card's bottom edge, down the rail, and into the next step's top centre.
-     *
-     * Every vertical this produces lives in a gutter (x = 12 or width - 12) or in the band
-     * between two steps, so no wire is ever drawn across a card a reader is trying to read.
-     * @param context - the layout's boxes, the container width and each card's place.
+     * An edge that skips a column has no gap of its own to turn in, so it takes the band under
+     * the figure instead: the two turns stay in the gaps on either side of the columns it
+     * passes, and the long run is below every card.
      * @param from - the source box.
      * @param to - the target box.
+     * @param bypass - the y of the band under the figure.
      * @returns the `d` attribute.
      */
-    function panelRailPath(context, from, to) {
-      const sy = from.y + from.h
-      const ty = to.y
-      const centreOf = (box) => box.x + box.w / 2
-      const rail = context.offset + PANEL_RAIL_INSET
-      const sourceCard = context.cards.has(from.id)
-      const targetCard = context.cards.has(to.id)
-      if (!sourceCard && targetCard) {
-        const stemY = sy + PANEL_RAIL_STEM
-        const tapY = ty - PANEL_RAIL_HOOK
-        const cornerX = to.index % 2 === 0 ? to.x + PANEL_RAIL_HOOK : to.x + to.w - PANEL_RAIL_HOOK
-        return panelPolyline([
-          [centreOf(from), sy],
-          [centreOf(from), stemY],
-          [rail, stemY],
-          [rail, tapY],
-          [cornerX, tapY],
-          [cornerX, ty],
-        ])
-      }
-      if (sourceCard && !targetCard) {
-        const outX = from.x + from.w - PANEL_RAIL_HOOK
-        const downY = sy + PANEL_RAIL_HOOK
-        const joinRail = context.offset + context.width - PANEL_RAIL_INSET
-        const busY = ty - PANEL_RAIL_STEM
-        return panelPolyline([
-          [outX, sy],
-          [outX, downY],
-          [joinRail, downY],
-          [joinRail, busY],
-          [centreOf(to), busY],
-          [centreOf(to), ty],
-        ])
-      }
-      const sourceCentre = centreOf(from)
-      const targetCentre = centreOf(to)
-      if (Math.round(sourceCentre * 100) === Math.round(targetCentre * 100)) {
-        return panelPolyline([[sourceCentre, sy], [targetCentre, ty]])
-      }
-      // Two steps that are not one above the other still meet at the left rail, which is
-      // free beside every card in the column.
-      const mid = sy + PANEL_RAIL_STEM
-      return panelPolyline([
-        [sourceCentre, sy],
-        [sourceCentre, mid],
-        [rail, mid],
-        [rail, ty - PANEL_RAIL_STEM],
-        [targetCentre, ty - PANEL_RAIL_STEM],
-        [targetCentre, ty],
-      ])
+    function panelWirePath(from, to, bypass) {
+      const sy = from.y + from.h / 2
+      const ty = to.y + to.h / 2
+      const sx = from.x + from.w
+      const tx = to.x
+      const half = PANEL_COLUMN_GAP / 2
+      if (to.column === from.column + 1) return panelPolyline([[sx, sy], [sx + half, sy], [sx + half, ty], [tx, ty]])
+      return panelPolyline([[sx, sy], [sx + half, sy], [sx + half, bypass], [tx - half, bypass], [tx - half, ty], [tx, ty]])
     }
 
     /**
-     * Lay the parsed graph out: rows of siblings, or one column of cards on a phone.
+     * Lay the parsed graph out: one column per step, left to right, siblings stacked.
      *
-     * Two modes, both computed instead of guessed. A layer whose natural width does not fit
-     * the space becomes a column, and under 720 px every layer does — a phone holds a picture,
-     * not a matrix. In that column a card keeps a 24 px gutter on both sides so the two rails
-     * fit beside it, while a leg or an end keeps the full width because it *is* the trunk line;
-     * siblings sit 26 px apart and a layer change takes 30 px, which is what leaves room for
-     * the fork's bar above each card. Above 720 px siblings sit side by side with 12 px gaps,
-     * centred in the container, and a layer change takes 44 px.
+     * The fork is the picture, so the direction is fixed: the start is the leftmost column and
+     * the end the rightmost, and the columns between them are the plan, the tasks, their
+     * subtasks, the summary and the acceptance. A column is as wide as its own widest card and
+     * every card in it is drawn at that width, which is what makes the cards of one column
+     * share a left edge, a right edge and therefore one bar per fork.
      *
-     * The container is never narrower than the space it was given. A stacked layer is not what
-     * pushes it wider: it uses exactly that space, so only the layers that stay in a row can
-     * ask for more.
+     * A column's cards sit 14 px apart and the column as a whole is centred on the figure's
+     * own middle, so a column of nine subtasks and a column holding one capsule share one
+     * centre line. Columns sit 48 px apart. The container is never narrower than the space the
+     * page gave, and when the flow needs more than that the container is as wide as the flow —
+     * the figure around it scrolls, and the page itself never does.
      * @param parsed - the parsed graph.
      * @param sizes - measured boxes by node id; a missing node falls back to its default.
      * @param availableWidth - the column the page has.
+     * @param floors - the least height of each card whose second row the model knows about.
      * @returns the container box, every node's box and every edge's path.
      */
-    function layoutPanelGraph(parsed, sizes, availableWidth) {
+    function layoutPanelGraph(parsed, sizes, availableWidth, floors) {
       const width = Number.isFinite(availableWidth) && availableWidth > 0 ? Math.round(availableWidth) : PANEL_DEFAULT_WIDTH
-      const sizeOf = new Map(parsed.nodes.map((node) => [node.id, panelNodeSize(node, sizes)]))
-      // A task node is the only round one; the legs and the two ends are the steps a reader
-      // walks through, and they keep the column's whole width.
-      const cards = new Set(parsed.nodes.filter((node) => node.shape === 'round').map((node) => node.id))
-      const layers = panelLayers(parsed)
-      const rowWidths = layers.map((ids) => ids.reduce((sum, id) => sum + sizeOf.get(id).w, 0) + PANEL_PNODE_GAP_X * Math.max(0, ids.length - 1))
-      const narrow = width < PANEL_STACK_WIDTH
-      const stacked = layers.map((ids, at) => narrow || rowWidths[at] > width)
-      const widest = rowWidths.reduce((best, measure, at) => (stacked[at] ? best : Math.max(best, measure)), 0)
-      const container = Math.max(width, widest)
-      const offset = Math.round((container - width) / 2)
-      const gapY = narrow ? PANEL_PNODE_STACK_GAP_Y : PANEL_PNODE_GAP_Y
+      const sizeOf = new Map(parsed.nodes.map((node) => [node.id, panelNodeSize(node, sizes, floors)]))
+      const columns = panelLayers(parsed)
+      const columnOf = new Map()
+      for (let index = 0; index < columns.length; index += 1) {
+        for (const id of columns[index]) columnOf.set(id, index)
+      }
+      const widths = columns.map((ids) => ids.reduce((widest, id) => Math.max(widest, sizeOf.get(id).w), 0))
+      const heights = columns.map((ids) => ids.reduce((sum, id, index) => sum + sizeOf.get(id).h + (index === 0 ? 0 : PANEL_SIBLING_GAP), 0))
+      const tallest = heights.reduce((best, height) => Math.max(best, height), 0)
+      // A wire that reaches further than the column beside it may not run through the ones it
+      // passes, so the figure keeps a band under every card for exactly those.
+      const skips = parsed.edges.some((edge) => columnOf.get(edge.to) !== columnOf.get(edge.from) + 1)
+      const height = tallest === 0 ? 0 : tallest + (skips ? PANEL_BYPASS + PANEL_SIBLING_GAP : 0)
+      const flowWidth = widths.reduce((sum, columnWidth, index) => sum + columnWidth + (index === 0 ? 0 : PANEL_COLUMN_GAP), 0)
+      const container = Math.max(width, flowWidth)
+      const offset = Math.round((container - flowWidth) / 2)
+      const lefts = []
+      let cursor = offset
+      for (let index = 0; index < columns.length; index += 1) {
+        lefts.push(cursor)
+        cursor += widths[index] + PANEL_COLUMN_GAP
+      }
       const nodes = []
       const boxes = new Map()
-      let top = 0
-      for (let at = 0; at < layers.length; at += 1) {
-        const ids = layers[at]
-        if (stacked[at]) {
-          let cursor = top
-          for (let index = 0; index < ids.length; index += 1) {
-            const id = ids[index]
-            const size = sizeOf.get(id)
-            const card = cards.has(id)
-            const box = {
-              id,
-              x: offset + (card ? PANEL_RAIL_GUTTER : 0),
-              y: cursor,
-              w: card ? width - 2 * PANEL_RAIL_GUTTER : width,
-              h: size.h,
-              index,
-              stacked: true,
-            }
-            box.anchor = box.x + box.w / 2
-            boxes.set(id, box)
-            nodes.push(box)
-            cursor += size.h + PANEL_PNODE_STACK_GAP
-          }
-          top = cursor - PANEL_PNODE_STACK_GAP
-        } else {
-          // A row is kept exact, halves included: a layer holding one node is centred on the
-          // container's own centre, so the chain into it is one vertical run and not a
-          // half-pixel stutter.
-          let cursor = (container - rowWidths[at]) / 2
-          let bottom = top
-          for (let index = 0; index < ids.length; index += 1) {
-            const id = ids[index]
-            const size = sizeOf.get(id)
-            const box = { id, x: cursor, y: top, w: size.w, h: size.h, index, stacked: false }
-            box.anchor = box.x + box.w / 2
-            boxes.set(id, box)
-            nodes.push(box)
-            cursor += size.w + PANEL_PNODE_GAP_X
-            bottom = Math.max(bottom, top + size.h)
-          }
-          top = bottom
+      for (let index = 0; index < columns.length; index += 1) {
+        // Centred on the figure's middle rather than on the tallest column's top: a capsule
+        // alone beside a column of nine subtasks sits on the line the run travels.
+        let top = Math.round((tallest - heights[index]) / 2)
+        for (const id of columns[index]) {
+          const size = sizeOf.get(id)
+          const box = { id, x: lefts[index], y: top, w: widths[index], h: size.h, column: index }
+          boxes.set(id, box)
+          nodes.push(box)
+          top += size.h + PANEL_SIBLING_GAP
         }
-        if (at + 1 < layers.length) top += gapY
       }
-      const height = nodes.reduce((bottom, box) => Math.max(bottom, box.y + box.h), 0)
-      const context = { boxes, cards, width, offset }
+      const bypass = tallest + PANEL_SIBLING_GAP
       const edges = []
       for (const edge of parsed.edges) {
         const from = boxes.get(edge.from)
         const to = boxes.get(edge.to)
         if (from === undefined || to === undefined) continue
-        const d = from.stacked || to.stacked
-          ? panelRailPath(context, from, to)
-          : panelSmoothStep(from.anchor, from.y + from.h, to.anchor, to.y)
-        edges.push({ from: edge.from, to: edge.to, d })
+        edges.push({ from: edge.from, to: edge.to, d: panelWirePath(from, to, bypass) })
       }
       return { width: container, height, nodes, edges }
     }
@@ -4676,42 +4986,67 @@ window.__ModuleLoader__.load({
       // The one sentence: the same step count the count line used to carry, plus the
       // measured remainder when there is one. It is meta text, so it is 12px.
       '.gw-progress-line { flex: 1 0 100%; min-width: 0; margin: 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }',
-      // ── the graph: a computed box, the wire layer behind it, the absolutely placed nodes ──
-      '.gw-progress-graph { position: relative; box-sizing: border-box; margin: 14px 0 0; }',
+      // ── the figure: a scroll box of its own, and the fork drawn inside it ─────────
+      // The run is left to right at every width, so the figure scrolls sideways rather than
+      // folding into a column: a stacked column would destroy the fork the page is.
+      '.gw-progress-figure { box-sizing: border-box; width: 100%; min-width: 0; margin: 14px 0 0; overflow-x: auto; overflow-y: hidden; }',
+      // A node's opened calls float under its card, and the figure is a scroll box, so the
+      // room the list needs has to exist inside it or the clip eats the one list there is.
+      '.gw-progress-figure[data-open="true"] { padding-bottom: 250px; }',
+      '.gw-progress-graph { position: relative; box-sizing: border-box; flex: none; margin: 0 auto; }',
       '.gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
-      '.gw-progress-wires > path { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 1.5; }',
+      '.gw-progress-wires > path { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }',
       '.gw-progress-pnodes { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }',
       // A node's position and width come from the layout as inline styles; its **height stays
       // auto**, so what the page measures is the box a reader is really looking at.
       '.gw-progress-pnode { position: absolute; box-sizing: border-box; min-width: 0; }',
-      '.gw-progress-pnode-body { box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; max-width: 100%; min-height: 32px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background-color: transparent; color: inherit; font: inherit; text-align: left; }',
+      // An open card rises as a whole. The list carries a z-index of its own to sit above the
+      // card it hangs from, but that number only competes inside whatever stacking context the
+      // list lands in — and a host stylesheet is free to put a card's own body in a context of
+      // its own. Raising the card, not the list, is the one rule that cannot lose to a sibling
+      // card drawn later in the document.
+      '.gw-progress-pnode[data-open="true"] { z-index: 4; }',
+      // The body is a column of at most two rows: the word, then the row of lights. A card
+      // with neither is the same column holding one row, so one box is all three kinds.
+      '.gw-progress-pnode-body { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; width: 100%; min-width: 0; max-width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background-color: transparent; color: inherit; font: inherit; text-align: left; }',
+      '.gw-progress-pnode-main { display: flex; align-items: center; gap: 6px; min-width: 0; }',
       // A node with something to open is a real button; one that is only a mark keeps the
       // same box, so the figure looks the same either way.
       '.gw-progress-pnode-body[type="button"] { cursor: pointer; }',
       '.gw-progress-pnode-body:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }',
-      // A plan task is half a step tall: 34px, the same card the matrix drew for it.
-      '.gw-progress-pnode[data-kind="task"] .gw-progress-pnode-body { min-height: 34px; padding: 0 8px; }',
-      // A run's two ends are the only capsules: they are places, not legs.
-      '.gw-progress-pnode[data-kind="start"] .gw-progress-pnode-body, .gw-progress-pnode[data-kind="end"] .gw-progress-pnode-body { justify-content: center; border-radius: 999px; }',
+      // A task card carries the word and the six ring lights: two rows, and the second one is
+      // the row a reader scans for which leg of the six is speaking.
+      '.gw-progress-pnode[data-kind="task"] .gw-progress-pnode-body { min-height: 56px; padding: 6px 8px; }',
+      // A sub box stands for one recorded call: one row, and the small type of a detail.
+      '.gw-progress-pnode[data-kind="sub"] .gw-progress-pnode-body { min-height: 30px; padding: 0 8px; border-radius: 8px; }',
+      // The run's five places are capsules, because they are places and not work; 验收 carries
+      // the five checks under its word, so it is two rows tall like a task.
+      '.gw-progress-pnode[data-kind="start"] .gw-progress-pnode-body, .gw-progress-pnode[data-kind="plan"] .gw-progress-pnode-body, .gw-progress-pnode[data-kind="summarize"] .gw-progress-pnode-body, .gw-progress-pnode[data-kind="accept"] .gw-progress-pnode-body, .gw-progress-pnode[data-kind="end"] .gw-progress-pnode-body { justify-content: center; border-radius: 999px; }',
+      '.gw-progress-pnode[data-kind="accept"] .gw-progress-pnode-body { min-height: 56px; }',
       '.gw-progress-pnode-dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }',
       '.gw-progress-pnode-word { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }',
       '.gw-progress-pnode[data-kind="task"] .gw-progress-pnode-word { font-size: 12px; }',
+      '.gw-progress-pnode[data-kind="sub"] .gw-progress-pnode-word { font-size: 11px; font-weight: 500; }',
       '.gw-progress-pnode[data-kind="start"] .gw-progress-pnode-word, .gw-progress-pnode[data-kind="end"] .gw-progress-pnode-word { flex: 0 1 auto; }',
       '.gw-progress-pnode-badge { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; font-variant-numeric: tabular-nums; }',
-      // Every attempt gets its own dot, in the node's one row: a retry costs no height.
-      '.gw-progress-pnode-dots { display: inline-flex; align-items: center; gap: 3px; flex: none; }',
-      '.gw-progress-pnode-attempt { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }',
-      '.gw-progress-pnode-attempt[data-state="done"] { background: var(--dsw-alias-state-success-primary); }',
-      '.gw-progress-pnode-attempt[data-state="doing"] { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }',
-      '.gw-progress-pnode-attempt[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }',
-      '.gw-progress-pnode-attempt[data-state="failed"], .gw-progress-pnode-attempt[data-state="blocked"], .gw-progress-pnode-attempt[data-state="cancelled"] { background: var(--dsw-alias-state-warn-primary); }',
-      // "Tried again": a short dashed step between the attempt that failed and the one after it.
-      '.gw-progress-pnode-retry { display: inline-block; flex: none; width: 8px; height: 0; border-top: 1px dashed var(--dsw-alias-border-l2, currentColor); }',
-      // A passed leg is green, from its edge to its dot and its word.
+      // A capsule's badge sits on a row of its own, centred under the word: the word keeps the
+      // whole line, so 汇总 is never cut to make room for a draft number.
+      '.gw-progress-pnode-detail { display: flex; justify-content: center; align-items: center; min-width: 0; }',
+      // ── the lights: six rings on a task, five checks on 验收 ─────────────────────
+      // A light is a dot and nothing else: the state is its colour, the word is its tooltip,
+      // and the card's own spoken label keeps the sentence a screen reader hears short.
+      '.gw-progress-pnode-lights { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }',
+      '.gw-progress-ring, .gw-progress-check { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }',
+      '.gw-progress-ring[data-state="done"], .gw-progress-check[data-state="done"] { background: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-ring[data-state="doing"], .gw-progress-check[data-state="doing"] { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }',
+      // Not reached is the only light with no fill, exactly like the node's own dot.
+      '.gw-progress-ring[data-state="pending"], .gw-progress-check[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }',
+      '.gw-progress-ring[data-state="failed"], .gw-progress-ring[data-state="blocked"], .gw-progress-check[data-state="failed"], .gw-progress-check[data-state="blocked"] { background: var(--dsw-alias-state-warn-primary); }',
+      // A passed card is green, from its edge to its dot and its word.
       '.gw-progress-pnode[data-state="done"] .gw-progress-pnode-body { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent)); }',
       '.gw-progress-pnode[data-state="done"] .gw-progress-pnode-dot { background: var(--dsw-alias-state-success-primary); }',
       '.gw-progress-pnode[data-state="done"] .gw-progress-pnode-word { color: var(--dsw-alias-state-success-primary); }',
-      // The current leg is blue, its dot breathing so the page says where it is even
+      // The current card is blue, its dot breathing so the page says where it is even
       // before a reader reads a word.
       '.gw-progress-pnode[data-state="doing"] .gw-progress-pnode-body { border-color: var(--dsw-alias-state-business-primary); background-image: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent), color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent)); }',
       '.gw-progress-pnode[data-state="doing"] .gw-progress-pnode-dot { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }',
@@ -4730,9 +5065,9 @@ window.__ModuleLoader__.load({
       // run, and the page has to say where that is.
       '.gw-progress-pnode[data-current="true"] .gw-progress-pnode-body { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent); }',
       // The opened calls are rendered by the node control into this list: it floats out from
-      // under its node, absolutely positioned, so not one sibling moves. The inset keeps the
+      // under its card, absolutely positioned, so not one sibling moves. The inset keeps the
       // panel inside the figure instead of letting it hang off the right edge.
-      '.gw-progress-node-calls { position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; right: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; max-height: 240px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: var(--dsw-alias-bg-elevated, var(--dsw-alias-bg-l1, transparent)); box-shadow: 0 6px 16px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent); }',
+      '.gw-progress-node-calls { position: absolute; z-index: 3; top: calc(100% + 6px); left: 0; right: 0; box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; max-height: 240px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas)); box-shadow: 0 6px 16px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent); }',
       // The all-rejected verdict rides in that list as plain rows: the summary node has no
       // shipped row to show, so its opened list is where the three facts are read.
       '.gw-progress-node-rejected { margin: 0; padding: 6px 4px; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
@@ -4747,9 +5082,21 @@ window.__ModuleLoader__.load({
       '.gw-progress-pnode[data-trace="active"] .gw-progress-pnode-body { border-color: var(--dsw-alias-state-business-primary); }',
       // ── one call line: clock, gate and word ──────────────────────────────────────
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
-      // The opened list carries one more cell than a bare list: the capsule that opens the
-      // child session, when the shell can open one.
-      '.gw-progress-node-calls .gw-progress-log-row { grid-template-columns: 46px minmax(0, 1fr) auto auto; padding: 6px 4px; }',
+      // A list hangs under one card, so a row is only ever as wide as that card — 110 to 240
+      // px. The clock, the gate and the verdict share the first line, and a task's title takes
+      // a line of its own. Nothing here may be squeezed: a column cell that runs out of room
+      // breaks a CJK word between every two characters, which is how a row used to read.
+      '.gw-progress-node-calls .gw-progress-log-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 6px 4px; }',
+      // The line box holds the gate capsule and the title; it is flattened so the title can take
+      // the row's whole second line while the gate stays beside the clock.
+      '.gw-progress-node-calls .gw-progress-log-line { display: contents; }',
+      '.gw-progress-node-calls .gw-progress-log-time { flex: none; white-space: nowrap; }',
+      '.gw-progress-node-calls .gw-progress-log-role, .gw-progress-node-calls .gw-progress-call-chain { flex: none; white-space: nowrap; }',
+      // The verdict sits at the right end of the first line; when that line is too narrow for
+      // all four it wraps to the next one whole, which a column cell cannot do.
+      '.gw-progress-node-calls .gw-progress-log-word { flex: none; margin-left: auto; white-space: nowrap; }',
+      '.gw-progress-node-calls .gw-progress-log-pill { flex: none; }',
+      '.gw-progress-node-calls .gw-progress-log-name { order: 1; flex: 1 1 100%; min-width: 0; }',
       '.gw-progress-log-row:last-child { border-bottom: 0; }',
       '.gw-progress-log-time { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
       '.gw-progress-log-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }',
@@ -4800,25 +5147,23 @@ window.__ModuleLoader__.load({
       // ── motion: two decorations, both stoppable ──────────────────────────────────
       '@keyframes gw-progress-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }',
       '@keyframes gw-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }',
-      // Motion is decoration here: the node's colour and its spoken state word already say
+      // Motion is decoration here: the card's colour and its spoken state word already say
       // "current", so a reader who asked for less motion loses nothing.
       '@media (prefers-reduced-motion: reduce) {',
-      '  .gw-progress-pnode[data-state="doing"] .gw-progress-pnode-dot, .gw-progress-pnode-attempt[data-state="doing"], .gw-progress-chip[data-state="running"] .gw-progress-chip-dot { animation: none; }',
+      '  .gw-progress-pnode[data-state="doing"] .gw-progress-pnode-dot, .gw-progress-ring[data-state="doing"], .gw-progress-check[data-state="doing"], .gw-progress-chip[data-state="running"] .gw-progress-chip-dot { animation: none; }',
       '}',
-      // Under 720px the graph is a column (the layout does that) and no word is cut: a card
-      // grows in height and wraps, because a task name on a phone is worth more than a fixed
-      // row pitch. The wires keep the tree's corners round at this width.
+      // Under 720px the figure keeps its direction and every row drops to 34px: the cards
+      // wrap their word instead of being cut, because a task name on a phone is worth two
+      // lines, and nothing is stacked into a column — that would destroy the fork.
       '@media (max-width: 720px) {',
-      '  .gw-progress-pnode-body { min-height: 34px; padding: 6px 10px; }',
+      '  .gw-progress-pnode[data-kind] .gw-progress-pnode-body { min-height: 34px; padding: 4px 8px; }',
       '  .gw-progress-pnode-word { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }',
       '  .gw-progress-run { white-space: normal; overflow-wrap: anywhere; }',
-      '  .gw-progress-wires > path { stroke-linecap: round; stroke-linejoin: round; }',
       '}',
       // Under 480px the dock keeps one full-width button and a call line drops its clock
-      // column: nothing here scrolls sideways, at any width.
+      // column; the figure still scrolls sideways rather than folding.
       '@media (max-width: 480px) {',
       '  .gw-progress-dock { flex-direction: column; align-items: stretch; }',
-      '  .gw-progress-node-calls .gw-progress-log-row { grid-template-columns: minmax(0, 1fr) auto; }',
       '  .gw-progress-node-calls .gw-progress-log-time { display: none; }',
       '}',
     ].join('\n')
@@ -4940,9 +5285,10 @@ window.__ModuleLoader__.load({
     /**
      * Read the real boxes off the page, once per draw.
      *
-     * The column the graph sits in is read from its **parent**, not from the graph itself:
-     * the graph's own width is the layout's output, so measuring it there would only ever
-     * confirm the number it was given. Node heights come back with it — that is what keeps
+     * The space the page gave the figure is read from the graph's **parent**, not from the
+     * graph itself: the graph's own width is the layout's output, so measuring it there would
+     * only ever confirm the number it was given — and the figure is the box that scrolls when
+     * the flow is wider than the column. Node heights come back with it: that is what keeps
      * the wires landing on the boxes a reader sees rather than on the defaults a first paint
      * had to guess.
      * @param graph - the `.gw-progress-graph` element, when the host rendered one.
@@ -4994,21 +5340,21 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The badge a node prints beside its word, or `''` when the word says it all.
+     * The badge a card prints beside its word, or `''` when the word says it all.
      *
-     * A summary leg always says which draft it wrote, because a run may ship a second or a
-     * third one. A work leg only says so on a repeat visit: one visit is the normal case, and
-     * adding a "1st" to the normal case is a word nobody needs. A task says how many times it
-     * was tried, and only when that is no longer one. The two ends never carry one.
+     * One card carries one: 汇总 says which draft the run actually shipped, because a run may
+     * ship a second or a third one and the opened list marks the row it went out on. A task
+     * says nothing — a retry inside a task is a second sub box, and that box's own label
+     * already numbers it (`· 第 2 遍`) — and so do the five places of the run.
      * @param node - one panel node.
+     * @param shipped - the draft number the gate shipped, when the run shipped one.
      * @param t - translator.
      * @returns the badge text, or `''` when this node carries none.
      */
-    function progressPanelBadge(node, t) {
-      if (node.kind === 'summarize') return t('progress.flow.draft', { n: node.ordinal })
-      if (node.kind === 'task') return node.attempts.length > 1 ? t('progress.flow.attempt', { n: node.attempts.length }) : ''
-      if (node.kind === 'start' || node.kind === 'end') return ''
-      return node.ordinal > 1 ? t('progress.flow.visit', { n: node.ordinal }) : ''
+    function progressPanelBadge(node, shipped, t) {
+      if (node.kind !== 'summarize') return ''
+      if (!Number.isFinite(shipped) || shipped <= 0) return ''
+      return t('progress.flow.draft', { n: shipped })
     }
 
     /**
@@ -5113,63 +5459,79 @@ window.__ModuleLoader__.load({
       }, [...rows, ...verdict])
     }
 
+    /** The dictionary prefix of each row of lights: the six ring words, the five checks. */
+    const PROGRESS_RING_KEY = 'progress.ring.'
+    const PROGRESS_CHECK_KEY = 'progress.verify.'
+
     /**
-     * The attempt dots of one task node, and the dashed step between a failed try and the
-     * one that followed it.
+     * The row of lights one card carries: six rings on a task, five checks on 验收.
      *
-     * Each dot is the state of its own row, never the node's: a task that failed once and
-     * then passed is a green card carrying one amber dot and one green one, and the retry
-     * mark sits exactly between that pair. The dots are decoration, so a screen reader hears
-     * the node's spoken state instead.
-     * @param node - one task node.
-     * @returns the dots' container.
+     * The lights are decoration looked up on the model by node id, not lines of the mermaid
+     * text: they say how far a step got of its six legs, not which step it is, and the text is
+     * the structure. Each light is one dot in the card's second row, coloured by the same
+     * state vocabulary every other dot on the page uses, with its own word as the tooltip. The
+     * row is `aria-hidden`, so the card's spoken label stays the one short sentence a screen
+     * reader hears.
+     * @param node - one panel node.
+     * @param t - translator.
+     * @returns the lights' row, or `null` when this card carries none.
      */
-    function progressPanelAttempts(node) {
-      const children = []
-      node.attempts.forEach((attempt, index) => {
-        children.push(h('span', {
-          key: `attempt:${attempt.seq}`,
-          className: 'gw-progress-pnode-attempt',
-          'data-attempt': String(index + 1),
-          'data-state': attempt.state,
-          'aria-hidden': 'true',
-        }))
-        if (attempt.state !== 'failed' || node.attempts[index + 1] === undefined) return
-        children.push(h('span', {
-          key: `retry:${attempt.seq}`,
-          className: 'gw-progress-pnode-retry',
-          'aria-hidden': 'true',
-        }))
-      })
-      return h('span', { key: 'dots', className: 'gw-progress-pnode-dots' }, children)
+    function ProgressPanelLights(node, t) {
+      const checks = Array.isArray(node.checks) && node.checks.length > 0
+      const list = checks ? node.checks : node.rings
+      if (!Array.isArray(list) || list.length === 0) return null
+      return h('span', {
+        key: 'lights',
+        className: 'gw-progress-pnode-lights',
+        'data-gw-progress-pnode-lights': checks ? 'checks' : 'rings',
+        title: t(checks ? 'progress.panel.checks' : 'progress.panel.rings'),
+        'aria-hidden': 'true',
+      }, list.map((light) => h('span', {
+        key: light.key,
+        className: checks ? 'gw-progress-check' : 'gw-progress-ring',
+        [checks ? 'data-gw-progress-check' : 'data-gw-progress-ring']: light.key,
+        'data-state': light.state,
+        title: t((checks ? PROGRESS_CHECK_KEY : PROGRESS_RING_KEY) + light.key),
+      })))
     }
 
     /**
-     * One node of the graph.
+     * One card of the figure.
      *
-     * The visible text is the leg's word, or a task's own title, plus the badge when there is
-     * one to print. Everything else is colour and a spoken state word: the page adds no
-     * sentence to a node.
+     * The visible text is the step's own word, or a task's title, or a sub box's call, plus
+     * the badge when one is due. Under it sits the row of lights: a task's six rings, 验收's
+     * five checks. Everything else is colour and a spoken state word — the page adds no
+     * sentence to a card.
      *
-     * The body is the node's control whenever the node has something to open — a real
-     * `button`, so Enter and Space reach it — and a plain `div` when it has nothing, which is
-     * the same rule the page always had: a mark is not a control. One click does the two
-     * readings this page offers: it opens (or closes) the calls, and it lights (or drops) the
-     * wires that touch this node. The trace is not a second control, so a node with nothing
-     * to open still answers a pointer and gets no button of its own.
+     * The body is the card's control whenever it has something to open — a real `button`, so
+     * Enter and Space reach it — and a plain `div` when it has nothing, which is the same rule
+     * the page always had: a mark is not a control. One click does the two readings this page
+     * offers: it opens (or closes) the calls, and it lights (or drops) the wires that touch
+     * this card. The trace is not a second control, so a card with nothing to open still
+     * answers a pointer and gets no button of its own.
      * @param node - one panel node.
-     * @param box - its laid-out box.
+     * @param box - its laid-out box; `box.column` is the column the text put it in.
      * @param props - translator, the open and trace state, the handlers and the row props.
      * @returns the node element.
      */
     function ProgressPanelNode(node, box, props) {
       const t = props.t
-      const badge = progressPanelBadge(node, t)
+      const badge = progressPanelBadge(node, props.shippedDraft, t)
       const stateWord = t(PROGRESS_PLAN_KEY[node.state] === undefined ? 'progress.plan.waiting' : PROGRESS_PLAN_KEY[node.state])
       const open = props.opened.indexOf(node.id) !== -1
       const traced = props.tracedNodes.has(node.id)
       const onClick = () => props.onNodeClick(node.id)
-      const parts = [
+      const subtask = node.subtask === undefined || node.subtask === null ? undefined : node.subtask
+      const badgeSpan = badge === '' ? null : h('span', {
+        key: 'badge',
+        className: 'gw-progress-pnode-badge',
+        'data-gw-progress-pnode-badge': true,
+      }, badge)
+      // A capsule keeps its word alone on the line and puts the badge under it: 汇总 and a
+      // draft number do not fit one 88 px pill, and a card that cuts its own title to `汇` is
+      // worse than a card that is one row taller.
+      const capsule = node.kind !== 'task' && node.kind !== 'sub'
+      const main = h('span', { key: 'main', className: 'gw-progress-pnode-main' }, [
         h('span', { key: 'dot', className: 'gw-progress-pnode-dot', 'aria-hidden': 'true' }),
         h('span', {
           key: 'word',
@@ -5177,28 +5539,34 @@ window.__ModuleLoader__.load({
           'data-gw-progress-pnode-word': true,
           title: node.label,
         }, node.label),
-        badge === '' ? null : h('span', {
-          key: 'badge',
-          className: 'gw-progress-pnode-badge',
-          'data-gw-progress-pnode-badge': true,
-        }, badge),
-        node.kind === 'task' ? progressPanelAttempts(node) : null,
-      ]
+        capsule ? null : badgeSpan,
+      ])
+      const detail = capsule && badgeSpan !== null
+        ? h('span', { key: 'detail', className: 'gw-progress-pnode-detail' }, badgeSpan)
+        : null
+      const parts = [main, detail, ProgressPanelLights(node, t)]
       return h('li', {
         key: node.id,
         className: 'gw-progress-pnode',
         'data-gw-progress-pnode': node.id,
         'data-kind': node.kind,
+        // The column the text decided, not a number the model guessed at: the figure is laid
+        // out from the mermaid source, so the drawn level is the layout's own.
+        'data-level': String(box.column),
         'data-state': node.state,
         'data-current': node.current ? 'true' : 'false',
-        'data-ordinal': String(node.ordinal),
-        ...node.taskNumber === undefined ? {} : { 'data-task': String(node.taskNumber) },
+        // The card that is open is the card that is on top: its list hangs outside its own box.
+        ...open ? { 'data-open': 'true' } : {},
+        ...subtask === undefined ? {} : {
+          ...subtask.taskNumber === undefined ? {} : { 'data-task': String(subtask.taskNumber) },
+          'data-subtask': String(subtask.seq),
+        },
         ...traced ? { 'data-trace': 'active' } : {},
         // Position and width come from the layout; the height is left to the box, so what
         // the page measures next is what a reader is really looking at.
         style: { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px` },
         'aria-label': [node.label, badge, stateWord].filter((part) => part !== '').join(' '),
-        // A node that carries a button answers the click on that button; a node that does
+        // A card that carries a button answers the click on that button; a card that does
         // not is still the thing a reader points at, so the trace lives on the mark itself.
         ...node.openable ? {} : { onClick },
       },
@@ -5228,8 +5596,13 @@ window.__ModuleLoader__.load({
      * jump once on a real session. Every wire points: the arrow says which step follows
      * which, and it is drawn in the border token because direction is structure, never state.
      *
-     * The container is also the page's "never mind" target: a click on the empty figure drops
-     * the trace, while a click that bubbled up from a node is left to that node.
+     * The figure is wrapped in its own scroll box: the run is left to right at every width, so
+     * a phone scrolls the picture instead of folding it into a column — and the page itself
+     * never scrolls sideways. The box only grows when a card's calls are open, because the
+     * list floats under its card and the clip would otherwise be the one thing that eats it.
+     *
+     * The graph is also the page's "never mind" target: a click on the empty figure drops the
+     * trace, while a click that bubbled up from a card is left to that card.
      * @param graph - the panel model.
      * @param layout - the computed layout of `parsePanelMermaid(graph.mermaid)`.
      * @param graphRef - the ref the measurement reads and the observer watches.
@@ -5250,6 +5623,11 @@ window.__ModuleLoader__.load({
       }
       const nodeProps = { ...props, linked }
       return h('div', {
+        className: 'gw-progress-figure',
+        'data-gw-progress-figure': true,
+        ...props.opened.length === 0 ? {} : { 'data-open': 'true' },
+      },
+      h('div', {
         className: 'gw-progress-graph',
         'data-gw-progress-graph': true,
         'data-gw-progress-source': graph.mermaid,
@@ -5291,7 +5669,7 @@ window.__ModuleLoader__.load({
         })
       })),
       h('ol', { className: 'gw-progress-pnodes', 'data-gw-progress-pnodes': true },
-        nodes.map((node) => ProgressPanelNode(node, boxes.get(node.id), nodeProps))))
+        nodes.map((node) => ProgressPanelNode(node, boxes.get(node.id), nodeProps)))))
     }
 
 
@@ -5445,9 +5823,23 @@ window.__ModuleLoader__.load({
       // sees and the structure anything else can read cannot disagree. Before the first
       // measurement the default sizes stand in, so a host without layout still renders.
       const parsed = graph === undefined ? undefined : parsePanelMermaid(graph.mermaid)
+      // Which cards are two rows tall is a fact about the model, looked up by id: neither the
+      // lights nor the shipped draft are in the text, so the layout is told about them instead
+      // of reading them off it. The badge's own predicate is the one the card prints it with.
+      const floors = new Map()
+      if (graph !== undefined) {
+        for (const node of graph.nodes) {
+          if ((Array.isArray(node.rings) && node.rings.length > 0) || (Array.isArray(node.checks) && node.checks.length > 0)) {
+            floors.set(node.id, PANEL_LIGHT_HEIGHT)
+            continue
+          }
+          if (progressPanelBadge(node, graph.final === undefined ? undefined : graph.final.draft, t) === '') continue
+          floors.set(node.id, PANEL_BADGE_ROW_HEIGHT)
+        }
+      }
       const layout = parsed === undefined
         ? undefined
-        : layoutPanelGraph(parsed, measure.sizes, measure.width > 0 ? measure.width : PANEL_DEFAULT_WIDTH)
+        : layoutPanelGraph(parsed, measure.sizes, measure.width > 0 ? measure.width : PANEL_DEFAULT_WIDTH, floors)
       // One click, two readings: a node that has calls opens (or closes) them, and any node
       // lights (or drops) the wires that touch it — the trace is a way to read the lines the
       // figure already draws, not a second thing to look at.
@@ -5469,6 +5861,8 @@ window.__ModuleLoader__.load({
         },
         // The row the gate shipped, by `seq`: the opened list marks it 交卷 and no other row.
         shippedSeq: graph.final === undefined ? undefined : graph.final.seq,
+        // …and its draft number, which is the one badge the figure prints (on 汇总).
+        shippedDraft: graph.final === undefined ? undefined : graph.final.draft,
         opened,
         traced,
         tracedNodes: panelTraceNodes(graph, traced),
@@ -5478,11 +5872,11 @@ window.__ModuleLoader__.load({
       }
       // The dock's button is the only thing the `conversation` service is needed for: with no
       // way to write the box, the page offers no button instead of one that would do nothing
-      // (§19.4). A run that is still working asks for no click, so it gets no button either.
+      // (§19.4). One state asks for a click: a run that has not started yet is waiting for the
+      // reader to say go. A finished run asks for nothing — the clicks it used to want were
+      // bookkeeping, and the run is done whether or not anyone confirms it.
       const fillDraft = typeof props.fillDraft === 'function' ? props.fillDraft : undefined
-      const dock = graph === undefined
-        ? 'none'
-        : graph.state === 'waiting' ? 'start' : graph.state === 'done' ? 'accept' : 'none'
+      const dock = graph !== undefined && graph.state === 'waiting' ? 'start' : 'none'
       const dockButton = dock === 'none' || fillDraft === undefined
         ? null
         : h('button', {
@@ -5492,7 +5886,7 @@ window.__ModuleLoader__.load({
           onClick: () => {
             if (fillDraft() === true) setFilled(true)
           },
-        }, t(dock === 'start' ? 'progress.dock.start' : 'progress.dock.accept'))
+        }, t('progress.dock.start'))
       const header = graph === undefined ? null : h('header', { className: 'gw-progress-bar', 'data-gw-progress-bar': true },
         h('span', { className: 'gw-progress-run', 'data-gw-progress-run': true, title: run.name }, run.name),
         h('span', {

@@ -1,3 +1,69 @@
+## 进度页横排分叉（`feat/task-fork`，HEAD `fe6d631`，无标签、版本仍 `0.13.53`）：隔离档案里真装真跑——七张读数（桌面 1500 三态、手机 390 三态、native-390 完成态）、**18 盏环 = 3 × 6**、**5 盏验**、完成态 `dock-fill` **0**、卡住那句每张都不存在、Mermaid 真值核对每张都对（首行 `flowchart LR`、节点/线计数与 DOM 相等、一个连通块、终点写作 `finish`）；门禁 `8 files / 331 passed`；**四条缺陷是真机截图抓到的**；`NOT_RUN`：原生手机进行中 / 等你点头 / `· 第 n 遍` / 深色主题 / 320 px / 读屏 / Firefox·Safari / 真 Mermaid 渲染器 / live 升级 — 2026-11-27 (`CONFIRMED`)
+
+**这一轮是什么**：`feat/task-fork` 把进度页换成一张横排分叉（七列、每张任务卡六环、每轮五验、接受动作删除）。本条目只记**真机读数、门禁与红线**；
+契约见 `DESIGN-progress-tab.md` §26，裁决见 `D-175`。**读数由 soak 那一轮落在 `.rsi/evidence/task-fork-2026-11-26/`，本节照抄它的七张，
+不重新测；门禁与包哈希是本条作者在本树重跑 / 重读过的（`CONFIRMED`）。** 产品代码、测试、`docs/` 本轮一个字节没改（写记忆这一轮只动文档）。
+
+**身份（本树自己读）**：HEAD = **`fe6d631`** = `main` 尖端、`git describe --tags --always` = **`v0.13.53-1-gfe6d631`**、
+`git tag --contains HEAD` 计数 **0**、`package.json` 版本 **`0.13.53`**。浏览器包 `lib/client.js` **422 685** 字节 /
+`sha256 c6387e1b8a3f795e20edad16220e569f5b36b957fa3a1e35c60d0d34bfbe0186`，`src/client/index.js` 同哈希、`cmp` 空输出；
+`lib/index.js` **27 956** 字节 / `sha256 ac69070e3eda3889a6bb36a9f967512efb5843e2e1ffc9ac80b32021defa2c32`（本块没碰）。
+打包：`file:….tmp/soak-fork/pack4/dsh-grok-workflow-0.13.53.tgz` **1 033 214** 字节 /
+`sha256 b5b7d208345b0dfc6e1928b11ea05cff288340bd5fe2f6fc5089b132841f3c46`（**164** 文件）；
+装进隔离 profile 的那份读回 **`0.13.53`**、`lib/client.js` 的 sha 与工作树相同、插件目录内软链 **0** 个。
+环境：隔离 home（从 `~/.dsh/profiles/web` 克隆、抹掉凭据、`DSH_HOME` 指向 clone）、一次性工作区、端口 **3412**（开跑前探过空闲）、真模型；
+跑的是**三个任务的真实工作流**，三个文件**真的写出来了**：`notes.md` **90 B**、`test.txt` **6 B**、`third.txt` **4 B**；收尾时隔离实例已停、scratch 全部删除。
+
+| 读数 | 宽 | 态 | 节点 / 线 | 环 / 验 | 底部 dock | 调用 / 亮线 / 暗线 | `scrollWidth == clientWidth` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `desktop-1500-running` | 1500 | 进行中 | **11 / 12** | 18 / 5 | 空 | 0 / 0 / 0 | 1500 = 1500 |
+| `desktop-1500-done` | 1500 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 1500 = 1500 |
+| `desktop-1500-node-open` | 1500 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | **1 / 9 / 20** | 1500 = 1500 |
+| `phone-390-running` | 390 | 进行中 | **11 / 12** | 18 / 5 | 空 | 0 / 0 / 0 | 390 = 390（图在自己内部横向滚：1078 / 383） |
+| `phone-390-done` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 390 = 390（同上） |
+| `phone-390-node-open` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | **1 / 9 / 20** | 390 = 390（同上） |
+| `native-390-done` | 390 | 已完成 | **17 / 24** | 18 / 5 | `dock-fill` **0** | 0 / 0 / 0 | 390 = 390（同上） |
+
+- **盒数对不对得上**：三个任务、每个任务三条调用。进行中 = 5 个固定盒（起点 / 规划 / 汇合 / 验收 / 终点）+ 3 张任务卡 + 3 条已经开始的
+  分支 = **11 盒 / 12 条线**（`start→plan`、3 条 fork、3 条 branch、3 条 join、`sum→accept`、`accept→end`）；完成态 = 5 + 3 + 9 条分支 =
+  **17 盒 / 24 条线**（1 + 3 + 9 + 9 + 1 + 1）。**每一张的节点行数 / 线行数与 DOM 的 `[data-gw-progress-pnode]` / 边数相等**。
+- **六环与五验真的在**：七张里 `[data-gw-progress-ring]` 都是 **18**（= 3 张任务卡 × 6 盏），`[data-gw-progress-check]` 都是 **5**，
+  且五盏的值是 `machine=done, model=done, isolated=pending, human=pending, ledger=pending`——这一轮跑了检查与复核、没跑真机 / 人验 / 对账，
+  **没跑的那三盏就暗暗地待着**（页面不替事件流勾选）。
+- **顶上那句话**：进行中是 `第 3 步，共 7 步 · 还剩约 …`，完成态是 `第 7 步，共 7 步`（`total` 恒 **7**）。
+- **卡住那句每一张都不存在**（`[data-gw-progress-stuck]` 计数 0）：这一轮一路顺利，按设计它就不该出现；**它长什么样本轮没拍到**。
+- **dock**：完成态 `dock-fill` **0** 颗——「收下这版」已经不在页面上；等你点头那一颗「开工」这一轮没有机会拍到（见 `NOT_RUN`）。
+- **页面自己的真值核对（每张都做）**：`data-gw-progress-source` 首行 **`flowchart LR`**；解析出的节点 / 线与 DOM 相等；
+  把边连起来走一遍，**一个连通块**（没有孤立的「起点 → 规划」）；终点在文本里写作 **`finish`**。
+- **控制台**：七张的浏览器会话 `console` **0** 条、`pageerror` **0** 条。
+
+**四条缺陷（真机截图抓到，不是套件先抓到的；都在同一分支修掉、各补一条守卫，逐条见 `D-175`）**：
+
+| # | 看到的 | 修法 / 守卫 |
+| --- | --- | --- |
+| ① | 「汇总」那颗盒子被裁成只剩「汇」 | 盒宽不再按字数截断，守卫钉住完整词 |
+| ② | 展开的调用行塌成一字一行 | 列表宽度不再被卡片宽度挤住，守卫钉住行宽 |
+| ③ | 邻居卡片盖住展开的列表 | 展开的那张卡补 `z-index`，守卫钉住层序 |
+| ④ | 列表透出背景（主题 token 死了） | 换成 `var(--dsw-alias-bg-layer-1, var(--dsw-alias-bg-base, Canvas))`，实测 `rgb(255,255,255)`；守卫钉住这道兜底 |
+
+**红线（照实记，含两条为别的原因动过的路径）**：`~/.dsh/profiles` 的 mtime **未变** = `2026-11-22 16:59:46`；
+`~/.dsh` = `2026-11-27 00:22:48`、`~/.dsh/profiles/web` = `2026-11-27 01:01:27`——**期间变过，但不是本块的写**：
+会改文件的每条命令都带 `DSH_HOME=<clone>`，变动的是 live 档案自己的设置写入加上另一个块的插件作业
+（`pnpm-lock.yaml` / `node_modules` / `.plugin-manager` **00:14:34**、`package.json` **00:19:54**、`cordis.yml` **00:20:53**、
+`cordis.patch.yml` **00:41:08** 与 **01:01:27**）；3080 根路径 **401 → 401**；live 那份载荷 sha `1fb003f3…` **不是本块的**，
+live 那一行仍钉 `github:free6589/dsh-grok-workflow` @ `0.13.53`（**没有升级**）；隔离实例已停、scratch 全部删掉。
+
+**门禁（本条作者在本树重跑）**：`npx tsc -p tsconfig.json --noEmit` **`EXIT=0`**；`npx oxlint src test`
+**`Found 14 warnings and 0 errors.`**（187 文件 / 96 规则）；八份进度相关 spec **`8 files / 331 passed`**
+（client 153 + progress-panel 38 + progress-panel-model 23 + progress-connector 15 + progress-hint-absent 8 + i18n-parity 8 + progress-tab 72 + progress 14）；
+`node scripts/build-client.mjs` 之后 `cmp lib/client.js src/client/index.js` 空输出。**整仓套件与 `npm run ci` 是 `NOT_RUN`**（`AGENTS.md` §12）。
+
+**`NOT_RUN`（一条不藏）**：① 原生手机上的**进行中**截图；② 等你点头态（`开工` 那颗按钮）在真机上；③ 分支上的 `· 第 n 遍`
+（三个任务都一次过，没造出重试）；④ 深色主题；⑤ 320 px；⑥ 读屏软件；⑦ Firefox / Safari；⑧ 真 Mermaid 渲染器；
+⑨ live 档案升级 / 重载 / 重启（红线）；⑩ 整仓测试与 `npm run ci`（§12）。
+
+**证据：** `.rsi/evidence/task-fork-2026-11-26/`（soak 那一轮落盘的七张读数、截图与安装输出；本条目只引用，不改它）。
+
 ## 进度页任务面板（`feat/task-panel`，产品提交 `45909bb`，无标签、版本仍 `0.13.52`）：隔离档案里真装真跑——桌面 1500 两态 + 手机 390 两态 + 同一颗节点的三次点击，**12 条读数 `scrollWidth == clientWidth` 全成立、`[data-current="true"]` 每态 1 颗、三次会话控制台 0 错**；Mermaid 真值核对每行都对（首行 `flowchart TD`、以 `end` 开头的行 **0**、解析出的节点/线数与 DOM 相等）；门禁 `8 files / 326 passed`（`gate-45909bb.out`）、整仓 **`105 files / 2030 passed`**（`suite-45909bb.out`，本轮自己跑并落盘）；**`NOT_RUN`：等你点头 / 未通过 / 已取消 / 卡住那句的字 / 421–499 px / live 升级** — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`45909bb`（`feat(progress): the tab is a task panel …`）把进度页换成任务面板——顶上一句话、中间一张由 Mermaid 文本自己排出来的分支图、底下一句只在卡住时出现。本条目只记**真机读数与门禁**；契约见 `DESIGN-progress-tab.md` §25，裁决见 `D-173`。**产品代码、测试、`docs/`、`package*.json`、`CHANGELOG.md` 本轮一个字节没改**（soak 那一路只读），也没 commit / push / tag / bump / publish。

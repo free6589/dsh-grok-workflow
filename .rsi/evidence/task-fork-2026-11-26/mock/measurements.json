@@ -1,0 +1,515 @@
+[
+  {
+    "name": "task-fork-desktop-1440",
+    "width": 1440,
+    "height": 900,
+    "pageScrollWidth": 1440,
+    "pageClientWidth": 1440,
+    "pageDoesNotScrollSideways": true,
+    "figures": [
+      {
+        "panel": "running",
+        "state": "running",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 872,
+              "y": 322,
+              "w": 88,
+              "h": 32
+            },
+            "badge": null
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1170,
+        "figureClientWidth": 1170,
+        "figureScrolls": false,
+        "graphWidth": 1170,
+        "graphHeight": 382,
+        "openList": null
+      },
+      {
+        "panel": "done",
+        "state": "done",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": "第 3 稿",
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 872,
+              "y": 860,
+              "w": 88,
+              "h": 49
+            },
+            "badge": "第 3 稿"
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1170,
+        "figureClientWidth": 1170,
+        "figureScrolls": false,
+        "graphWidth": 1170,
+        "graphHeight": 382,
+        "openList": null
+      }
+    ]
+  },
+  {
+    "name": "task-fork-desktop-1440-open",
+    "width": 1440,
+    "height": 900,
+    "pageScrollWidth": 1440,
+    "pageClientWidth": 1440,
+    "pageDoesNotScrollSideways": true,
+    "figures": [
+      {
+        "panel": "running",
+        "state": "running",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 872,
+              "y": 322,
+              "w": 88,
+              "h": 32
+            },
+            "badge": null
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1170,
+        "figureClientWidth": 1170,
+        "figureScrolls": false,
+        "graphWidth": 1170,
+        "graphHeight": 382,
+        "openList": {
+          "cardId": "t1",
+          "cardWidth": 186,
+          "listWidth": 186,
+          "listCoversCard": true,
+          "rowCount": 3,
+          "rowHeights": [
+            54,
+            54,
+            53
+          ],
+          "nameWidths": [
+            164,
+            164,
+            164
+          ],
+          "rowsOverflow": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "panel": "done",
+        "state": "done",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": "第 3 稿",
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 872,
+              "y": 1110,
+              "w": 88,
+              "h": 49
+            },
+            "badge": "第 3 稿"
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1170,
+        "figureClientWidth": 1170,
+        "figureScrolls": false,
+        "graphWidth": 1170,
+        "graphHeight": 382,
+        "openList": null
+      }
+    ]
+  },
+  {
+    "name": "task-fork-phone-390",
+    "width": 390,
+    "height": 844,
+    "pageScrollWidth": 390,
+    "pageClientWidth": 390,
+    "pageDoesNotScrollSideways": true,
+    "figures": [
+      {
+        "panel": "running",
+        "state": "running",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 699,
+              "y": 356,
+              "w": 88,
+              "h": 34
+            },
+            "badge": null
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1024,
+        "figureClientWidth": 320,
+        "figureScrolls": true,
+        "graphWidth": 1024,
+        "graphHeight": 418,
+        "openList": null
+      },
+      {
+        "panel": "done",
+        "state": "done",
+        "nodeCount": 17,
+        "edgeCount": 24,
+        "ringsPerTask": [
+          6,
+          6,
+          6
+        ],
+        "checksOnAccept": [
+          5
+        ],
+        "overColumn": [],
+        "wireCrossesCard": false,
+        "capsules": [
+          {
+            "id": "start",
+            "text": "起点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          },
+          {
+            "id": "plan",
+            "text": "规划",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "sum",
+            "text": "汇总",
+            "badge": "第 3 稿",
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "accept",
+            "text": "验收",
+            "badge": null,
+            "scrollWidth": 57,
+            "clientWidth": 57,
+            "whole": true
+          },
+          {
+            "id": "end",
+            "text": "终点",
+            "badge": null,
+            "scrollWidth": 26,
+            "clientWidth": 26,
+            "whole": true
+          }
+        ],
+        "everyCapsuleWordWhole": true,
+        "sumCapsule": [
+          {
+            "box": {
+              "x": 699,
+              "y": 931,
+              "w": 88,
+              "h": 49
+            },
+            "badge": "第 3 稿"
+          }
+        ],
+        "dockButton": 0,
+        "figureScrollWidth": 1024,
+        "figureClientWidth": 320,
+        "figureScrolls": true,
+        "graphWidth": 1024,
+        "graphHeight": 418,
+        "openList": null
+      }
+    ]
+  }
+]

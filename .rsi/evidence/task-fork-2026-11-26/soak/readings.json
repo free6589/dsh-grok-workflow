@@ -1,0 +1,4967 @@
+{
+ "note": "Every number below was read from the DOM by one evaluate issued at the moment of the screenshot named in the same entry, next to it. Nothing is derived, estimated or carried over: pnodes/edges/current/rings/checks are querySelectorAll counts, the graph assertions parse the data-gw-progress-source text that same evaluate returned, and the widths are the document's own scrollWidth/clientWidth. `assert` is the comparison of those raw numbers against the block's expectations, computed in the same evaluate result.",
+ "url": "http://127.0.0.1:3412/?token=<redacted>",
+ "sessionUrl": "http://127.0.0.1:3412/",
+ "profile": "web-clone (isolated DSH_HOME .tmp/soak-fork/dsh-home)",
+ "port": 3412,
+ "widths": {
+  "desktop": 1500,
+  "phone": 390
+ },
+ "sentAt": 1795712550402,
+ "sentAtLocal": "2026-11-26T17:02:30.402Z",
+ "tabPath": "text",
+ "saved": {
+  "desktop-1500-running": {
+   "file": "desktop-1500-running.png",
+   "at": 12.157,
+   "chip": "进行中"
+  },
+  "phone-390-running": {
+   "file": "phone-390-running.png",
+   "at": 14.449,
+   "chip": "进行中"
+  },
+  "desktop-1500-done": {
+   "file": "desktop-1500-done.png",
+   "at": 136.6,
+   "chip": "已完成"
+  },
+  "phone-390-done": {
+   "file": "phone-390-done.png",
+   "at": 138.725,
+   "chip": "已完成"
+  },
+  "desktop-1500-node-open": {
+   "file": "desktop-1500-node-open.png",
+   "at": 141.854,
+   "chip": "已完成"
+  },
+  "phone-390-node-open": {
+   "file": "phone-390-node-open.png",
+   "at": 143.64,
+   "chip": "已完成"
+  },
+  "phone-native-390-done": {
+   "file": "phone-native-390-done.png",
+   "at": 164.514,
+   "chip": "已完成"
+  }
+ },
+ "entries": {
+  "desktop-1500-running": {
+   "screenshot": "desktop-1500-running.png",
+   "at": 12.157,
+   "width": 1500,
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "进行中",
+   "chipState": "running",
+   "line": "第 4 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 11,
+   "edges": 12,
+   "current": 1,
+   "currentNode": "t1_s1",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "pending"
+    },
+    {
+     "key": "model",
+     "state": "pending"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "true",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "pending"
+      },
+      {
+       "key": "model",
+       "state": "pending"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 11,
+   "srcEdgeLines": 12,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t2_s2",
+    "t3_s3",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t2_s2[\"执行\"]\n  t3_s3[\"执行\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": null
+    }
+   ],
+   "docScrollWidth": 1500,
+   "docClientWidth": 1500,
+   "figureScrollWidth": 1213,
+   "figureClientWidth": 1213,
+   "innerWidth": 1500,
+   "innerHeight": 1600,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "phone-390-running": {
+   "screenshot": "phone-390-running.png",
+   "at": 14.449,
+   "width": 390,
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "进行中",
+   "chipState": "running",
+   "line": "第 4 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 11,
+   "edges": 12,
+   "current": 1,
+   "currentNode": "t1_s1",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "doing"
+    },
+    {
+     "key": "check",
+     "state": "pending"
+    },
+    {
+     "key": "review",
+     "state": "pending"
+    },
+    {
+     "key": "accept",
+     "state": "pending"
+    },
+    {
+     "key": "summarize",
+     "state": "pending"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "pending"
+    },
+    {
+     "key": "model",
+     "state": "pending"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "doing",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "doing"
+      },
+      {
+       "key": "check",
+       "state": "pending"
+      },
+      {
+       "key": "review",
+       "state": "pending"
+      },
+      {
+       "key": "accept",
+       "state": "pending"
+      },
+      {
+       "key": "summarize",
+       "state": "pending"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "true",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "doing",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "pending"
+      },
+      {
+       "key": "model",
+       "state": "pending"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "pending",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 11,
+   "srcEdgeLines": 12,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t2_s2",
+    "t3_s3",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t2_s2[\"执行\"]\n  t3_s3[\"执行\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": null
+    }
+   ],
+   "docScrollWidth": 390,
+   "docClientWidth": 390,
+   "figureScrollWidth": 1078,
+   "figureClientWidth": 383,
+   "innerWidth": 390,
+   "innerHeight": 844,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "desktop-1500-done": {
+   "screenshot": "desktop-1500-done.png",
+   "at": 136.6,
+   "width": 1500,
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "已完成",
+   "chipState": "done",
+   "line": "第 7 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 17,
+   "edges": 24,
+   "current": 1,
+   "currentNode": "end",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "done"
+    },
+    {
+     "key": "model",
+     "state": "done"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s4",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "4",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "7",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "6",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s8",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "8",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s5",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "5",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s9",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "9",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "done"
+      },
+      {
+       "key": "model",
+       "state": "done"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "done",
+     "current": "true",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 17,
+   "srcEdgeLines": 24,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t1_s4",
+    "t1_s7",
+    "t2_s2",
+    "t2_s6",
+    "t2_s8",
+    "t3_s3",
+    "t3_s5",
+    "t3_s9",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s4"
+    ],
+    [
+     "t1_s4",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s7"
+    ],
+    [
+     "t1_s7",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s6"
+    ],
+    [
+     "t2_s6",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s8"
+    ],
+    [
+     "t2_s8",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s5"
+    ],
+    [
+     "t3_s5",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s9"
+    ],
+    [
+     "t3_s9",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t1_s4[\"检查\"]\n  t1_s7[\"复核\"]\n  t2_s2[\"执行\"]\n  t2_s6[\"检查\"]\n  t2_s8[\"复核\"]\n  t3_s3[\"执行\"]\n  t3_s5[\"检查\"]\n  t3_s9[\"复核\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t1 --> t1_s4\n  t1_s4 --> sum\n  t1 --> t1_s7\n  t1_s7 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t2 --> t2_s6\n  t2_s6 --> sum\n  t2 --> t2_s8\n  t2_s8 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  t3 --> t3_s5\n  t3_s5 --> sum\n  t3 --> t3_s9\n  t3_s9 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s4",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s4",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s7",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s7",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s6",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s6",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s8",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s8",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s5",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s5",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s9",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s9",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": null
+    }
+   ],
+   "docScrollWidth": 1500,
+   "docClientWidth": 1500,
+   "figureScrollWidth": 1213,
+   "figureClientWidth": 1213,
+   "innerWidth": 1500,
+   "innerHeight": 1600,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "phone-390-done": {
+   "screenshot": "phone-390-done.png",
+   "at": 138.725,
+   "width": 390,
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "已完成",
+   "chipState": "done",
+   "line": "第 7 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 17,
+   "edges": 24,
+   "current": 1,
+   "currentNode": "end",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "done"
+    },
+    {
+     "key": "model",
+     "state": "done"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s4",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "4",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "7",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "6",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s8",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "8",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s5",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "5",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s9",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "9",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "done"
+      },
+      {
+       "key": "model",
+       "state": "done"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "done",
+     "current": "true",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 17,
+   "srcEdgeLines": 24,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t1_s4",
+    "t1_s7",
+    "t2_s2",
+    "t2_s6",
+    "t2_s8",
+    "t3_s3",
+    "t3_s5",
+    "t3_s9",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s4"
+    ],
+    [
+     "t1_s4",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s7"
+    ],
+    [
+     "t1_s7",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s6"
+    ],
+    [
+     "t2_s6",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s8"
+    ],
+    [
+     "t2_s8",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s5"
+    ],
+    [
+     "t3_s5",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s9"
+    ],
+    [
+     "t3_s9",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t1_s4[\"检查\"]\n  t1_s7[\"复核\"]\n  t2_s2[\"执行\"]\n  t2_s6[\"检查\"]\n  t2_s8[\"复核\"]\n  t3_s3[\"执行\"]\n  t3_s5[\"检查\"]\n  t3_s9[\"复核\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t1 --> t1_s4\n  t1_s4 --> sum\n  t1 --> t1_s7\n  t1_s7 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t2 --> t2_s6\n  t2_s6 --> sum\n  t2 --> t2_s8\n  t2_s8 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  t3 --> t3_s5\n  t3_s5 --> sum\n  t3 --> t3_s9\n  t3_s9 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s4",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s4",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s7",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s7",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s6",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s6",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s8",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s8",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s5",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s5",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s9",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s9",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": null
+    }
+   ],
+   "docScrollWidth": 390,
+   "docClientWidth": 390,
+   "figureScrollWidth": 1078,
+   "figureClientWidth": 383,
+   "innerWidth": 390,
+   "innerHeight": 844,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "desktop-1500-node-open": {
+   "screenshot": "desktop-1500-node-open.png",
+   "at": 141.845,
+   "width": 1500,
+   "openedNode": "t1",
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "已完成",
+   "chipState": "done",
+   "line": "第 7 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 17,
+   "edges": 24,
+   "current": 1,
+   "currentNode": "end",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "done"
+    },
+    {
+     "key": "model",
+     "state": "done"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 3,
+     "traced": "active"
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1_s4",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "4",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "7",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "6",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s8",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "8",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s5",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "5",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s9",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "9",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "done"
+      },
+      {
+       "key": "model",
+       "state": "done"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "done",
+     "current": "true",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 1,
+   "traceActive": 9,
+   "traceDim": 20,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 17,
+   "srcEdgeLines": 24,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t1_s4",
+    "t1_s7",
+    "t2_s2",
+    "t2_s6",
+    "t2_s8",
+    "t3_s3",
+    "t3_s5",
+    "t3_s9",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s4"
+    ],
+    [
+     "t1_s4",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s7"
+    ],
+    [
+     "t1_s7",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s6"
+    ],
+    [
+     "t2_s6",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s8"
+    ],
+    [
+     "t2_s8",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s5"
+    ],
+    [
+     "t3_s5",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s9"
+    ],
+    [
+     "t3_s9",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t1_s4[\"检查\"]\n  t1_s7[\"复核\"]\n  t2_s2[\"执行\"]\n  t2_s6[\"检查\"]\n  t2_s8[\"复核\"]\n  t3_s3[\"执行\"]\n  t3_s5[\"检查\"]\n  t3_s9[\"复核\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t1 --> t1_s4\n  t1_s4 --> sum\n  t1 --> t1_s7\n  t1_s7 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t2 --> t2_s6\n  t2_s6 --> sum\n  t2 --> t2_s8\n  t2_s8 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  t3 --> t3_s5\n  t3_s5 --> sum\n  t3 --> t3_s9\n  t3_s9 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": "dim"
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": "active"
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": "dim"
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s4",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s4",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s7",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s7",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s6",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s6",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s8",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s8",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s5",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s5",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s9",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s9",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": "dim"
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": "dim"
+    }
+   ],
+   "docScrollWidth": 1500,
+   "docClientWidth": 1500,
+   "figureScrollWidth": 1213,
+   "figureClientWidth": 1213,
+   "innerWidth": 1500,
+   "innerHeight": 1600,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "phone-390-node-open": {
+   "screenshot": "phone-390-node-open.png",
+   "at": 143.64,
+   "width": 390,
+   "openedNode": "t1",
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "已完成",
+   "chipState": "done",
+   "line": "第 7 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 17,
+   "edges": 24,
+   "current": 1,
+   "currentNode": "end",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "done"
+    },
+    {
+     "key": "model",
+     "state": "done"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 3,
+     "traced": "active"
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1_s4",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "4",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "7",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": "active"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "6",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s8",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "8",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s5",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "5",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s9",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "9",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "done"
+      },
+      {
+       "key": "model",
+       "state": "done"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "done",
+     "current": "true",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 1,
+   "traceActive": 9,
+   "traceDim": 20,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 17,
+   "srcEdgeLines": 24,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t1_s4",
+    "t1_s7",
+    "t2_s2",
+    "t2_s6",
+    "t2_s8",
+    "t3_s3",
+    "t3_s5",
+    "t3_s9",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s4"
+    ],
+    [
+     "t1_s4",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s7"
+    ],
+    [
+     "t1_s7",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s6"
+    ],
+    [
+     "t2_s6",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s8"
+    ],
+    [
+     "t2_s8",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s5"
+    ],
+    [
+     "t3_s5",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s9"
+    ],
+    [
+     "t3_s9",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t1_s4[\"检查\"]\n  t1_s7[\"复核\"]\n  t2_s2[\"执行\"]\n  t2_s6[\"检查\"]\n  t2_s8[\"复核\"]\n  t3_s3[\"执行\"]\n  t3_s5[\"检查\"]\n  t3_s9[\"复核\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t1 --> t1_s4\n  t1_s4 --> sum\n  t1 --> t1_s7\n  t1_s7 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t2 --> t2_s6\n  t2_s6 --> sum\n  t2 --> t2_s8\n  t2_s8 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  t3 --> t3_s5\n  t3_s5 --> sum\n  t3 --> t3_s9\n  t3_s9 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": "dim"
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": "active"
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": "dim"
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s4",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s4",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t1",
+     "to": "t1_s7",
+     "kind": "branch",
+     "trace": "active"
+    },
+    {
+     "from": "t1_s7",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s6",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s6",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t2",
+     "to": "t2_s8",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t2_s8",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s5",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s5",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "t3",
+     "to": "t3_s9",
+     "kind": "branch",
+     "trace": "dim"
+    },
+    {
+     "from": "t3_s9",
+     "to": "sum",
+     "kind": "join",
+     "trace": "dim"
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": "dim"
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": "dim"
+    }
+   ],
+   "docScrollWidth": 390,
+   "docClientWidth": 390,
+   "figureScrollWidth": 1078,
+   "figureClientWidth": 383,
+   "innerWidth": 390,
+   "innerHeight": 844,
+   "devicePixelRatio": 1,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  },
+  "phone-native-390-done": {
+   "screenshot": "phone-native-390-done.png",
+   "at": 164.503,
+   "width": 390,
+   "native": true,
+   "nativePath": "sidebar-toggle+entry",
+   "nativeOpened": true,
+   "mounted": true,
+   "runName": "任务团队 · 3 个任务",
+   "chip": "已完成",
+   "chipState": "done",
+   "line": "第 7 步，共 7 步",
+   "dockText": "",
+   "dockState": "none",
+   "dockFill": 0,
+   "stuckPresent": false,
+   "stuckText": null,
+   "pnodes": 17,
+   "edges": 24,
+   "current": 1,
+   "currentNode": "end",
+   "rings": [
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    },
+    {
+     "key": "plan",
+     "state": "done"
+    },
+    {
+     "key": "execute",
+     "state": "done"
+    },
+    {
+     "key": "check",
+     "state": "done"
+    },
+    {
+     "key": "review",
+     "state": "done"
+    },
+    {
+     "key": "accept",
+     "state": "done"
+    },
+    {
+     "key": "summarize",
+     "state": "done"
+    }
+   ],
+   "ringCount": 18,
+   "checks": [
+    {
+     "key": "machine",
+     "state": "done"
+    },
+    {
+     "key": "model",
+     "state": "done"
+    },
+    {
+     "key": "isolated",
+     "state": "pending"
+    },
+    {
+     "key": "human",
+     "state": "pending"
+    },
+    {
+     "key": "ledger",
+     "state": "pending"
+    }
+   ],
+   "checkCount": 5,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start",
+     "level": "0",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "起点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "plan",
+     "kind": "plan",
+     "level": "1",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "规划",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 1 · 写 notes.md 安装步骤",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 2 · 写 test.txt hello",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3",
+     "kind": "task",
+     "level": "2",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "任务 3 · 写 third.txt bye",
+     "rings": [
+      {
+       "key": "plan",
+       "state": "done"
+      },
+      {
+       "key": "execute",
+       "state": "done"
+      },
+      {
+       "key": "check",
+       "state": "done"
+      },
+      {
+       "key": "review",
+       "state": "done"
+      },
+      {
+       "key": "accept",
+       "state": "done"
+      },
+      {
+       "key": "summarize",
+       "state": "done"
+      }
+     ],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "1",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s4",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "4",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "1",
+     "subtask": "7",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "2",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "6",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t2_s8",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "2",
+     "subtask": "8",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "3",
+     "label": "执行",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s5",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "5",
+     "label": "检查",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "t3_s9",
+     "kind": "sub",
+     "level": "3",
+     "state": "done",
+     "current": "false",
+     "task": "3",
+     "subtask": "9",
+     "label": "复核",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "sum",
+     "kind": "summarize",
+     "level": "4",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "汇总",
+     "rings": [],
+     "checks": [],
+     "open": true,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "accept",
+     "kind": "accept",
+     "level": "5",
+     "state": "done",
+     "current": "false",
+     "task": null,
+     "subtask": null,
+     "label": "验收",
+     "rings": [],
+     "checks": [
+      {
+       "key": "machine",
+       "state": "done"
+      },
+      {
+       "key": "model",
+       "state": "done"
+      },
+      {
+       "key": "isolated",
+       "state": "pending"
+      },
+      {
+       "key": "human",
+       "state": "pending"
+      },
+      {
+       "key": "ledger",
+       "state": "pending"
+      }
+     ],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    },
+    {
+     "id": "end",
+     "kind": "end",
+     "level": "6",
+     "state": "done",
+     "current": "true",
+     "task": null,
+     "subtask": null,
+     "label": "终点",
+     "rings": [],
+     "checks": [],
+     "open": false,
+     "calls": 0,
+     "traced": null
+    }
+   ],
+   "nodeCallsCount": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "srcHeader": "flowchart LR",
+   "srcNodeLines": 17,
+   "srcEdgeLines": 24,
+   "srcBadLines": [],
+   "srcComponents": 1,
+   "srcDanglingEdges": 0,
+   "srcDeclared": [
+    "start",
+    "plan",
+    "t1",
+    "t2",
+    "t3",
+    "t1_s1",
+    "t1_s4",
+    "t1_s7",
+    "t2_s2",
+    "t2_s6",
+    "t2_s8",
+    "t3_s3",
+    "t3_s5",
+    "t3_s9",
+    "sum",
+    "accept",
+    "finish"
+   ],
+   "srcEdgePairs": [
+    [
+     "start",
+     "plan"
+    ],
+    [
+     "plan",
+     "t1"
+    ],
+    [
+     "plan",
+     "t2"
+    ],
+    [
+     "plan",
+     "t3"
+    ],
+    [
+     "t1",
+     "t1_s1"
+    ],
+    [
+     "t1_s1",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s4"
+    ],
+    [
+     "t1_s4",
+     "sum"
+    ],
+    [
+     "t1",
+     "t1_s7"
+    ],
+    [
+     "t1_s7",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s2"
+    ],
+    [
+     "t2_s2",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s6"
+    ],
+    [
+     "t2_s6",
+     "sum"
+    ],
+    [
+     "t2",
+     "t2_s8"
+    ],
+    [
+     "t2_s8",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s3"
+    ],
+    [
+     "t3_s3",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s5"
+    ],
+    [
+     "t3_s5",
+     "sum"
+    ],
+    [
+     "t3",
+     "t3_s9"
+    ],
+    [
+     "t3_s9",
+     "sum"
+    ],
+    [
+     "sum",
+     "accept"
+    ],
+    [
+     "accept",
+     "finish"
+    ]
+   ],
+   "srcText": "flowchart LR\n  start([\"起点\"])\n  plan([\"规划\"])\n  t1(\"任务 1 · 写 notes.md 安装步骤\")\n  t2(\"任务 2 · 写 test.txt hello\")\n  t3(\"任务 3 · 写 third.txt bye\")\n  t1_s1[\"执行\"]\n  t1_s4[\"检查\"]\n  t1_s7[\"复核\"]\n  t2_s2[\"执行\"]\n  t2_s6[\"检查\"]\n  t2_s8[\"复核\"]\n  t3_s3[\"执行\"]\n  t3_s5[\"检查\"]\n  t3_s9[\"复核\"]\n  sum([\"汇总\"])\n  accept([\"验收\"])\n  finish([\"终点\"])\n  start --> plan\n  plan --> t1\n  plan --> t2\n  plan --> t3\n  t1 --> t1_s1\n  t1_s1 --> sum\n  t1 --> t1_s4\n  t1_s4 --> sum\n  t1 --> t1_s7\n  t1_s7 --> sum\n  t2 --> t2_s2\n  t2_s2 --> sum\n  t2 --> t2_s6\n  t2_s6 --> sum\n  t2 --> t2_s8\n  t2_s8 --> sum\n  t3 --> t3_s3\n  t3_s3 --> sum\n  t3 --> t3_s5\n  t3_s5 --> sum\n  t3 --> t3_s9\n  t3_s9 --> sum\n  sum --> accept\n  accept --> finish",
+   "edgeAttrs": [
+    {
+     "from": "start",
+     "to": "plan",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t1",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t2",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "plan",
+     "to": "t3",
+     "kind": "fork",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s1",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s1",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s4",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s4",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t1",
+     "to": "t1_s7",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t1_s7",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s2",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s2",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s6",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s6",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t2",
+     "to": "t2_s8",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t2_s8",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s3",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s3",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s5",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s5",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "t3",
+     "to": "t3_s9",
+     "kind": "branch",
+     "trace": null
+    },
+    {
+     "from": "t3_s9",
+     "to": "sum",
+     "kind": "join",
+     "trace": null
+    },
+    {
+     "from": "sum",
+     "to": "accept",
+     "kind": "chain",
+     "trace": null
+    },
+    {
+     "from": "accept",
+     "to": "end",
+     "kind": "chain",
+     "trace": null
+    }
+   ],
+   "docScrollWidth": 390,
+   "docClientWidth": 390,
+   "figureScrollWidth": 1078,
+   "figureClientWidth": 383,
+   "innerWidth": 390,
+   "innerHeight": 844,
+   "devicePixelRatio": 2,
+   "assert": {
+    "headerIsFlowchartLR": true,
+    "srcNodeLinesEqDomPnodes": true,
+    "srcEdgeLinesEqDomEdges": true,
+    "srcOneComponent": true,
+    "srcNoDanglingEdges": true,
+    "srcNoBadLines": true,
+    "currentNodeCountIsOne": true,
+    "taskCardsCarrySixRings": true,
+    "ringsAreSixPerTask": true,
+    "acceptCarriesFiveChecks": true,
+    "noPageSidewaysScroll": true
+   }
+  }
+ }
+}
