@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.51] - 2026-11-26
+
 ### Changed / 变更
 
 - **Closing a block now looks for its files in the folder the work was approved in — even from another session, or after a restart / 关单现在去「当初批准这块活时所在的文件夹」里核对文件——换一个会话、甚至重启之后也一样** —
