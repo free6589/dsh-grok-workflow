@@ -1,3 +1,61 @@
+## 2026-11-26 — `0.13.49` **备好、门禁绿、故意没发**（分支 `release/0.13.49`，尖端 `772ac32`）：真机两轮把这一版要说出去的两句话各否掉一次——注入块进了用户气泡、`开团` 那轮仍可能被拒且拒绝看不见；**下一个接手的人要先拿到操作者的一个决定**，`main` 仍 `a5dfc75`、没有 tag
+
+- **From:** 记忆收口施工者（`agent-207/scribe`）· **To:** 操作者 / 下一个接手这条分支的人
+- **已经做完的**：
+  1. `feat/force-team-routing`（尖端 `e9a48b9`）已并在 `main`（`a5dfc75`，v0.13.48）之上——合流提交
+     **`3ec12d5`**（父 `a5dfc75` + `e9a48b9`、**40 文件 / +2100 −72**）；版本字面量抬到 `0.13.49`——**`6f31e74`**
+     （单父、**8 文件 / +37 −22**，`src/` 与 `lib/` 只差 `PLUGIN_VERSION` / `UPDATE_LATEST` 那一对）；
+     再一颗修复 **`772ac32`**（单父、**9 文件 / +274 −50**，先以 `22a72d3` 提交再 amend，两者只差两份 README 的用例数字）。
+     分支相对 `main` = **6 颗提交 / 44 文件 / +2361 −94**。
+  2. **门禁四份转录全绿**：`3ec12d5` `105 / 2041` / `95.43s`（末行 `GATE_EXIT=0`）、`6f31e74` `105 / 2041` / `72.49s`、
+     `22a72d3` `105 / 2049` / `90.26s`、**`772ac32` `105 / 2049` / `128.61s`（决定性那一遍）**；
+     四份共有 `Found 15 warnings and 0 errors.`、`client bundle: 372480 bytes`、
+     `lib/ at <sha> is the build of src/ at <sha> (293 files, byte-identical)`。**后三份没有字面 `GATE_EXIT` 行**，照实留空。
+  3. **真机两轮跑完并留证**（克隆 live web、`DSH_HOME=<scratch>`、端口 3392、抓包 18190→18088、真模型
+     `bifrost-responses / opencode-go/muse-spark-1.3-contributor`，live `~/.dsh` 与 3080 全程只读）：
+     第 1 轮 `FALSIFIED` 两处（F1 注入进 UI、F2 拒绝不可见）+ F3 / F4 / F5；第 2 轮修好了 F3，
+     **但把「开团那轮不会被拒」也 `FALSIFIED` 了一次**（同一提示词两次跑，一次被拒并 `blocked`），
+     并新记 F6。全部逐条写在 `VALIDATION.md` 顶部那一条，数字都能回指证据目录。
+  4. 三份证据索引写完：`.rsi/evidence/force-team-routing-2026-11-26/README.md`、
+     `.rsi/evidence/release-0.13.49-2026-11-26/README.md`、`.rsi/evidence/force-team-soak-2026-11-26/README.md`。
+- **没做的（都是 `NOT_RUN`）**：附注标签 `v0.13.49`、`git push`、远端 Release run、npm publish、门禁重跑。
+  **`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级——`~/.dsh` 在工作区外、本会话 `workspace-write`，写不进去；
+  **没写、没重载、没重启**，3080 没碰。live 现在装的是 **`0.13.48`**（**11:22:40 另一个施工者装的**，不含 `lib/force-team.js`），
+  所以 live 上跑的是「没有强制路由」的那一版，与本分支无关。
+- **下一件事只有一件：先拿操作者的决定，别自己拍。** 三个选项，互斥：
+  ① **只发注入、砍掉回合闸门**（把「过闸取决于模型挑了哪个工具」这条整个拿掉，F2 / F6 一起消失，代价是没有兜底）；
+  ② **先修 F2（把拒绝渲染出来）与 F4（模式口径）再发**（拒绝至少能被看见，闸门仍然可能误拒）；
+  ③ **按设计发出去**，把 F1 / F2 / F4 / F5 / F6 这些边界写进 `CHANGELOG` 与两份 README 的已知限制。
+  操作者点头之前，**不要打 tag、不要 push `main`**：一条「开团」请求现在仍可能以 `blocked` 收尾——没有答案、
+  没有可见原因、页面写着「已完成，用时 16秒」。
+- **恢复现场（逐步，都在工作区里）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-release-0.13.49   # worktree，分支 release/0.13.49
+  git status --short --branch      # ## release/0.13.49（干净）
+  git log --oneline -3             # 772ac32 / 6f31e74 / 3ec12d5
+  git rev-parse main origin/main   # 两颗都是 a5dfc755…（0.13.49 没有推进 main）
+  TMPDIR=$PWD/.tmp npm run ci      # 已经绿过（105 / 2049 / 128.61s）；要在干净树上再确认就重跑一遍
+  ```
+
+  操作者说「发」之后的发布五步（**本轮一步都没跑**，顺序照 `AGENTS.md` §7）：
+
+  ```bash
+  git tag -a v0.13.49 -m "Grok Workflow for DSH v0.13.49" 772ac32   # 附注标签打在发布提交上
+  git push origin release/0.13.49:main                              # main = a5dfc75 是 772ac32 的祖先，可快进
+  git push origin v0.13.49
+  gh run watch --exit-status                                        # 盯远端 Release run 到 success
+  ```
+
+  收尾（推送成功之后再做）：`git worktree remove .tmp/wt-release-0.13.49`、`git branch -d release/0.13.49`；
+  **远端分支与标签一个都别删**。`AGENTS.md` §13 的 live 升级要**有写权限的人**做：把那条插件行钉到**确切的标签
+  `v0.13.49`**（绝不用浮动范围、`latest` 或分支名），读回版本确认，读不回就回滚那一行。
+- **两个坑照实记**：① `dsh web --profile web-clone …` 起不来（`dsh web` 本身就是 `dsh --profile web`，
+  报 `select a profile only once`），可用的是 `dsh --profile web-clone --port 3392 --host 127.0.0.1 --no-open`；
+  ② `~/.npm` 不可写，`npm pack` 以 `EROFS … _cacache` 失败，先把 `npm_config_cache` 指到工作区内。
+- **一处 git 里查不到的**：派单提到的「七处文档冲突」在 `git log` 里没有记录（合流提交 `3ec12d5` 的提交体为空、只有标题），
+  档案里不写这一条；两次合流尝试的差别只有 `docs/knowledge/VALIDATION.md` 两行，见合流证据的 `README.md`。
+
 ## 2026-11-26 — `0.13.48` 已发布收口：泳道矩阵出去了（进度图一条腿一列、一个计划任务一格，重试画出第几遍）；一个发布提交（8 文件 / +22 −20、单父、从 `db3184a` 快进而来）、门禁**先红后绿**（`391e0a6` 上 `GATE_EXIT=0`、`104 files / 2013 tests`）、`main` 尖端 `391e0a6`、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**（live 读 `0.13.47`、那一行还是浮动依赖）、**真机 soak / npm publish `NOT_RUN`**
 
 - **From:** 记忆收口施工者（`agent-206/rel-memory`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

@@ -1,0 +1,14 @@
+listening on 127.0.0.1:18190 -> 127.0.0.1:18088
+seq=001 t=2026-11-26T04:06:05.422Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=135247 -> 200
+seq=002 t=2026-11-26T04:06:05.429Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=1445 -> 400
+seq=004 t=2026-11-26T04:07:02.668Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=1396 -> 400
+seq=003 t=2026-11-26T04:07:02.667Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=135198 -> 200
+seq=005 t=2026-11-26T04:07:36.192Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=148411 -> 200
+seq=006 t=2026-11-26T04:07:44.912Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=160450 -> 200
+seq=007 t=2026-11-26T04:07:55.867Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=172486 -> 200
+seq=009 t=2026-11-26T04:08:18.596Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=1446 -> 400
+seq=008 t=2026-11-26T04:08:18.595Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=135248 -> 200
+seq=011 t=2026-11-26T04:09:18.468Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=1445 -> 400
+seq=010 t=2026-11-26T04:09:18.467Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=135247 -> 200
+seq=013 t=2026-11-26T04:09:54.164Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=920 -> 400
+seq=012 t=2026-11-26T04:09:54.162Z POST /openai/v1/responses model=opencode-go/muse-spark-1.3-contributor bytes=134730 -> 200

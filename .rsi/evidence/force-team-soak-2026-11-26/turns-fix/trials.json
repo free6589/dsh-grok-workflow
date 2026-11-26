@@ -1,0 +1,75 @@
+[
+  {
+    "session": "session-6e6a935c-0a22-4301-bf42-dd5c5919971b",
+    "steps": 1,
+    "inj": true,
+    "ft": 1,
+    "wf": 0,
+    "calls": [
+      "todo_write"
+    ],
+    "team": [],
+    "end": {
+      "kind": "blocked"
+    },
+    "prompt": "开团：先读一下 README.md 第一行，再告诉我这行几个字"
+  },
+  {
+    "session": "session-919edbf3-b196-4079-9a08-a9dd0adf8734",
+    "steps": 4,
+    "inj": true,
+    "ft": 0,
+    "wf": 0,
+    "calls": [
+      "grok_open_block",
+      "todo_write",
+      "todo_write"
+    ],
+    "team": [
+      "grok_open_block"
+    ],
+    "end": {
+      "kind": "completed"
+    },
+    "prompt": "开团：1+1 等于几"
+  },
+  {
+    "session": "session-6f4896ed-fd47-4313-8ca5-a7400151cd61",
+    "steps": 1,
+    "inj": true,
+    "ft": 0,
+    "wf": 0,
+    "calls": [],
+    "team": [],
+    "end": {
+      "kind": "completed"
+    },
+    "prompt": "用一句话回答：今天是几号？不要开团，也不要组队。"
+  },
+  {
+    "session": "session-c55e6b25-7c9c-4e92-bba5-37c7e1f1ed0e",
+    "steps": 1,
+    "inj": true,
+    "ft": 0,
+    "wf": 0,
+    "calls": [],
+    "team": [],
+    "end": {
+      "kind": "completed"
+    },
+    "prompt": "开团：先读一下 README.md 第一行，再告诉我这行几个字"
+  },
+  {
+    "session": "session-cdf531f6-6b7a-44f4-b789-735edae6417a",
+    "steps": 1,
+    "inj": false,
+    "ft": 0,
+    "wf": 0,
+    "calls": [],
+    "team": [],
+    "end": {
+      "kind": "completed"
+    },
+    "prompt": "用一句话回答：今天是几号？"
+  }
+]

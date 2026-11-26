@@ -1,0 +1,42 @@
+# the page right after the first message "/grok on"
+
+DSH 本地构建
+0.2.2-rc.3-6b729fe
+会话
+生图
+新会话
+插件
+定时任务
+自动化任务
+网页版
+SDLC
+更多
+工作区
+soak-force-team
+新会话
+开团：请直接调用 grok_workflow
+1分钟
+开团：用 grok_workflow 工具统计
+4分钟
+开团：用 grok_workflow 工具统计
+5分钟
+开团：先读一下 README.md 第一
+7分钟
+开团：1+1 等于几 【强制：这
+9分钟
+待办
+设置
+探索未至之境
+预览版
+soak-force-team
+标准模式
+main
+新建工作树
+描述你想要构建的内容, / 调用指令, @ 文件或对话
+工作区内修改
+自动接着跑
+关
+自迭代
+关
+工作流开关
+开
