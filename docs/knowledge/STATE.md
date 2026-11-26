@@ -3715,3 +3715,25 @@ https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.41 ——`isDra
 （本会话 `workspace-write`、`~/.dsh` 在工作区外，写探测只会得到只读）——**没写、没重载、没重启** 3080 上的实例，live 装哪一版本轮 `NOT_RUN`；
 真机 soak 本轮也没跑（改动的真机读数由 `.rsi/evidence/steering-reconnect-2026-11-26/` 覆盖）。证据
 `.rsi/evidence/release-0.13.41-2026-11-26/`（`gate-a64a50a.out` 23312 字节、`sha256 9ad02f92…420da6`）。）
+
+Last updated: 2026-11-26 10:20 +08:00（**强制团队路由：命中就注入硬指令，同一回合再兜一次闸（`CONFIRMED`）** —
+分支 **`feat/force-team-routing`**，从 `e772cd6` 干净长出：`2f56f8b`（`0412a23` 的复长，`src/force-team.ts` 等六份源码 +
+它的 spec + 几份既有 spec 的计数 + README 键表 + `docs/ARCHITECTURE.md` / `docs/LOCAL-TESTING.md`）+
+构建提交 **`e90ba2f`**（`lib/force-team.*` 新增 21096 字节`sha256 23a4ab3e…040b`，`config` / `intake` / `index` /
+`settings` / `types` 重编译；**`lib/client.js` 与基线逐字相同** `20c04ff6…73c8`，浏览器包不在这一半里）。
+行为：中文 `开团` / `组队` / `分工`（子串）或英文 `form a team` / `split the work` / `delegate`（整词，
+`delegated` 不命中）命中且 grok 为开时，往该回合用户文本尾部追加一段固定硬指令（改写原文、不写会话事件、不进 UI）；
+同一回合第二个及以后的 `agent/pre-step` 上若本回合没有任何 `tool-workflow/*` 事件，再按 intake 的四行双语形状
+**拒一次**（每回合最多一次、不循环、跨回合标记丢弃）。开关 `forceTeamRouting` 默认 `true`，`/grok off` 时两半都关，
+子代理会话一律不碰。**硬事实：仓库里没有「回合结束」hook**（`agent/pre-step` 是唯一 waterfall，`turn/end` 不可应答），
+所以**模型一步答完的回合没有第二次门机会**——那一轮只剩注入这一根杠杆；这条决定了本功能的强度上限（`D-167`）。
+**门禁（本分支自己跑的，尖端 `e90ba2f`）**：`tsc -p tsconfig.json --noEmit` `EXIT=0`、`oxlint src test`
+`15 warnings / 0 errors`（186 文件）、**整仓 `npx vitest run` = `104 files / 1976 passed`（`EXIT=0`，92.69 s）**；
+`npm run build` 之后 `git status --short` 空。基线 `e772cd6` 是 `103 files / 1948 passed`，**+1 文件 / +28 条**
+正好是 `test/force-team.spec.ts`。**`verify:lib` 在本沙箱 `BLOCKED`**（`Cannot find module
+'/tmp/verify-lib-*/node_modules/typescript/bin/tsc'`，沙箱装不上依赖），`npm run ci` 整份 `NOT_RUN`（`AGENTS.md` §12），
+**真机 soak `NOT_RUN`**——「命中→注入→兜底拒一次」这条链没有在真机上单独验过，不冒充。
+**本分支不含进度页那一半**：泳道矩阵、重试点列 / 角标 / 重看线、`D-166` 与 `DESIGN` §23、以及那批浏览器 spec
+都在另一条分支上（同一起点 `e772cd6` 长出）。**红线**：`~/.dsh` 与 `~/.dsh/profiles` mtime 全程未变、3080 前后 401、
+未 push / 未打 tag / 未 bump / 未 publish、未合 `main`、没删 `backup/*`。证据：本轮只做了门禁，没有新的真机目录；
+`test/force-team.spec.ts` 就是这一半的可执行契约。）
