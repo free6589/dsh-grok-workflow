@@ -210,8 +210,8 @@ window.__ModuleLoader__.load({
      * by a later round and intentionally static here so the page never phones
      * home on its own. Both must stay plain `X.Y.Z` strings (see `isVersion`).
      */
-    const PLUGIN_VERSION = '0.13.56'
-    const UPDATE_LATEST = '0.13.56'
+    const PLUGIN_VERSION = '0.13.57'
+    const UPDATE_LATEST = '0.13.57'
     const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
     /**
      * Whether the shipped version is the newest known release.
@@ -379,7 +379,8 @@ window.__ModuleLoader__.load({
       // The task panel: the one sentence under the title, the stuck line, the three duration
       // shapes, the two labels the graph itself carries (its reader name, and the name of the
       // control that opens a node's wires), and the sheet a narrow screen draws those calls in.
-      'progress.panel.step': 'Step {at} of {total}',
+      'progress.panel.step': 'Step {at} of {total} ({total} levels)',
+      'progress.panel.tasks': '{count} tasks in the figure',
       'progress.panel.eta': 'about {time} left',
       'progress.panel.etaBasis': 'from the {n} finished levels actually measured',
       'progress.panel.stuck.failed': 'Stuck at {at}: attempt {n} of {role} did not pass',
@@ -390,6 +391,12 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h}h {m}m',
       'progress.panel.trace': 'Trace its wires',
       'progress.panel.graph': 'Task graph',
+      // The standing legend once a node is opened: what a lit wire, a dimmed wire,
+      // the six dots and the five dots each say.
+      'progress.panel.legend.traced': 'Lit wire: visited',
+      'progress.panel.legend.untraced': 'Dimmed wire: unvisited',
+      'progress.panel.legend.rings': 'Six dots: six stages',
+      'progress.panel.legend.checks': 'Five dots: five checks',
       // What the two rows of lights on a card are called, when a card names them at all.
       'progress.panel.rings': 'Six stages',
       'progress.panel.checks': 'Five checks',
@@ -647,7 +654,8 @@ window.__ModuleLoader__.load({
       'progress.verify.ledger': '对账',
       // 任务面板：标题下那一句、卡住那一句、三种时长写法、图自己的读屏名与节点控件的名字，
       // 以及窄屏把调用摊开时那张抽屉的两个词。
-      'progress.panel.step': '第 {at} 步，共 {total} 步',
+      'progress.panel.step': '第 {at} 步，共 {total} 步（{total} 层流程）',
+      'progress.panel.tasks': '图上 {count} 个任务',
       'progress.panel.eta': '还剩约 {time}',
       'progress.panel.etaBasis': '按 {n} 个已完成层的实测耗时推算',
       'progress.panel.stuck.failed': '卡在 {at}：{role} 第 {n} 遍没过',
@@ -658,6 +666,11 @@ window.__ModuleLoader__.load({
       'progress.panel.durationHour': '{h} 小时 {m} 分',
       'progress.panel.trace': '看线',
       'progress.panel.graph': '任务图',
+      // 点开节点后常驻的图例：亮线、暗线、六点、五点各说什么。
+      'progress.panel.legend.traced': '亮线：走过的线',
+      'progress.panel.legend.untraced': '暗线：没走的线',
+      'progress.panel.legend.rings': '六点：六环，走完六个阶段',
+      'progress.panel.legend.checks': '五点：五验，通过五道验收',
       // 卡上两排灯各自叫什么（卡自己不点名，只有读屏与悬停用得上）。
       'progress.panel.rings': '六环',
       'progress.panel.checks': '五验',
@@ -2699,9 +2712,14 @@ window.__ModuleLoader__.load({
     const PROGRESS_TARGET = 'grok-progress'
     /** Node kind contributed by this bundle; namespaced for the same reason. */
     const PROGRESS_KIND = 'grok-progress-run'
-    /** View tab id, ordered after the stock chat (0) and trajectory (10). */
+    /** View tab id, second on the strip so the 390 px budget keeps it visible. */
     const PROGRESS_VIEW_ID = 'grok-progress'
-    const PROGRESS_VIEW_ORDER = 20
+    // Chat is order 0 and the trajectory view order 10; the host folds the
+    // strip by width (visibleViewLimit = max(1, floor((rowWidth - 48) / 120))),
+    // so 390 keeps two entries and the third rank folds into the overflow menu.
+    // Order 5 puts this tab between the two stock views: one click at 390,
+    // the default (null → chat) and every other rank untouched.
+    const PROGRESS_VIEW_ORDER = 5
     /**
      * The eight progress and Guardian lifecycle events the tab folds; all others are ignored.
      *
@@ -4425,10 +4443,11 @@ window.__ModuleLoader__.load({
         nodes,
         edges,
         checks,
-        headline: { at, total, remaining, ...eta === undefined ? {} : { eta } },
+        headline: { at, total, remaining, taskCount: tasks.length, ...eta === undefined ? {} : { eta } },
         at,
         total,
         remaining,
+        taskCount: tasks.length,
         // Carried through: the opened call list marks the row the gate shipped, and it has to
         // mark the row the run named rather than a second guess at it.
         ...shipped === undefined ? {} : { final: { draft: run.summaryFinalDraft, seq: shipped.seq } },
@@ -5127,6 +5146,16 @@ window.__ModuleLoader__.load({
       '.gw-progress-wires > path[data-trace="active"] { stroke: var(--dsw-alias-state-business-primary); stroke-width: 2; }',
       '.gw-progress-wires > path[data-trace="dim"] { opacity: 0.3; }',
       '.gw-progress-pnode[data-trace="active"] .gw-progress-pnode-body { border-color: var(--dsw-alias-state-business-primary); }',
+      // ── the trace legend: four standing words, once a node is opened ─────────────
+      // Four short sentences under the figure, only while a trace is lit: what a lit wire,
+      // a dimmed wire, the six dots and the five dots each say. Plain text in the page flow,
+      // so it wraps on a phone and never covers a card.
+      '.gw-progress-legend { box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 4px 0; padding: 0; list-style: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); }',
+      '.gw-progress-legend-item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }',
+      '.gw-progress-legend-wire { display: inline-block; width: 18px; height: 2px; border-radius: 1px; background: var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-legend-wire[data-trace="active"] { background: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-legend-wire[data-trace="dim"] { opacity: 0.4; }',
+      '.gw-progress-legend-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }',
       // ── one call line: clock, gate and word ──────────────────────────────────────
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       // A list hangs under one card, so a row is only ever as wide as that card — 110 to 240
@@ -5718,6 +5747,29 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The standing legend of a lit trace: four short sentences under the figure.
+     *
+     * Only while a node is opened (traced !== undefined): a lit wire is a wire the reader's
+     * own click lit, a dimmed wire is one it did not touch, the six dots are a task card's
+     * six stages and the five dots are the run's five checks. Plain text in the page flow,
+     * so a phone wraps it instead of covering a card.
+     * @param t - translator.
+     * @returns the legend element.
+     */
+    function ProgressPanelLegend(t) {
+      const item = (key, mark) => h('li', { key, className: 'gw-progress-legend-item' }, [mark, h('span', { key: 'word' }, t(key))])
+      return h('ul', {
+        className: 'gw-progress-legend',
+        'data-gw-progress-legend': true,
+      }, [
+        item('progress.panel.legend.traced', h('span', { key: 'mark', className: 'gw-progress-legend-wire', 'data-trace': 'active', 'aria-hidden': 'true' })),
+        item('progress.panel.legend.untraced', h('span', { key: 'mark', className: 'gw-progress-legend-wire', 'data-trace': 'dim', 'aria-hidden': 'true' })),
+        item('progress.panel.legend.rings', h('span', { key: 'mark', className: 'gw-progress-legend-dot', 'aria-hidden': 'true' })),
+        item('progress.panel.legend.checks', h('span', { key: 'mark', className: 'gw-progress-legend-dot', 'aria-hidden': 'true' })),
+      ])
+    }
+
+    /**
      * The graph itself: the wire layer, and the nodes it is drawn behind.
      *
      * The picture is laid out from the mermaid text the graph carries, so what a reader sees
@@ -5863,12 +5915,17 @@ window.__ModuleLoader__.load({
     }
 
 
-    /** The one sentence under the title: the step the run is on, and the remainder when measured. */
+    /** The step sentence under the title: the step the run is on, and the remainder when measured. */
     function progressPanelHeadline(graph, t) {
       const step = t('progress.panel.step', { at: graph.headline.at, total: graph.headline.total })
       const eta = graph.headline.eta
       if (eta === undefined) return step
       return `${step} · ${t('progress.panel.eta', { time: progressPanelDuration(eta.ms, t) })}`
+    }
+
+    /** The task sentence under the step sentence: how many task cards the figure draws, apart from the steps. */
+    function progressPanelTaskLine(graph, t) {
+      return t('progress.panel.tasks', { count: graph.headline.taskCount })
     }
 
     /**
@@ -6075,7 +6132,11 @@ window.__ModuleLoader__.load({
           className: 'gw-progress-line',
           'data-gw-progress-line': true,
           title: progressPanelEtaTitle(graph, t),
-        }, progressPanelHeadline(graph, t)))
+        }, progressPanelHeadline(graph, t)),
+        h('p', {
+          className: 'gw-progress-count',
+          'data-gw-progress-count': true,
+        }, progressPanelTaskLine(graph, t)))
       const stuck = graph === undefined ? undefined : graph.stuck
       return h('section', {
         className: 'gw-progress',
@@ -6089,6 +6150,10 @@ window.__ModuleLoader__.load({
         : [
           header,
           ProgressPanelGraph(graph, layout, graphRef, panelProps),
+          // The trace legend stands under the figure, only while a trace is lit: four
+          // standing words that say what a lit wire, a dimmed wire, the six dots and the
+          // five dots each mean. Closed, the page says nothing about a reading nobody made.
+          panelProps.traced === undefined ? null : ProgressPanelLegend(t),
           // The opened calls come out of the figure and stand here, in the
           // panel's own column: after the figure, so they can only push the page down — never
           // across a card, and never over the dock's button, which follows them.

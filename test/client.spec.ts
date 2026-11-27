@@ -1919,19 +1919,20 @@ describe('client progress tab: registration', () => {
     }
   }
 
-  it('registers a namespaced view entry after chat and trajectory, without a priority', () => {
+  it('registers a namespaced view entry between chat and trajectory, without a priority', () => {
     expect(progress.viewId).toBe('grok-progress')
     expect(progress.target).toBe('grok-progress')
     expect(progress.kind.startsWith('grok-progress')).toBe(true)
-    // The stock chat is order 0 and the trajectory view order 10, so 20 is "third".
-    expect(progress.viewOrder).toBe(20)
+    // The stock chat is order 0 and the trajectory view order 10: second place keeps
+    // the entry on the host's two-slot 390 strip, where the third rank folds away.
+    expect(progress.viewOrder).toBe(5)
 
     const { conversation } = fakeConversation()
     const mounted = mountProgressOn(conversation, fakeSessions())
     const entry = mounted.live()[0]!
     expect(entry.options['name']).toBe('conversation.view')
     expect(entry.options['id']).toBe('grok-progress')
-    expect(entry.options['order']).toBe(20)
+    expect(entry.options['order']).toBe(5)
     // A list slot orders by `order`; `priority` belongs to keyed replacement and must
     // not appear here (it would say "shadow someone" where nothing is shadowed).
     expect('priority' in entry.options).toBe(false)
@@ -2299,11 +2300,16 @@ describe('client progress tab: the flowchart (three screens)', () => {
       'progress.panel.eta',
       'progress.panel.etaBasis',
       'progress.panel.graph',
+      'progress.panel.legend.checks',
+      'progress.panel.legend.rings',
+      'progress.panel.legend.traced',
+      'progress.panel.legend.untraced',
       'progress.panel.rings',
       'progress.panel.step',
       'progress.panel.stuck.blocked',
       'progress.panel.stuck.failed',
       'progress.panel.stuck.rejected',
+      'progress.panel.tasks',
       'progress.panel.trace',
     ])
     for (const key of Object.keys(zh).filter((entry) => entry.startsWith('progress.panel.'))) {
@@ -2384,7 +2390,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(pageTexts(page)).toEqual([
       '任务团队 · 3 个任务',
       '等你点头',
-      '第 1 步，共 7 步',
+      '第 1 步，共 7 步（7 层流程）',
+      '图上 0 个任务',
       // the seven levels are drawn before anything was recorded: the four places the run has
       // not reached are dark, and the fork is still the picture
       '起点',
@@ -2416,7 +2423,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(texts(hookOf(page, 'data-gw-progress-chip'))).toEqual(['进行中'])
     expect(hookOf(page, 'data-gw-progress-chip').props['data-state']).toBe('running')
     // The step sentence replaces the count line, and the measured remainder rides behind it.
-    expect(texts(hookOf(page, 'data-gw-progress-line'))).toEqual(['第 4 步，共 7 步 · 还剩约 1 分 0 秒'])
+    expect(texts(hookOf(page, 'data-gw-progress-line'))).toEqual(['第 4 步，共 7 步（7 层流程） · 还剩约 1 分 0 秒'])
+    expect(texts(hookOf(page, 'data-gw-progress-count'))).toEqual(['图上 3 个任务'])
 
     // Seven levels, left to right: the plan, one card per plan task, one branch per recorded
     // call, then the summary, the acceptance and the end.
@@ -2492,7 +2500,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(pageTexts(page)).toEqual([
       '任务团队 · 3 个任务',
       '已完成',
-      '第 7 步，共 7 步',
+      '第 7 步，共 7 步（7 层流程）',
+      '图上 1 个任务',
       '起点',
       '规划',
       '任务 1 · 修复登录',
@@ -2516,7 +2525,8 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(badgeOf(pageOf(running.run), 't2_s3')).toBe('')
     // No finished step was measured here — the one that finished is amber — so the page
     // prints the step and no estimate at all (`progress-panel-model` owns the measured case).
-    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-line'))).toEqual(['第 4 步，共 7 步'])
+    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-line'))).toEqual(['第 4 步，共 7 步（7 层流程）'])
+    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-count'))).toEqual(['图上 3 个任务'])
     expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-stuck')).join(' ')).toBe('卡在 4：执行 第 1 遍没过')
 
     // The same stream once the run ends: no retry is in flight, so nothing claims to be
@@ -2644,7 +2654,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
     const page = view.run()
     expect(nodesOf(page).map((node) => node.props['data-state']))
       .toEqual(['done', 'done', 'done', 'done', 'done', 'failed', 'done', 'done'])
-    expect(texts(hookOf(page, 'data-gw-progress-line')).join(' ')).toBe('第 5 步，共 7 步 · 还剩约 1 分 20 秒')
+    expect(texts(hookOf(page, 'data-gw-progress-line')).join(' ')).toBe('第 5 步，共 7 步（7 层流程） · 还剩约 1 分 20 秒')
     // The card has no calls, so the verdict is the only thing its control opens.
     const body = bodyOf(page, 'sum')
     expect(body.type, 'a verdict is something to open, even with no call').toBe('button')
@@ -2986,7 +2996,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
         [3, '检查', '检查', 'completed'],
         [4, '复核', '复核', undefined],
       ], { spanMs: 20_000 })
-      expect(texts(hookOf(pageOf(open.run), 'data-gw-progress-line')).join(' ')).toBe('第 4 步，共 7 步 · 还剩约 1 分 0 秒')
+      expect(texts(hookOf(pageOf(open.run), 'data-gw-progress-line')).join(' ')).toBe('第 4 步，共 7 步（7 层流程） · 还剩约 1 分 0 秒')
     })
 
     it('keeps the planner and the synthesizer as legs of their own, never as steps', () => {

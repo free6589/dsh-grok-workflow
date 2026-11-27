@@ -504,6 +504,31 @@ export interface ProgressFlowRejected {
     /** The gate's own words, verbatim. */
     reason: string;
 }
+/**
+ * One plan task's calls inside one work leg: the calls a single step of the plan walked.
+ *
+ * A work leg (`execute` / `check` / `review`) is one *visit*, however many plan tasks it
+ * served, so its rows are the calls of every task that step touched. The sub-nodes are that
+ * same set split by the task number the row's phase carries (`任务 2 · 写文档` → 2) — not a
+ * second fold, and not a second set of rows: each row sits in exactly one place, either in a
+ * task's sub-node or, when its phase names no task, on the leg itself.
+ *
+ * They are not steps. `total`, `at` and `remaining` count legs only, and the leg's own state
+ * is read off all of its rows before the split, so hanging tasks under a step never changes
+ * where the reader is or what colour the step is.
+ */
+export interface ProgressFlowSubNode {
+    /** Stable identity: `<parent key>:t<n>`. */
+    key: string;
+    /** Plan-task number from the row's phase, ≥ 1; strictly ascending inside one `subs`. */
+    taskNumber: number;
+    /** The task's phase on this leg, verbatim, off its earliest call; never truncated. */
+    title: string;
+    /** `nodeState` over this task's own rows — the same states, and colours, as the leg's. */
+    state: ProgressState;
+    /** This task's calls on this leg, in `seq` order. */
+    members: ProgressMemberFact[];
+}
 /** One node of the flow: one leg of the run, with the calls that spoke for it. */
 export interface ProgressFlowNode {
     /** Stable identity: `flow:start` / `flow:end` / `flow:<position>:<kind>:<ordinal>`. */
@@ -513,8 +538,23 @@ export interface ProgressFlowNode {
     ordinal: number;
     /** Aggregate state (see {@link nodeState}); the start is always `done`, the end follows the run. */
     state: ProgressState;
-    /** The calls this node speaks for, in `seq` order; both ends carry none of their own. */
+    /**
+     * The calls this node speaks for, in `seq` order; both ends carry none of their own.
+     *
+     * On a work leg these are the rows whose phase named no plan task (see
+     * {@link ProgressFlowNode.subs}); every other row of the leg sits in its task's sub-node.
+     * The two together are exactly the rows the leg held, each once.
+     */
     members: ProgressMemberFact[];
+    /**
+     * The plan tasks this leg served, one sub-node each, in task-number order.
+     *
+     * Only a work leg (`execute` / `check` / `review`) can carry them, and only when at least
+     * one of its rows named a task: a leg whose rows named none keeps §21's shape exactly, so
+     * the field is *absent* rather than an empty list. Neither end, the plan or the summary
+     * ever carries it — those legs are about one role, not about a plan task's calls.
+     */
+    subs?: ProgressFlowSubNode[];
     /**
      * Set on the summary leg when every draft was rejected — nothing shipped.
      *
@@ -575,9 +615,19 @@ export declare function storyRoleOf(member: ProgressMemberFact): string;
  *    step has opened yet — because a declared call is a fact, not a gap;
  * 4. the guardian call is not a leg: its own monitor speaks for it.
  *
+ * A work leg (`execute` / `check` / `review`) then splits its own rows by the plan task
+ * their **phase** names (`任务 2 · 写文档` → 2), one sub-node per task, in number order: the
+ * step is one visit and the tasks are what it worked on. The split moves no row out of the
+ * step — the rows left on it are the ones whose phase names no task, and the step keeps the
+ * state it read off all of them before the split (see {@link ProgressFlowNode.subs}). No
+ * other leg splits: the plan and the summary are about one role, not about a plan task's
+ * calls, and both ends are structure.
+ *
  * The current node (`at`) is the one a reader is waiting on: the node holding the earliest
  * unsettled call, else the end of a run that is still open, else the first step that is
- * failed or blocked, else the end. Before the run declares any step it is the start.
+ * failed or blocked, else the end. Before the run declares any step it is the start. A call
+ * that moved into a sub-node is still that step's call, so the reader's place does not slide
+ * off it; the sub-nodes themselves are never a place (they are not steps).
  *
  * The summary is the one leg a run can end without shipping anything: `summary-final` names
  * the draft that shipped, and `summary-rejected` says the gate turned every draft back. Only

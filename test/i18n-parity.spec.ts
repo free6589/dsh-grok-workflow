@@ -109,7 +109,8 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   // the three durations that spell the estimate, the trace's one word, the figure's
   // reader label, and the two words of the sheet a narrow screen opens a list in. The first
   // eleven replace the count line and the flow's label, which are gone.
-  ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
+  ['progress.panel.step', '第 {at} 步，共 {total} 步（{total} 层流程）', 'Step {at} of {total} ({total} levels)'],
+  ['progress.panel.tasks', '图上 {count} 个任务', '{count} tasks in the figure'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
   ['progress.panel.etaBasis', '按 {n} 个已完成层的实测耗时推算', 'from the {n} finished levels actually measured'],
   ['progress.panel.stuck.failed', '卡在 {at}：{role} 第 {n} 遍没过', 'Stuck at {at}: attempt {n} of {role} did not pass'],
@@ -120,6 +121,11 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.panel.durationHour', '{h} 小时 {m} 分', '{h}h {m}m'],
   ['progress.panel.trace', '看线', 'Trace its wires'],
   ['progress.panel.graph', '任务图', 'Task graph'],
+  // The trace legend (P2③): four standing words under the figure once a node is opened.
+  ['progress.panel.legend.traced', '亮线：走过的线', 'Lit wire: visited'],
+  ['progress.panel.legend.untraced', '暗线：没走的线', 'Dimmed wire: unvisited'],
+  ['progress.panel.legend.rings', '六点：六环，走完六个阶段', 'Six dots: six stages'],
+  ['progress.panel.legend.checks', '五点：五验，通过五道验收', 'Five dots: five checks'],
   // The sheet a narrow screen draws an opened list in: what it holds, and the one control
   // that puts it away. Wide pages print neither word.
   ['progress.panel.calls', '调用', 'Calls'],
