@@ -1922,6 +1922,13 @@ describe('the trace legend: five standing words, in both languages', () => {
     expect(en('progress.panel.legend.pending')).toBe('Dim means not run yet, not failed')
   })
 
+  it('gives the dimmed legend dot a fallback, so a dead idle token still draws a ring', () => {
+    const rule = ruleWith('.gw-progress-legend-dot[data-state="pending"]') ?? ''
+    expect(rule).toContain('--dsw-alias-state-idle-primary')
+    expect(rule).toContain('--dsw-alias-label-primary')
+    expect(rule).toContain('Canvas')
+  })
+
   it('prints the legend once a node is opened, and only then', () => {
     const closed = pageOf(runningRun())
     expect(hooksOf(closed, 'data-gw-progress-legend')).toHaveLength(0)

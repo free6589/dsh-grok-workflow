@@ -5160,7 +5160,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-legend-wire[data-trace="active"] { background: var(--dsw-alias-state-business-primary); }',
       '.gw-progress-legend-wire[data-trace="dim"] { opacity: 0.4; }',
       '.gw-progress-legend-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }',
-      '.gw-progress-legend-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }',
+      '.gw-progress-legend-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary, var(--dsw-alias-label-primary, Canvas)); }',
       // ── one call line: clock, gate and word ──────────────────────────────────────
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       // A list hangs under one card, so a row is only ever as wide as that card — 110 to 240
