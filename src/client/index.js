@@ -210,8 +210,8 @@ window.__ModuleLoader__.load({
      * by a later round and intentionally static here so the page never phones
      * home on its own. Both must stay plain `X.Y.Z` strings (see `isVersion`).
      */
-    const PLUGIN_VERSION = '0.13.57'
-    const UPDATE_LATEST = '0.13.57'
+    const PLUGIN_VERSION = '0.13.58'
+    const UPDATE_LATEST = '0.13.58'
     const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
     /**
      * Whether the shipped version is the newest known release.
@@ -390,7 +390,8 @@ window.__ModuleLoader__.load({
       'progress.panel.durationMin': '{m}m {s}s',
       'progress.panel.durationHour': '{h}h {m}m',
       'progress.panel.trace': 'Trace its wires',
-      'progress.panel.graph': 'Task graph',
+      'progress.panel.graph': 'Task graph of {run}',
+      'progress.panel.list': 'Calls of {node}',
       // The standing legend once a node is opened: what a lit wire, a dimmed wire,
       // the six dots and the five dots each say.
       'progress.panel.legend.traced': 'Lit wire: visited',
@@ -665,7 +666,8 @@ window.__ModuleLoader__.load({
       'progress.panel.durationMin': '{m} 分 {s} 秒',
       'progress.panel.durationHour': '{h} 小时 {m} 分',
       'progress.panel.trace': '看线',
-      'progress.panel.graph': '任务图',
+      'progress.panel.graph': '{run} 的任务图',
+      'progress.panel.list': '{node} 的调用',
       // 点开节点后常驻的图例：亮线、暗线、六点、五点各说什么。
       'progress.panel.legend.traced': '亮线：走过的线',
       'progress.panel.legend.untraced': '暗线：没走的线',
@@ -5540,6 +5542,7 @@ window.__ModuleLoader__.load({
         className: 'gw-progress-node-calls',
         'data-gw-progress-node-calls': node.id,
         id: progressPanelCallsId(node.id),
+        'aria-label': props.t('progress.panel.list', { node: node.label }),
       }, [...rows, ...verdict])
     }
 
@@ -5568,9 +5571,12 @@ window.__ModuleLoader__.load({
      * @returns the sheet element.
      */
     function ProgressPanelSheet(nodes, props, sheetRef) {
+      const names = nodes.map((node) => node.label).filter((label) => label !== '').join('、')
       return h('div', {
         className: 'gw-progress-sheet',
         'data-gw-progress-sheet': true,
+        role: 'region',
+        'aria-label': props.t('progress.panel.calls') + (names === '' ? '' : '：' + names),
         ref: sheetRef,
       },
       h('div', { key: 'head', className: 'gw-progress-sheet-head' },
@@ -5792,7 +5798,7 @@ window.__ModuleLoader__.load({
      * @param props - translator, the open and trace state, the handlers and the row props.
      * @returns the graph element.
      */
-    function ProgressPanelGraph(graph, layout, graphRef, props) {
+    function ProgressPanelGraph(graph, layout, graphRef, props, runName) {
       // The picture is laid out from the text, so a parsed id is translated back to the
       // model's own before anything is looked up: the DOM then agrees with the model.
       const boxes = new Map(layout.nodes.map((box) => [panelModelIdFor(box.id), box]))
@@ -5814,7 +5820,7 @@ window.__ModuleLoader__.load({
         className: 'gw-progress-graph',
         'data-gw-progress-graph': true,
         'data-gw-progress-source': graph.mermaid,
-        'aria-label': props.t('progress.panel.graph'),
+        'aria-label': props.t('progress.panel.graph', { run: runName }),
         role: 'group',
         ref: graphRef,
         style: { width: `${layout.width}px`, height: `${layout.height}px` },
@@ -6118,7 +6124,13 @@ window.__ModuleLoader__.load({
             if (fillDraft() === true) setFilled(true)
           },
         }, t('progress.dock.start'))
-      const header = graph === undefined ? null : h('header', { className: 'gw-progress-bar', 'data-gw-progress-bar': true },
+      const header = graph === undefined ? null : h('header', {
+        className: 'gw-progress-bar',
+        'data-gw-progress-bar': true,
+        // The header is the page's one labelled place: a reader landing here hears whose
+        // run this is before the step sentence, the figure and the stuck line.
+        'aria-label': run.name,
+      },
         h('span', { className: 'gw-progress-run', 'data-gw-progress-run': true, title: run.name }, run.name),
         h('span', {
           className: 'gw-progress-chip',
@@ -6149,7 +6161,7 @@ window.__ModuleLoader__.load({
         ? h('div', { className: 'gw-progress-empty', 'data-progress-empty': true }, t('progress.empty.title'))
         : [
           header,
-          ProgressPanelGraph(graph, layout, graphRef, panelProps),
+          ProgressPanelGraph(graph, layout, graphRef, panelProps, run.name),
           // The trace legend stands under the figure, only while a trace is lit: four
           // standing words that say what a lit wire, a dimmed wire, the six dots and the
           // five dots each mean. Closed, the page says nothing about a reading nobody made.
@@ -6162,7 +6174,9 @@ window.__ModuleLoader__.load({
           // would say "there is something here" about nothing.
           stuck === undefined
             ? null
-            : h('p', { className: 'gw-progress-stuck', 'data-gw-progress-stuck': true, role: 'status' },
+            // One sentence, read whole: the live region is atomic so a reader hears the held
+            // step and the verdict in one pass, never a fragment of a sentence.
+            : h('p', { className: 'gw-progress-stuck', 'data-gw-progress-stuck': true, role: 'status', 'aria-atomic': 'true' },
               progressPanelStuckText(stuck, t)),
           ProgressGuardianPanel(run.guardian, t),
           h('footer', { className: 'gw-progress-foot' },

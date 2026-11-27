@@ -1,0 +1,10 @@
+{
+  "firefox": {
+    "console": [],
+    "page": []
+  },
+  "chromium": {
+    "console": [],
+    "page": []
+  }
+}

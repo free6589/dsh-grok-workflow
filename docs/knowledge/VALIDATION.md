@@ -1,3 +1,15 @@
+## fix/screen-reader-walk 读屏走读（分支 `fix/screen-reader-walk`，基线 `8f02c32`，未提交，`CONFIRMED`）
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| typecheck | `npx tsc -p tsconfig.json --noEmit`（`TMPDIR=/run/media/fish/data/dsh-tmp`，本树） | **`EXIT 0`，0 错** |
+| lint | `npx oxlint src test`（同环境） | **`17 warnings / 0 errors`**（197 files / 96 rules；基线同为 17w0e，本分支无新增） |
+| 走读钉子（红→绿） | `npx vitest run test/progress-screen-walk.spec.ts`（同环境） | 红：`5 failed`（`header aria-label` / 图名含运行名 / sheet region / list 名 / stuck atomic 缺失，基线树实测）；绿：补 aria 后 **`5 passed`** |
+| 相邻回归 | `npx vitest run test/progress-screen-walk.spec.ts test/progress-panel.spec.ts test/progress-tab.spec.ts test/i18n-parity.spec.ts test/client.spec.ts`（同环境） | **`5 files / 301 passed`**（含 `lib/client.js` 逐字节比对；`lib/` 已重建） |
+| 走读记录 | `.rsi/evidence/screen-reader-walk/WALKTHROUGH.md` + `reading-order.json`（自动化等价：渲染树 DOM 顺序遍历，本机无 orca/nvda，走读顺序 = NVDA/VoiceOver 浏览模式顺序） | 三态（waiting/running/done/failed）地标→chip→步骤句→任务句→图→卡→卡住句各一段；点开 `plan` 后 sheet region + list 咬合 `aria-controls`；卡住句 `卡在 2：X-do 第 1 遍没过` |
+| 补 aria 清单 | `src/client/index.js`（只加属性，不改文案行为 CSS）+ 新键 `progress.panel.list`（中英）+ `progress.panel.graph` 加参 `{run}` | `header[aria-label=run.name]` / 图 `aria-label={run} 的任务图` / sheet `role=region + aria-label=调用：{卡名}` / list `aria-label={卡名} 的调用` / stuck `aria-atomic=true`；断言见 `test/progress-screen-walk.spec.ts` 5 项 |
+| 未做（`NOT_RUN`） | 真人 NVDA / VoiceOver 实测、Firefox/Safari 读屏差异、live 档案升级 | 本机无读屏软件、无 safari/webkit 引擎；`lib/` 重建仅为满足逐字节门禁，无行为改动 |
+
 ## 0.13.57 发版门禁与远端结论（2026-11-27，Wave3 合流发版，包工头经 Serena 通道实测）(`CONFIRMED`)
 
 | state | command（环境） | result |
@@ -9860,3 +9872,18 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak
 **证据：** `.rsi/evidence/stuck-hint-2026-11-26/`（`README.md` 是索引：五张图 + 四份读数 + 四份会话流 + `timeline.json` +
 `install.txt` + `redline.txt` + 三个脚本）；读数订正在 `.rsi/evidence/task-panel-2026-11-26/soak/`
 （`raw-readings-phone.json` 的 `callListFields` 与 `raw-readings-phone.CORRECTION.md`）。
+
+## Firefox tri-state evidence (fix/browser-firefox-safari, 2026-11-27) (`CONFIRMED`)
+
+Same static bundle harness, two engines, three states each. No live DSH, no network, no product change.
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| tsc | `npx tsc -p tsconfig.json --noEmit`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | `EXIT 0` |
+| oxlint | `npx oxlint src test`（同环境） | `0 errors`（`17 warnings`） |
+| guard | `npx vitest run test/browser-tri-states.spec.ts`（同环境） | `3 passed` |
+| firefox soak | `node .tmp/tri-ff/soak-tri.mjs .tmp/tri-ff/tri-harness.html .rsi/evidence/browser-firefox-safari/` | `firefox-waiting/running/done.png` + `chromium-*` 对照 + `readings.json` + `console.json` |
+
+Readings (firefox 157, same instant as each PNG): waiting `等你点头/waiting/开工` (`第 1 步，共 7 步`), running `进行中/running` (`第 4 步` + 剩余约 1 分), done `已完成/done` (`第 7 步`); console/page errors all `[]`.
+
+Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs sudo and was not run; guard asserts no forged `webkit/safari` key. Evidence: `.rsi/evidence/browser-firefox-safari/` (`README.md` is the index).

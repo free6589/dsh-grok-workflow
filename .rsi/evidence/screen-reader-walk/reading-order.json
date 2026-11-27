@@ -1,0 +1,265 @@
+{
+  "waiting": [
+    {
+      "hook": "data-gw-progress-bar",
+      "type": "header",
+      "ariaLabel": "RENAMED-wait",
+      "text": "RENAMED-wait 等你点头 第 1 步，共 7 步（7 层流程） 图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-chip",
+      "type": "span",
+      "role": "status",
+      "text": "等你点头"
+    },
+    {
+      "hook": "data-gw-progress-line",
+      "type": "p",
+      "text": "第 1 步，共 7 步（7 层流程）"
+    },
+    {
+      "hook": "data-gw-progress-count",
+      "type": "p",
+      "text": "图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-graph",
+      "type": "div",
+      "role": "group",
+      "ariaLabel": "RENAMED-wait 的任务图",
+      "text": "起点 规划 汇总 验收 终点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "起点 过了",
+      "text": "起点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "规划 等着",
+      "text": "规划"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "汇总 等着",
+      "text": "汇总"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "验收 等着",
+      "text": "验收"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "终点 等着",
+      "text": "终点"
+    }
+  ],
+  "running": [
+    {
+      "hook": "data-gw-progress-bar",
+      "type": "header",
+      "ariaLabel": "RENAMED-run",
+      "text": "RENAMED-run 进行中 第 2 步，共 7 步（7 层流程） 图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-chip",
+      "type": "span",
+      "role": "status",
+      "text": "进行中"
+    },
+    {
+      "hook": "data-gw-progress-line",
+      "type": "p",
+      "text": "第 2 步，共 7 步（7 层流程）"
+    },
+    {
+      "hook": "data-gw-progress-count",
+      "type": "p",
+      "text": "图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-graph",
+      "type": "div",
+      "role": "group",
+      "ariaLabel": "RENAMED-run 的任务图",
+      "text": "起点 规划 汇总 验收 终点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "起点 过了",
+      "text": "起点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "规划 在做",
+      "text": "规划"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "汇总 等着",
+      "text": "汇总"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "验收 等着",
+      "text": "验收"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "终点 等着",
+      "text": "终点"
+    }
+  ],
+  "done": [
+    {
+      "hook": "data-gw-progress-bar",
+      "type": "header",
+      "ariaLabel": "RENAMED-done",
+      "text": "RENAMED-done 已完成 第 7 步，共 7 步（7 层流程） 图上 1 个任务"
+    },
+    {
+      "hook": "data-gw-progress-chip",
+      "type": "span",
+      "role": "status",
+      "text": "已完成"
+    },
+    {
+      "hook": "data-gw-progress-line",
+      "type": "p",
+      "text": "第 7 步，共 7 步（7 层流程）"
+    },
+    {
+      "hook": "data-gw-progress-count",
+      "type": "p",
+      "text": "图上 1 个任务"
+    },
+    {
+      "hook": "data-gw-progress-graph",
+      "type": "div",
+      "role": "group",
+      "ariaLabel": "RENAMED-done 的任务图",
+      "text": "起点 规划 X-task 1 检查 汇总 验收 终点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "起点 过了",
+      "text": "起点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "规划 过了",
+      "text": "规划"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "X-task 1 过了",
+      "text": "X-task 1"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "检查 过了",
+      "text": "检查"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "汇总 过了",
+      "text": "汇总"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "验收 过了",
+      "text": "验收"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "终点 过了",
+      "text": "终点"
+    }
+  ],
+  "failed": [
+    {
+      "hook": "data-gw-progress-bar",
+      "type": "header",
+      "ariaLabel": "RENAMED-failed",
+      "text": "RENAMED-failed 未通过 第 2 步，共 7 步（7 层流程） 图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-chip",
+      "type": "span",
+      "role": "status",
+      "text": "未通过"
+    },
+    {
+      "hook": "data-gw-progress-line",
+      "type": "p",
+      "text": "第 2 步，共 7 步（7 层流程）"
+    },
+    {
+      "hook": "data-gw-progress-count",
+      "type": "p",
+      "text": "图上 0 个任务"
+    },
+    {
+      "hook": "data-gw-progress-graph",
+      "type": "div",
+      "role": "group",
+      "ariaLabel": "RENAMED-failed 的任务图",
+      "text": "起点 规划 汇总 验收 终点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "起点 过了",
+      "text": "起点"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "规划 没过",
+      "text": "规划"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "汇总 没过",
+      "text": "汇总"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "验收 没过",
+      "text": "验收"
+    },
+    {
+      "hook": "data-gw-progress-pnode",
+      "type": "li",
+      "ariaLabel": "终点 没过",
+      "text": "终点"
+    },
+    {
+      "hook": "data-gw-progress-stuck",
+      "type": "p",
+      "role": "status",
+      "ariaAtomic": "true",
+      "text": "卡在 2：X-do 第 1 遍没过"
+    }
+  ]
+}
