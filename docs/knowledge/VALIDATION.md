@@ -1,3 +1,12 @@
+## Round18三路收尾验证记（2026-11-28，包工头收三小工+统一写记忆，未跑门禁未推送）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git status --short --branch`+`git log --oneline -5`+`git show --stat HEAD`（去留/记忆/建议三小工一致实测） | `## main...origin/main [ahead 2]`干净、首行`03c3e1f`、2文件100行 `CONFIRMED`（tsc0/lint17w0e主代理转述未重跑） |
+| 棚/分支去留 | `git branch -a`+`git worktree list`+`git branch --merged main`（三小工一致实测） | h1无名棚清`CONFIRMED`；`fix/decisions-16`在位且已合流；但`33fe6c4`未在HEAD祖先链+棚1主+1从≠旧记1主+3从，两项差异待主代理定 |
+| stash/version | `git stash list`+`package.json version`（三小工一致实测） | 三条原位+`0.13.62` `CONFIRMED`；live`#v0.13.61`为转述未验，以主代理亲手改版为准 |
+| 日志 | 主代理亲手复验转述（本轮未重跑） | 六轮本仓零真面（N1a/N1b/N2/N3非本仓，N1/N2/N3宿主证伪，C6/C7 BLOCKED） |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码0行、`~/.dsh`0行、分支/tag/远端0变动、不推送 |
 ## Round12三路收尾验证记（2026-11-28，包工头收三小工+统一写记忆，未跑门禁）
 
 | state | command | result |
