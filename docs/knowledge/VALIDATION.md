@@ -1,3 +1,15 @@
+## 记忆小工只读复核（2026-11-28 00:55，本轮只读 `CONFIRMED` + 主代理复验转述，未跑门禁）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线身份 | `git rev-parse main` + `git rev-parse origin/main` + `git log --oneline -5` | `3f26b71` = `origin/main`，首行 `3f26b71`（`CONFIRMED`，本轮实测） |
+| 树干净 | `git status --short --branch` | 仅 `## main...origin/main`（`CONFIRMED`；pixel 误落证据目录已由主代理删除，本轮未见残留，转述） |
+| stash | `git stash list` | 三条原位（`CONFIRMED`，本轮实测：foreman-stash + 两条 entry-guard 暂存） |
+| tag 剥出 | `git rev-parse 'v0.13.62^{}'` + `git cat-file -p v0.13.62` | 剥出 = `45458f2`（`CONFIRMED`本轮实测；对象 `9a9185e9` 为主代理复验值转述） |
+| 已删三枝 | `git branch -a` 全量实读 | 无 `guardian-chip` / `status-inline` / `release/0.13.62`，已清（`CONFIRMED`本轮实测）；`backup×4` / `feat/audit-layer` / `fix/entry-guard` / `fix/carry-cjk` / `fix/resume-reuse` 均在 |
+| 五路现状 | 主代理亲手复验转述，本轮 `NOT_RUN` 未重跑 | live 升级 `BLOCKED`；contract `f975120` 须改新名后 main 重跑；pixel `HYPOTHESIS`（ol 默认样式）待合流判定；soak 真机 `BLOCKED`（`NO_ADAPTER` / `MISSING_CREDENTIAL`） |
+| 红线 | 本轮行为自查 | 仅只读 git + 三份记忆追加；未删分支、未碰 live/tag、不 force-push、不 publish、不写密钥 |
+
 ## 0.13.62 发版门禁与远端结论（2026-11-28，主代理亲手复验；`CONFIRMED`）
 
 | state | command | result |

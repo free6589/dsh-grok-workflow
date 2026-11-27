@@ -1,3 +1,10 @@
+## 2026-11-28 — 记忆小工增量行（只补三份记忆，不写产品代码；本轮只读 `CONFIRMED` + 主代理复验转述）
+
+- **From:** 记忆小工（dispatcher-wrap-06/agent-1，主检出只读） · **To:** 主代理 / 下一个接手的人
+- **本轮只读实测（`CONFIRMED`）**：`git status --short --branch` → `## main...origin/main` 干净；`git log --oneline -5` 首行 `3f26b71`；`git rev-parse main` = `git rev-parse origin/main` = `3f26b71`；`git rev-parse 'v0.13.62^{}'` = `45458f2`；`git branch -a` 无 `guardian-chip` / `status-inline` / `release/0.13.62`，有 `backup×4` + `feat/audit-layer` + `fix/entry-guard` + `fix/carry-cjk` + `fix/resume-reuse`；`git stash list` 三条原位（`foreman-stash` / `entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines`）；`git worktree list` 8 处（主检出 `3f26b71 [main]` + 7 棚：`fix-resume-reuse` / `fix-session-poison-events` / `wt-contract` / `wt-office` / `wt-pixel` / `wt-soak-gaps-062` / data 盘 `wt-cjk-strip`）。
+- **主代理亲手复验转述（本小工未重跑，不夸大）**：live 升级 `BLOCKED`（沙盒只读，live 仍 `#v0.13.61`，实例活，需主代理亲手改）；`wave-contract-freeze` 保留（棚内 `f975120` 已落盘 6 项，分支被占用删不动）；pixel 棚内 `M4+??1`（`42+/94-`，主线 5077 仍有 250px）+ soak390 `PASS`（主检出误落证据目录已由主代理删，棚内待查）；contract 落盘 `f975120`（`17/17+325/325`）但冻旧名 `tool-workflow/*`，须改新名后 main 重跑（`NOT_RUN`）；soak-gaps 走读 `5/5` + client `153/153`，真机三态 `BLOCKED`（`NO_ADAPTER` / `MISSING_CREDENTIAL`，证据在棚内）；下一波待办：live 亲手升级、contract 改名重跑、pixel 合流判定（ol 默认样式 `HYPOTHESIS`）、soak 真机 `BLOCKED` 跟进。
+- **红线**：未删分支、未碰 live/tag、不 force-push、不 publish、不写密钥、不写产品代码；`fix/entry-guard` / `fix/carry-cjk` 待 stash 确认不动。
+
 ## 2026-11-28 — 0.13.62 发版收尾（主线 `45458f2` = 远端 `origin/main`，远端双绿 + Release 已发布；只收记忆 + 同步主检出，不动其余）
 
 - **From:** 0.13.62 发版收尾（主代理亲手复验） · **To:** 下一个接手的人
