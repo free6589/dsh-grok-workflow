@@ -156,6 +156,17 @@ describe('carry-over: compiling one round', () => {
     const digest = buildCarryoverDigest(rounds, { chars: 4_000 })
     expect(digest).not.toContain('sk-abcdef0123456789abcdef')
   })
+
+  it('keeps bare deliverable file names as locators (receipt 3/3)', () => {
+    // 回执三方：三文件都在 + archive 尾行 3/3，但抓块按证据行扫不到裸文件名 → 0 命中。
+    // 修法：locators 认裸文件名（`a.ts`），与用户汇总（交付物行）同口径。
+    const text = renderReport(reportFixture({ evidence: 'verified a.ts, b.ts and c.ts' }))
+    const round = parseReportRound(text)
+    expect(round).not.toBeNull()
+    for (const file of ['a.ts', 'b.ts', 'c.ts']) {
+      expect(round!.locators.some(locator => locator.includes(file))).toBe(true)
+    }
+  })
 })
 
 describe('carry-over: graceful degradation', () => {
