@@ -5,6 +5,47 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.62] - 2026-11-27
+
+### Fixed / 修复
+
+- **Progress records travel on the plugin channel, sessions reopen / 进度记录走插件通道，会话重开不再中毒** —
+  The nine progress and Guardian facts now move as `plugin:grok-workflow/progress/*` plugin records
+  (ignorable) instead of `tool-workflow/*` session events; the harness refuses a log with an
+  unknown non-ignorable type, which poisoned two real sessions so they could not reopen.
+  Readers accept both names, so old logs still fold and new runs never re-poison.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which channel
+  a progress fact travels on.**
+  / 九条进度与 Guardian 事实改走 `plugin:grok-workflow/progress/*` 插件记录（可忽略），不再走 `tool-workflow/*`
+  会话事件；宿主拒绝含未知不可忽略类型的日志，两份真实会话因此中毒打不开。读取器同时认旧名，
+  旧日志照常折叠，新运行不再中毒。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是进度事实走哪条通道。**
+
+- **Carry-over locators keep office deliverable file names / 回执定位器保留办公交付物文件名** —
+  Locators quoted by a round's rows now also match bare deliverable file names ending in
+  `pdf`, `docx`, `xlsx` or `pptx`,
+  so a 3/3 round whose evidence row lists office deliverable file names still counts all its hits
+  at the same granularity as the deliverables line; the delivery-side machine-detail strip uses
+  the same extension table, so an office file name is never read back as prose.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which locator
+  pattern a round matches.**
+  / 每轮行内引用的定位器现在也认以 `pdf`、`docx`、`xlsx`、`pptx` 结尾的裸交付物文件名（含中文名），
+  证据行写办公交付物文件名的 3/3 回执也能按交付物行同一口径命中三处；交付侧的机器细节剥离用同一张扩展名表，
+  办公文件名不会再被读回成正文。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是每轮匹配哪一种定位器。**
+
+- **Delivery strip removes a line-head CJK bare file name / 交付剥离行首 CJK 裸文件名** —
+  The delivery-side machine-detail strip now removes a line-head bare file name containing CJK
+  characters (hiragana, katakana, CJK extensions, and hangul) even when it is not a deliverable,
+  so a `报告.ts` the run did not produce no longer reaches the human reader as prose;
+  deliverables on the keep list are still preserved, and `1.2.3` / `版本v1.2.3` still do not match.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which names
+  the strip removes.**
+  / 交付侧机器细节剥离现在连非交付物的行首 CJK 裸文件名（含平假名、片假名、汉字扩展与谚文）也剥掉，
+  本轮没产出的 `报告.ts` 不会再作为正文递给读者；keep 名单里的交付物照常保留，`1.2.3` / `版本v1.2.3`
+  依然不命中。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是剥离器删掉哪些名字。**
+
 ## [0.13.61] - 2026-11-27
 
 ### Fixed / 修复
