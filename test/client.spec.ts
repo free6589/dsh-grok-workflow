@@ -2713,10 +2713,14 @@ describe('client progress tab: the flowchart (three screens)', () => {
     expect(nodesOf(page).map((node) => node.props['data-state'])).not.toContain('failed')
   })
 
-  it('opens one node into its own calls, and closes it again', () => {
+  it('opens one node into the sheet under the figure, and closes it again', () => {
+    // WHY one sheet at both widths: the floating box a node used to draw over its own card
+    // landed on the neighbour at desktop width, so wide reuses the narrow sheet and no card
+    // draws a list of its own. The node keeps aria-expanded/aria-controls; only the box moved.
     const { run } = flowOf(legOnlyCalls)
     const view = mount(run)
     const closed = view.run()
+    expect(hooksOf(closed, 'data-gw-progress-sheet')).toHaveLength(0)
     expect(hooksOf(closed, 'data-gw-progress-node-calls')).toHaveLength(0)
     expect(hooksOf(closed, 'data-gw-progress-log-row')).toHaveLength(0)
 
@@ -2751,14 +2755,15 @@ describe('client progress tab: the flowchart (three screens)', () => {
     // A second node opens on its own, and the first one stays open.
     ;(bodyOf(opened, 'plan').props['onClick'] as () => void)()
     const both = view.run()
-    // Both are open, and they read in document order: the node earlier in the flow first,
-    // whatever order the reader clicked them in.
+    // Both are open, in the order the reader opened them: the sheet appends one group
+    // per opened node, so the groups read u1 then plan — the click order, not the flow order.
     expect(hooksOf(both, 'data-gw-progress-node-calls').map((tree) => tree.props['data-gw-progress-node-calls']))
-      .toEqual(['plan', 'u1'])
+      .toEqual(['u1', 'plan'])
 
-    // Clicking the first one again closes only that one.
+    // Clicking the first one again closes only that one, and the survivor keeps its group.
     ;(bodyOf(both, 'u1').props['onClick'] as () => void)()
     const one = view.run()
+    expect(hooksOf(one, 'data-gw-progress-sheet')).toHaveLength(1)
     expect(hooksOf(one, 'data-gw-progress-node-calls').map((tree) => tree.props['data-gw-progress-node-calls']))
       .toEqual(['plan'])
   })
