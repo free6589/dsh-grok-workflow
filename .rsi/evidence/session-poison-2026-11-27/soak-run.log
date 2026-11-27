@@ -1,0 +1,15 @@
+waiting: run-start count=1 ignorable=true
+running: agent-start count=1
+done: agent-end=1 run-end=1
+poison tool-workflow/* written: 0
+compat: tool-workflow/run-start -> plugin:grok-workflow/progress/run-start
+compat: tool-workflow/agent-start -> plugin:grok-workflow/progress/agent-start
+compat: tool-workflow/agent-end -> plugin:grok-workflow/progress/agent-end
+compat: tool-workflow/run-end -> plugin:grok-workflow/progress/run-end
+compat: tool-workflow/guardian-end -> plugin:grok-workflow/progress/guardian-end
+compat: tool-workflow/guardian-start -> plugin:grok-workflow/progress/guardian-start
+compat: tool-workflow/guardian-finding -> plugin:grok-workflow/progress/guardian-finding
+compat: tool-workflow/summary-final -> plugin:grok-workflow/progress/summary-final
+compat: tool-workflow/summary-rejected -> plugin:grok-workflow/progress/summary-rejected
+journal progress events: 4, all ignorable: true, warnings: 0
+SOAK PASS: waiting/running/done all on plugin channel, journal clean

@@ -1,0 +1,11 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-session-poison-events
+
+ ✓ test/session-poison-events.spec.ts (3 tests) 8ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  23:34:14
+   Duration  247ms (transform 87ms, setup 0ms, import 121ms, tests 8ms, environment 0ms)
+
+GUARD_EXIT:0
