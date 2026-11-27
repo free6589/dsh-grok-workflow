@@ -10028,3 +10028,16 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 门禁 | `npm run typecheck` + `npm run lint` + `npx vitest run`三件套 | tsc0 / 17w0e / 74/74 `PASS` |
 | 树 | `git status --short --branch` | 仅 `## main...origin/main` 干净 |
 | live | `grep grok-workflow ~/.dsh/profiles/web/package.json` | 仍 `#v0.13.61`，待亲手改 |
+## Round7记忆沉淀验证（2026-11-27T17:49:14Z，主代理亲手复验，`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | `git log --oneline -1` | `acf62fa docs(memory): record round6 push e365b7a` |
+| 树 | `git status --short --branch` | 仅 `## main...origin/main`，无改动、无未推送 |
+| 分支 | `git branch -a` | 已无 `pixel*`（删棚完成，分支已 `-d`，证据在主树跟踪） |
+| live | `grep -n grok-workflow ~/.dsh/profiles/web/package.json` | `13: "dsh-grok-workflow": "github:free6589/dsh-grok-workflow#v0.13.61"`；只读复核，未改、未重载、未重启 |
+| stash | `git stash list` | 三条原位：`foreman-stash` / `entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines` |
+| probe 三件套 | turn/end `NOT_FOUND`；live 注册表 `BLOCKED`；同钥 `MISMATCH` | `NO_ADAPTER` 的缺目录口径维持 `HYPOTHESIS` |
+| host 复算 | 266 / 65 / 87 | 三数均 `BLOCKED`（缺源档）；旧口径偏大（含回显 + 未去重 + 含非启动失败）`CONFIRMED`；P1 定级否 |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |
+| 未做（`NOT_RUN`） | 发版、全量 `npm run ci`、真机 soak | 本轮只沉淀记忆，没产品改动可跑；这不是绿灯 |

@@ -7008,3 +7008,11 @@ Issue #1 状态评论 issuecomment-6927842856。
 
 - **做了什么**：pixel合流 `e365b7a`（`6c02b97`+`bcd2151 --no-ff`）已推远端（`6c02b97..e365b7a`）；树干净；stash三条原位；live仍旧版待亲手改。
 - **下一步**：主代理亲手钉live到v0.13.62 → pixel删棚 → probe三件套/host复算分派。
+## 2026-11-27T17:49:14Z — Round7收尾（记忆沉淀，不发版；=2026-11-28 01:49 +08:00）
+
+- **做了什么**：四路收尾的事实落进记忆，**没发版、没改产品代码、没碰 live**。主线 `acf62fa` = `origin/main`（`git log --oneline -1` 与 `git status --short --branch` 两读，树干净）`CONFIRMED`；
+  pixel 删棚完成（`git branch -a` 已无 `pixel*`，分支已 `-d`，证据留在主树跟踪）`CONFIRMED`；
+  probe 三件套（turn/end `NOT_FOUND`、live 注册表 `BLOCKED`、同钥 `MISMATCH`）成立，`NO_ADAPTER` 的缺目录口径仍只能算 `HYPOTHESIS`；
+  host 复算 266/65/87 三数均 `BLOCKED`（缺源档），旧口径偏大（含回显 + 未去重 + 含非启动失败）`CONFIRMED`，P1 定级否；
+  live 只读复核仍 `#v0.13.61`（`~/.dsh/profiles/web/package.json:13`），实例活着，等主代理亲手改前留快照；stash 三条原位。
+- **下一步**：主代理亲手把 live 那一行钉到目标版本 → 补齐 `BLOCKED` 项缺的源档（probe 目录口径、host 三数）后再判；记忆三份本轮**只追加**，旧行一个字没改。
