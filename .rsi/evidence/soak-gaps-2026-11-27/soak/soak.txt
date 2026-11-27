@@ -1,0 +1,31 @@
+soak-gaps-2026-11-27 取证说明（失败态工作流 · 一轮真机 · 8 缺口对照）
+
+分支: fix/soak-gaps @ b04106c（只写证据目录，未动 src/lib/test/package.json）
+版本: 0.13.55（tgz sha256 ac72fa6e…；lib/client.js sha256 9546e419…）
+安装: npm pack → dsh plugin add file:tgz；版本/sha 回读一致；gw-progress-sheet-room count 2；symlink 0
+端口: 3441（live 3080 未碰，401 前后一致）；代理 18190 refuse-always（判腿 12 次 401 injected）
+模型: bifrost-responses/opencode-go/muse-spark-1.3-contributor（BIFROST_VIRTUAL_KEY=yes）
+会话: 失败轮 runId 81821772-07a6-4ac8-8a76-6fc95d7ef36d；run-end stopReason=error；25 agent（13 completed / 12 failed）
+页面: run 所在会话 titled 调用 workflow 工具；进度 tab（窄屏走 更多会话视图 overflow 菜单）
+
+读数（soak/readings.json 11 键）:
+- done-1500：chip 未通过 / stuck 卡在 3：检查 第1遍没过 / pnodes 32 / edges 54 / guardian finished
+- both-1500：三组全开 t1+t2+t3 / calls 3 / rows 24 / groups 3 / failedRows 12 / gap 474
+- sheet-390/360/421/499/720：mq720=true；sheet-721/1500：mq721=true；rows 均为 24 / groups 3
+- drag-800-600-800：stableAfterDrag true（pnodes 32 / rows 24 跨断点不变）
+- closed-390：抽屉关闭 rows 0 / 树保留 32 节点
+- PNG 10 张；console.json consoleErrors [] pageErrors []
+
+缺口对照（7 真机 + 1 逻辑块）:
+1. skip-report（跳过上报）：NOT_RUN 设备（窗口期内无跳过事件；判据走 test/soak-gaps-logic.spec.ts）
+2. stuck-4-capsules（4 胶囊）：本轮 failed；blocked/cancelled 未出（走逻辑块用例直断）
+3. retry-dashed（重试虚线）：attemptDots 0（判腿 401 直失败无重试链；虚线样式走 test 钉）
+4. multi-line drawer（多行抽屉）：both-1500 rows 24 / groups 3 / sheet 高 240（max-height:min(50vh,240px) 生效）
+5. 720/721 single-pixel：sheet-720 mq720 true vs sheet-721 mq721 true（单像素断点正确）
+6. drag-across-breakpoint（拖窗跨断点）：stableAfterDrag true
+7. double-group expand（双组摊开）：t1+t2+t3 全开 rows 24（traceActive 19 / traceDim 45）
+8. 421–499：sheet-421/499 rows 24 正常渲染（room 高 315）
+blocked 态：114 轮结论 engine 补 cancelled 后 run-end，无 sleeveless 残留行；走逻辑块用例直断，未上设备。
+
+自检: node verify-readings.mjs（见同目录）exit 0
+live 红线: ~/.dsh 与 3080(401) 取证前后一致；写探针只读；实例已停、scratch 已删（证据保留）
