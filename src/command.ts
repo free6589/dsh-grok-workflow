@@ -43,7 +43,7 @@ import { readModeRecord, setMode } from './mode.js'
 import type { ModeRecord } from './mode.js'
 import { isPromptShapedArgument, refuseDiscardedCommandPrompt } from './intake.js'
 import { readLatestCheckpointSync } from './checkpoint/wiring.js'
-import { PROGRESS_AGENT_END, PROGRESS_AGENT_START, PROGRESS_RUN_END, PROGRESS_RUN_START } from './records.js'
+import { PROGRESS_AGENT_END, PROGRESS_AGENT_START, PROGRESS_GUARDIAN_END, PROGRESS_RUN_END, PROGRESS_RUN_START, normalizeProgressRecord } from './records.js'
 
 /** Agent surface the handler needs (the live agent carries more). */
 export interface GrokCommandAgent {
@@ -107,7 +107,8 @@ export const GROK_USAGE_TEXT = 'Usage: /grok [on|off|status]. This text was not 
  * One run's recorded progress, folded from the session's own journal.
  *
  * `/grok status` may only report what the session can show: the progress rows this
- * plugin writes (`tool-workflow/*`), the dispose record, and the checkpoint file.
+ * plugin writes (`plugin:grok-workflow/progress/*`, old `tool-workflow/*` names
+ * normalized on read), the dispose record, and the checkpoint file.
  * It never guesses a state from memory, because a status line is the one place a
  * reader checks a claim they cannot otherwise see.
  */
@@ -136,9 +137,11 @@ export function readRunStatusFacts(session: Session | undefined): RunStatusFacts
   const settled = new Set<number>()
   let sawGuard = false
   for (const event of session.ownEvents()) {
-    const type = (event as { type?: unknown }).type
+    const rawType = (event as { type?: unknown }).type
     const data = (event as { data?: Record<string, unknown> }).data
-    if (typeof type !== 'string' || data === undefined || data === null) continue
+    if (typeof rawType !== 'string' || data === undefined || data === null) continue
+    // Old sessions carry the retired `tool-workflow/*` names; normalize before reading.
+    const type = normalizeProgressRecord(rawType)
     if (type === PROGRESS_RUN_START) {
       if (typeof data['runId'] === 'string') facts.runId = data['runId']
       if (typeof data['name'] === 'string') facts.name = data['name']
@@ -170,8 +173,10 @@ export function readRunStatusFacts(session: Session | undefined): RunStatusFacts
       if (typeof data['stopReason'] === 'string') facts.stopReason = data['stopReason']
       continue
     }
-    // `tool-workflow/guardian-end` is written by `src/run.ts` with these two fields.
-    if (type === 'tool-workflow/guardian-end') {
+    // The Guardian settlement is written by `src/run.ts` with these two fields
+    // (old sessions carry the retired `tool-workflow/guardian-end` name, already
+    // normalized above, so both spellings land here).
+    if (type === PROGRESS_GUARDIAN_END) {
       const findings = Number(data['findingCount'])
       const cancelled = data['cancelled'] === true
       if (Number.isFinite(findings)) {

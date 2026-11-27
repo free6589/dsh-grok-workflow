@@ -5517,3 +5517,13 @@ spine 为空，pre-fix 形状会进脊柱。
 - **Alternatives rejected:** 留空不记——后写者无从知道 D-179 是否可用。
 - **Consequences:** 下一个决策从 D-180 起顺延时，需先确认 D-179 是否已被认领。
 - **Evidence:** 本文件 `grep -n "^## D-17"`（D-178 不存在、D-179 不存在，写下时实测）。
+
+## D-180 · 进度与守望者记录改走插件自有通道，不再写 `tool-workflow/*` 会话事件（2026-11-27，`fix/session-poison-events`，未发版）
+
+- **Status:** `CONFIRMED`
+- **Date:** 2026-11-27
+- **Context:** 本机 DSH（0.2.2-rc.5）打开旧会话时，对日志里 `ignorable != true` 且类型不在已知集合的事件直接拒绝整个日志。已知集合只有 `tool-workflow/run-start`、`agent-start`、`agent-end`、`run-end` 四个；插件写的 `guardian-start/guardian-finding/guardian-end`、`summary-final/summary-rejected` 不在其中，导致两个真实会话（`session-9f1a5732…` 8 处、`session-bc80a4a8…` 1 处）打不开，连带模式服务也报错。旧日志里另有 104 + 12 条四个旧名事件（run/agent-start/agent-end/run-end），属同一通道问题，一并处理。
+- **Decision:** 九个事实改走插件自有通道 `plugin:grok-workflow/progress/*`（`appendPluginRecord`，`ignorable:true`）：run-start、agent-start、agent-end、run-end、summary-final、summary-rejected、guardian-start、guardian-finding、guardian-end。payload 形状不变，只搬通道；读侧（fold、状态查询、页面）同时认新旧两种名字，旧会话照常显示。
+- **Alternatives rejected:** 只给守望者三件套加 `ignorable` 而不动四个旧名——四个旧名虽在已知集合里，但它们是引擎的命名空间，插件借用迟早再撞；一次性全搬，以后不再借用引擎名字。改已知集合（动 harness）——越界，不动核心。
+- **Consequences:** 新跑的工作流只写新名；旧会话里的旧名由读侧兼容，不再写旧名。旧版插件读到新名会跳过那几条进度记录（读侧本来就是「不认识就跳过」），所以不承诺降级显示。
+- **Evidence:** `validateStoredEvents` 实测：修后的两个会话日志均 PASS；`tsc 0` + 相关 spec 全绿（见 VALIDATION 本轮条）。

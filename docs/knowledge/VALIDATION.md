@@ -9954,3 +9954,16 @@ Same static bundle harness, two engines, three states each. No live DSH, no netw
 Readings (firefox 157, same instant as each PNG): waiting `等你点头/waiting/开工` (`第 1 步，共 7 步`), running `进行中/running` (`第 4 步` + 剩余约 1 分), done `已完成/done` (`第 7 步`); console/page errors all `[]`.
 
 Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs sudo and was not run; guard asserts no forged `webkit/safari` key. Evidence: `.rsi/evidence/browser-firefox-safari/` (`README.md` is the index).
+
+## 进度记录改走插件通道 + 两个旧会话修复（2026-11-27，分支 `fix-session-poison-events`，未发版）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| typecheck | `npx tsc -p tsconfig.json --noEmit`（本分支 worktree） | **`EXIT 0`**，0 错 |
+| lint | `npx oxlint src test`（同环境） | **`17 warnings / 0 errors`**（与基线同数；多出的 `receiver` 未用参数已修掉） |
+| 定向 spec | `TMPDIR=$PWD/.tmp npx vitest run test/progress.spec.ts test/summary-outcome.spec.ts test/progress-tab.spec.ts test/command.spec.ts test/experience-pack.spec.ts test/client.spec.ts`（同环境） | **`6 files / 319 passed`** |
+| 相邻 spec | `TMPDIR=$PWD/.tmp npx vitest run test/records-redaction.spec.ts test/progress-hint-absent.spec.ts test/progress-panel.spec.ts test/progress-panel-model.spec.ts test/progress-connector.spec.ts test/progress-entry.spec.ts test/progress-screen-walk.spec.ts test/guardian.spec.ts test/i18n-parity.spec.ts`（同环境） | **`9 files / 155 passed`** |
+| 旧会话手术前备份 | `cp session.v4.jsonl.zstd .bak.zstd` ×2（备份已移出树外 `/tmp/session-fix-bak-offtree/`，sha256 已登记） | `session-9f1a5732…` 19MB、`session-bc80a4a8…` 89KB，原文件手术前与备份逐字节相同 |
+| 旧会话手术 | 旧九名 → 新 `plugin:grok-workflow/progress/*` 名 + 补 `ignorable:true`；其余行字节不动；seq 连续性逐个校验 | `session-9f1a5732…` 转 112 条、`session-bc80a4a8…` 转 13 条；转后 `validateStoredEvents`（harness 真校验函数）**双 PASS** |
+| 未做（`NOT_RUN`） | `npm run ci` 全量、真机隔离 soak、发版 | 块内只跑碰到的 spec（AGENTS.md §12）；全量与 soak 留给发版轮 |
+| 阻塞（`BLOCKED`） | — | 无 |

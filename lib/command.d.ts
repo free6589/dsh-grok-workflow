@@ -74,7 +74,8 @@ export declare const GROK_USAGE_TEXT = "Usage: /grok [on|off|status]. This text 
  * One run's recorded progress, folded from the session's own journal.
  *
  * `/grok status` may only report what the session can show: the progress rows this
- * plugin writes (`tool-workflow/*`), the dispose record, and the checkpoint file.
+ * plugin writes (`plugin:grok-workflow/progress/*`, old `tool-workflow/*` names
+ * normalized on read), the dispose record, and the checkpoint file.
  * It never guesses a state from memory, because a status line is the one place a
  * reader checks a claim they cannot otherwise see.
  */

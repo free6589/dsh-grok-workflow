@@ -1,10 +1,11 @@
 /**
  * The "进度" conversation tab: the pure half.
  *
- * The tab renders the four `tool-workflow/*` session events this plugin's own recorder
+ * The tab renders the nine `plugin:grok-workflow/progress/*` records this plugin's own recorder
  * writes (`src/records.ts`, `createWorkflowProgressRecorder`) as one horizontal track of
  * stage nodes, plus the two optional payloads a stream may carry:
- * `tool-workflow/stage-detail` (field values) and `tool-workflow/summary-final` (which
+ * `tool-workflow/stage-detail` (field values, read-only) and
+ * `plugin:grok-workflow/progress/summary-final` (which
  * summary draft the run actually shipped). Both only ever *add* to what a stream
  * without them renders. This module is the fold, the state precedence, the percentage and the detail
  * provenance, with no React, no DOM, no clock and no estimate, so every rule the browser
@@ -31,9 +32,18 @@
  */
 
 import { NAMING_LANGUAGES, SYNTHESIS_FINAL_MARK, synthesisDraftLabel } from './naming.js'
+import {
+  PROGRESS_AGENT_END,
+  PROGRESS_AGENT_START,
+  PROGRESS_GUARDIAN_END,
+  PROGRESS_GUARDIAN_FINDING,
+  PROGRESS_GUARDIAN_START,
+  PROGRESS_RUN_START,
+  normalizeProgressRecord,
+} from './records.js'
 
 /**
- * The eight progress and Guardian lifecycle events the tab folds — and, in the bundle, the
+ * The nine progress and Guardian lifecycle records the tab folds — and, in the bundle, the
  * whitelist the host routes the tab by.
  *
  * One name, two homes, one list: this copy is what {@link foldProgressRuns} reads, and
@@ -45,20 +55,26 @@ import { NAMING_LANGUAGES, SYNTHESIS_FINAL_MARK, synthesisDraftLabel } from './n
  * invisible on screen, so `test/progress-tab.spec.ts` compares the shipped list with this
  * one and fails on a single missing or extra entry.
  *
+ * The names moved house (from `tool-workflow/*` session events to
+ * `plugin:grok-workflow/progress/*` plugin records — same facts, same shapes, a channel
+ * the harness never rejects); the semantics did not. Old sessions still carry the old
+ * names, so {@link foldProgressRuns} folds every record through
+ * `normalizeProgressRecord` (from `src/records.ts`) before it reads anything.
+ *
  * `tool-workflow/stage-detail` is deliberately **not** here: it only ever *adds* field
  * values to a node and never decides a state, so it is not a lifecycle event and does not
  * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
  */
 export const PROGRESS_EVENT_TYPES = [
-  'tool-workflow/run-start',
-  'tool-workflow/agent-start',
-  'tool-workflow/agent-end',
-  'tool-workflow/summary-final',
-  'tool-workflow/summary-rejected',
-  'tool-workflow/guardian-start',
-  'tool-workflow/guardian-finding',
-  'tool-workflow/guardian-end',
-  'tool-workflow/run-end',
+  'plugin:grok-workflow/progress/run-start',
+  'plugin:grok-workflow/progress/agent-start',
+  'plugin:grok-workflow/progress/agent-end',
+  'plugin:grok-workflow/progress/summary-final',
+  'plugin:grok-workflow/progress/summary-rejected',
+  'plugin:grok-workflow/progress/guardian-start',
+  'plugin:grok-workflow/progress/guardian-finding',
+  'plugin:grok-workflow/progress/guardian-end',
+  'plugin:grok-workflow/progress/run-end',
 ] as const
 
 /**
@@ -82,7 +98,7 @@ export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
  * as its own fact once the gate has passed a draft, and the fold settles it onto the row
  * that landed. A stream without it renders exactly what it rendered before.
  */
-export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
+export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'plugin:grok-workflow/progress/summary-final'
 
 /**
  * The event that says the gate rejected every draft, with the last stage that failed.
@@ -93,7 +109,7 @@ export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
  * heard of this event renders a rejected run exactly as it did before — as a run with no
  * final draft — because the event only ever adds a reading of a gap it already saw.
  */
-export const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = 'tool-workflow/summary-rejected'
+export const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = 'plugin:grok-workflow/progress/summary-rejected'
 
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export const PROGRESS_VIEW_TARGET = 'grok-progress'
@@ -151,7 +167,7 @@ function canonicalDetailField(name: string): DetailFieldKey | undefined {
   return DETAIL_FIELD_BY_TOKEN[name.toLowerCase().replace(/[^a-z0-9]/g, '')]
 }
 
-/** One recorded `tool-workflow/*` event, in the shape a session reader gets it back. */
+/** One recorded `plugin:grok-workflow/progress/*` record, in the shape a session reader gets it back. */
 export interface ProgressEventRecord {
   readonly type: string
   /** Session sequence number of the enclosing event, when known. */
@@ -493,11 +509,12 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
   const drafts = new Map<string, Draft>()
   let index = 0
   /** Announce every run first: the fold is order-insensitive, so an `agent-start` that
-   * arrives before its `run-start` still belongs to that run. */
+   * arrives before its `run-start` still belongs to that run. Old sessions carry the
+   * retired `tool-workflow/*` names, so every type is normalized before it is read. */
   for (const record of records) {
     const seq = typeof record.seq === 'number' && Number.isFinite(record.seq) ? record.seq : index
     index += 1
-    if (record.type !== 'tool-workflow/run-start') continue
+    if (normalizeProgressRecord(record.type) !== PROGRESS_RUN_START) continue
     const data = asRecord(record.data) ?? {}
     const runId = typeof data['runId'] === 'string' ? data['runId'] : undefined
     if (runId === undefined || drafts.has(runId)) continue
@@ -516,14 +533,15 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
   for (const record of records) {
     const seq = typeof record.seq === 'number' && Number.isFinite(record.seq) ? record.seq : index
     index += 1
+    const type = normalizeProgressRecord(record.type)
     const data = asRecord(record.data) ?? {}
     const runId = typeof data['runId'] === 'string' ? data['runId'] : undefined
-    const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
-    const isSummaryFinal = record.type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE
-    const isSummaryRejected = record.type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE
-    if (!isDetail && !isSummaryFinal && !isSummaryRejected && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
+    const isDetail = type === PROGRESS_DETAIL_EVENT_TYPE
+    const isSummaryFinal = type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE
+    const isSummaryRejected = type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE
+    if (!isDetail && !isSummaryFinal && !isSummaryRejected && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(type)) continue
     if (runId === undefined) continue
-    if (record.type === 'tool-workflow/run-start') continue
+    if (type === PROGRESS_RUN_START) continue
     const draft = drafts.get(runId)
     if (draft === undefined) continue
     if (seq < draft.anchorSeq) draft.anchorSeq = seq
@@ -562,7 +580,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       if (draft.summaryRejected === undefined) draft.summaryRejected = { drafts: Math.trunc(drafts), stage, reason }
       continue
     }
-    if (record.type === 'tool-workflow/guardian-start') {
+    if (type === PROGRESS_GUARDIAN_START) {
       const previous = draft.guardian
       const budget = Number(data['budgetMs'])
       draft.guardian = {
@@ -575,7 +593,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       }
       continue
     }
-    if (record.type === 'tool-workflow/guardian-finding') {
+    if (type === PROGRESS_GUARDIAN_FINDING) {
       const memberSeq = Number(data['seq'])
       if (!Number.isFinite(memberSeq)) continue
       const guardian: ProgressGuardianFacts = draft.guardian ?? {
@@ -592,14 +610,14 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       draft.guardian = guardian
       continue
     }
-    if (record.type === 'tool-workflow/guardian-end') {
+    if (type === PROGRESS_GUARDIAN_END) {
       const previous: ProgressGuardianFacts = draft.guardian ?? {
         started: false, armed: false, budgetMs: 0, ended: false, cancelled: false, findings: [],
       }
       draft.guardian = { ...previous, ended: true, cancelled: data['cancelled'] === true }
       continue
     }
-    if (record.type === 'tool-workflow/agent-start') {
+    if (type === PROGRESS_AGENT_START) {
       const memberSeq = Number(data['seq'])
       if (!Number.isFinite(memberSeq)) continue
       if (draft.members.has(memberSeq)) continue
@@ -615,7 +633,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       draft.order.push(memberSeq)
       continue
     }
-    if (record.type === 'tool-workflow/agent-end') {
+    if (type === PROGRESS_AGENT_END) {
       const memberSeq = Number(data['seq'])
       if (!Number.isFinite(memberSeq)) continue
       draft.settlements.set(memberSeq, typeof data['outcome'] === 'string' ? data['outcome'] : 'failed')

@@ -1,0 +1,37 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-session-poison-events
+
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ✓ test/client.spec.ts (153 tests) 542ms
+ ✓ test/reliability.spec.ts (19 tests) 373ms
+(node:62) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (14 tests) 321ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 225ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 264ms
+(node:97) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/summary-outcome.spec.ts (16 tests) 220ms
+ ✓ test/command.spec.ts (27 tests) 218ms
+(node:115) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/experience-pack.spec.ts (26 tests) 188ms
+ ✓ test/checkpoint-wiring.spec.ts (44 tests) 185ms
+ ✓ test/routing.spec.ts (25 tests) 177ms
+ ✓ test/unload-drain.spec.ts (5 tests) 180ms
+ ✓ test/guardian.spec.ts (29 tests) 173ms
+ ✓ test/loop.spec.ts (35 tests) 77ms
+ ✓ test/records-redaction.spec.ts (3 tests) 60ms
+ ✓ test/progress-tab.spec.ts (83 tests) 54ms
+
+ Test Files  15 passed (15)
+      Tests  509 passed (509)
+   Start at  23:33:05
+   Duration  9.59s (transform 2.89s, setup 0ms, import 4.22s, tests 3.26s, environment 2ms)
+
+SPEC_EXIT:0

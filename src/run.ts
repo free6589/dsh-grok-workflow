@@ -9,6 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
 import { statSync } from 'node:fs'
@@ -35,6 +36,9 @@ import {
   callSiteFrames,
   classifyDisposeTrigger,
   createWorkflowProgressRecorder,
+  PROGRESS_GUARDIAN_END,
+  PROGRESS_GUARDIAN_FINDING,
+  PROGRESS_GUARDIAN_START,
   progressStopReason,
   recordDispose,
   recordRouting,
@@ -1152,14 +1156,16 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   const progress = FIXED_SHOW_PROGRESS
     ? createWorkflowProgressRecorder(progressSession, logger)
     : undefined
-  // Guardian events share the parent session journal with the progress track.
+  // Guardian events share the parent session journal with the progress track,
+  // through the plugin-record channel: ignorable records the harness skips.
   // A read-only or disposed session must never turn a presentation failure into a failed run.
-  const recordGuardianProgress = (type: string, data: Record<string, unknown>): void => {
+  const recordGuardianProgress = (
+    type: typeof PROGRESS_GUARDIAN_START | typeof PROGRESS_GUARDIAN_FINDING | typeof PROGRESS_GUARDIAN_END,
+    data: Record<string, unknown>,
+  ): void => {
     if (progressSession === undefined || run === undefined) return
-    const target = progressSession as unknown as { append?: (eventType: string, payload: Record<string, unknown>) => unknown }
-    if (typeof target.append !== 'function') return
     try {
-      target.append(type, { runId: String(run.id), ...data })
+      appendPluginRecord(progressSession, type, { runId: String(run.id), ...data } as never)
     } catch (error) {
       logger.warn(`progress record dropped after ${type} append failed: ${redactError(error)}`)
     }
@@ -1248,7 +1254,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     childBudgetMs: guardianChildBudgetMs(deadlineMs, config.childTimeoutMs),
     logger,
     state,
-    onFinding: finding => recordGuardianProgress('tool-workflow/guardian-finding', {
+    onFinding: finding => recordGuardianProgress(PROGRESS_GUARDIAN_FINDING, {
       seq: finding.seq,
       label: finding.label,
       signal: finding.signal,
@@ -1488,7 +1494,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       progress?.runStart(run)
       // Persist the Guardian header before adopt(), whose first sweep can
       // synchronously discover a stale child buffered before run adoption.
-      recordGuardianProgress('tool-workflow/guardian-start', {
+      recordGuardianProgress(PROGRESS_GUARDIAN_START, {
         armed: guardian.stats.armed,
         budgetMs: guardian.stats.budgetMs,
       })
@@ -1682,7 +1688,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       logger.warn(`workflow guardian finalisation failed: ${redactError(error)}`)
       guardian.dispose()
     }
-    recordGuardianProgress('tool-workflow/guardian-end', {
+    recordGuardianProgress(PROGRESS_GUARDIAN_END, {
       cancelled: guardianSettlement?.cancelled ?? guardian.cancelled,
       findingCount: guardianSettlement?.findings.length ?? guardian.findings.length,
     })

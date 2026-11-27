@@ -1,3 +1,10 @@
+Last updated: 2026-11-27 23:30 +08:00（**fix/session-poison-events 施工中：九个进度记录改走插件自有通道（未提交，未发版）（`CONFIRMED`，本分支 worktree 实测）** —
+分支 **`fix-session-poison-events`**（基线 `main` = `c049388`，`git status` 仅本分支改动 + 三份记忆文件；`fix/guardian-chip`、`fix/status-inline`、`fix/pixel-sweep`、`fix/cjk-strip`、`fix/office-ext`、`fix/resume-reuse` 一律不动；stash 三条原位不动；已发布 tag 不动；未碰 live/重启）；
+改动面（`git diff --stat` 本轮实读，`27 files`）：`src/records.ts`（六常量改名 + 三 guardian 常量新增 + recorder 切 `appendPluginRecord` + `normalizeProgressRecord` + `PluginRecordMap` 补 9 条 + 注释）→ `src/run.ts`（守望三处改常量 + 本体改 `appendPluginRecord`）→ `src/progress-tab.ts`（事件表九项新名 + fold 入口 normalize + 引用切换）→ `src/command.ts`（状态查询双认）→ `src/client/index.js` + 重建的 `lib/*`（路由 mirror 双认 + replay 用新名）→ 六份测试文件（真 Session + 双认断言）；
+门禁（本轮实测）：`tsc 0 错`；`oxlint 17 warnings / 0 errors`（与基线同数）；定向 `6 files / 319 passed` + 相邻 `9 files / 155 passed`；
+旧会话手术（用户已批准动存档，`CONFIRMED`）：`session-9f1a5732…` 转 112 条、`session-bc80a4a8…` 转 13 条（旧九名→新名 + 补 `ignorable:true`，其余行字节不动，seq 连续）；转后 `validateStoredEvents`（harness 真校验）**双 PASS**；备份在树外 `/tmp/session-fix-bak-offtree/`（双 sha256 已登记）；决断见 `D-180`，门禁见 `VALIDATION.md` 本轮条。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 19:45 +08:00（**0.13.61 发版完成：合流 566fb80 + build 4a62071 + prepare 13752d2 + 主线 689a315 + tag v0.13.61 + 远端双绿 + Release 已发布（`CONFIRMED`；git身份/远端/分支/stash本轮经 Serena 通道实测复核，本地两次 `npm run ci` 为前置已证直接用、不重验）** —
 链 `88f21bd`（entry-guard 并入 release）→ `566fb80`（carry-cjk 并入 release）→ `4a62071`（build重建lib）→ `13752d2`（`chore(release): prepare v0.13.61`，八文件）→ `689a315`（`Merge branch 'release/0.13.61'`）（`CONFIRMED`）；
 `git rev-parse main` = `git rev-parse origin/main` = `689a3158f53f0fa0e3d1f132a5dd46cc4c11a1db`，`git rev-parse release/0.13.61` = `13752d2aaa3a0040b367999268a5621cc85c7594`，`git rev-parse 'v0.13.61^{}'` = `689a315…`，tag对象 `99e75fb34044b63ec4095e367ede32b14400f779`（`CONFIRMED`）；

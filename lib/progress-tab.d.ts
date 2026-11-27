@@ -1,10 +1,11 @@
 /**
  * The "进度" conversation tab: the pure half.
  *
- * The tab renders the four `tool-workflow/*` session events this plugin's own recorder
+ * The tab renders the nine `plugin:grok-workflow/progress/*` records this plugin's own recorder
  * writes (`src/records.ts`, `createWorkflowProgressRecorder`) as one horizontal track of
  * stage nodes, plus the two optional payloads a stream may carry:
- * `tool-workflow/stage-detail` (field values) and `tool-workflow/summary-final` (which
+ * `tool-workflow/stage-detail` (field values, read-only) and
+ * `plugin:grok-workflow/progress/summary-final` (which
  * summary draft the run actually shipped). Both only ever *add* to what a stream
  * without them renders. This module is the fold, the state precedence, the percentage and the detail
  * provenance, with no React, no DOM, no clock and no estimate, so every rule the browser
@@ -30,7 +31,7 @@
  *   (`recoveredFailureSeqs`). Red therefore means "still broken now", never "was broken".
  */
 /**
- * The eight progress and Guardian lifecycle events the tab folds — and, in the bundle, the
+ * The nine progress and Guardian lifecycle records the tab folds — and, in the bundle, the
  * whitelist the host routes the tab by.
  *
  * One name, two homes, one list: this copy is what {@link foldProgressRuns} reads, and
@@ -42,11 +43,17 @@
  * invisible on screen, so `test/progress-tab.spec.ts` compares the shipped list with this
  * one and fails on a single missing or extra entry.
  *
+ * The names moved house (from `tool-workflow/*` session events to
+ * `plugin:grok-workflow/progress/*` plugin records — same facts, same shapes, a channel
+ * the harness never rejects); the semantics did not. Old sessions still carry the old
+ * names, so {@link foldProgressRuns} folds every record through
+ * `normalizeProgressRecord` (from `src/records.ts`) before it reads anything.
+ *
  * `tool-workflow/stage-detail` is deliberately **not** here: it only ever *adds* field
  * values to a node and never decides a state, so it is not a lifecycle event and does not
  * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
  */
-export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/summary-final", "tool-workflow/summary-rejected", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
+export declare const PROGRESS_EVENT_TYPES: readonly ["plugin:grok-workflow/progress/run-start", "plugin:grok-workflow/progress/agent-start", "plugin:grok-workflow/progress/agent-end", "plugin:grok-workflow/progress/summary-final", "plugin:grok-workflow/progress/summary-rejected", "plugin:grok-workflow/progress/guardian-start", "plugin:grok-workflow/progress/guardian-finding", "plugin:grok-workflow/progress/guardian-end", "plugin:grok-workflow/progress/run-end"];
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
@@ -67,7 +74,7 @@ export declare const PROGRESS_DETAIL_EVENT_TYPE = "tool-workflow/stage-detail";
  * as its own fact once the gate has passed a draft, and the fold settles it onto the row
  * that landed. A stream without it renders exactly what it rendered before.
  */
-export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-final";
+export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "plugin:grok-workflow/progress/summary-final";
 /**
  * The event that says the gate rejected every draft, with the last stage that failed.
  *
@@ -77,7 +84,7 @@ export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-
  * heard of this event renders a rejected run exactly as it did before — as a run with no
  * final draft — because the event only ever adds a reading of a gap it already saw.
  */
-export declare const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = "tool-workflow/summary-rejected";
+export declare const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = "plugin:grok-workflow/progress/summary-rejected";
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export declare const PROGRESS_VIEW_TARGET = "grok-progress";
 /** Conversation node kind owned by the tab (namespaced for the same reason). */
@@ -90,7 +97,7 @@ export type DetailSource = 'stage-detail' | 'coordination' | 'not-reported';
 export declare const DETAIL_FIELDS: readonly ["workCommit", "changes", "testsRun", "results", "localRuntimeVerified", "blockers", "nextAction"];
 /** One of {@link DETAIL_FIELDS}. */
 export type DetailFieldKey = (typeof DETAIL_FIELDS)[number];
-/** One recorded `tool-workflow/*` event, in the shape a session reader gets it back. */
+/** One recorded `plugin:grok-workflow/progress/*` record, in the shape a session reader gets it back. */
 export interface ProgressEventRecord {
     readonly type: string;
     /** Session sequence number of the enclosing event, when known. */
