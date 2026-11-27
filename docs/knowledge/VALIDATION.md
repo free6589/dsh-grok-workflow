@@ -10063,3 +10063,17 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | live | 只读复核 | 仍 `#v0.13.61`，实例活，未改、未重载、未重启 |
 | stash | `git stash list` | 三条原位：`foreman-stash` / `entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines` |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |
+## Round10记忆沉淀验证（2026-11-28 02:28 +08:00，包工头亲手复验，`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | `git log --oneline -5` | 首行 `c9ccd02 docs(memory): record round9 wrap` |
+| 树 | `git status --short --branch` | 仅 `## main...origin/main`，无改动、无未推送 |
+| 同步 | `git rev-parse main` + `git rev-parse origin/main` | 双读 `c9ccd02d1fd6f768972ec7fdb08b92ee42b688e9` |
+| candidate | `git log --oneline origin/main..fix/candidate-follow-09 --` | 空输出、零独有提交；反向落后2提交，已被包含 |
+| 棚 | `git worktree list` | 1主+2从：`c9ccd02 [main]` / `fix-resume-reuse fe6d631` / `wt-candidate-09 ea471da` |
+| 分支 | `git branch -a` | `* main`、`+ fix/candidate-follow-09`、`fix/carry-cjk`、`fix/entry-guard`等；`feat/audit-layer`唯一有独有提交，其余常规分支均已合 |
+| stash | `git stash list` | 三条原位：`foreman-stash` / `entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines` |
+| live | `grep -n grok-workflow ~/.dsh/profiles/web/package.json` | 第13行仍 `#v0.13.61`，只读未改、未重载、未重启 |
+| 未做（`NOT_RUN`） | cjk外盘95M定位、日志三轮原文复算 | 转述主代理沿用，未冒充实测 |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |

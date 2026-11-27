@@ -7028,3 +7028,7 @@ Issue #1 状态评论 issuecomment-6927842856。
 
 - **做了什么**：主线 `bbc9324` = `origin/main`，树干净（`git status --short --branch` 仅 `## main...origin/main`，`git log --oneline -3` 首行 `bbc9324`）；contract删棚阻塞（已合但棚内 `??` 证据目录卡住、分支被占用，均停报未强删）；旧棚复核（5已合待删留清单，2证据目录待确认：wt-contract `contract-rename-2026-11-28/` 4文件、wt-soak `soak-gaps-062-2026-11-28/` 3文件）；日志挖新二轮8新异常面（对照 `CONFIRMED`×5/`HYPOTHESIS`×1，候选2个，证伪3成立，无 `BLOCKED`）；live仍 `#v0.13.61`实例活；stash三条原位。三小工只读+草稿，包工头只写三份记忆增量行，未写产品代码。
 - **下一步**：主代理亲手改live → contract证据归档后删棚 → 旧棚逐个删（soak先归档）→ 日志候选2个隔离跟进；每步先 `status` 确认干净，已合用 `-d`，禁 `-D`/force-push。
+## 2026-11-28 02:28 +08:00 — Round10收尾（记忆沉淀，不发版，包工头亲手复验`CONFIRMED`）
+
+- **做了什么**：三小工只读+草稿（记忆/去留/下一波），包工头只写三份记忆增量行、未写产品代码。主线 `c9ccd02` = `origin/main`（`rev-parse`双读同值，`status`仅`## main...origin/main`）；candidate零独有提交（`origin/main..candidate`空）建议close走独立补丁；全部分支收录：除`feat/audit-layer`有独有提交、`backup/*`快照外其余均已合；棚1主+2从；stash三条原位；live只读仍`#v0.13.61`未改未重启；cjk外盘/日志三轮本轮未重跑记`NOT_RUN`。
+- **下一步**：主代理判candidate close → 亲手改live（改前快照钉到目标版）→ 待可写卷清cjk孤儿95M → AB候选先回指源档对数再判；每步先`status`确认，已合用`-d`，禁`-D`/force-push。
