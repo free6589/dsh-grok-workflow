@@ -1,0 +1,112 @@
+{
+  "firefox": {
+    "title": "tri-done:waiting=waiting,running=running,done=done",
+    "errors": {
+      "console": [],
+      "page": []
+    },
+    "frames": [
+      {
+        "id": "waiting",
+        "chip": "等你点头",
+        "chipState": "waiting",
+        "line": "第 1 步，共 7 步（7 层流程）",
+        "dock": "开工",
+        "dockFill": "开工",
+        "dockState": "start",
+        "pnodes": 5,
+        "rings": 0,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "firefox-waiting.png"
+      },
+      {
+        "id": "running",
+        "chip": "进行中",
+        "chipState": "running",
+        "line": "第 4 步，共 7 步（7 层流程） · 还剩约 1 分 0 秒",
+        "dock": "",
+        "dockFill": null,
+        "dockState": "none",
+        "pnodes": 10,
+        "rings": 12,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "firefox-running.png"
+      },
+      {
+        "id": "done",
+        "chip": "已完成",
+        "chipState": "done",
+        "line": "第 7 步，共 7 步（7 层流程）",
+        "dock": "",
+        "dockFill": null,
+        "dockState": "none",
+        "pnodes": 8,
+        "rings": 6,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "firefox-done.png"
+      }
+    ],
+    "ua": "Mozilla/5.0 (X11; Linux x86_64; rv:157.0) Gecko/20100101 Firefox/157.0"
+  },
+  "chromium": {
+    "title": "tri-done:waiting=waiting,running=running,done=done",
+    "errors": {
+      "console": [],
+      "page": []
+    },
+    "frames": [
+      {
+        "id": "waiting",
+        "chip": "等你点头",
+        "chipState": "waiting",
+        "line": "第 1 步，共 7 步（7 层流程）",
+        "dock": "开工",
+        "dockFill": "开工",
+        "dockState": "start",
+        "pnodes": 5,
+        "rings": 0,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "chromium-waiting.png"
+      },
+      {
+        "id": "running",
+        "chip": "进行中",
+        "chipState": "running",
+        "line": "第 4 步，共 7 步（7 层流程） · 还剩约 1 分 0 秒",
+        "dock": "",
+        "dockFill": null,
+        "dockState": "none",
+        "pnodes": 10,
+        "rings": 12,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "chromium-running.png"
+      },
+      {
+        "id": "done",
+        "chip": "已完成",
+        "chipState": "done",
+        "line": "第 7 步，共 7 步（7 层流程）",
+        "dock": "",
+        "dockFill": null,
+        "dockState": "none",
+        "pnodes": 8,
+        "rings": 6,
+        "checks": 5,
+        "stuck": false,
+        "w": 1280,
+        "file": "chromium-done.png"
+      }
+    ],
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  }
+}
