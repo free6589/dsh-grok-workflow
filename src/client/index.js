@@ -2723,6 +2723,9 @@ window.__ModuleLoader__.load({
     // so 390 keeps two entries and the third rank folds into the overflow menu.
     // Order 5 puts this tab between the two stock views: one click at 390,
     // the default (null → chat) and every other rank untouched.
+    // entry-guard: this entry guards only itself. Its rank is exactly 5
+    // (see test/progress-entry.spec.ts); the host strip it joins is snapshotted
+    // there, so a host-added view turns that spec red instead of folding us silently.
     const PROGRESS_VIEW_ORDER = 5
     /**
      * The eight progress and Guardian lifecycle events the tab folds; all others are ignored.
