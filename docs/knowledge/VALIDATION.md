@@ -10172,3 +10172,6 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
 | Round17主线/棚/分支 | `git status --short --branch` + `git log --oneline -3` + `git worktree list`（本轮只读实测） | `b3e0abc`（`ccd1539`+`37f5b91 --no-ff`）ahead `origin/main` 2、树干净；DEC棚内`33fe6c4`未合流；1主+3从，四棚已清五分支已删 `CONFIRMED` |
 | Round17未做/写面 | live/stash只读 + 本轮写面 | live仍`#v0.13.61`、stash三条原位（只读未改未重启）；只有三份记忆追加行（STATE 1行/HANDOFF 3行/VALIDATION 2行），产品代码0行，不删分支不动live不推送 `CONFIRMED` |
+| Round21主线/去留 | `git status --short --branch` + `git log --oneline -5` + `git branch -a` + `git worktree list`（本包工头只读实测） | `e19e8e2`（`ae78750`+`d7b7aae --no-ff`，4文件78行src零改动）ahead 2树干净；1主+3从在位；分支一个不删全留待定 `CONFIRMED` |
+| Round21日志/S1/live/stash | 主代理CONFIRMED直接引用 + `git stash list`三条实见 | 九轮本仓零真面（A1/A2/A3，证伪3，新N3 HYPOTHESIS）；S1棚内M15（红2→绿14，回归170绿未提交）；live仍`#v0.13.61`未改未重启；stash三条原位 `CONFIRMED` |
+| Round21未做/写面 | 本轮复验动作 + 写面声明 | 门禁/CI不重验`NOT_RUN`；只有三份记忆追加行（STATE 1行/HANDOFF 1块/VALIDATION 3行），产品代码0行，不删分支不动live不推送不读密钥 `CONFIRMED` |
