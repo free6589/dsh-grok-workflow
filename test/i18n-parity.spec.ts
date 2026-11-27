@@ -109,7 +109,8 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   // the three durations that spell the estimate, the trace's one word, the figure's
   // reader label, and the two words of the sheet a narrow screen opens a list in. The first
   // eleven replace the count line and the flow's label, which are gone.
-  ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
+  ['progress.panel.step', '第 {at} 步，共 {total} 步（{total} 层流程）', 'Step {at} of {total} ({total} levels)'],
+  ['progress.panel.tasks', '图上 {count} 个任务', '{count} tasks in the figure'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
   ['progress.panel.etaBasis', '按 {n} 个已完成层的实测耗时推算', 'from the {n} finished levels actually measured'],
   ['progress.panel.stuck.failed', '卡在 {at}：{role} 第 {n} 遍没过', 'Stuck at {at}: attempt {n} of {role} did not pass'],
