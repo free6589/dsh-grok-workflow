@@ -23,7 +23,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Session } from '@deepseek-ai/dsh-session'
+import { Session, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { grokCommand } from '../src/command.js'
 import { deliverReport, machineLedger } from '../src/delivery/index.js'
 import { FIXED_MAX_RETRIES, resolveConfig } from '../src/config.js'
@@ -37,7 +37,7 @@ import { buildMinContextDigest, buildCheckpoint, assertCheckpoint } from '../src
 import { createCheckpointRecorder, readLatestCheckpointSync } from '../src/checkpoint/wiring.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
-import { PROGRESS_AGENT_START, PROGRESS_RUN_END, PROGRESS_RUN_START } from '../src/records.js'
+import { PROGRESS_AGENT_START, PROGRESS_GUARDIAN_END, PROGRESS_RUN_END, PROGRESS_RUN_START } from '../src/records.js'
 
 const LIMITS = { maxConcurrency: 2, maxTasks: 4 } as const
 const config = resolveConfig(LIMITS)
@@ -378,11 +378,16 @@ describe('4 — /grok status answers from the session journal and the checkpoint
     const session = realSession('status-run')
     // The plugin's own record types, written through the real session so the fold
     // reads exactly what a live run leaves behind.
-    const append = session.append.bind(session) as unknown as (type: string, data: Record<string, unknown>) => unknown
-    append(PROGRESS_RUN_START, { runId: 'run-exp-1', name: '天气与酒店' })
-    append(PROGRESS_AGENT_START, { runId: 'run-exp-1', seq: 1, label: '任务 2 · 酒店价格', phase: '执行', childId: 'child-42' })
-    append('tool-workflow/guardian-end', { runId: 'run-exp-1', cancelled: false, findingCount: 2 })
-    append(PROGRESS_RUN_END, { runId: 'run-exp-1', stopReason: 'cancelled' })
+    appendPluginRecord(session, PROGRESS_RUN_START, { runId: 'run-exp-1', name: '天气与酒店' })
+    appendPluginRecord(session, PROGRESS_AGENT_START, { runId: 'run-exp-1', seq: 1, label: '任务 2 · 酒店价格', phase: '执行', childId: 'child-42' })
+    // Old sessions carry the same fact under the retired name; command.ts reads
+    // the session journal raw, so one old-name event proves the dual recognition.
+    // The retired name is outside the session map, so the write goes through the
+    // untyped surface (exactly how the old build wrote it).
+    const appendLegacy = (session.append as unknown as (type: string, data: Record<string, unknown>) => unknown).bind(session)
+    appendLegacy('tool-workflow/guardian-end', { runId: 'run-exp-1', cancelled: false, findingCount: 2 })
+    appendPluginRecord(session, PROGRESS_GUARDIAN_END, { runId: 'run-exp-1', cancelled: false, findingCount: 2 })
+    appendPluginRecord(session, PROGRESS_RUN_END, { runId: 'run-exp-1', stopReason: 'cancelled' })
     const result = grokCommand().handler({ agent: { session }, rawInput: 'status' })
     expect(result.text).toContain('Last run: 天气与酒店 (run-exp-1)')
     expect(result.text).toContain('- State: cancelled')

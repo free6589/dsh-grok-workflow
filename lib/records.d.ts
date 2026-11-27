@@ -202,25 +202,30 @@ export declare function recordRouting(session: Session | undefined, entry: {
     routes: readonly RouteTrailEntry[];
 }, logger?: WorkflowLogger, limit?: number): void;
 /**
- * Session events the stock Web GUI folds into a `workflow-run` chat node.
+ * Progress records: the plugin-record channel the Web GUI's workflow-run node folds.
  *
- * The family is owned by `@deepseek-ai/dsh-tool-workflow` (`lib/index.js:83-135`)
- * and folded by `@deepseek-ai/dsh-client-ui-workflow-run` (`lib/client.js:591-640`):
+ * These are written with `appendPluginRecord`, so each event lands as `ignorable` and
+ * never enters the model-visible surface: an older reader that has never heard of a
+ * type skips it instead of refusing the whole log, and fork/resume carry the records
+ * with the rest of the journal. The old `tool-workflow/*` names for the same facts
+ * polluted the session: the harness rejects a log whose `ignorable != true` event has
+ * a type outside its known set, so two real sessions stopped opening. The payload
+ * shapes are unchanged — only the channel moved — and `test/records.spec.ts` still
+ * pins the shapes, so a DSH upgrade that renames a field fails a test instead of
+ * silently emptying the panel. {@link PROGRESS_SUMMARY_FINAL} is the one addition,
+ * and it is optional by construction: a reader that has never heard of it ignores it.
+ *
  * `run-start` opens the node, `agent-start`/`agent-end` add and settle one member
  * row each, `run-end` fixes the terminal status. This plugin talks to the engine
  * directly (`src/run.ts`), so without these events the panel has nothing to fold
  * and the user sees an empty window for the whole run: t43 measured **zero**
  * session events between the user message and the report, and the only visible
- * effect was child sessions appearing. The recorder below reproduces the in-tree
- * one — same four types, same field shapes — and `test/records.spec.ts` pins the
- * shapes, so a DSH upgrade that renames a field fails a test instead of silently
- * emptying the panel. {@link PROGRESS_SUMMARY_FINAL} is the one addition, and it
- * is optional by construction: a reader that has never heard of it ignores it.
+ * effect was child sessions appearing.
  */
-export declare const PROGRESS_RUN_START = "tool-workflow/run-start";
-export declare const PROGRESS_AGENT_START = "tool-workflow/agent-start";
-export declare const PROGRESS_AGENT_END = "tool-workflow/agent-end";
-export declare const PROGRESS_RUN_END = "tool-workflow/run-end";
+export declare const PROGRESS_RUN_START = "plugin:grok-workflow/progress/run-start";
+export declare const PROGRESS_AGENT_START = "plugin:grok-workflow/progress/agent-start";
+export declare const PROGRESS_AGENT_END = "plugin:grok-workflow/progress/agent-end";
+export declare const PROGRESS_RUN_END = "plugin:grok-workflow/progress/run-end";
 /**
  * The optional event that names the summary draft the run actually ships.
  *
@@ -231,7 +236,7 @@ export declare const PROGRESS_RUN_END = "tool-workflow/run-end";
  * final one" has to arrive as its own fact — which the gate only learns once it
  * has passed a draft.
  */
-export declare const PROGRESS_SUMMARY_FINAL = "tool-workflow/summary-final";
+export declare const PROGRESS_SUMMARY_FINAL = "plugin:grok-workflow/progress/summary-final";
 /**
  * The optional event that says the gate rejected every draft, and why.
  *
@@ -243,7 +248,81 @@ export declare const PROGRESS_SUMMARY_FINAL = "tool-workflow/summary-final";
  * a rejected run exactly as it did — as a run that handed in nothing — instead of
  * misreading a count as a winning draft number.
  */
-export declare const PROGRESS_SUMMARY_REJECTED = "tool-workflow/summary-rejected";
+export declare const PROGRESS_SUMMARY_REJECTED = "plugin:grok-workflow/progress/summary-rejected";
+/**
+ * The Guardian monitor announcement for one run.
+ *
+ * Same channel as the six progress events above: an ignorable plugin record the
+ * panel folds into the run's Guardian lane, never a `tool-workflow/*` session
+ * event (see the channel note on the progress constants).
+ */
+export declare const PROGRESS_GUARDIAN_START = "plugin:grok-workflow/progress/guardian-start";
+/**
+ * One Guardian liveness intervention for one run (not a task-quality verdict).
+ *
+ * Same channel as the progress events: ignorable plugin record, old
+ * `tool-workflow/guardian-finding` name retired for the reason above.
+ */
+export declare const PROGRESS_GUARDIAN_FINDING = "plugin:grok-workflow/progress/guardian-finding";
+/**
+ * The Guardian monitor settlement for one run.
+ *
+ * Same channel as the progress events: ignorable plugin record, old
+ * `tool-workflow/guardian-end` name retired for the reason above.
+ */
+export declare const PROGRESS_GUARDIAN_END = "plugin:grok-workflow/progress/guardian-end";
+/** Payload of a Guardian monitor announcement for one run. */
+export interface ProgressGuardianStart {
+    runId: string;
+    armed: boolean;
+    budgetMs: number;
+}
+/** Payload of one Guardian liveness intervention (not a task-quality verdict). */
+export interface ProgressGuardianFinding {
+    runId: string;
+    seq: number;
+    label: string;
+    signal: 'timeout' | 'heartbeat-loss';
+    action: 'rescue' | 'cancel-run' | 'observe';
+    reason: string;
+    atMs?: number;
+}
+/** Payload of a Guardian monitor settlement for one run. */
+export interface ProgressGuardianEnd {
+    runId: string;
+    cancelled: boolean;
+    findingCount: number;
+}
+declare module '@deepseek-ai/dsh-session' {
+    interface PluginRecordMap {
+        /** Progress: the run announcement that creates the GUI node. */
+        'plugin:grok-workflow/progress/run-start': ProgressRunStart;
+        /** Progress: one member row added to the run's node. */
+        'plugin:grok-workflow/progress/agent-start': ProgressAgentStart;
+        /** Progress: one member row settled (matched by `seq`). */
+        'plugin:grok-workflow/progress/agent-end': ProgressAgentEnd;
+        /** Progress: the node closed with its terminal status. */
+        'plugin:grok-workflow/progress/run-end': ProgressRunEnd;
+        /** Progress: which summary draft the run shipped (the one that passed the gate). */
+        'plugin:grok-workflow/progress/summary-final': ProgressSummaryFinal;
+        /** Progress: the gate rejected every draft, with the last failing stage and its reason. */
+        'plugin:grok-workflow/progress/summary-rejected': ProgressSummaryRejected;
+        /** Progress: the Guardian monitor announced for one run. */
+        'plugin:grok-workflow/progress/guardian-start': ProgressGuardianStart;
+        /** Progress: one Guardian liveness intervention for one run. */
+        'plugin:grok-workflow/progress/guardian-finding': ProgressGuardianFinding;
+        /** Progress: the Guardian monitor settled for one run. */
+        'plugin:grok-workflow/progress/guardian-end': ProgressGuardianEnd;
+    }
+}
+/**
+ * Fold one recorded progress type to its current name.
+ *
+ * @param type - the type a session event carries.
+ * @returns the `plugin:grok-workflow/progress/*` replacement for a retired
+ * `tool-workflow/*` name, or the input unchanged for anything else.
+ */
+export declare function normalizeProgressRecord(type: string): string;
 /** Payload of {@link PROGRESS_RUN_START} (`ToolWorkflowRunStartData`). */
 export interface ProgressRunStart {
     runId: string;
@@ -369,11 +448,11 @@ export interface WorkflowProgressRecorder {
  * 3. **Concurrent and recursive runs stay independent.** State is per recorder,
  *    and one recorder owns exactly one run.
  *
- * The four lifecycle `tool-workflow/*` types are declared by
- * `@deepseek-ai/dsh-tool-workflow`'s own module augmentation. This package deliberately does not depend on that
- * package (it would drag the tool layer into the plugin's dependency tree just to
- * borrow four type names), so the append is issued through a narrow local
- * interface and the payload shapes are pinned by tests instead.
+ * Every fact goes through the plugin-record channel (`appendPluginRecord`): the
+ * same shapes the old `tool-workflow/*` recorder wrote, but as ignorable records
+ * the harness never rejects. The payload shapes are pinned by tests instead of a
+ * dependency on the tool layer (which would drag the tool layer into the plugin's
+ * dependency tree just to borrow type names).
  */
 export declare function createWorkflowProgressRecorder(session: Session | undefined, logger: WorkflowLogger): WorkflowProgressRecorder;
 /**

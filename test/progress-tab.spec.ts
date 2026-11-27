@@ -4,6 +4,8 @@ import {
   DETAIL_FIELDS,
   PROGRESS_DETAIL_EVENT_TYPE,
   PROGRESS_EVENT_TYPES,
+  PROGRESS_SUMMARY_FINAL_EVENT_TYPE,
+  PROGRESS_SUMMARY_REJECTED_EVENT_TYPE,
   PROGRESS_NODE_KIND,
   PROGRESS_STAGES,
   PROGRESS_VIEW_TARGET,
@@ -21,6 +23,16 @@ import {
   recoveredFailureSeqs,
   selectActiveRun,
 } from '../src/progress-tab.js'
+import {
+  PROGRESS_AGENT_END,
+  PROGRESS_AGENT_START,
+  PROGRESS_GUARDIAN_END,
+  PROGRESS_GUARDIAN_FINDING,
+  PROGRESS_GUARDIAN_START,
+  PROGRESS_RUN_END,
+  PROGRESS_RUN_START,
+  normalizeProgressRecord,
+} from '../src/records.js'
 import type { ProgressEventRecord, ProgressFlow, ProgressFlowNode, ProgressMemberFact, ProgressRunFacts } from '../src/progress-tab.js'
 
 /**
@@ -87,7 +99,7 @@ function trackOf(members: ProgressMemberFact[], stopReason?: string) {
  * contract with two homes and no type can tie them together (`src/client/index.js` is served
  * verbatim, so it cannot import the typed table). Reading the shipped export is what makes
  * "they are the same list" checkable rather than a promise: when the bundle grew
- * `tool-workflow/summary-final` and the typed copy did not, the shipped draft number was
+ * the `summary-final` record and the typed copy did not, the shipped draft number was
  * silently dropped and the 交卷 card said "no draft" for a run that had one.
  */
 function clientEventTypes(): readonly string[] {
@@ -128,16 +140,22 @@ function stageNode(track: ReturnType<typeof deriveTrack>, key: string) {
 describe('progress tab: the event contract', () => {
   it('folds the progress and Guardian event contract and namespaces its view target and node kind', () => {
     expect(PROGRESS_EVENT_TYPES).toEqual([
-      'tool-workflow/run-start',
-      'tool-workflow/agent-start',
-      'tool-workflow/agent-end',
-      'tool-workflow/summary-final',
-      'tool-workflow/summary-rejected',
-      'tool-workflow/guardian-start',
-      'tool-workflow/guardian-finding',
-      'tool-workflow/guardian-end',
-      'tool-workflow/run-end',
+      PROGRESS_RUN_START,
+      PROGRESS_AGENT_START,
+      PROGRESS_AGENT_END,
+      PROGRESS_SUMMARY_FINAL_EVENT_TYPE,
+      PROGRESS_SUMMARY_REJECTED_EVENT_TYPE,
+      PROGRESS_GUARDIAN_START,
+      PROGRESS_GUARDIAN_FINDING,
+      PROGRESS_GUARDIAN_END,
+      PROGRESS_RUN_END,
     ])
+    // Each entry is the new plugin-record name: the old `tool-workflow/*` channel
+    // polluted the session log and the harness refused to open it.
+    expect(PROGRESS_RUN_START).toBe('plugin:grok-workflow/progress/run-start')
+    expect(PROGRESS_SUMMARY_FINAL_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-final')
+    expect(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-rejected')
+    expect(PROGRESS_GUARDIAN_END).toBe('plugin:grok-workflow/progress/guardian-end')
     // The optional detail payload is not a lifecycle event: it can add field
     // values to a node but must never decide a state.
     expect(PROGRESS_DETAIL_EVENT_TYPE).toBe('tool-workflow/stage-detail')
@@ -169,13 +187,13 @@ describe('progress tab: the event contract', () => {
 
   it('folds the recorded stream into one run with its rows and settlement', () => {
     const runs = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队 · 2 个任务' }, 10, 1_000),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复登录', childId: 'c1' }, 11, 1_100),
-      rec('tool-workflow/guardian-start', { runId: 'run-1', armed: true, budgetMs: 300_000 }, 12, 1_200),
-      rec('tool-workflow/guardian-finding', { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'rescue', reason: 'rescued with guidance', atMs: 1_500 }, 13, 1_500),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }, 14, 2_100),
-      rec('tool-workflow/guardian-end', { runId: 'run-1', cancelled: false, findingCount: 1 }, 15, 2_150),
-      rec('tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }, 16, 2_200),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队 · 2 个任务' }, 10, 1_000),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复登录', childId: 'c1' }, 11, 1_100),
+      rec(PROGRESS_GUARDIAN_START, { runId: 'run-1', armed: true, budgetMs: 300_000 }, 12, 1_200),
+      rec(PROGRESS_GUARDIAN_FINDING, { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'rescue', reason: 'rescued with guidance', atMs: 1_500 }, 13, 1_500),
+      rec(PROGRESS_AGENT_END, { runId: 'run-1', seq: 1, outcome: 'completed' }, 14, 2_100),
+      rec(PROGRESS_GUARDIAN_END, { runId: 'run-1', cancelled: false, findingCount: 1 }, 15, 2_150),
+      rec(PROGRESS_RUN_END, { runId: 'run-1', stopReason: 'completed' }, 16, 2_200),
     ])
     expect(runs).toHaveLength(1)
     const run = runs[0]!
@@ -211,16 +229,46 @@ describe('progress tab: the event contract', () => {
     ])
   })
 
+  it('folds a stream written under the retired tool-workflow names', () => {
+    // Old sessions already carry these names (written before the channel moved to
+    // plugin records); the fold normalizes them, so an old run still renders.
+    const runs = foldProgressRuns([
+      rec('tool-workflow/run-start', { runId: 'run-old', name: '任务团队' }, 10, 1_000),
+      rec('tool-workflow/agent-start', { runId: 'run-old', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11, 1_100),
+      rec('tool-workflow/guardian-start', { runId: 'run-old', armed: true, budgetMs: 60_000 }, 12, 1_200),
+      rec('tool-workflow/guardian-finding', { runId: 'run-old', seq: 1, label: '执行', signal: 'timeout', action: 'observe', reason: 'left running', atMs: 1_500 }, 13, 1_500),
+      rec('tool-workflow/agent-end', { runId: 'run-old', seq: 1, outcome: 'completed' }, 14, 2_100),
+      rec('tool-workflow/guardian-end', { runId: 'run-old', cancelled: false, findingCount: 1 }, 15, 2_150),
+      rec('tool-workflow/summary-final', { runId: 'run-old', draft: 1 }, 16, 2_160),
+      rec('tool-workflow/run-end', { runId: 'run-old', stopReason: 'completed' }, 17, 2_200),
+    ])
+    expect(runs).toHaveLength(1)
+    expect(runs[0]!.runId).toBe('run-old')
+    expect(runs[0]!.members).toHaveLength(1)
+    expect(runs[0]!.guardian?.ended).toBe(true)
+    expect(runs[0]!.summaryFinalDraft).toBe(1)
+    expect(runs[0]!.stopReason).toBe('completed')
+    // An old rejected name folds the same way.
+    const [rejected] = foldProgressRuns([
+      rec('tool-workflow/run-start', { runId: 'run-old-2', name: '任务团队' }, 1),
+      rec('tool-workflow/summary-rejected', { runId: 'run-old-2', drafts: 2, stage: 'check', reason: 'x' }, 2),
+    ])
+    expect(rejected!.summaryRejected).toEqual({ drafts: 2, stage: 'check', reason: 'x' })
+    // And the normalizer leaves everything else untouched.
+    expect(normalizeProgressRecord('assistant/message')).toBe('assistant/message')
+    expect(normalizeProgressRecord(PROGRESS_RUN_START)).toBe(PROGRESS_RUN_START)
+  })
+
   it('is order-insensitive, idempotent and settles a row whose start arrives late', () => {
     const events = [
       // Shuffled on purpose: a replay may hand a reader events in another order.
-      rec('tool-workflow/run-end', { runId: 'run-1', stopReason: 'error' }, 13),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 2, outcome: 'failed' }, 12),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 2, outcome: 'failed' }, 12),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 2, label: '检查', phase: '任务 1 · 修复', childId: 'c2' }, 11),
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队 · 1 个任务' }, 10),
+      rec(PROGRESS_RUN_END, { runId: 'run-1', stopReason: 'error' }, 13),
+      rec(PROGRESS_AGENT_END, { runId: 'run-1', seq: 2, outcome: 'failed' }, 12),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11),
+      rec(PROGRESS_AGENT_END, { runId: 'run-1', seq: 2, outcome: 'failed' }, 12),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 2, label: '检查', phase: '任务 1 · 修复', childId: 'c2' }, 11),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队 · 1 个任务' }, 10),
     ]
     const run = foldProgressRuns(events)[0]!
     // One row per seq, not one per start event.
@@ -232,10 +280,10 @@ describe('progress tab: the event contract', () => {
 
   it('drops a settlement for a row nobody declared and a run nobody announced', () => {
     const runs = foldProgressRuns([
-      rec('tool-workflow/agent-start', { runId: 'ghost', seq: 1, label: '执行', childId: 'c1' }, 5),
-      rec('tool-workflow/agent-end', { runId: 'ghost', seq: 1, outcome: 'completed' }, 6),
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 9, outcome: 'completed' }, 11),
+      rec(PROGRESS_AGENT_START, { runId: 'ghost', seq: 1, label: '执行', childId: 'c1' }, 5),
+      rec(PROGRESS_AGENT_END, { runId: 'ghost', seq: 1, outcome: 'completed' }, 6),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队' }, 10),
+      rec(PROGRESS_AGENT_END, { runId: 'run-1', seq: 9, outcome: 'completed' }, 11),
     ])
     expect(runs.map((run) => run.runId)).toEqual(['run-1'])
     expect(runs[0]!.members).toEqual([])
@@ -243,8 +291,8 @@ describe('progress tab: the event contract', () => {
 
   it('keeps an observe finding as observed, not as a run cancellation', () => {
     const runs = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
-      rec('tool-workflow/guardian-finding', { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'observe', reason: 'left running', atMs: 1_500 }, 13),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队' }, 10),
+      rec(PROGRESS_GUARDIAN_FINDING, { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'observe', reason: 'left running', atMs: 1_500 }, 13),
     ])
     expect(runs[0]!.guardian?.findings).toEqual([{
       seq: 1,
@@ -732,11 +780,11 @@ describe('progress tab: the detail provenance ladder', () => {
 describe('progress tab: the stage-detail port', () => {
   it('folds a stage-detail event onto the node whose phase it names, and feeds the ladder', () => {
     const run = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '执行', childId: 'c1' }, 11),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }, 12),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队' }, 10),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 1, label: '执行', phase: '执行', childId: 'c1' }, 11),
+      rec(PROGRESS_AGENT_END, { runId: 'run-1', seq: 1, outcome: 'completed' }, 12),
       rec(PROGRESS_DETAIL_EVENT_TYPE, { runId: 'run-1', phase: '执行', WORK_COMMIT: 'abc1234', CHANGES: 'spine' }, 13),
-      rec('tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }, 14),
+      rec(PROGRESS_RUN_END, { runId: 'run-1', stopReason: 'completed' }, 14),
     ])[0]!
     // The payload is read, not ignored …
     expect(run.details).toHaveLength(1)
@@ -756,8 +804,8 @@ describe('progress tab: the stage-detail port', () => {
 
   it('uses a phase-less payload as the run-level fallback and lets an injected source win', () => {
     const run = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
-      rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '执行', childId: 'c1' }, 11),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队' }, 10),
+      rec(PROGRESS_AGENT_START, { runId: 'run-1', seq: 1, label: '执行', phase: '执行', childId: 'c1' }, 11),
       rec(PROGRESS_DETAIL_EVENT_TYPE, { runId: 'run-1', BLOCKERS: 'none' }, 12),
     ])[0]!
     const track = deriveTrack(run, { labelFor })
@@ -772,7 +820,7 @@ describe('progress tab: the stage-detail port', () => {
 
   it('ignores an empty payload instead of claiming a stage was measured and found blank', () => {
     const run = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
+      rec(PROGRESS_RUN_START, { runId: 'run-1', name: '任务团队' }, 10),
       rec(PROGRESS_DETAIL_EVENT_TYPE, { runId: 'run-1', phase: '执行', CHANGES: '   ' }, 11),
     ])[0]!
     expect(run.details).toEqual([])
@@ -832,13 +880,13 @@ describe('progress tab: the numbered names a run repeats', () => {
 
   it('marks the summary draft the gate shipped, and only that draft', () => {
     const [run] = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
-      rec('tool-workflow/agent-end', { runId: 'r', seq: 1, outcome: 'completed' }, 3),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 4),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 5),
-      rec('tool-workflow/agent-end', { runId: 'r', seq: 2, outcome: 'completed' }, 6),
-      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+      rec(PROGRESS_RUN_START, { runId: 'r', name: '任务团队' }, 1),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec(PROGRESS_AGENT_END, { runId: 'r', seq: 1, outcome: 'completed' }, 3),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 4),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 2 }, 5),
+      rec(PROGRESS_AGENT_END, { runId: 'r', seq: 2, outcome: 'completed' }, 6),
+      rec(PROGRESS_RUN_END, { runId: 'r', stopReason: 'completed' }, 7),
     ])
     expect(run!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
     expect(run!.summaryFinalDraft).toBe(2)
@@ -852,13 +900,13 @@ describe('progress tab: the numbered names a run repeats', () => {
     // carries two rows with the same name; the earlier one recorded nothing, so only
     // the later one is 「定稿」 and a reader never sees two final rows.
     const [run] = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
-      rec('tool-workflow/agent-end', { runId: 'r', seq: 1, outcome: 'completed' }, 3),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第1稿', phase: '汇总', childId: 'c2' }, 4),
-      rec('tool-workflow/agent-end', { runId: 'r', seq: 2, outcome: 'completed' }, 5),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 1 }, 6),
-      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+      rec(PROGRESS_RUN_START, { runId: 'r', name: '任务团队' }, 1),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec(PROGRESS_AGENT_END, { runId: 'r', seq: 1, outcome: 'completed' }, 3),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 2, label: '汇总·第1稿', phase: '汇总', childId: 'c2' }, 4),
+      rec(PROGRESS_AGENT_END, { runId: 'r', seq: 2, outcome: 'completed' }, 5),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 1 }, 6),
+      rec(PROGRESS_RUN_END, { runId: 'r', stopReason: 'completed' }, 7),
     ])
     expect(run!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第1稿（定稿）'])
     expect(run!.members.filter((row) => row.label.includes('定稿'))).toHaveLength(1)
@@ -866,18 +914,18 @@ describe('progress tab: the numbered names a run repeats', () => {
 
   it('stays idempotent and order-insensitive, and never invents a mark', () => {
     const events = (extra: ProgressEventRecord[]): ProgressEventRecord[] => [
-      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec(PROGRESS_RUN_START, { runId: 'r', name: '任务团队' }, 1),
       ...extra,
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 4),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 5),
-      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 6),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 4),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 5),
+      rec(PROGRESS_RUN_END, { runId: 'r', stopReason: 'completed' }, 6),
     ]
     // Arriving before the rows it names, twice, and once for a draft that never ran:
     // the mark lands once, on draft 2, and nothing else moves.
     const [before] = foldProgressRuns(events([
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 2),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 3),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 9 }, 3),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 2 }, 2),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 2 }, 3),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 9 }, 3),
     ]))
     expect(before!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
     expect(before!.summaryFinalDraft).toBe(2)
@@ -887,8 +935,8 @@ describe('progress tab: the numbered names a run repeats', () => {
     expect(none!.summaryFinalDraft).toBeUndefined()
     // A payload that names no draft is not a fact.
     const [junk] = foldProgressRuns(events([
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 'two' }, 2),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 0 }, 3),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 'two' }, 2),
+      rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r', draft: 0 }, 3),
     ]))
     expect(junk!.summaryFinalDraft).toBeUndefined()
     expect(junk!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿'])
@@ -923,25 +971,25 @@ describe('progress tab: the flow of one run', () => {
     options: { stopReason?: string, summaryFinal?: number, summaryRejected?: { drafts: number, stage: 'check' | 'verify', reason: string } } = {},
   ): ProgressEventRecord[] {
     const records: ProgressEventRecord[] = [
-      rec('tool-workflow/run-start', { runId: 'r-flow', name: '任务团队 · 2 个任务' }, 1, 1_000),
+      rec(PROGRESS_RUN_START, { runId: 'r-flow', name: '任务团队 · 2 个任务' }, 1, 1_000),
     ]
     let at = 2
     for (const [seq, label, phase, outcome] of calls) {
-      records.push(rec('tool-workflow/agent-start', { runId: 'r-flow', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
+      records.push(rec(PROGRESS_AGENT_START, { runId: 'r-flow', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
       at += 1
       if (outcome === undefined) continue
-      records.push(rec('tool-workflow/agent-end', { runId: 'r-flow', seq, outcome }, at, 1_500 + seq * 100))
+      records.push(rec(PROGRESS_AGENT_END, { runId: 'r-flow', seq, outcome }, at, 1_500 + seq * 100))
       at += 1
     }
     if (options.summaryFinal !== undefined) {
-      records.push(rec('tool-workflow/summary-final', { runId: 'r-flow', draft: options.summaryFinal }, at))
+      records.push(rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r-flow', draft: options.summaryFinal }, at))
       at += 1
     }
     if (options.summaryRejected !== undefined) {
-      records.push(rec('tool-workflow/summary-rejected', { runId: 'r-flow', ...options.summaryRejected }, at))
+      records.push(rec(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE, { runId: 'r-flow', ...options.summaryRejected }, at))
       at += 1
     }
-    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-flow', stopReason: options.stopReason }, at))
+    if (options.stopReason !== undefined) records.push(rec(PROGRESS_RUN_END, { runId: 'r-flow', stopReason: options.stopReason }, at))
     return records
   }
 
@@ -1332,21 +1380,21 @@ describe('progress tab: the plan tasks a work leg hangs under it', () => {
     options: { stopReason?: string, summaryRejected?: { drafts: number, stage: 'check' | 'verify', reason: string } } = {},
   ): ProgressEventRecord[] {
     const records: ProgressEventRecord[] = [
-      rec('tool-workflow/run-start', { runId: 'r-subs', name: '任务团队 · 2 个任务' }, 1, 1_000),
+      rec(PROGRESS_RUN_START, { runId: 'r-subs', name: '任务团队 · 2 个任务' }, 1, 1_000),
     ]
     let at = 2
     for (const [seq, label, phase, outcome] of calls) {
-      records.push(rec('tool-workflow/agent-start', { runId: 'r-subs', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
+      records.push(rec(PROGRESS_AGENT_START, { runId: 'r-subs', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
       at += 1
       if (outcome === undefined) continue
-      records.push(rec('tool-workflow/agent-end', { runId: 'r-subs', seq, outcome }, at, 1_500 + seq * 100))
+      records.push(rec(PROGRESS_AGENT_END, { runId: 'r-subs', seq, outcome }, at, 1_500 + seq * 100))
       at += 1
     }
     if (options.summaryRejected !== undefined) {
-      records.push(rec('tool-workflow/summary-rejected', { runId: 'r-subs', ...options.summaryRejected }, at))
+      records.push(rec(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE, { runId: 'r-subs', ...options.summaryRejected }, at))
       at += 1
     }
-    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-subs', stopReason: options.stopReason }, at))
+    if (options.stopReason !== undefined) records.push(rec(PROGRESS_RUN_END, { runId: 'r-subs', stopReason: options.stopReason }, at))
     return records
   }
 

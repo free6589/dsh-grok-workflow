@@ -2206,8 +2206,8 @@ window.__ModuleLoader__.load({
     // ─── Chat task panel: the `workflow-run` node, re-registered ────────────────
     //
     // The chat task list is not drawn by this plugin. It is the stock `workflow-run`
-    // chat node of `@deepseek-ai/dsh-client-ui-workflow-run`, folding the four
-    // `tool-workflow/*` events this plugin records. That renderer makes a member row
+    // chat node of `@deepseek-ai/dsh-client-ui-workflow-run`, folding the
+    // `plugin:grok-workflow/progress/*` records this plugin writes. That renderer makes a member row
     // openable only while the member is *running*: its `navigableMembers()` requires
     // `member.status === 'running'` together with a live child session, so every
     // finished row — the planner row `规划助手已完成`, a task's `执行` / `检查` rows —
@@ -2686,13 +2686,14 @@ window.__ModuleLoader__.load({
     //
     // A third tab next to the stock chat and trajectory views. It exists because the
     // stock renderer cannot show what this plugin's own recorder measures: it folds the
-    // four `tool-workflow/*` events into one run node with rows, and there is no channel
+    // nine `plugin:grok-workflow/progress/*` records into one run node with rows, and there is no channel
     // for a task-level state (`docs/task-progress-panel.md`, P1-2: BLOCKED upstream).
     //
     // What this tab is, stated so nothing below overclaims:
     //
-    // - It reads **only** the four events `src/records.ts` writes through its recorder
-    //   (`run-start`, `agent-start`, `agent-end`, `run-end`). It writes nothing, sends
+    // - It reads **only** the records `src/records.ts` writes through its recorder
+    //   (`run-start`, `agent-start`, `agent-end`, `summary-final`, `summary-rejected`,
+    //   `guardian-start`, `guardian-finding`, `guardian-end`, `run-end`). It writes nothing, sends
     //   nothing, and adds no session event of its own.
     // - It shows a fixed process spine (start → … → end) plus one real node per recorded
     //   `phase`, so every declared row is visible and a run that does not follow the
@@ -2728,22 +2729,25 @@ window.__ModuleLoader__.load({
     // there, so a host-added view turns that spec red instead of folding us silently.
     const PROGRESS_VIEW_ORDER = 5
     /**
-     * The eight progress and Guardian lifecycle events the tab folds; all others are ignored.
+     * The nine progress and Guardian lifecycle records the tab folds; all others are ignored.
      *
-     * `summary-final` belongs on this list and not only in the fold's own special case: an
-     * event type the view definition does not match never reaches the tab, so a claim the
-     * recorder wrote would be dropped before any folding could see it.
+     * The names moved house (from `tool-workflow/*` session events to
+     * `plugin:grok-workflow/progress/*` plugin records — same facts, a channel the
+     * harness never rejects); the semantics did not. `summary-final` belongs on this
+     * list and not only in the fold's own special case: an event type the view
+     * definition does not match never reaches the tab, so a claim the recorder
+     * wrote would be dropped before any folding could see it.
      */
     const PROGRESS_EVENT_TYPES = [
-      'tool-workflow/run-start',
-      'tool-workflow/agent-start',
-      'tool-workflow/agent-end',
-      'tool-workflow/summary-final',
-      'tool-workflow/summary-rejected',
-      'tool-workflow/guardian-start',
-      'tool-workflow/guardian-finding',
-      'tool-workflow/guardian-end',
-      'tool-workflow/run-end',
+      'plugin:grok-workflow/progress/run-start',
+      'plugin:grok-workflow/progress/agent-start',
+      'plugin:grok-workflow/progress/agent-end',
+      'plugin:grok-workflow/progress/summary-final',
+      'plugin:grok-workflow/progress/summary-rejected',
+      'plugin:grok-workflow/progress/guardian-start',
+      'plugin:grok-workflow/progress/guardian-finding',
+      'plugin:grok-workflow/progress/guardian-end',
+      'plugin:grok-workflow/progress/run-end',
     ]
 
     /**
@@ -2808,7 +2812,8 @@ window.__ModuleLoader__.load({
      * `PROGRESS_SUMMARY_FINAL_EVENT_TYPE` in `src/progress-tab.ts`; a stream without
      * it renders exactly what it rendered before.
      */
-    const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
+    const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'plugin:grok-workflow/progress/summary-final'
+    const PROGRESS_SUMMARY_FINAL_EVENT_TYPE_LEGACY = 'tool-workflow/summary-final'
 
     /**
      * The optional event that says the gate rejected every draft, and why.
@@ -2818,7 +2823,8 @@ window.__ModuleLoader__.load({
      * `src/progress-tab.ts`; a stream without it renders a rejected run exactly as it
      * rendered before — as a run that handed in nothing.
      */
-    const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = 'tool-workflow/summary-rejected'
+    const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = 'plugin:grok-workflow/progress/summary-rejected'
+    const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE_LEGACY = 'tool-workflow/summary-rejected'
 
     /**
      * The numbered summary-draft names, this half's copy of `src/naming.ts`
@@ -2829,6 +2835,28 @@ window.__ModuleLoader__.load({
      * the final card's own assertion — neither compares back to `src/naming.ts`, so a change
      * to the naming table has to be carried across by hand.
      */
+    /**
+     * The retired `tool-workflow/*` names for the nine facts above. Old sessions
+     * still carry them; the fold and the match below accept both spellings and the
+     * replay state always writes the new names. Mirror of `normalizeProgressRecord`
+     * in `src/records.ts` — the host serves this file verbatim, so it cannot import
+     * that function and the table is carried across by hand.
+     */
+    const PROGRESS_RECORD_RENAMES = {
+      'tool-workflow/run-start': 'plugin:grok-workflow/progress/run-start',
+      'tool-workflow/agent-start': 'plugin:grok-workflow/progress/agent-start',
+      'tool-workflow/agent-end': 'plugin:grok-workflow/progress/agent-end',
+      'tool-workflow/run-end': 'plugin:grok-workflow/progress/run-end',
+      'tool-workflow/summary-final': 'plugin:grok-workflow/progress/summary-final',
+      'tool-workflow/summary-rejected': 'plugin:grok-workflow/progress/summary-rejected',
+      'tool-workflow/guardian-start': 'plugin:grok-workflow/progress/guardian-start',
+      'tool-workflow/guardian-finding': 'plugin:grok-workflow/progress/guardian-finding',
+      'tool-workflow/guardian-end': 'plugin:grok-workflow/progress/guardian-end',
+    }
+    function normalizeProgressRecordType(type) {
+      return Object.prototype.hasOwnProperty.call(PROGRESS_RECORD_RENAMES, type) ? PROGRESS_RECORD_RENAMES[type] : type
+    }
+
     const PROGRESS_SUMMARY_DRAFTS = {
       zh: { draft: '汇总·第{n}稿', final: '（定稿）' },
       en: { draft: 'Summarize · draft {n}', final: ' (final)' },
@@ -3000,7 +3028,7 @@ window.__ModuleLoader__.load({
       for (const record of records) {
         const seq = typeof record.seq === 'number' && Number.isFinite(record.seq) ? record.seq : index
         index += 1
-        if (record.type !== 'tool-workflow/run-start') continue
+        if (normalizeProgressRecordType(record.type) !== 'plugin:grok-workflow/progress/run-start') continue
         const data = progressRecord(record.data) || {}
         const runId = typeof data.runId === 'string' ? data.runId : undefined
         if (runId === undefined || drafts.has(runId)) continue
@@ -3018,12 +3046,13 @@ window.__ModuleLoader__.load({
       for (const record of records) {
         const seq = typeof record.seq === 'number' && Number.isFinite(record.seq) ? record.seq : index
         index += 1
+        const type = normalizeProgressRecordType(record.type)
         const data = progressRecord(record.data) || {}
         const runId = typeof data.runId === 'string' ? data.runId : undefined
-        const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
-        const isSummaryFinal = record.type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE
-        const isSummaryRejected = record.type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE
-        if (runId === undefined || (!isDetail && !isSummaryFinal && !isSummaryRejected && PROGRESS_EVENT_TYPES.indexOf(record.type) === -1)) continue
+        const isDetail = type === PROGRESS_DETAIL_EVENT_TYPE
+        const isSummaryFinal = type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE || type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE_LEGACY
+        const isSummaryRejected = type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE || type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE_LEGACY
+        if (runId === undefined || (!isDetail && !isSummaryFinal && !isSummaryRejected && PROGRESS_EVENT_TYPES.indexOf(type) === -1)) continue
         const draft = drafts.get(runId)
         if (draft === undefined) continue
         if (seq < draft.anchorSeq) draft.anchorSeq = seq
@@ -3062,7 +3091,7 @@ window.__ModuleLoader__.load({
           }
           continue
         }
-        if (record.type === 'tool-workflow/guardian-start') {
+        if (type === 'plugin:grok-workflow/progress/guardian-start') {
           const previous = draft.guardian
           const budget = Number(data.budgetMs)
           draft.guardian = {
@@ -3075,7 +3104,7 @@ window.__ModuleLoader__.load({
           }
           continue
         }
-        if (record.type === 'tool-workflow/guardian-finding') {
+        if (type === 'plugin:grok-workflow/progress/guardian-finding') {
           const memberSeq = Number(data.seq)
           if (!Number.isFinite(memberSeq)) continue
           const guardian = draft.guardian || {
@@ -3092,14 +3121,14 @@ window.__ModuleLoader__.load({
           draft.guardian = guardian
           continue
         }
-        if (record.type === 'tool-workflow/guardian-end') {
+        if (type === 'plugin:grok-workflow/progress/guardian-end') {
           const previous = draft.guardian || {
             started: false, armed: false, budgetMs: 0, ended: false, cancelled: false, findings: [],
           }
           draft.guardian = { ...previous, ended: true, cancelled: data.cancelled === true }
           continue
         }
-        if (record.type === 'tool-workflow/agent-start') {
+        if (type === 'plugin:grok-workflow/progress/agent-start') {
           const memberSeq = Number(data.seq)
           if (!Number.isFinite(memberSeq)) continue
           if (draft.members.some((member) => member.seq === memberSeq)) continue
@@ -3113,7 +3142,7 @@ window.__ModuleLoader__.load({
           })
           continue
         }
-        if (record.type === 'tool-workflow/agent-end') {
+        if (type === 'plugin:grok-workflow/progress/agent-end') {
           const memberSeq = Number(data.seq)
           if (!Number.isFinite(memberSeq)) continue
           // Last settlement wins; repeating one event cannot change it twice.
@@ -3122,7 +3151,7 @@ window.__ModuleLoader__.load({
           if (member !== undefined) member.endedAt = record.time
           continue
         }
-        if (record.type !== 'tool-workflow/run-end') continue
+        if (type !== 'plugin:grok-workflow/progress/run-end') continue
         if (draft.stopReason === undefined) {
           draft.stopReason = typeof data.stopReason === 'string' ? data.stopReason : 'error'
           draft.endedAt = record.time
@@ -6228,11 +6257,11 @@ window.__ModuleLoader__.load({
       kind: PROGRESS_KIND,
       target: PROGRESS_TARGET,
       match: (event) => {
-        if (PROGRESS_EVENT_TYPES.indexOf(event.type) === -1) return null
+        if (PROGRESS_EVENT_TYPES.indexOf(normalizeProgressRecordType(event.type)) === -1) return null
         const data = progressRecord(event.data)
         const runId = data === undefined || typeof data.runId !== 'string' ? undefined : data.runId
         if (runId === undefined) return null
-        return { id: runId, role: event.type === 'tool-workflow/run-start' ? 'start' : 'update' }
+        return { id: runId, role: normalizeProgressRecordType(event.type) === 'plugin:grok-workflow/progress/run-start' ? 'start' : 'update' }
       },
       start: (_context, match) => {
         const data = progressRecord(match.event.data) || {}
@@ -6246,44 +6275,44 @@ window.__ModuleLoader__.load({
       update: (context, match) => {
         const state = context.state
         const records = [
-          { type: 'tool-workflow/run-start', data: { runId: state.runId, name: state.name }, time: state.startedAt },
+          { type: 'plugin:grok-workflow/progress/run-start', data: { runId: state.runId, name: state.name }, time: state.startedAt },
           ...state.members.map((member) => ({
-            type: 'tool-workflow/agent-start',
+            type: 'plugin:grok-workflow/progress/agent-start',
             data: { runId: state.runId, seq: member.seq, label: member.label, phase: member.phase, childId: member.childId },
             time: member.startedAt,
           })),
           ...state.members.filter((member) => member.outcome !== undefined).map((member) => ({
-            type: 'tool-workflow/agent-end',
+            type: 'plugin:grok-workflow/progress/agent-end',
             data: { runId: state.runId, seq: member.seq, outcome: member.outcome },
             time: member.endedAt,
           })),
           ...(state.guardian?.started === true ? [{
-            type: 'tool-workflow/guardian-start',
+            type: 'plugin:grok-workflow/progress/guardian-start',
             data: { runId: state.runId, armed: state.guardian.armed, budgetMs: state.guardian.budgetMs },
           }] : []),
           ...(state.guardian?.findings ?? []).map((finding) => ({
-            type: 'tool-workflow/guardian-finding',
+            type: 'plugin:grok-workflow/progress/guardian-finding',
             data: { runId: state.runId, ...finding },
           })),
           ...(state.guardian?.ended === true ? [{
-            type: 'tool-workflow/guardian-end',
+            type: 'plugin:grok-workflow/progress/guardian-end',
             data: { runId: state.runId, cancelled: state.guardian.cancelled },
           }] : []),
           // The shipped mark is replayed like the guardian's own events: without this line
           // the re-fold below rebuilds the run from its members and the claim evaporates on
           // the very next event — which is the `run-end` that always follows it.
           ...(state.summaryFinalDraft === undefined ? [] : [{
-            type: 'tool-workflow/summary-final',
+            type: 'plugin:grok-workflow/progress/summary-final',
             data: { runId: state.runId, draft: state.summaryFinalDraft },
           }]),
           // The rejected verdict is replayed for the same reason the shipped mark is:
           // without this line the next event's re-fold drops the only fact that says why
           // this run handed in nothing.
           ...(state.summaryRejected === undefined ? [] : [{
-            type: 'tool-workflow/summary-rejected',
+            type: 'plugin:grok-workflow/progress/summary-rejected',
             data: { runId: state.runId, drafts: state.summaryRejected.drafts, stage: state.summaryRejected.stage, reason: state.summaryRejected.reason },
           }]),
-          ...(state.stopReason === undefined ? [] : [{ type: 'tool-workflow/run-end', data: { runId: state.runId, stopReason: state.stopReason }, time: state.endedAt }]),
+          ...(state.stopReason === undefined ? [] : [{ type: 'plugin:grok-workflow/progress/run-end', data: { runId: state.runId, stopReason: state.stopReason }, time: state.endedAt }]),
           { type: match.event.type, data: match.event.data, time: match.event.time },
         ]
         const run = foldProgressEvents(records)[0]

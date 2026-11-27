@@ -5,6 +5,16 @@ import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
+import {
+  PROGRESS_AGENT_END,
+  PROGRESS_AGENT_START,
+  PROGRESS_RUN_END,
+  PROGRESS_RUN_START,
+} from '../src/records.js'
+import {
+  PROGRESS_SUMMARY_FINAL_EVENT_TYPE,
+  PROGRESS_SUMMARY_REJECTED_EVENT_TYPE,
+} from '../src/progress-tab.js'
 import { readModeRecord } from '../src/mode.js'
 import { handleModeRoute, MODE_ROUTE_PATH as CORE_MODE_ROUTE_PATH } from '../src/mode-surface.js'
 
@@ -2069,25 +2079,25 @@ describe('client progress tab: the flowchart (three screens)', () => {
   function streamOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number, spanMs?: number, summaryRejected?: { drafts: number, stage: string, reason: string } } = {}) {
     const spanMs = options.spanMs === undefined ? 500 : options.spanMs
     const records: Array<Record<string, unknown>> = [
-      rec('tool-workflow/run-start', { runId: 'r-story', name: '任务团队 · 3 个任务' }, 1, STORY_BASE - 60_000),
+      rec(PROGRESS_RUN_START, { runId: 'r-story', name: '任务团队 · 3 个任务' }, 1, STORY_BASE - 60_000),
     ]
     let at = 2
     for (const [seq, label, phase, outcome] of calls) {
-      records.push(rec('tool-workflow/agent-start', { runId: 'r-story', seq, label, phase, childId: `child-${seq}` }, at, STORY_BASE + seq * 60_000))
+      records.push(rec(PROGRESS_AGENT_START, { runId: 'r-story', seq, label, phase, childId: `child-${seq}` }, at, STORY_BASE + seq * 60_000))
       at += 1
       if (outcome === undefined) continue
-      records.push(rec('tool-workflow/agent-end', { runId: 'r-story', seq, outcome }, at, STORY_BASE + seq * 60_000 + spanMs))
+      records.push(rec(PROGRESS_AGENT_END, { runId: 'r-story', seq, outcome }, at, STORY_BASE + seq * 60_000 + spanMs))
       at += 1
     }
     if (options.summaryFinal !== undefined) {
-      records.push(rec('tool-workflow/summary-final', { runId: 'r-story', draft: options.summaryFinal }, at))
+      records.push(rec(PROGRESS_SUMMARY_FINAL_EVENT_TYPE, { runId: 'r-story', draft: options.summaryFinal }, at))
       at += 1
     }
     if (options.summaryRejected !== undefined) {
-      records.push(rec('tool-workflow/summary-rejected', { runId: 'r-story', ...options.summaryRejected }, at))
+      records.push(rec(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE, { runId: 'r-story', ...options.summaryRejected }, at))
       at += 1
     }
-    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-story', stopReason: options.stopReason }, at))
+    if (options.stopReason !== undefined) records.push(rec(PROGRESS_RUN_END, { runId: 'r-story', stopReason: options.stopReason }, at))
     return records
   }
 
@@ -2862,7 +2872,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
       // the members alone.
       const events = streamOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
       const tab = shell()
-      const claimAt = events.findIndex((event) => event.type === 'tool-workflow/summary-final')
+      const claimAt = events.findIndex((event) => event.type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE)
       expect(claimAt, 'the fixture must carry the claim').toBeGreaterThan(0)
       const fed: string[] = []
       for (const event of events.slice(0, claimAt + 1)) fed.push(tab.feed(event))
@@ -2896,7 +2906,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
         [2, '汇总·第1稿', '汇总', 'completed'],
       ], { summaryRejected: { drafts: 1, stage: 'verify', reason: 'the answer omits incomplete task b' }, stopReason: 'completed' })
       const tab = shell()
-      const claimAt = events.findIndex((event) => event.type === 'tool-workflow/summary-rejected')
+      const claimAt = events.findIndex((event) => event.type === PROGRESS_SUMMARY_REJECTED_EVENT_TYPE)
       expect(claimAt, 'the fixture must carry the claim').toBeGreaterThan(0)
       const fed: string[] = []
       for (const event of events.slice(0, claimAt + 1)) fed.push(tab.feed(event))
@@ -2935,16 +2945,19 @@ describe('client progress tab: the flowchart (three screens)', () => {
 
     it('keeps every recorder event type on the tab\'s own update list', () => {
       // `match` reads exactly this list: a type missing from it reaches no tab at all.
+      // The new plugin-record names; the bundle accepts the retired
+      // `tool-workflow/*` spellings too (old sessions), but it always replays
+      // state with these names.
       const recorded = [
-        'tool-workflow/run-start',
-        'tool-workflow/agent-start',
-        'tool-workflow/agent-end',
-        'tool-workflow/summary-final',
-        'tool-workflow/summary-rejected',
-        'tool-workflow/guardian-start',
-        'tool-workflow/guardian-finding',
-        'tool-workflow/guardian-end',
-        'tool-workflow/run-end',
+        'plugin:grok-workflow/progress/run-start',
+        'plugin:grok-workflow/progress/agent-start',
+        'plugin:grok-workflow/progress/agent-end',
+        'plugin:grok-workflow/progress/summary-final',
+        'plugin:grok-workflow/progress/summary-rejected',
+        'plugin:grok-workflow/progress/guardian-start',
+        'plugin:grok-workflow/progress/guardian-finding',
+        'plugin:grok-workflow/progress/guardian-end',
+        'plugin:grok-workflow/progress/run-end',
       ]
       for (const type of recorded) {
         expect(progress.eventTypes, type).toContain(type)
@@ -3424,17 +3437,17 @@ describe('client progress tab: nodes, calls and the wire layer', () => {
   /** The folded run of one recorded stream. */
   function runOf(calls: readonly Call[], options: { stopReason?: string } = {}): ProgressRun {
     const records: Array<Record<string, unknown>> = [
-      rec('tool-workflow/run-start', { runId: 'r-layout', name: '任务团队 · 布局' }, 1, BASE - 60_000),
+      rec(PROGRESS_RUN_START, { runId: 'r-layout', name: '任务团队 · 布局' }, 1, BASE - 60_000),
     ]
     let at = 2
     for (const [seq, label, phase, outcome] of calls) {
-      records.push(rec('tool-workflow/agent-start', { runId: 'r-layout', seq, label, phase, childId: `child-${seq}` }, at, BASE + seq * 60_000))
+      records.push(rec(PROGRESS_AGENT_START, { runId: 'r-layout', seq, label, phase, childId: `child-${seq}` }, at, BASE + seq * 60_000))
       at += 1
       if (outcome === undefined) continue
-      records.push(rec('tool-workflow/agent-end', { runId: 'r-layout', seq, outcome }, at, BASE + seq * 60_000 + 500))
+      records.push(rec(PROGRESS_AGENT_END, { runId: 'r-layout', seq, outcome }, at, BASE + seq * 60_000 + 500))
       at += 1
     }
-    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-layout', stopReason: options.stopReason }, at))
+    if (options.stopReason !== undefined) records.push(rec(PROGRESS_RUN_END, { runId: 'r-layout', stopReason: options.stopReason }, at))
     const runs = progress.fold(records)
     expect(runs, 'the fixture must fold into one run').toHaveLength(1)
     return runs[0]!

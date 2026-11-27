@@ -35,16 +35,12 @@ import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness, type EngineHarness } from './engine-harness.js'
 import { foldLikeTheGui } from './gui-fold.js'
 
-/** A session that records appends and can be told to refuse them. */
-class FakeSession {
-  readonly writes: { type: string, data: Record<string, unknown> }[] = []
-  /** Number of appends that succeed before every later one throws. */
-  failAfter: number | undefined
 
-  append(type: string, data: Record<string, unknown>): void {
-    if (this.failAfter !== undefined && this.writes.length >= this.failAfter) throw new Error('session is closed')
-    this.writes.push({ type, data })
-  }
+/** Read back what the recorder wrote, through the real session journal. */
+function writesOf(session: SessionType): { type: string, data: Record<string, unknown> }[] {
+  return session.ownEvents()
+    .map(event => ({ type: event.type, data: event.data as Record<string, unknown> }))
+    .filter(write => write.type.startsWith('plugin:grok-workflow/progress/'))
 }
 
 const loggerWith = (warnings: string[]): { warn: (message: string) => void } => ({
@@ -53,15 +49,15 @@ const loggerWith = (warnings: string[]): { warn: (message: string) => void } => 
 
 describe('progress recorder: payload contract', () => {
   it('writes exactly the fields the in-tree recorder writes', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-1` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队 · 2 个任务' } })
     recorder.agentStart('run-1', { seq: 1, label: '规划助手', childId: 'child-1' })
     recorder.agentStart('run-1', { seq: 2, label: '执行', phase: '任务 1 · 修复登录接口', childId: 'child-2' })
     recorder.agentEnd('run-1', { seq: 2, outcome: 'completed' })
     recorder.runEnd('run-1', 'completed')
 
-    expect(target.writes).toEqual([
+    expect(writesOf(target)).toEqual([
       { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: '任务团队 · 2 个任务' } },
       // No `phase` key at all when the call declares none: the fold tests
       // `data.phase === undefined`, and an explicit `undefined` would be dropped
@@ -80,14 +76,14 @@ describe('progress recorder: payload contract', () => {
     // A chat row's label is fixed at `agent-start`, so "this draft is the final one"
     // has to arrive as its own fact. The payload carries the run and the draft and
     // nothing else; the existing four shapes stay byte-identical.
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-2` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
     recorder.summaryFinal('run-1', 2)
     recorder.summaryFinal('not-ours', 3)
     recorder.summaryFinal('run-1', Number.NaN)
     recorder.runEnd('run-1', 'completed')
-    expect(target.writes).toEqual([
+    expect(writesOf(target)).toEqual([
       { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: '任务团队' } },
       { type: PROGRESS_SUMMARY_FINAL, data: { runId: 'run-1', draft: 2 } },
       { type: PROGRESS_RUN_END, data: { runId: 'run-1', stopReason: 'completed' } },
@@ -110,15 +106,15 @@ describe('progress recorder: payload contract', () => {
 
 describe('progress recorder: the three rules from t43', () => {
   it('records one run in order: run-start, members, run-end', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-3` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'r', meta: { name: 'n' } })
     recorder.agentStart('r', { seq: 1, label: 'a', childId: 'c1' })
     recorder.agentEnd('r', { seq: 1, outcome: 'completed' })
     recorder.agentStart('r', { seq: 2, label: 'b', childId: 'c2' })
     recorder.agentEnd('r', { seq: 2, outcome: 'failed' })
     recorder.runEnd('r', 'completed')
-    expect(target.writes.map(write => write.type)).toEqual([
+    expect(writesOf(target).map(write => write.type)).toEqual([
       PROGRESS_RUN_START,
       PROGRESS_AGENT_START, PROGRESS_AGENT_END,
       PROGRESS_AGENT_START, PROGRESS_AGENT_END,
@@ -127,47 +123,60 @@ describe('progress recorder: the three rules from t43', () => {
   })
 
   it('never writes another run’s events into this session', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-4` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'mine', meta: { name: 'n' } })
     // A concurrent run (another session, another recorder) shares the engine bus.
     recorder.agentStart('theirs', { seq: 1, label: 'x', childId: 'ctx1' })
     recorder.agentEnd('theirs', { seq: 1, outcome: 'completed' })
     recorder.runEnd('theirs', 'completed')
-    expect(target.writes).toHaveLength(1)
-    expect(target.writes[0]!.data).toEqual({ runId: 'mine', name: 'n' })
+    expect(writesOf(target)).toHaveLength(1)
+    expect(writesOf(target)[0]!.data).toEqual({ runId: 'mine', name: 'n' })
   })
 
   it('replays a member event that arrived before its run was adopted', () => {
     // `engine.start()` is synchronous, but the caller awaits it, so the script's
     // first `agent()` can win the microtask race. Order must survive that.
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-5` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.agentStart('r', { seq: 1, label: 'early', childId: 'c1' })
     recorder.runStart({ id: 'r', meta: { name: 'n' } })
     recorder.agentEnd('r', { seq: 1, outcome: 'completed' })
-    expect(target.writes.map(write => write.type)).toEqual([PROGRESS_RUN_START, PROGRESS_AGENT_START, PROGRESS_AGENT_END])
-    expect(target.writes[1]!.data).toMatchObject({ runId: 'r', seq: 1, label: 'early' })
+    expect(writesOf(target).map(write => write.type)).toEqual([PROGRESS_RUN_START, PROGRESS_AGENT_START, PROGRESS_AGENT_END])
+    expect(writesOf(target)[1]!.data).toMatchObject({ runId: 'r', seq: 1, label: 'early' })
   })
 
   it('keeps the pre-adoption buffer bounded by run and by event', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-6` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     for (let index = 0; index < 40; index += 1) {
       recorder.agentStart(`foreign-${index}`, { seq: index, label: `l${index}`, childId: `c${index}` })
     }
     // Nothing was written: none of those runs was ever adopted.
-    expect(target.writes).toHaveLength(0)
+    expect(writesOf(target)).toHaveLength(0)
     // The most recent run is still buffered, so adopting it replays its events.
     recorder.runStart({ id: 'foreign-39', meta: { name: 'n' } })
-    expect(target.writes.map(write => write.type)).toEqual([PROGRESS_RUN_START, PROGRESS_AGENT_START])
+    expect(writesOf(target).map(write => write.type)).toEqual([PROGRESS_RUN_START, PROGRESS_AGENT_START])
   })
 
   it('contains a refusing session: the panel entry is lost, the run is not', () => {
     const warnings: string[] = []
-    const target = new FakeSession()
-    target.failAfter = 1
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith(warnings))
+    // A plugin record goes through the session's private record channel, not the
+    // public `append`, so a fake `failAfter` cannot refuse it. The first record is
+    // let through and every later one is refused (by counting `publicationEntry`
+    // calls, which the record path reads before committing): run-start lands, the
+    // next write warns once and drops the run — the old `failAfter = 1` semantics.
+    // A Proxy cannot do this: `#appendRecord` is a private method and rejects a
+    // proxy receiver, so the counting override is installed on the session itself.
+    const target = Session.create(`sess-progress-rec-7` as never)
+    let records = 0
+    const entryOf = (target as unknown as { publicationEntry(): unknown }).publicationEntry.bind(target)
+    ;(target as unknown as { publicationEntry(): unknown }).publicationEntry = (() => {
+      records += 1
+      if (records > 1) throw new Error('session is closed')
+      return entryOf()
+    })
+    const recorder = createWorkflowProgressRecorder(target, loggerWith(warnings))
     expect(() => { recorder.runStart({ id: 'r', meta: { name: 'n' } }) }).not.toThrow()
     expect(() => { recorder.agentStart('r', { seq: 1, label: 'a', childId: 'c1' }) }).not.toThrow()
     expect(() => { recorder.runEnd('r', 'completed') }).not.toThrow()
@@ -175,17 +184,17 @@ describe('progress recorder: the three rules from t43', () => {
     expect(warnings[0]).toContain('progress record dropped')
     // One refusal stops this run's recording (the in-tree recorder does the same:
     // retrying a permanently failing append would only spam the log).
-    expect(target.writes).toHaveLength(1)
+    expect(writesOf(target)).toHaveLength(1)
   })
 
   it('writes nothing after dispose, and nothing without a session', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = Session.create(`sess-progress-rec-8` as never)
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'r', meta: { name: 'n' } })
     recorder.dispose()
     recorder.agentStart('r', { seq: 1, label: 'a', childId: 'c1' })
     recorder.runEnd('r', 'completed')
-    expect(target.writes).toHaveLength(1)
+    expect(writesOf(target)).toHaveLength(1)
 
     const detached = createWorkflowProgressRecorder(undefined, loggerWith([]))
     expect(() => {
@@ -392,15 +401,16 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
       ? { structured: executionResult }
       : { structured: verificationResult(taskFromPrompt(call.prompt)) }))
     const real = Session.create('sess-progress-refusing' as never)
+    // The records travel through the session's private record channel
+    // (`publicationEntry`, shared with `append`), not the public `append`:
+    // refusing there rejects exactly the events this recorder writes.
     const refusing = new Proxy(real, {
-      get(target, property, receiver) {
-        if (property === 'append') {
-          return (type: string, data: unknown): unknown => {
-            if (type.startsWith('tool-workflow/')) throw new Error('this session is closed to run events')
-            return (target.append as (kind: string, payload: unknown) => unknown)(type, data)
-          }
+      get(target, property) {
+        if (property === 'publicationEntry') {
+          return (): unknown => { throw new Error('this session is closed to run events') }
         }
-        return Reflect.get(target, property, receiver)
+        const value = Reflect.get(target, property, target)
+        return typeof value === 'function' ? value.bind(target) : value
       },
     })
     const warnings: string[] = []

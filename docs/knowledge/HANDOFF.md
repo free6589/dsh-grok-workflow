@@ -1,3 +1,12 @@
+## 2026-11-27 — fix/session-poison-events 施工移交（未提交：九记录改插件通道 + 旧会话已修，未发版）
+
+- **From:** 修通道的人（分支 `fix-session-poison-events`） · **To:** 合流 + 发版的人
+- **分支 / 基线（`CONFIRMED`）**：`fix-session-poison-events` @ `c049388`（= `main`）；一任务一分支；`fix/guardian-chip`、`fix/status-inline`、`fix/pixel-sweep`、`fix/cjk-strip`、`fix/office-ext`、`fix/resume-reuse` 一律没碰。
+- **做了什么（`CONFIRMED`，本分支 worktree 实测）**：九个进度记录从 `tool-workflow/*` 搬到 `plugin:grok-workflow/progress/*`（`appendPluginRecord`，`ignorable:true`）；读侧（fold、`/grok status`、页面）双认新旧名；payload 形状不变；`stage-detail` 只读不动。门禁：`tsc 0` / `oxlint 17w0e`（基线同数）/ 定向 `6 files 319 passed` + 相邻 `9 files 155 passed`。
+- **旧会话（`CONFIRMED`，用户已批准动存档）**：`session-9f1a5732…`（112 条）+ `session-bc80a4a8…`（13 条）已转新名，转后 `validateStoredEvents` 双 PASS；备份在树外 `/tmp/session-fix-bak-offtree/`（`133c36bb…1a14af` + `57d30867…aab2e8`）；恢复办法：备份拷回原路径即可。
+- **没做 / 别动**：未提交、未推远端、未合流、未发版、未抬版本；`CHANGELOG` 未加条（留给发版轮）；真机隔离 soak `NOT_RUN`；live 未碰。
+- **下一步**：验收 diff → 合流（合流后跑一次全量 `npm run ci`）→ 发版轮决定版本号。决断 `D-180`，门禁 `VALIDATION.md` 本轮条。
+
 ## 2026-11-27 — 0.13.61 发版收尾（只写记忆 + 推 main + 删本波 `release/0.13.61` 分支棚，不碰其余）**（主线 `689a315` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45992537765` success + Release `45992555196` success + Release `v0.13.61` 已发布（`2026-11-27T11:43:01Z`，资产 `1052999` 字节 `sha256 b8137ebf…1831fc31`）；只删本波建的本地 `release/0.13.61`（已合才 `-d`，`-d` 失败就报告不强删；远端无此分支则不动）；`fix/entry-guard`、`fix/carry-cjk`、`fix/resume-reuse`、其他分支、任何 tag、两个 stash 一律不动；不动代码、不碰 live、不重启）**
 
 - **From:** 0.13.61 发版收尾员（只写记忆 + 推 main + 删本波分支，不碰其余） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { Session } from '@deepseek-ai/dsh-session'
 import type { Session as SessionType } from '@deepseek-ai/dsh-session'
 import { resolveConfig } from '../src/config.js'
 import { parseMemberLabel } from '../src/naming.js'
 import {
+  PROGRESS_AGENT_END,
+  PROGRESS_AGENT_START,
+  PROGRESS_RUN_END,
+  PROGRESS_RUN_START,
   PROGRESS_SUMMARY_FINAL,
   PROGRESS_SUMMARY_REJECTED,
   PROGRESS_SUMMARY_REJECTED_REASON_CHARS,
@@ -194,13 +199,18 @@ describe('summaryGateOutcome: the two outcomes one marker string can state', () 
 })
 
 describe('the recorder publishes a rejected outcome as its own fact', () => {
-  class FakeSession {
-    readonly writes: { type: string, data: Record<string, unknown> }[] = []
-    failAfter: number | undefined
-    append(type: string, data: Record<string, unknown>): void {
-      if (this.failAfter !== undefined && this.writes.length >= this.failAfter) throw new Error('session is closed')
-      this.writes.push({ type, data })
-    }
+  /** Read back what the recorder wrote, through the real session journal. */
+  function writesOf(session: SessionType): { type: string, data: Record<string, unknown> }[] {
+    return session.ownEvents()
+      .map(event => ({ type: event.type, data: event.data as Record<string, unknown> }))
+      .filter(write => write.type.startsWith('plugin:grok-workflow/progress/'))
+  }
+
+  // Session ids unique per test, so journals never leak across cases.
+  let sessionSeq = 0
+  const freshSession = (): SessionType => {
+    sessionSeq += 1
+    return Session.create(`sess-summary-rec-${sessionSeq}` as never)
   }
 
   const loggerWith = (warnings: string[]): { warn: (message: string) => void } => ({
@@ -208,24 +218,24 @@ describe('the recorder publishes a rejected outcome as its own fact', () => {
   })
 
   it('writes the run, the count, the stage and the reason — and nothing else', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = freshSession()
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
     recorder.summaryRejected('run-1', { drafts: 3, stage: 'check', reason: 'cites "x"' })
     recorder.runEnd('run-1', 'completed')
-    expect(target.writes).toEqual([
-      { type: 'tool-workflow/run-start', data: { runId: 'run-1', name: '任务团队' } },
+    expect(writesOf(target)).toEqual([
+      { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: '任务团队' } },
       { type: PROGRESS_SUMMARY_REJECTED, data: { runId: 'run-1', drafts: 3, stage: 'check', reason: 'cites "x"' } },
-      { type: 'tool-workflow/run-end', data: { runId: 'run-1', stopReason: 'completed' } },
+      { type: PROGRESS_RUN_END, data: { runId: 'run-1', stopReason: 'completed' } },
     ])
-    expect(PROGRESS_SUMMARY_REJECTED).toBe('tool-workflow/summary-rejected')
+    expect(PROGRESS_SUMMARY_REJECTED).toBe('plugin:grok-workflow/progress/summary-rejected')
     // Two different facts, two different names: a rejected run has no final draft.
     expect(PROGRESS_SUMMARY_REJECTED).not.toBe(PROGRESS_SUMMARY_FINAL)
   })
 
   it('drops every payload that is not a rejection it can explain', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = freshSession()
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
     // Not our run, no draft judged, a stage outside the gate's two words, and no reason.
     recorder.summaryRejected('not-ours', { drafts: 3, stage: 'check', reason: 'x' })
@@ -235,29 +245,38 @@ describe('the recorder publishes a rejected outcome as its own fact', () => {
     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', reason: '   ' })
     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', reason: 7 as never })
     recorder.runEnd('run-1', 'completed')
-    expect(target.writes.map(write => write.type)).toEqual(['tool-workflow/run-start', 'tool-workflow/run-end'])
+    expect(writesOf(target).map(write => write.type)).toEqual([PROGRESS_RUN_START, PROGRESS_RUN_END])
   })
 
   it('bounds the reason it writes', () => {
-    const target = new FakeSession()
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    const target = freshSession()
+    const recorder = createWorkflowProgressRecorder(target, loggerWith([]))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
     recorder.summaryRejected('run-1', { drafts: 2, stage: 'verify', reason: 'x'.repeat(500) })
-    const write = target.writes.find(candidate => candidate.type === PROGRESS_SUMMARY_REJECTED)
+    const write = writesOf(target).find(candidate => candidate.type === PROGRESS_SUMMARY_REJECTED)
     expect(write).toBeDefined()
     expect((write!.data['reason'] as string).length).toBe(PROGRESS_SUMMARY_REJECTED_REASON_CHARS)
   })
 
   it('drops the run when the session refuses the append, like the sibling recorders', () => {
-    const target = new FakeSession()
-    target.failAfter = 1
+    // Same channel note as the sibling test in test/progress.spec.ts: count
+    // `publicationEntry` calls on the session itself (a Proxy receiver is
+    // rejected by the private `#appendRecord`).
+    const target = freshSession()
+    let records = 0
+    const entryOf = (target as unknown as { publicationEntry(): unknown }).publicationEntry.bind(target)
+    ;(target as unknown as { publicationEntry(): unknown }).publicationEntry = (() => {
+      records += 1
+      if (records > 1) throw new Error('session is closed')
+      return entryOf()
+    })
     const warnings: string[] = []
-    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith(warnings))
+    const recorder = createWorkflowProgressRecorder(target, loggerWith(warnings))
     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', reason: 'x' })
     // The second fact is not attempted: the run is no longer this recorder's to speak for.
     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', reason: 'again' })
-    expect(target.writes).toHaveLength(1)
+    expect(writesOf(target)).toHaveLength(1)
     expect(warnings.length).toBeGreaterThan(0)
   })
 })
@@ -269,11 +288,11 @@ function rec(type: string, data: Record<string, unknown>, seq: number, time?: nu
 
 describe('the fold and the flow read the rejected outcome', () => {
   const rejectedStream = (payload: Record<string, unknown>, seq = 6): ProgressEventRecord[] => [
-    rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1, 1_000),
-    rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
-    rec('tool-workflow/agent-end', { runId: 'r', seq: 1, outcome: 'completed' }, 3),
-    rec('tool-workflow/summary-rejected', { runId: 'r', ...payload }, seq),
-    rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, seq + 1),
+    rec(PROGRESS_RUN_START, { runId: 'r', name: '任务团队' }, 1, 1_000),
+    rec(PROGRESS_AGENT_START, { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+    rec(PROGRESS_AGENT_END, { runId: 'r', seq: 1, outcome: 'completed' }, 3),
+    rec(PROGRESS_SUMMARY_REJECTED, { runId: 'r', ...payload }, seq),
+    rec(PROGRESS_RUN_END, { runId: 'r', stopReason: 'completed' }, seq + 1),
   ]
 
   it('carries the verdict onto the run and into the story', () => {
@@ -321,7 +340,7 @@ describe('the fold and the flow read the rejected outcome', () => {
     // flow says it with `final` plus a summary node that stayed green.
     const [run] = foldProgressRuns([
       ...rejectedStream({ drafts: 3, stage: 'check', reason: 'cites "x"' }, 6),
-      rec('tool-workflow/summary-final', { runId: 'r', draft: 1 }, 8),
+      rec(PROGRESS_SUMMARY_FINAL, { runId: 'r', draft: 1 }, 8),
     ])
     const flow = deriveProgressFlow(run!)
     expect(flow.final).toMatchObject({ draft: 1 })
@@ -331,8 +350,8 @@ describe('the fold and the flow read the rejected outcome', () => {
 
   it('leaves a run with neither fact saying nothing at all', () => {
     const [run] = foldProgressRuns([
-      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1, 1_000),
-      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec(PROGRESS_RUN_START, { runId: 'r', name: '任务团队' }, 1, 1_000),
+      rec(PROGRESS_AGENT_START, { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
     ])
     expect(run!.summaryRejected).toBeUndefined()
     const flow = deriveProgressFlow(run!)

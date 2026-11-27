@@ -3,8 +3,9 @@
  *
  * This is a *test* transcription of
  * `@deepseek-ai/dsh-client-ui-workflow-run/lib/client.js` (DSH 0.2.1-rc.2): the
- * `workflow-run` conversation-node definition consumes exactly four events
- * (`tool-workflow/run-start`, `-agent-start`, `-agent-end`, `-run-end`), keys a group
+ * `workflow-run` conversation-node definition consumes exactly four records
+ * (`plugin:grok-workflow/progress/run-start`, `-agent-start`, `-agent-end`, `-run-end`),
+ * keys a group
  * by the **exact** `phase` string (`workflowPhaseKey`, lines 505-507), renders the raw
  * `label` (lines 541-558) and turns `run-end`'s `stopReason` into the node's status
  * (`statusFromStopReason`, lines 508-514). Keeping the transcription here — instead of
@@ -85,12 +86,12 @@ export function foldLikeTheGui(events: readonly PanelEvent[]): FoldedNode | unde
   let node: { name: string, members: { seq: number, label: string, phase: string | null, outcome?: string }[] } | undefined
   let stopReason: string | undefined
   for (const event of events) {
-    if (event.type === 'tool-workflow/run-start') {
+    if (event.type === 'plugin:grok-workflow/progress/run-start') {
       node = { name: String(event.data.name ?? ''), members: [] }
       continue
     }
     if (node === undefined) continue
-    if (event.type === 'tool-workflow/agent-start') {
+    if (event.type === 'plugin:grok-workflow/progress/agent-start') {
       node.members.push({
         seq: Number(event.data.seq),
         label: String(event.data.label ?? ''),
@@ -98,13 +99,13 @@ export function foldLikeTheGui(events: readonly PanelEvent[]): FoldedNode | unde
       })
       continue
     }
-    if (event.type === 'tool-workflow/agent-end') {
+    if (event.type === 'plugin:grok-workflow/progress/agent-end') {
       node.members = node.members.map(member => member.seq === Number(event.data.seq)
         ? { ...member, outcome: String(event.data.outcome ?? 'failed') }
         : member)
       continue
     }
-    if (event.type === 'tool-workflow/run-end') stopReason = String(event.data.stopReason ?? 'error')
+    if (event.type === 'plugin:grok-workflow/progress/run-end') stopReason = String(event.data.stopReason ?? 'error')
   }
   if (node === undefined) return undefined
   const phases = new Map<string, FoldedPhase>()
