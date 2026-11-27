@@ -1919,19 +1919,20 @@ describe('client progress tab: registration', () => {
     }
   }
 
-  it('registers a namespaced view entry after chat and trajectory, without a priority', () => {
+  it('registers a namespaced view entry between chat and trajectory, without a priority', () => {
     expect(progress.viewId).toBe('grok-progress')
     expect(progress.target).toBe('grok-progress')
     expect(progress.kind.startsWith('grok-progress')).toBe(true)
-    // The stock chat is order 0 and the trajectory view order 10, so 20 is "third".
-    expect(progress.viewOrder).toBe(20)
+    // The stock chat is order 0 and the trajectory view order 10: second place keeps
+    // the entry on the host's two-slot 390 strip, where the third rank folds away.
+    expect(progress.viewOrder).toBe(5)
 
     const { conversation } = fakeConversation()
     const mounted = mountProgressOn(conversation, fakeSessions())
     const entry = mounted.live()[0]!
     expect(entry.options['name']).toBe('conversation.view')
     expect(entry.options['id']).toBe('grok-progress')
-    expect(entry.options['order']).toBe(20)
+    expect(entry.options['order']).toBe(5)
     // A list slot orders by `order`; `priority` belongs to keyed replacement and must
     // not appear here (it would say "shadow someone" where nothing is shadowed).
     expect('priority' in entry.options).toBe(false)

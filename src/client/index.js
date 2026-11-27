@@ -2701,9 +2701,14 @@ window.__ModuleLoader__.load({
     const PROGRESS_TARGET = 'grok-progress'
     /** Node kind contributed by this bundle; namespaced for the same reason. */
     const PROGRESS_KIND = 'grok-progress-run'
-    /** View tab id, ordered after the stock chat (0) and trajectory (10). */
+    /** View tab id, second on the strip so the 390 px budget keeps it visible. */
     const PROGRESS_VIEW_ID = 'grok-progress'
-    const PROGRESS_VIEW_ORDER = 20
+    // Chat is order 0 and the trajectory view order 10; the host folds the
+    // strip by width (visibleViewLimit = max(1, floor((rowWidth - 48) / 120))),
+    // so 390 keeps two entries and the third rank folds into the overflow menu.
+    // Order 5 puts this tab between the two stock views: one click at 390,
+    // the default (null → chat) and every other rank untouched.
+    const PROGRESS_VIEW_ORDER = 5
     /**
      * The eight progress and Guardian lifecycle events the tab folds; all others are ignored.
      *
