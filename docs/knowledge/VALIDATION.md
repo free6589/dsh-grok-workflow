@@ -1,3 +1,14 @@
+## Round25三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+三小工只读实测，不发版不推送）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | 记忆小工`status --short --branch`+`log --oneline -5`+`log origin/main..HEAD --oneline`+`diff --stat`只读实测 | `4bd8583`（`5fb048b`+lib证据2文件125行：README123+build-cmd2）ahead 1、仅`## main...origin/main [ahead 1]`干净 `CONFIRMED` |
+| lib分支未合入 | 去留小工`merge-base --is-ancestor`双向+`cherry`+`log -3`+`--merged/--no-merged`只读实测 | 双向exit1互非祖先、`+c90b5ef`独有、在no-merged名单；verify:lib字节一致293文件HEAD未动（转述主代理） `CONFIRMED` |
+| 方法学已合零动作 | 去留小工`merge-base`+`--merged`只读实测 | ancestor exit0、`e8936d4`合并提交在史、在merged名单，tip`6de92bb`无新提交 `CONFIRMED` |
+| 分支/棚/stash去留 | 去留小工`branch -a -v`+`worktree list`+`stash list`+`stash show --name-only`只读复核 | 11本地+5远端、1主3从worktree、stash三条原位（HANDOFF/carryover.spec/STATE），一个没动，删留清单待主代理定 `CONFIRMED` |
+| 日志/live/下一波 | 主代理转述+下一波小工`show --stat`/`cat/grep`只读佐证 | 十三轮本仓零真面（4新面`HYPOTHESIS`、C2证伪、N4/N5 `BLOCKED`、全绿候选`HYPOTHESIS`）；live仍`#v0.13.61`落后本仓`0.13.62`（未改未重启）；ahead1纯证据包可推待定、lib合流草稿待定、live冻结`BLOCKED` `CONFIRMED` |
+| 本轮写面 | — | 只有三份记忆文件的增量行（STATE+1/HANDOFF+5/VALIDATION+7）；产品代码0行、不删分支不动live不重启不force-push不动tag不publish不写密钥不推送不合流 |
+
 ## Round24三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+本包工头只读实测，不发版不推送）
 
 | state | command | result |

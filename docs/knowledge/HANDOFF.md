@@ -1,3 +1,9 @@
+## 2026-11-28 — Round25三路收尾（记忆沉淀，不发版不推送，主代理CONFIRMED直接引用+三小工已收齐）
+
+- **From:** dispatcher-wrap-28包工头（统一写三份记忆增量行） · **To:** 主代理lead / 下一个接手的人
+- **做了什么**：只出三份记忆增量行、未写产品代码。主线 `4bd8583`（`5fb048b`+lib证据2文件125行，`show --stat`实测）ahead `origin/main` 1树干净`CONFIRMED`（记忆小工status/log/log-range/diff-stat四条实测）；lib分支`fix/lib-rebuild-25@c90b5ef`未合入`CONFIRMED`（去留小工双向is-ancestor均exit1+cherry独有；verify:lib字节一致293文件转述主代理）；方法学`fix/method-c2-23`已合入零动作`CONFIRMED`（ancestor exit0+`e8936d4`+merged名单）；日志十三轮本仓零真面（4新面`HYPOTHESIS`、C2证伪、N4/N5 `BLOCKED`、全绿候选`HYPOTHESIS`，转述）；live仍`#v0.13.61`落后本仓`0.13.62`（只读cat实测，未改未重启）；stash三条原位`CONFIRMED`；分支/worktree/stash一个没动（11本地+5远端、1主3从，删留清单待定）。
+- **下一步**：主代理判ahead 1推不推（仅推`4bd8583`证据包，先fetch看远端，快进推禁force）→ lib分支判合流（按草稿序列：status/fetch/checkout main/merge --no-ff/typecheck/lint/verify:lib，任一步非零即停）→ 远端绿+明确指令后才评估live亲手改（当前冻结`BLOCKED`）；stash全程原位；每步先`status`确认，禁-D/force-push/动tag/publish/动live重启。
+
 ## 2026-11-28 — Round24三路收尾（记忆沉淀，不发版不推送，主代理CONFIRMED直接引用+三小工已收齐）
 
 - **From:** dispatcher-wrap-27包工头（统一写三份记忆增量行） · **To:** 主代理lead / 下一个接手的人
