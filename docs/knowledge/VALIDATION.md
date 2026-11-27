@@ -1,3 +1,16 @@
+## 0.13.60 发版门禁与远端结论（2026-11-27，三合流发版，前置已证直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前） | `TMPDIR=$PWD/.tmp npm run ci` | **`EXIT 0`：`116 files / 2118 passed`，`Duration 137.37s`，lint `17 warnings/0 errors`** |
+| verify:lib + 客户端包 | `npm run verify:lib` + `npm run build` | `lib/ at cece95e is build of src/ at cece95e (293 files byte-identical)`；client bundle `442814` 字节；`package.json` 读回 `0.13.60`，`lib/client.js` 含 `0.13.60` 两处 |
+| 三合流 | `git merge --no-ff` ×3（`release/0.13.60`） | `64f137c`（收编）→ `a9ca3d5`（计数）→ `8e2f859`（图例），基线 `a9d0537`，ort 自动合，**无冲突、无手工融合** |
+| 主线身份 | 本树 | 抬版 `7f8d615 chore(release): prepare v0.13.60`（八文件）；主线合流 `ea6244b26cdd7cc8c9caeae3b01a0c458e10f55d`；tag `v0.13.60` 对象 `9098ebdc53b65742c7bf380b21a02a9f90b6372a` 剥出=`ea6244b`；`push main` + `push tag` 均 `RC 0` |
+| 远端 CI | run `45985798679`（main） | **`success`** |
+| 远端 Release | run `45985803015`（tag `v0.13.60`） | **`success`**；Release **`v0.13.60`** 已发布（非draft非prerelease），资产 `dsh-grok-workflow-0.13.60.tgz` `1052007` 字节 `sha256 a7b64610…d3357` |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.60]` 三条（notrun-shots快照收归`.rsi`单份+计数单行不断行+图例描边嵌套兜底，中英）已在发版提交中，`[Unreleased]` 为空，本轮不重复加条 |
+| 阻塞（`BLOCKED`） | — | 无 |
+
 ## 0.13.59 发版门禁与远端结论（2026-11-27，双合流发版，前置已证直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |

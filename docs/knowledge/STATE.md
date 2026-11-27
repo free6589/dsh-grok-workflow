@@ -1,3 +1,17 @@
+Last updated: 2026-11-27 18:55 +08:00（**0.13.60 发版完成：三合流 + prepare + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
+合流SHA **`ea6244b26cdd7cc8c9caeae3b01a0c458e10f55d`**（`Merge branch 'release/0.13.60'`，`--no-ff`，ort无冲突）（`CONFIRMED`）；
+release分支尖端合流前 **`cece95e5eb631a1bc7d8701897784c397995ca3f`**；抬版提交 **`7f8d615`** `chore(release): prepare v0.13.60`（`CONFIRMED`）；
+CI：`TMPDIR=$PWD/.tmp npm run ci` **`EXIT 0`**；lint **`17 warnings/0 errors`**；`verify:lib`（`lib/ at cece95e is build of src/ at cece95e`，`293 files byte-identical`）；client bundle **`442814`** 字节；tests **`116 files / 2118 passed`** / `Duration 137.37s`（`CONFIRMED`）；
+版本读回 `package.json` **`0.13.60`**，`lib/client.js` 含 `0.13.60` 两处（`CONFIRMED`）；
+tag **`v0.13.60`** 附注，tag对象 **`9098ebdc53b65742c7bf380b21a02a9f90b6372a`**，剥出=**`ea6244b`**（`CONFIRMED`）；
+远端CI run **`45985798679`** `success`，Release run **`45985803015`** `success`（`CONFIRMED`）；
+Release页 `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.60` 非draft非prerelease，资产 `dsh-grok-workflow-0.13.60.tgz` **1052007** 字节 `sha256 a7b64610…d3357`（`CONFIRMED`）；
+八文件：`package.json`、`package-lock.json`、`src/client/index.js`、`lib/client.js`、`CHANGELOG.md`（`[0.13.60]` 三条：notrun-shots快照收归`.rsi`单份+计数单行不断行+图例描边嵌套兜底，中英）、`README.md`、`README.zh-CN.md`、`docs/LOCAL-TESTING.md`（`CONFIRMED`）；
+三分支按序：`64f137c` 收编→`a9ca3d5` 计数→`8e2f859` 图例，基线 `a9d0537`（`CONFIRMED`）；
+`CHANGELOG` 与 `README` 已在发布提交里，本轮不重复改（`CONFIRMED`，本树实读）；
+红线：无force-push、未动已发布tag、未publish、未碰live/重启/`fix/resume-reuse`（`CONFIRMED`）。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 17:45 +08:00（**0.13.59 发版完成：双合流 + prepare + build重建 + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
 基线 **`c3ea2eb`**（= 0.13.58 收尾记忆提交）（`CONFIRMED`）；
 双合流 **`89c7b31`**（report-mismatch `6aa7f28`）→ **`f3dde50`**（legend-pending-wording `4432fc6`），ort 自动合无冲突，无手工融合裁决，`DECISIONS` 不新增（`CONFIRMED`）；
