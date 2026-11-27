@@ -10131,3 +10131,15 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | live/stash | 主代理CONFIRMED + `git stash list`实见三条 | live仍`#v0.13.61`、stash三条原位；只读未改、未重载、未重启 |
 | 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，本小工不重验门禁、不跑CI |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
+## Round16记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用，不重验；三小工只读复核一致）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | `git status --short --branch` + `git log --oneline -5`（三小工同跑同见） | `c7e6ea8`（`4849bdf`+gap12证据10文件8488行）ahead `origin/main` 1、树干净 `CONFIRMED` |
+| H1/DECISIONS | 主代理CONFIRMED（本轮直接引用，棚名`worktree list`实见在位） | H1棚内3绿未合入（wt-h1-16）、DECISIONS棚内3附注未合入（wt-dec-16） |
+| 棚/分支 | `git branch -a` + `git worktree list`（复核小工实跑） | 1主+7从=8个在位，7个`+`占用分支对上，分支一个没删 |
+| 旧棚 | 主代理CONFIRMED（本轮直接引用） | 两脏棚仍在（gap-12/candidate-09各有`??`证据，停报未删） |
+| live/stash | live转述主代理 + `git stash list`实见三条 | live仍`#v0.13.61`、stash三条原位；只读未改、未重载、未重启 |
+| 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，三小工不重验门禁、不跑CI；棚内3绿/3附注/两脏内容不重验 |
+| 下一波（建议未执行） | — | push判定先行→H1/DECISIONS合流判定（先c后d）→live永远最后（主代理亲手改，改前快照） |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
