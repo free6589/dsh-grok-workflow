@@ -49,6 +49,7 @@ Each entry records the decision, evidence, alternatives, and status.
   contract itself.
 - **Consequences:** The script uses a bounded worker pool and a bounded attempt
   loop. Exceeding a cap must fail validation, never silently increase it.
+- [Round16证伪]FALSIFIED（2026-11-28）：本条的「并发默认 3 / 上限 6、`maxRetries` 默认 1 且 schema 上限 3、`maxTasks` 默认 6 / 上限 12」与源码现状不符——现为并发默认 10 / 硬上限 100、任务默认 10 / 硬上限 100、`maxRetries` 固定为 1 且已从配置面删除（进 `REMOVED_CONFIG_KEYS`），越界走的是「钳到上限并告警」而不是校验失败；复核命令：`grep -n "maxConcurrency: 100\|maxTasks: 100\|DEFAULT_MAX_CONCURRENCY = 10\|DEFAULT_MAX_TASKS = 10\|FIXED_MAX_RETRIES = 1" src/config.ts`（EXIT 0）→ `24: maxConcurrency: 100`、`26: maxTasks: 100`、`153: FIXED_MAX_RETRIES = 1`、`156: DEFAULT_MAX_TASKS = 10`、`357: DEFAULT_MAX_CONCURRENCY = 10`；复核命令：`grep -n "maxRetries" src/config.ts`（EXIT 0）→ `487: 'maxRetries',`（在 `REMOVED_CONFIG_KEYS` 内）；spec钉子：`test/config.spec.ts:640-642`（`HARD_LIMITS.maxConcurrency` 为 100、`FIXED_MAX_RETRIES` 为 1、`DEFAULT_MAX_CONCURRENCY` 为 10）与 `test/client.spec.ts:491-492`（`DEFAULT_MAX_CONCURRENCY` / `DEFAULT_MAX_TASKS` 均为 10）。
 
 ## D-004 — Verification is criterion-based and requires evidence
 
@@ -212,6 +213,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Reason（为何不做自适应）:** 任务数在 planner 返回前未知（门禁路径先规划后执行），而 deadline 必须在启动时定；用 `maxTasks` 猜上限等于把「最多 12 个任务」当成「必然 12 个任务」，在常见 1-2 任务场景下给出 6 小时的荒唐上限。需要更长 deadline 的用户可以在 profile patch 里显式写（该值已能被 `configVersion` 前的 schema 校验），把「要多长」留给人而不是公式。
 - **Evidence:** `test/lifecycle-disposal.spec.ts`：默认值断言 `3_600_000`、硬上限仍可设到 `86_400_000`、以及一次真实超时报告里写出"`1000 ms deadline`"（证明报告用的是**实际生效**的值而不是硬编码文案）；`test/input.spec.ts` 与 `test/client.spec.ts` 同步钉住默认值与设置页范围。变异验证：把默认值改回 `1_800_000`，两处断言立即失败。
 - **Consequences:** 设置页 `timeoutMs` 的默认值显示为 `3600000`（范围 1000–86400000 不变）；t42 取证截图里的 `default 1800000` 属于**历史基线**，不再代表当前默认值。仍遗留一条真实缺口：deadline 临近没有进度事件（t41 的 P1-3/U-9），本决策不覆盖，记在 WORKFLOW-DESIGN 的 DD-13 与 VALIDATION Round 5 的 NOT_RUN 里。
+- [Round16证伪]FALSIFIED（2026-11-28）：本条的「`timeoutMs` 默认 `3_600_000`、硬上限 `86_400_000`、工具注册取 `min(timeoutMs + 60_000, 86_400_000)`」与源码现状不符——现默认是 `0`（不限时、不装定时器），schema 上限是 `Number.MAX_SAFE_INTEGER` 而不是 86 400 000，工具注册在 `timeoutMs <= 0` 时干脆不带该字段、否则取 `min(timeoutMs + 60_000, MAX_TIMER_DELAY_MS)`（`2_147_483_647`）；复核命令：`grep -n "DEFAULT_TIMEOUT_MS = 0\|MAX_SAFE_INTEGER" src/config.ts`（EXIT 0）→ `124: export const DEFAULT_TIMEOUT_MS = 0`、`662: timeoutMs: z.natural().min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_TIMEOUT_MS).volatile()`；复核命令：`grep -n "MAX_TIMER_DELAY_MS" src/index.ts`（EXIT 0）→ `291: ...config.timeoutMs <= 0 || config.timeoutMs > MAX_TIMER_DELAY_MS`、`293: : { timeoutMs: Math.min(config.timeoutMs + 60_000, MAX_TIMER_DELAY_MS) }`；spec钉子：`test/config.spec.ts:899-900`（默认 `0` 且 `DEFAULT_TIMEOUT_MS` 与解析结果同值）、`test/config.spec.ts:909`（`86_400_000` 只是被接受的一个值，不是上限）。
 
 ## D-018 — deadline 由插件自己强制执行（t47，修 t46 实证的「引擎不收 abort」）
 
@@ -482,6 +484,7 @@ Each entry records the decision, evidence, alternatives, and status.
   hybrid prompt 只传历史前 2000 字 + 本条前 2000 字，要求 `{"tier":"chat|fast|team"}`，解析失败回退规则结果。
 - **Consequences:** 设置页 enum 双语；27 字段投影断言更新。
 - **Alternatives rejected:** 全量模型分诊（寒暄也变慢变贵）。
+- [Round16证伪]FALSIFIED（2026-11-28）：本条的「新增 `triageClassifier: rules|hybrid`（默认 rules）+ `triageModel` 复用」与源码现状不符——这两个键连同 `triageAsk` / `triageFollowupAsFast` 都已进 `REMOVED_CONFIG_KEYS`，旧前台链与 `src/triage.ts` 在 M3.3 已被删除，patch 再带上它们只会被忽略并记一条提示，rules/hybrid 的模型分诊路径已不存在；复核命令：`grep -n "triageClassifier" src/config.ts`（EXIT 0）→ `479: 'triageClassifier',`（`477-480` 四行同族，位置在 `REMOVED_CONFIG_KEYS` 数组内）；复核命令：`git log -1 --format='%h %s' -- src/triage.ts src/gate.ts`（EXIT 0）→ `09aa1bd refactor(m3.3): delete the old front desk chain`；spec钉子：`test/config-limits-repair.spec.ts:208`（`REMOVED_CONFIG_KEYS` 恰 25 条）与 `test/config-removed-keys.spec.ts:58`（每个已删键都能加载、且不进入解析结果）。
 
 ## D-034 — 团队档即时回执 + 确定性人话导读，零额外调用（v0.4.0）
 
