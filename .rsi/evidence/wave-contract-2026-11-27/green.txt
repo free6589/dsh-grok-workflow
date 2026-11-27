@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-contract
+
+ ✓ test/contract-freeze.spec.ts (17 tests) 75ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  23:09:52
+   Duration  857ms (transform 584ms, setup 0ms, import 663ms, tests 75ms, environment 0ms)
+
