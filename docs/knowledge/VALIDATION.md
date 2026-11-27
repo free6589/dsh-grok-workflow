@@ -10077,3 +10077,14 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | live | `grep -n grok-workflow ~/.dsh/profiles/web/package.json` | 第13行仍 `#v0.13.61`，只读未改、未重载、未重启 |
 | 未做（`NOT_RUN`） | cjk外盘95M定位、日志三轮原文复算 | 转述主代理沿用，未冒充实测 |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |
+## Round11记忆沉淀验证（2026-11-28，主代理亲手复验`CONFIRMED`，直接引用不重复验证）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | 主代理亲手复验（本轮直接引用） | `46600d1` = `origin/main`，树干净（补丁分支切走后已checkout回main）`CONFIRMED` |
+| candidate | 主代理亲手复验（本轮直接引用） | `chore/candidate-09-evidence@8359fd2`（基线46600d1，4文件90行，仅证据），分支不动 `CONFIRMED` |
+| AB回指 | 主代理亲手复验（本轮直接引用） | A `BLOCKED`（缺源档）、B `CONFIRMED`（缺口seq30未补派） |
+| live | 主代理亲手复验（本轮直接引用） | 快照三轮仍`#v0.13.61`实例活，远端Latest已是`v0.13.62`；只读未改、未重载、未重启 `CONFIRMED` |
+| stash | 主代理亲手复验（本轮直接引用） | 三条原位 `CONFIRMED` |
+| 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已复验，本小工不重复验证、不跑命令 |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、补丁分支不动 |
