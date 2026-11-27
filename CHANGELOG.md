@@ -5,6 +5,35 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.58] - 2026-11-27
+
+### Fixed / 修复
+
+- **Firefox tri-state evidence pinned by a guard, no product change / 火狐三态证据钉死，产品零改动** —
+  Three Firefox screenshots (waiting / running / done) plus their readings are pinned by
+  `test/browser-tri-states.spec.ts`: chips, dock button and a zero-error console are asserted as bytes,
+  so a future change cannot silently move them.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only test guards, no shipped
+  behavior changed.** Safari/WebKit stays recorded as NOT_RUN (no local engine), not verified.
+  / 火狐三态截图（等待 / 进行中 / 已完成）连同读数被 `test/browser-tri-states.spec.ts` 钉死：牌子、dock 按钮与零报错控制台都按字节断言，以后谁也动不了它们还不被发现。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；这只是测试钉子，已发布的行为没变。** Safari/WebKit 记为 NOT_RUN（本机无引擎），没写成已验证。
+
+- **Screen reader walks the progress page in reading order / 读屏按阅读顺序走完进度页** —
+  Header, figure, sheet, list and the stuck line now carry `aria-label` / `role="region"` /
+  `aria-atomic` announcements pinned red-first by `test/progress-screen-walk.spec.ts` (5 failed before,
+  5 passed after): attributes only, no copy, behavior or CSS change.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only added announcements.**
+  / 标题、任务图、面板、调用列表与卡住句现在带 `aria-label` / `role="region"` / `aria-atomic` 播报，
+  由 `test/progress-screen-walk.spec.ts` 红先绿后钉死（先 5 挂、后 5 过）：只加属性，文案、行为、样式都没动。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是多了这些播报。**
+
+- **Stale snapshots collected, eleven root leftovers dropped / 快照收编、根目录十一处清理** —
+  Not-run screenshots are collected under `.rsi/evidence/` and eleven stale root leftovers are removed
+  (keeping `progress-now`), so the tree root stays clean.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; housekeeping only.**
+  / 未跑截图收编进 `.rsi/evidence/`，根目录十一处过期残留删除（保留 `progress-now`），根目录保持干净。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；只是内务清理。**
+
 ## [0.13.57] - 2026-11-27
 
 ### Fixed / 修复
