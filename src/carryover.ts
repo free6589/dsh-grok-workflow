@@ -151,11 +151,12 @@ const TASK_ROW = /^- (\S+): (verified|failed|blocked) \(\d+ attempts?\) — (.*)
 /** The indented reason line under a task row. */
 const TASK_ROW_REASON = /^\s+incomplete(?: \([a-z]+\))?: (.*)$/
 
-/** Absolute-path locators (`/tmp/x`, `/home/u/a.ts`) and URLs, bounded below. */
+/** Locators a round's rows quote: absolute paths, URLs, and bare file names. */
 const LOCATOR_PATTERNS: readonly RegExp[] = [
   /file:\/\/[^\s,;()]+/g,
   /https?:\/\/[^\s,;()]+/g,
   /\/[\w.@-]+(?:\/[\w.@-]+)+/g,
+  /(?<![\w/.])[\w-]+(?:\.[\w-]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi,
 ]
 
 /** Collapse whitespace, redact, and bound one line of compiled text. */

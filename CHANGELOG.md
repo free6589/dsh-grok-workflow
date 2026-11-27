@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.59] - 2026-11-27
+
+### Fixed / 修复
+
+- **Carry-over locators keep bare deliverable file names / 回执定位器保留裸文件名** —
+  Locators quoted by a round's rows now also match bare deliverable file names (`a.ts`, `report.json`),
+  so a 3/3 round whose evidence row lists `a.ts, b.ts and c.ts` still counts all three hits at the same
+  granularity as the deliverables line the operator summarizes from.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which locator
+  pattern a round matches.**
+  / 每轮行内引用的定位器现在也认裸交付文件名（`a.ts`、`report.json`），证据行写
+  `a.ts, b.ts and c.ts` 的 3/3 回执也能按交付物行同一口径命中三处。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是每轮匹配哪一种定位器。**
+
+- **Trajectory legend gains a fifth sentence: dim means not run yet, never failed / 轨迹图例加第五句：暗点是还没跑到，不是没过** —
+  The progress legend now ships five keys (both dictionaries): a dimmed dot only ever says the event stream
+  has not reached that stage yet, never that it failed, so an unvisited stage stops looking like a failure.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only the added legend copy.**
+  / 进度图例现在是五个键（两本字典都有）：暗点只表示事件流还没跑到那一步，从不表示没过，没跑的阶段从此不再像挂了。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是多了这句图例文案。**
+
 ## [0.13.58] - 2026-11-27
 
 ### Fixed / 修复

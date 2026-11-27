@@ -210,8 +210,8 @@ window.__ModuleLoader__.load({
      * by a later round and intentionally static here so the page never phones
      * home on its own. Both must stay plain `X.Y.Z` strings (see `isVersion`).
      */
-    const PLUGIN_VERSION = '0.13.58'
-    const UPDATE_LATEST = '0.13.58'
+    const PLUGIN_VERSION = '0.13.59'
+    const UPDATE_LATEST = '0.13.59'
     const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
     /**
      * Whether the shipped version is the newest known release.
@@ -398,6 +398,7 @@ window.__ModuleLoader__.load({
       'progress.panel.legend.untraced': 'Dimmed wire: unvisited',
       'progress.panel.legend.rings': 'Six dots: six stages',
       'progress.panel.legend.checks': 'Five dots: five checks',
+      'progress.panel.legend.pending': 'Dim means not run yet, not failed',
       // What the two rows of lights on a card are called, when a card names them at all.
       'progress.panel.rings': 'Six stages',
       'progress.panel.checks': 'Five checks',
@@ -673,6 +674,7 @@ window.__ModuleLoader__.load({
       'progress.panel.legend.untraced': '暗线：没走的线',
       'progress.panel.legend.rings': '六点：六环，走完六个阶段',
       'progress.panel.legend.checks': '五点：五验，通过五道验收',
+      'progress.panel.legend.pending': '暗点是还没跑到，不是没过',
       // 卡上两排灯各自叫什么（卡自己不点名，只有读屏与悬停用得上）。
       'progress.panel.rings': '六环',
       'progress.panel.checks': '五验',
@@ -5148,7 +5150,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-wires > path[data-trace="active"] { stroke: var(--dsw-alias-state-business-primary); stroke-width: 2; }',
       '.gw-progress-wires > path[data-trace="dim"] { opacity: 0.3; }',
       '.gw-progress-pnode[data-trace="active"] .gw-progress-pnode-body { border-color: var(--dsw-alias-state-business-primary); }',
-      // ── the trace legend: four standing words, once a node is opened ─────────────
+      // ── the trace legend: five standing words, once a node is opened ─────────────
       // Four short sentences under the figure, only while a trace is lit: what a lit wire,
       // a dimmed wire, the six dots and the five dots each say. Plain text in the page flow,
       // so it wraps on a phone and never covers a card.
@@ -5158,6 +5160,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-legend-wire[data-trace="active"] { background: var(--dsw-alias-state-business-primary); }',
       '.gw-progress-legend-wire[data-trace="dim"] { opacity: 0.4; }',
       '.gw-progress-legend-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-legend-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }',
       // ── one call line: clock, gate and word ──────────────────────────────────────
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       // A list hangs under one card, so a row is only ever as wide as that card — 110 to 240
@@ -5753,11 +5756,11 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The standing legend of a lit trace: four short sentences under the figure.
+     * The standing legend of a lit trace: five short sentences under the figure.
      *
      * Only while a node is opened (traced !== undefined): a lit wire is a wire the reader's
      * own click lit, a dimmed wire is one it did not touch, the six dots are a task card's
-     * six stages and the five dots are the run's five checks. Plain text in the page flow,
+     * six stages, the five dots are the run's five checks, and a dimmed dot only ever says the event stream has not reached that stage yet — never that it failed. Plain text in the page flow,
      * so a phone wraps it instead of covering a card.
      * @param t - translator.
      * @returns the legend element.
@@ -5772,6 +5775,7 @@ window.__ModuleLoader__.load({
         item('progress.panel.legend.untraced', h('span', { key: 'mark', className: 'gw-progress-legend-wire', 'data-trace': 'dim', 'aria-hidden': 'true' })),
         item('progress.panel.legend.rings', h('span', { key: 'mark', className: 'gw-progress-legend-dot', 'aria-hidden': 'true' })),
         item('progress.panel.legend.checks', h('span', { key: 'mark', className: 'gw-progress-legend-dot', 'aria-hidden': 'true' })),
+        item('progress.panel.legend.pending', h('span', { key: 'mark', className: 'gw-progress-legend-dot', 'data-state': 'pending', 'aria-hidden': 'true' })),
       ])
     }
 
@@ -6162,9 +6166,10 @@ window.__ModuleLoader__.load({
         : [
           header,
           ProgressPanelGraph(graph, layout, graphRef, panelProps, run.name),
-          // The trace legend stands under the figure, only while a trace is lit: four
-          // standing words that say what a lit wire, a dimmed wire, the six dots and the
-          // five dots each mean. Closed, the page says nothing about a reading nobody made.
+          // The trace legend stands under the figure, only while a trace is lit: five
+          // standing words that say what a lit wire, a dimmed wire, the six dots, the
+          // five dots and a dimmed dot each mean (dimmed is "not run yet", never failed).
+          // Closed, the page says nothing about a reading nobody made.
           panelProps.traced === undefined ? null : ProgressPanelLegend(t),
           // The opened calls come out of the figure and stand here, in the
           // panel's own column: after the figure, so they can only push the page down — never

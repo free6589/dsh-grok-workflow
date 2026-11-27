@@ -1,0 +1,19 @@
+{
+  "zh": [
+    "亮线：走过的线",
+    "暗线：没走的线",
+    "六点：六环，走完六个阶段",
+    "五点：五验，通过五道验收",
+    "暗点是还没跑到，不是没过"
+  ],
+  "en": [
+    "Lit wire: visited",
+    "Dimmed wire: unvisited",
+    "Six dots: six stages",
+    "Five dots: five checks",
+    "Dim means not run yet, not failed"
+  ],
+  "hasItem": true,
+  "hasCss": true,
+  "installedBytes": 434316
+}
