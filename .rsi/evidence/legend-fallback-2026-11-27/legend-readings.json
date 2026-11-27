@@ -1,0 +1,24 @@
+{
+  "readings": {
+    "box": {
+      "x": 12,
+      "y": 88.875,
+      "width": 876,
+      "height": 17,
+      "top": 88.875,
+      "right": 888,
+      "bottom": 105.875,
+      "left": 12
+    },
+    "boxShadow": "rgb(255, 255, 255) 0px 0px 0px 1px inset",
+    "background": "rgba(0, 0, 0, 0)",
+    "texts": [
+      "亮线：走过的线",
+      "暗线：没走的线",
+      "六点：六环，走完六个阶段",
+      "五点：五验，通过五道验收",
+      "暗点是还没跑到，不是没过"
+    ]
+  },
+  "cssRule": ".gw-progress-legend-dot[data-state=\"pending\"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary, var(--dsw-alias-label-primary, Canvas)); }"
+}
