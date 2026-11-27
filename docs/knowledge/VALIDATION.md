@@ -10217,3 +10217,11 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | Round21主线/去留 | `git status --short --branch` + `git log --oneline -5` + `git branch -a` + `git worktree list`（本包工头只读实测） | `e19e8e2`（`ae78750`+`d7b7aae --no-ff`，4文件78行src零改动）ahead 2树干净；1主+3从在位；分支一个不删全留待定 `CONFIRMED` |
 | Round21日志/S1/live/stash | 主代理CONFIRMED直接引用 + `git stash list`三条实见 | 九轮本仓零真面（A1/A2/A3，证伪3，新N3 HYPOTHESIS）；S1棚内M15（红2→绿14，回归170绿未提交）；live仍`#v0.13.61`未改未重启；stash三条原位 `CONFIRMED` |
 | Round21未做/写面 | 本轮复验动作 + 写面声明 | 门禁/CI不重验`NOT_RUN`；只有三份记忆追加行（STATE 1行/HANDOFF 1块/VALIDATION 3行），产品代码0行，不删分支不动live不推送不读密钥 `CONFIRMED` |
+## Round26记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用 + 本小工只读复核）
+
+| state | command | result |
+| --- | --- | --- |
+| Round26主线/未推送 | `git status --short --branch` + `git log --oneline -5` + `git rev-list --left-right --count origin/main...main` + `git diff --stat origin/main..main`（只读实测） | `c0cb20b`（`b88008b`+`c90b5ef --no-ff`，3文件57+/3-，纯`lib/script.*`）ahead 2未推送、树干净；`rev-list`=0/2；`diff --stat`同上 `CONFIRMED`；门禁tsc0/lint17w0e/verify293一致为转述 |
+| Round26 CI双红同因 | `gh run list -L 4 --json ...` + `gh run view 46074567615 --json jobs`（只读实测） | `b88008b`/`5fb048b`两条`failure`；两条任务Node22与Node24失败步同为`git diff --exit-code -- lib/`，即lib产物差 `CONFIRMED`；合流推送后转绿 `HYPOTHESIS` |
+| Round26日志/live/stash/分支 | 主代理CONFIRMED直接引用 + `git stash list` + `git branch -a` + `git worktree list` + `~/.dsh/profiles/web/package.json:13`只读 | 日志十四轮本仓零真面（巡检N1超时落盘、证伪3条、N8 `HYPOTHESIS`、N9待判重）；live仍`#v0.13.61`只读实见；stash三条原位实见；1主+3从四条在位，分支一个没删 `CONFIRMED` |
+| Round26未做/写面 | 本轮复验动作 + 写面声明 | 十四轮日志本轮未重跑`NOT_RUN`（转述）；只有三份记忆追加行（STATE 1行/HANDOFF 1块4行/VALIDATION 1节8行），产品代码0行，不删分支不动live不重启不force-push不动tag不publish不写密钥不推送 `CONFIRMED` |
