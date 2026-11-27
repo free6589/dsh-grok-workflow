@@ -9860,3 +9860,18 @@ Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak
 **证据：** `.rsi/evidence/stuck-hint-2026-11-26/`（`README.md` 是索引：五张图 + 四份读数 + 四份会话流 + `timeline.json` +
 `install.txt` + `redline.txt` + 三个脚本）；读数订正在 `.rsi/evidence/task-panel-2026-11-26/soak/`
 （`raw-readings-phone.json` 的 `callListFields` 与 `raw-readings-phone.CORRECTION.md`）。
+
+## Firefox tri-state evidence (fix/browser-firefox-safari, 2026-11-27) (`CONFIRMED`)
+
+Same static bundle harness, two engines, three states each. No live DSH, no network, no product change.
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| tsc | `npx tsc -p tsconfig.json --noEmit`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | `EXIT 0` |
+| oxlint | `npx oxlint src test`（同环境） | `0 errors`（`17 warnings`） |
+| guard | `npx vitest run test/browser-tri-states.spec.ts`（同环境） | `3 passed` |
+| firefox soak | `node .tmp/tri-ff/soak-tri.mjs .tmp/tri-ff/tri-harness.html .rsi/evidence/browser-firefox-safari/` | `firefox-waiting/running/done.png` + `chromium-*` 对照 + `readings.json` + `console.json` |
+
+Readings (firefox 157, same instant as each PNG): waiting `等你点头/waiting/开工` (`第 1 步，共 7 步`), running `进行中/running` (`第 4 步` + 剩余约 1 分), done `已完成/done` (`第 7 步`); console/page errors all `[]`.
+
+Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs sudo and was not run; guard asserts no forged `webkit/safari` key. Evidence: `.rsi/evidence/browser-firefox-safari/` (`README.md` is the index).
