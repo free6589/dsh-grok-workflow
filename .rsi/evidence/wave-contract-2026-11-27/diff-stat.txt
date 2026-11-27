@@ -1,0 +1,7 @@
+ .../wave-contract-2026-11-27/diff-stat.txt         |   7 +
+ .rsi/evidence/wave-contract-2026-11-27/green.txt   |  10 +
+ .rsi/evidence/wave-contract-2026-11-27/red.txt     |   9 +
+ .../wave-contract-2026-11-27/typecheck.txt         |   4 +
+ docs/knowledge/CONTRACT-wave-2026-11-27.md         | 110 +++++++++
+ test/contract-freeze.spec.ts                       | 268 +++++++++++++++++++++
+ 6 files changed, 408 insertions(+)
