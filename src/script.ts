@@ -813,6 +813,9 @@ function routeReason(value) {
 function failureCategory(failureClass, code) {
   if (failureClass === 'task-failed' || failureClass === 'verification-failed') return 'quality';
   if (failureClass === 'budget-exhausted') return 'configuration';
+  // B-gap (gap-13):配置类统一归 configuration —— 补派判据只看 category,
+  // setup 位只决定 attempt 内是否提前 break。集中在这里,判据与 attempt 循环解耦。
+  if (failureClass === 'agent-start-failed') return 'configuration';
   // The guest engine raises AGENT_RESULT for a child run that failed, crashed
   // or was disposed. Whatever the text says, the failure came from below the
   // task's own work, so it is infrastructure even when it cannot be classified
@@ -3159,7 +3162,16 @@ async function requestSummaryDraft(prompt, attempt) {
   // first draft reads 汇总·第1稿 and a rewrite reads the next number. The same
   // string is the prompt's first line, so the panel's label and the child's own
   // title cannot disagree.
+  //
+  // B-gap (gap-13): failed 汇总同腿补派 1 次。per-unit 计数:attempt 索引本身就是
+  // 单元计数器(0=首发,>=1=已补派过),不引入全局计数。配置类失败
+  // (setup/routeHealth 死亡位、budget-exhausted、agent-start-failed、category
+  // configuration)标为人工(manual),不自动补派:这类失败重发只会烧预算。
+  // 只有可重试失败(infrastructure/quality 的 format-error/transport/route 死亡)
+  // 且 attempt === 0 时,才用同一条腿(synthesizer)补发一次;补派仍失败则如实
+  // 返回空文本,由交付层兜底,不再循环(有界,不成环)。
   const label = synthesisDraftLabel(attempt + 1);
+  let firstError = '';
   try {
     const call = await callRole('synthesizer', prompt, {
       schema: SUMMARY_SCHEMA,
@@ -3183,7 +3195,16 @@ async function requestSummaryDraft(prompt, attempt) {
           }
         }
       }
-      return { text: '', error: 'synthesizer failed on every route: [' + call.failure.class + '] ' + call.failure.reason };
+      // B-gap (gap-13) redispatch: same-leg one-shot. attempt is the per-unit
+      // counter (0 = first issue, >= 1 = already redispatched), so attempt > 0
+      // means the budget is spent and this failure is terminal. Configuration
+      // failures repeat by definition and are marked manual instead.
+      if (attempt === 0 && isSynthRedispatchable(call.failure)) {
+        log('synthesizer redispatching same leg once after [' + call.failure.class + ']');
+        return requestSummaryDraft(prompt, 1);
+      }
+      if (attempt === 0 && isSynthManualOnly(call.failure)) firstError = call.failure.class;
+      return { text: '', error: 'synthesizer failed on every route: [' + call.failure.class + '] ' + call.failure.reason + (firstError === '' ? '' : ' (manual: ' + firstError + ', no auto-redispatch)') };
     }
     const normalized = normalizeSummary(call.value);
     if (!normalized) {
@@ -3200,12 +3221,45 @@ async function requestSummaryDraft(prompt, attempt) {
           return { text: resubmitted.summary, error: '' };
         }
       }
+      // B-gap (gap-13): a prose answer that never submits is a retryable quality
+      // gap on the same leg — one redispatch, same per-unit counter rule.
+      if (attempt === 0) {
+        log('synthesizer redispatching same leg once after unparsable summary');
+        return requestSummaryDraft(prompt, 1);
+      }
       return { text: '', error: 'synthesizer returned no valid summary' };
     }
     return { text: normalized.summary, error: '' };
   } catch (error) {
     return { text: '', error: 'synthesizer could not run: [' + classifyCallFailure('synthesizer', error).class + '] ' + safeError(error) };
   }
+}
+
+/**
+ * B-gap (gap-13): whether a dead synthesizer call may be redispatched on the
+ * same leg. Configuration failures repeat by definition (budget-exhausted,
+ * agent-start-failed, category configuration, or the setup bit the budget guard
+ * sets) and are marked manual instead of re-sent. Everything else — a route
+ * transport death or a retryable format/infrastructure/quality gap — may go
+ * once more on the same leg. The per-unit bound lives in the caller: only
+ * attempt 0 redispatches, so the redispatch itself (attempt 1) is
+ * terminal whatever it returns.
+ */
+function isSynthRedispatchable(failure) {
+  if (!failure) return false;
+  return !isSynthManualOnly(failure);
+}
+
+/**
+ * B-gap (gap-13): configuration-class failures are manual-only — no automatic
+ * redispatch, the error string carries the mark instead.
+ */
+function isSynthManualOnly(failure) {
+  if (!failure) return false;
+  if (failure.setup === true) return true;
+  if (failure.class === 'budget-exhausted' || failure.class === 'agent-start-failed') return true;
+  if (failure.category === 'configuration') return true;
+  return false;
 }
 
 /**
