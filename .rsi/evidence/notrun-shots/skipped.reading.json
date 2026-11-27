@@ -1,0 +1,12 @@
+{
+  "verdictOutcome": "skipped",
+  "judged": false,
+  "chipKeys": [
+    "progress.chip.waiting",
+    "progress.chip.running",
+    "progress.chip.done",
+    "progress.chip.failed",
+    "progress.chip.cancelled"
+  ],
+  "note": "页面无 skipped 胶囊；跳过上报只落在台账 verdict 行，不进 chip。"
+}

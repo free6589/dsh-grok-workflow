@@ -1,0 +1,10 @@
+{
+  "running": {
+    "chip": "进行中",
+    "chipState": "running",
+    "dockState": "none",
+    "dockButton": null
+  },
+  "endedChip": "未通过",
+  "endedState": "failed"
+}
