@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.61] - 2026-11-27
+
+### Fixed / 修复
+
+- **Carry-over locators keep CJK deliverable file names / 回执定位器保留中文交付物文件名** —
+  Locators quoted by a round's rows now also match bare deliverable file names containing CJK
+  characters (hiragana, katakana, CJK extensions, and hangul),
+  so a 3/3 round whose evidence row lists Chinese file names still counts all its hits
+  at the same granularity as the deliverables line; the delivery-side machine-detail strip uses
+  the same extended ranges, so a CJK file name is never read back as prose.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which locator
+  pattern a round matches.**
+  / 每轮行内引用的定位器现在也认含 CJK 字符的裸交付物文件名（含平假名、片假名、汉字扩展与谚文），证据行写中文文件名的 3/3 回执也能按交付物行同一口径命中三处；交付侧的机器细节剥离用同一套扩展范围，中文文件名不会再被读回成正文。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是每轮匹配哪一种定位器。**
+
+- **390 entry pinned to order 5 with a versioned host snapshot / 390 入口钉在 order 5，另带一份带版本号的宿主快照** —
+  The progress entry keeps view order 5 (between the two stock views) and the registered slot order 5;
+  a versioned STOCK snapshot (chat 0 / trajectory 10, v1) pins the host strip it joins, so a host-added
+  view turns the spec red instead of folding the entry silently, and the 390 strip keeps two visible
+  entries with the third rank folded into the overflow menu.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only where the entry
+  is allowed to mount and how drift is detected.**
+  / 进度入口保持视图顺序 5（两宿主视图之间）与注册槽顺序 5；一份带版本号的 STOCK 快照（chat 0 / trajectory 10，v1）
+  钉住它加入的那条宿主条，宿主加视图会让用例变红、而不是悄悄把入口挤掉，390 那条保持两个可见入口、第三顺位折进溢出菜单。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是入口允许挂在哪、漂移怎么被发现。**
+
 ## [0.13.60] - 2026-11-27
 
 ### Fixed / 修复
