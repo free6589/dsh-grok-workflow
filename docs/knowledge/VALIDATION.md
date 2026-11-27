@@ -1,3 +1,16 @@
+## 0.13.58 发版门禁与远端结论（2026-11-27，Wave4 三合流发版，包工头实测，前置已证直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前） | `npm run ci`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | **`EXIT 0`：`116 files / 2113 passed`，`Duration 76.44s`，lint `17w0e`** |
+| 三合流 | `git merge --no-ff` ×3 | `9ad34d2`（火狐）→ `3092f8d`（走读）→ `25daeaf`（卫生），ort 自动合，**无冲突、无手工融合** |
+| 主线身份 | 本树 | 基线 `8f02c32`；prepare `258cf95`（八文件，版本读回 `0.13.58`）；主线合流 `44b4248`；tag `v0.13.58` 对象 `0ba856e` 指向 `44b4248`；`push main` + `push tag` 均 `RC 0` |
+| 远端 CI | run `45957998322`（main，`44b4248`） | **`success`**（Node22/24 绿） |
+| 远端 Release | run `45958009818`（tag `v0.13.58`） | **`success`**；Release **`v0.13.58`** 已发布（`2026-11-27T07:24:01Z`），资产 `dsh-grok-workflow-0.13.58.tgz` `1050257` 字节 |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.58]` 三条（火狐三态 / 读屏走读 / 卫生清理）已在发版提交中，`[Unreleased]` 为空，本轮不重复加条 |
+| 未做（`NOT_RUN`） | Safari 实测、真人读屏差异 | 前置已记 `NOT_RUN`，本轮不重复执行 |
+| 阻塞（`BLOCKED`） | — | 无 |
+
 ## fix/screen-reader-walk 读屏走读（分支 `fix/screen-reader-walk`，基线 `8f02c32`，未提交，`CONFIRMED`）
 
 | state | command（环境） | result |

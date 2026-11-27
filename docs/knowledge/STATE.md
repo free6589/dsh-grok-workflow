@@ -1,3 +1,15 @@
+Last updated: 2026-11-27 15:30 +08:00（**0.13.58 发版完成：三合流 + prepare + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
+基线 **`8f02c32`**（= 远端 `0.13.57` 已发）（`CONFIRMED`）；
+三合流 **`9ad34d2`**（火狐）→ **`3092f8d`**（走读）→ **`25daeaf`**（卫生），ort 自动合无冲突（`VALIDATION` 头尾各追加），无手工融合裁决，`DECISIONS` 不新增（`CONFIRMED`）；
+发版准备 **`258cf95`**（八文件，版本号读回全 `0.13.58`）（`CONFIRMED`）；主线合流 **`44b4248`**（`CONFIRMED`）；
+本地全量 `npm run ci` **`EXIT 0`：`116 files / 2113 passed` / `76.44s` / lint `17w0e`**（`CONFIRMED`）；
+附注标签 **`v0.13.58`** 对象 **`0ba856e`** 指向 **`44b4248`**（`CONFIRMED`）；`push main` + `push tag` 均 **`RC 0`**（`CONFIRMED`）；
+远端 CI run **`45957998322`** `success`（Node22/24 绿）+ 远端 Release run **`45958009818`** `success`（`CONFIRMED`）；
+Release **`v0.13.58`** 已发布 **`2026-11-27T07:24:01Z`**，资产 `dsh-grok-workflow-0.13.58.tgz` **1050257** 字节（`CONFIRMED`）；
+用户条目已在发版提交中（`CHANGELOG.md [0.13.58]` 三条：火狐三态 / 读屏走读 / 卫生清理），`[Unreleased]` 为空（`CONFIRMED`）。
+本轮环境备注：默认 `bash` 工具全程不可用，全部 git/CI 操作经 Serena 通道；`/home` 及 `/tmp` 配额满致 `verify:lib` 首跑失败（非代码失败），`TMPDIR` 指 data 盘即过（`CONFIRMED`）。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 15:10 +08:00（**fix/screen-reader-walk 未提交施工中（`CONFIRMED`，本树实测）** —
 分支 **`fix/screen-reader-walk`**（基线 **`8f02c32`**，`git branch -a` 无他人同任务活分支可复用判断：`fix/browser-firefox-safari` 在 `057d834` 做浏览器三态，与读屏无关）；改动 **`src/client/index.js` + `lib/client.js`（重建逐字节）+ `test/client.spec.ts` + `test/i18n-parity.spec.ts` + 新 `test/progress-screen-walk.spec.ts` + `.rsi/evidence/screen-reader-walk/`**；门禁 `tsc 0错 / oxlint 17w0e（基线同数）/ 5 files 301 passed`；`git status` 剩本分支改动 + 主检出遗留 untracked（`.progress-*`、`us-weather-week.html`、`evidence/` 等，他人掉落不动）；未推远端，未合流。
 以下为上一轮记录，原样保留：

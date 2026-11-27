@@ -1,3 +1,11 @@
+## 2026-11-27 — 0.13.58 发版收口（Wave4 三合流发版：火狐 + 走读 + 卫生合流 + CI + 抬版 + 合 main + 打 tag + 双推 + 远端双绿 + 记忆 + 清分支）**（主线 `44b4248` = 远端 `origin/main`；远端 CI `45957998322` success + Release `45958009818` success + Release `v0.13.58` 已发布（`2026-11-27T07:24:01Z`，资产 `1050257` 字节）；删 `release/0.13.58` + 三修分支（已合才 `-d`，`-d` 拒绝就上报不强删）；残留 untracked、`fix/resume-reuse`、备份、已发布 tag 一律不动；不动代码、不碰 live、不重启）**
+
+- **From:** 0.13.58 发版包工头（合流 + 发版 + 记忆 + 清分支，不碰 live） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）
+- **发版结论（`CONFIRMED`，前置已证直接用、不重验）**：基线 `8f02c32`；三合流 `9ad34d2`（火狐）→ `3092f8d`（走读）→ `25daeaf`（卫生）（ort 自动合无冲突，无手工融合裁决，`DECISIONS` 不新增）；prepare `258cf95`（八文件，版本读回 `0.13.58`）；主线合流 `44b4248`；附注标签 `v0.13.58`（对象 `0ba856e`）；`push main` + `push tag` 均 `RC 0`；本地 `npm run ci` `EXIT 0`（`116 files / 2113 passed` / `76.44s` / lint `17w0e`）；远端 CI `45957998322` success（Node22/24 绿）+ Release `45958009818` success；Release `v0.13.58` 已发布（`2026-11-27T07:24:01Z`），资产 `dsh-grok-workflow-0.13.58.tgz` `1050257` 字节；用户条目在 `CHANGELOG.md [0.13.58]` 三条（火狐三态 / 读屏走读 / 卫生清理），`[Unreleased]` 已空，本轮不重复加。
+- **环境备注**：默认 `bash` 工具全程不可用，全部 git/CI 操作经 Serena 通道执行。`/home` 及 `/tmp` 配额满致 `verify:lib` 首跑失败（非代码失败），`TMPDIR` 指 data 盘即过。
+- **已删 / 未删（收尾复验实测后填，`CONFIRMED`）**：`git branch -d release/0.13.58 fix/browser-firefox-safari fix/screen-reader-walk fix/hygiene-cleanup`（已合才删；`-d` 拒绝则上报不强删）。删后带回 `git branch -a` + `git status --short --branch` + `git worktree list` + `git rev-parse main`。
+- **红线**：残留 untracked、`fix/resume-reuse`、备份、已发布 tag 一律不动；不动代码、不碰 live、不重启；live 升级只记录不执行。
+
 ## 2026-11-27 — fix/screen-reader-walk 施工移交（未提交：5 处 aria + 5 断言 + 走读证据，未推远端）
 
 - **From:** 读屏走读执行者（Wave4 第二路） · **To:** 主代理（合流 + 验收的人）
