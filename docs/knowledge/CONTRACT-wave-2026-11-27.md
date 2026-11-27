@@ -5,7 +5,7 @@
 
 ## 1. progress 事件名（冻结值）
 
-冻结 9 项 lifecycle（顺序固定，`tool-workflow/` 前缀）：
+冻结 9 项 lifecycle（顺序固定，`plugin:grok-workflow/progress/` 前缀）：
 
 `run-start` / `agent-start` / `agent-end` / `summary-final` / `summary-rejected`
 / `guardian-start` / `guardian-finding` / `guardian-end` / `run-end`
@@ -28,7 +28,7 @@ T2/T3/T4 引用 stub：`import { PROGRESS_EVENT_TYPES } from '../src/progress-ta
 
 | 键 | 冻结值 | 位置 |
 | --- | --- | --- |
-| 3 个事件常量 | `stage-detail` / `summary-final` / `summary-rejected`（`tool-workflow/` 前缀）；`stage-detail` 不在 9 项白名单内 | `src/progress-tab.ts` 第 73/85/96 行；client 镜像第 2801/2811/2821 行 |
+| 3 个事件常量 | `stage-detail`（仍是 `tool-workflow/` 前缀，未改名）/ `summary-final` / `summary-rejected`（`plugin:grok-workflow/progress/` 前缀）；`stage-detail` 不在 9 项白名单内 | `src/progress-tab.ts` 第 73/85/96 行；client 镜像第 2801/2811/2821 行 |
 | `DETAIL_FIELDS` 7 项（顺序固定） | `workCommit, changes, testsRun, results, localRuntimeVerified, blockers, nextAction` | `src/progress-tab.ts` 第 111–119 行；client 镜像第 2866 行 |
 | 别名折叠 | `workcommit/changes/change/testsrun/tests/results/result/testresults/localruntimeverified/blockers/blocker/nextaction/next` → 7 键；首拼写获胜 | `src/progress-tab.ts` 第 133–147 行；client `PROGRESS_DETAIL_ALIASES` 第 2876 行 |
 | `VIEW_TARGET` | `grok-progress` | `src/progress-tab.ts` 第 99 行；client `PROGRESS_TARGET` 第 2716 行 |

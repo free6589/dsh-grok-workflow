@@ -63,15 +63,15 @@ import {
  */
 
 const FROZEN_EVENTS = [
-  'tool-workflow/run-start',
-  'tool-workflow/agent-start',
-  'tool-workflow/agent-end',
-  'tool-workflow/summary-final',
-  'tool-workflow/summary-rejected',
-  'tool-workflow/guardian-start',
-  'tool-workflow/guardian-finding',
-  'tool-workflow/guardian-end',
-  'tool-workflow/run-end',
+  'plugin:grok-workflow/progress/run-start',
+  'plugin:grok-workflow/progress/agent-start',
+  'plugin:grok-workflow/progress/agent-end',
+  'plugin:grok-workflow/progress/summary-final',
+  'plugin:grok-workflow/progress/summary-rejected',
+  'plugin:grok-workflow/progress/guardian-start',
+  'plugin:grok-workflow/progress/guardian-finding',
+  'plugin:grok-workflow/progress/guardian-end',
+  'plugin:grok-workflow/progress/run-end',
 ] as const
 
 const FROZEN_DETAIL_FIELDS = [
@@ -114,8 +114,8 @@ describe('contract-freeze: progress-tab 读端键（9+3+7+2）', () => {
 
   it('3 个事件常量冻结', () => {
     expect(PROGRESS_DETAIL_EVENT_TYPE).toBe('tool-workflow/stage-detail')
-    expect(PROGRESS_SUMMARY_FINAL_EVENT_TYPE).toBe('tool-workflow/summary-final')
-    expect(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE).toBe('tool-workflow/summary-rejected')
+    expect(PROGRESS_SUMMARY_FINAL_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-final')
+    expect(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-rejected')
     expect((PROGRESS_EVENT_TYPES as readonly string[]).includes(PROGRESS_DETAIL_EVENT_TYPE)).toBe(false)
   })
 
@@ -155,10 +155,10 @@ describe('contract-freeze: records 的 plugin 键存在', () => {
   })
 
   it('records 六 progress 常量与 progress-tab 侧一致', () => {
-    expect(PROGRESS_RUN_START).toBe('tool-workflow/run-start')
-    expect(PROGRESS_AGENT_START).toBe('tool-workflow/agent-start')
-    expect(PROGRESS_AGENT_END).toBe('tool-workflow/agent-end')
-    expect(PROGRESS_RUN_END).toBe('tool-workflow/run-end')
+    expect(PROGRESS_RUN_START).toBe('plugin:grok-workflow/progress/run-start')
+    expect(PROGRESS_AGENT_START).toBe('plugin:grok-workflow/progress/agent-start')
+    expect(PROGRESS_AGENT_END).toBe('plugin:grok-workflow/progress/agent-end')
+    expect(PROGRESS_RUN_END).toBe('plugin:grok-workflow/progress/run-end')
     expect(PROGRESS_SUMMARY_FINAL).toBe(PROGRESS_SUMMARY_FINAL_EVENT_TYPE)
     expect(PROGRESS_SUMMARY_REJECTED).toBe(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE)
     for (const event of [
