@@ -1,0 +1,42 @@
+# contract-rename evidence — gate log (逐字粘贴，未编造)
+# 采集者 dispatcher-rename-07/evidence-worker-03 | 时间 2026-11-28 01:02:38-01:02:59 +08:00 | worktree .tmp/wt-contract | HEAD 4d5ecfc
+# 采集时原始落盘 .tmp/evid-scratch/{tsc,lint,contract}.out（gitignored scratch），转录完成后已删除，本文件是唯一留存。
+
+========== 门禁 1/3 ==========
+$ npm run typecheck        # package.json: tsc -p tsconfig.json --noEmit
+
+> dsh-grok-workflow@0.13.62 typecheck
+> tsc -p tsconfig.json --noEmit
+
+TSC_EXIT=0
+
+========== 门禁 2/3 ==========
+$ npm run lint             # package.json: oxlint src test
+
+> dsh-grok-workflow@0.13.62 lint
+> oxlint src test
+
+[…中间 166 行是 17 条 warning 的逐条明细，只留头尾，未增删改]
+
+Found 17 warnings and 0 errors.
+Finished in 253ms on 200 files with 96 rules using 6 threads.
+LINT_EXIT=0
+   （那 174 行未逐字录入。采集后复跑 `npm run lint | grep -n contract-freeze` 无任何匹配：这 17 条 warning 不在本次改名的两个文件上；样例见上面的 src/redact.ts:290 与 src/client/index.js:3926 PANEL_STACK_WIDTH。）
+
+========== 门禁 3/3 ==========
+$ npx vitest run test/contract-freeze.spec.ts
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-contract
+
+ ✓ test/contract-freeze.spec.ts (17 tests) 87ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  01:02:59
+   Duration  1.06s (transform 575ms, setup 0ms, import 675ms, tests 87ms, environment 0ms)
+
+CONTRACT_EXIT=0
+
+========== 未跑 ==========
+npm run ci (全量)   -> NOT_RUN（块内只跑 tsc/lint/定向 spec，AGENTS.md §12）
+真机 soak           -> NOT_RUN（本块是契约/测试文件改名，无运行时行为变更）

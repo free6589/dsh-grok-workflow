@@ -1,0 +1,6 @@
+$ git status --short --branch（主检出 /home/fish/projects_mine/dsh-grok-workflow）
+## main...origin/main
+
+# 结论：主检出干净，除分支行外零输出；本证据包未在主检出落任何文件。
+# 证据目录唯一位置：棚内 .tmp/wt-pixel/.rsi/evidence/pixel-sweep-2026-11-28/
+# 主检出 HEAD：02e54ca47b09b2938bbe17898a617fdd2c3186e4（main，与棚内 rebase 后同 SHA，不同分支）。

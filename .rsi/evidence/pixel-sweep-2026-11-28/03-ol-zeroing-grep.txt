@@ -1,0 +1,18 @@
+$ grep -rn "250px" .tmp/wt-pixel/src/client/index.js .tmp/wt-pixel/lib/client.js
+（零命中，EXIT=1）
+# 结论：src/lib 产品代码内无 250px 残留。250px 仅出现在测试断言文本中
+#（test/progress-panel.spec.ts: not.toContain('padding-bottom: 250px')、
+# test/pixel-sweep.spec.ts: not.toContain('padding-bottom: 250px')），属断言字符串，非样式规则。
+
+$ grep -n "gw-progress-sheet .gw-progress-node-calls" .tmp/wt-pixel/src/client/index.js .tmp/wt-pixel/lib/client.js
+.tmp/wt-pixel/src/client/index.js:5170:      '.gw-progress-sheet .gw-progress-node-calls { position: static; max-height: none; overflow-y: visible; margin: 0; padding: 0; list-style: none; border: 0; border-radius: 0; background: none; box-shadow: none; }',
+.tmp/wt-pixel/lib/client.js:5170:      '.gw-progress-sheet .gw-progress-node-calls { position: static; max-height: none; overflow-y: visible; margin: 0; padding: 0; list-style: none; border: 0; border-radius: 0; background: none; box-shadow: none; }',
+# 结论：ol 归零 margin:0 + list-style:none 已并入 sheet 规则，src 与 lib 同行号同内容（5170 行）。
+
+$ grep -n "gw-progress-pnodes" .tmp/wt-pixel/src/client/index.js
+5079:      '.gw-progress-pnodes { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }',
+5891:      h('ol', { className: 'gw-progress-pnodes', 'data-gw-progress-pnodes': true },
+# 结论：主 ol（.gw-progress-pnodes）同样 margin:0 + padding:0 + list-style:none。
+
+# 补零小工（agent-1）交付复核：完工 2026-11-27T17:17:19Z；grep -rn 250px src/client/index.js
+# lib/client.js 零命中（EXIT 1）。来源：agent-1 交付消息 + 本包只读复采一致。

@@ -1,0 +1,109 @@
+# contract-rename evidence — diff stats
+# 采集 2026-11-28 01:05 +08:00, worktree .tmp/wt-contract, branch fix/wave-contract-freeze, HEAD 4d5ecfc
+
+## (a) 改名提交 vs rebase 后提交（rebase 后改名 diff）
+$ git diff --stat 10418bd..4d5ecfc
+ docs/knowledge/CONTRACT-wave-2026-11-27.md |  4 ++--
+ test/contract-freeze.spec.ts               | 30 +++++++++++++++---------------
+ 2 files changed, 17 insertions(+), 17 deletions(-)
+
+$ git diff --numstat 10418bd..4d5ecfc
+2	2	docs/knowledge/CONTRACT-wave-2026-11-27.md
+15	15	test/contract-freeze.spec.ts
+
+## (b) 整支 vs base（含 freeze 提交）
+$ git diff --stat 86d9ddd..4d5ecfc
+ .../wave-contract-2026-11-27/diff-stat.txt         |   7 +
+ .rsi/evidence/wave-contract-2026-11-27/green.txt   |  10 +
+ .rsi/evidence/wave-contract-2026-11-27/red.txt     |   9 +
+ .../wave-contract-2026-11-27/typecheck.txt         |   4 +
+ docs/knowledge/CONTRACT-wave-2026-11-27.md         | 110 +++++++++
+ test/contract-freeze.spec.ts                       | 268 +++++++++++++++++++++
+ 6 files changed, 408 insertions(+)
+
+## (c) 两颗提交
+$ git log --oneline --graph 86d9ddd..4d5ecfc
+* 4d5ecfc test(contract): rename tool-workflow to plugin:grok-workflow/progress, sync CONTRACT doc
+* 10418bd test(contract): freeze wave contract with evidence pack and spec
+
+## (d) 改名提交完整补丁（逐行 旧→新）
+$ git show 4d5ecfc --format="%H %s"
+4d5ecfc60b11217b2fe2fc6e3f78da54212dfc97 test(contract): rename tool-workflow to plugin:grok-workflow/progress, sync CONTRACT doc
+
+diff --git a/docs/knowledge/CONTRACT-wave-2026-11-27.md b/docs/knowledge/CONTRACT-wave-2026-11-27.md
+index 1056e03..0496b1a 100644
+--- a/docs/knowledge/CONTRACT-wave-2026-11-27.md
++++ b/docs/knowledge/CONTRACT-wave-2026-11-27.md
+@@ -5,7 +5,7 @@
+ 
+ ## 1. progress 事件名（冻结值）
+ 
+-冻结 9 项 lifecycle（顺序固定，`tool-workflow/` 前缀）：
++冻结 9 项 lifecycle（顺序固定，`plugin:grok-workflow/progress/` 前缀）：
+ 
+ `run-start` / `agent-start` / `agent-end` / `summary-final` / `summary-rejected`
+ / `guardian-start` / `guardian-finding` / `guardian-end` / `run-end`
+@@ -28,7 +28,7 @@ T2/T3/T4 引用 stub：`import { PROGRESS_EVENT_TYPES } from '../src/progress-ta
+ 
+ | 键 | 冻结值 | 位置 |
+ | --- | --- | --- |
+-| 3 个事件常量 | `stage-detail` / `summary-final` / `summary-rejected`（`tool-workflow/` 前缀）；`stage-detail` 不在 9 项白名单内 | `src/progress-tab.ts` 第 73/85/96 行；client 镜像第 2801/2811/2821 行 |
++| 3 个事件常量 | `stage-detail`（仍是 `tool-workflow/` 前缀，未改名）/ `summary-final` / `summary-rejected`（`plugin:grok-workflow/progress/` 前缀）；`stage-detail` 不在 9 项白名单内 | `src/progress-tab.ts` 第 73/85/96 行；client 镜像第 2801/2811/2821 行 |
+ | `DETAIL_FIELDS` 7 项（顺序固定） | `workCommit, changes, testsRun, results, localRuntimeVerified, blockers, nextAction` | `src/progress-tab.ts` 第 111–119 行；client 镜像第 2866 行 |
+ | 别名折叠 | `workcommit/changes/change/testsrun/tests/results/result/testresults/localruntimeverified/blockers/blocker/nextaction/next` → 7 键；首拼写获胜 | `src/progress-tab.ts` 第 133–147 行；client `PROGRESS_DETAIL_ALIASES` 第 2876 行 |
+ | `VIEW_TARGET` | `grok-progress` | `src/progress-tab.ts` 第 99 行；client `PROGRESS_TARGET` 第 2716 行 |
+diff --git a/test/contract-freeze.spec.ts b/test/contract-freeze.spec.ts
+index 1561a65..0de2b8e 100644
+--- a/test/contract-freeze.spec.ts
++++ b/test/contract-freeze.spec.ts
+@@ -63,15 +63,15 @@ import {
+  */
+ 
+ const FROZEN_EVENTS = [
+-  'tool-workflow/run-start',
+-  'tool-workflow/agent-start',
+-  'tool-workflow/agent-end',
+-  'tool-workflow/summary-final',
+-  'tool-workflow/summary-rejected',
+-  'tool-workflow/guardian-start',
+-  'tool-workflow/guardian-finding',
+-  'tool-workflow/guardian-end',
+-  'tool-workflow/run-end',
++  'plugin:grok-workflow/progress/run-start',
++  'plugin:grok-workflow/progress/agent-start',
++  'plugin:grok-workflow/progress/agent-end',
++  'plugin:grok-workflow/progress/summary-final',
++  'plugin:grok-workflow/progress/summary-rejected',
++  'plugin:grok-workflow/progress/guardian-start',
++  'plugin:grok-workflow/progress/guardian-finding',
++  'plugin:grok-workflow/progress/guardian-end',
++  'plugin:grok-workflow/progress/run-end',
+ ] as const
+ 
+ const FROZEN_DETAIL_FIELDS = [
+@@ -114,8 +114,8 @@ describe('contract-freeze: progress-tab 读端键（9+3+7+2）', () => {
+ 
+   it('3 个事件常量冻结', () => {
+     expect(PROGRESS_DETAIL_EVENT_TYPE).toBe('tool-workflow/stage-detail')
+-    expect(PROGRESS_SUMMARY_FINAL_EVENT_TYPE).toBe('tool-workflow/summary-final')
+-    expect(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE).toBe('tool-workflow/summary-rejected')
++    expect(PROGRESS_SUMMARY_FINAL_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-final')
++    expect(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE).toBe('plugin:grok-workflow/progress/summary-rejected')
+     expect((PROGRESS_EVENT_TYPES as readonly string[]).includes(PROGRESS_DETAIL_EVENT_TYPE)).toBe(false)
+   })
+ 
+@@ -155,10 +155,10 @@ describe('contract-freeze: records 的 plugin 键存在', () => {
+   })
+ 
+   it('records 六 progress 常量与 progress-tab 侧一致', () => {
+-    expect(PROGRESS_RUN_START).toBe('tool-workflow/run-start')
+-    expect(PROGRESS_AGENT_START).toBe('tool-workflow/agent-start')
+-    expect(PROGRESS_AGENT_END).toBe('tool-workflow/agent-end')
+-    expect(PROGRESS_RUN_END).toBe('tool-workflow/run-end')
++    expect(PROGRESS_RUN_START).toBe('plugin:grok-workflow/progress/run-start')
++    expect(PROGRESS_AGENT_START).toBe('plugin:grok-workflow/progress/agent-start')
++    expect(PROGRESS_AGENT_END).toBe('plugin:grok-workflow/progress/agent-end')
++    expect(PROGRESS_RUN_END).toBe('plugin:grok-workflow/progress/run-end')
+     expect(PROGRESS_SUMMARY_FINAL).toBe(PROGRESS_SUMMARY_FINAL_EVENT_TYPE)
+     expect(PROGRESS_SUMMARY_REJECTED).toBe(PROGRESS_SUMMARY_REJECTED_EVENT_TYPE)
+     for (const event of [

@@ -1,0 +1,31 @@
+$ git -C .tmp/wt-pixel diff --stat
+ lib/client.js                   |  18 ++------
+ src/client/index.js             |  18 ++------
+ test/progress-connector.spec.ts |   4 +-
+ test/progress-panel.spec.ts     | 100 ++++++++++++++--------------------------
+ 4 files changed, 44 insertions(+), 96 deletions(-)
+
+$ git -C .tmp/wt-pixel diff --name-only
+lib/client.js
+src/client/index.js
+test/progress-connector.spec.ts
+test/progress-panel.spec.ts
+
+# 未跟踪（不计入 --stat）：test/pixel-sweep.spec.ts（3 断言：无 absolute 浮层 / 无 250px / 无 z-index:4 卡片抬升）
+
+# 关键 hunk 摘要（src/client/index.js，与 lib/client.js 同构）：
+# 1) 删除 '.gw-progress-figure[data-open="true"] { padding-bottom: 250px; }'
+#    → 替换为注释：sheet 接管滚动空间，figure 不再为浮层预留 250px。
+# 2) 删除 '.gw-progress-pnode[data-open="true"] { z-index: 4; }'（卡片抬升规则整段删）
+# 3) 浮层规则 '.gw-progress-node-calls { position: absolute; ... }' 整行退役为注释行
+#    （Retired: ... see `.gw-progress-sheet .gw-progress-node-calls`）
+# 4) sheet 内列表规则补零为：
+#    '.gw-progress-sheet .gw-progress-node-calls { position: static; max-height: none;
+#      overflow-y: visible; margin: 0; padding: 0; list-style: none; ... }'
+# 5) 去掉 data-open 挂载：'...open ? { data-open: true } : {}' 及 figure 的 data-open 条件展开
+#    （opened.length === 0 ? {} : { 'data-open': 'true' } 删除）
+# 6) test/progress-panel.spec.ts 约 100 行改写（36 insertions 口径内含 connector 4 行），
+#    含断言 expect(progress.css).not.toContain('padding-bottom: 250px')。
+
+# 来源：2026-11-28T01:2x+08:00 只读采集（git -C .tmp/wt-pixel diff），未改棚内状态。
+# 补零小工（agent-1）终版确认一致：4 files changed, 44 insertions(+), 96 deletions(-)。

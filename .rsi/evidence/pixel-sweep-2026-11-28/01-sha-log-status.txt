@@ -1,0 +1,25 @@
+$ git -C .tmp/wt-pixel rev-parse HEAD
+02e54ca47b09b2938bbe17898a617fdd2c3186e4
+
+$ git -C .tmp/wt-pixel rev-parse ORIG_HEAD
+c0493883184367cb8bedb5298583ca72d4828992
+
+# rebase 前 = c0493883184367cb8bedb5298583ca72d4828992（棚内 reflog: rebase start checkout 02e54ca 前的 HEAD；棚内此前观测到的未提交改动基线）
+# rebase 后 = 02e54ca47b09b2938bbe17898a617fdd2c3186e4（目标基线 02e54ca）
+# rebase 方向：fix/pixel-sweep 从 c049388 变基到 02e54ca（docs(memory): record round4 four-block wrap）
+
+$ git -C .tmp/wt-pixel log --oneline -3
+02e54ca docs(memory): record round4 four-block wrap
+86d9ddd docs(memory): record post-0.13.62 five-block wrap
+3f26b71 docs(memory): record the 0.13.62 release
+
+$ git -C .tmp/wt-pixel status --short --branch
+## fix/pixel-sweep
+ M lib/client.js
+ M src/client/index.js
+ M test/progress-connector.spec.ts
+ M test/progress-panel.spec.ts
+?? test/pixel-sweep.spec.ts
+
+# 快照时间：2026-11-28T01:16~01:20+08:00；采集于主检出，用 git -C 指向棚内，只读未改棚内状态。
+# 主检出 HEAD（git rev-parse HEAD）：02e54ca47b09b2938bbe17898a617fdd2c3186e4（与棚内 rebase 后一致，均为基线提交；分支不同：主检出 main vs 棚内 fix/pixel-sweep）

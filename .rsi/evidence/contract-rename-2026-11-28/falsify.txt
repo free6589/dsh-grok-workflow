@@ -1,0 +1,86 @@
+# contract-rename evidence — 证伪记录（命题 / 逐字命令 / 实际输出 / 判定）
+# 采集者 dispatcher-rename-07/evidence-worker-03 | 2026-11-28 01:03-01:06 +08:00 | worktree .tmp/wt-contract | HEAD 4d5ecfc
+
+==================================================================
+F1  命题：改完之后 src/ 与 test/ 里已经没有旧串 tool-workflow 了
+判定：假（命题被证伪）
+------------------------------------------------------------------
+$ grep -rn "tool-workflow" src test --include="*.ts" --include="*.js" | wc -l
+74
+$ grep -rn "tool-workflow" src --include="*.ts" --include="*.js" | cut -d: -f1 | sort | uniq -c
+     14 src/client/index.js
+      3 src/command.ts
+      8 src/progress-tab.ts
+     16 src/records.ts
+$ grep -rn "tool-workflow" test --include="*.ts" | cut -d: -f1 | sort | uniq -c
+      1 test/client.spec.ts
+      1 test/contract-freeze.spec.ts
+      1 test/experience-pack.spec.ts
+      1 test/naming.spec.ts
+      4 test/notrun-shots.spec.ts
+      1 test/progress.spec.ts
+     13 test/progress-tab.spec.ts
+     11 test/session-poison-events.spec.ts
+
+-- 残留里真正"活着"的字符串（不是注释）只有两类，逐条：
+$ grep -rn "'tool-workflow/" src --include="*.ts" --include="*.js"
+src/client/index.js:2805:    const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
+src/client/index.js:2816:    const PROGRESS_SUMMARY_FINAL_EVENT_TYPE_LEGACY = 'tool-workflow/summary-final'
+src/client/index.js:2827:    const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE_LEGACY = 'tool-workflow/summary-rejected'
+src/client/index.js:2846:      'tool-workflow/run-start': 'plugin:grok-workflow/progress/run-start',
+src/client/index.js:2847:      'tool-workflow/agent-start': 'plugin:grok-workflow/progress/agent-start',
+src/client/index.js:2848:      'tool-workflow/agent-end': 'plugin:grok-workflow/progress/agent-end',
+src/client/index.js:2849:      'tool-workflow/run-end': 'plugin:grok-workflow/progress/run-end',
+src/client/index.js:2850:      'tool-workflow/summary-final': 'plugin:grok-workflow/progress/summary-final',
+src/client/index.js:2851:      'tool-workflow/summary-rejected': 'plugin:grok-workflow/progress/summary-rejected',
+src/client/index.js:2852:      'tool-workflow/guardian-start': 'plugin:grok-workflow/progress/guardian-start',
+src/client/index.js:2853:      'tool-workflow/guardian-finding': 'plugin:grok-workflow/progress/guardian-finding',
+src/client/index.js:2854:      'tool-workflow/guardian-end': 'plugin:grok-workflow/progress/guardian-end',
+src/progress-tab.ts:89:export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
+src/records.ts:472:  'tool-workflow/run-start': PROGRESS_RUN_START,
+src/records.ts:473:  'tool-workflow/agent-start': PROGRESS_AGENT_START,
+src/records.ts:474:  'tool-workflow/agent-end': PROGRESS_AGENT_END,
+src/records.ts:475:  'tool-workflow/run-end': PROGRESS_RUN_END,
+src/records.ts:476:  'tool-workflow/summary-final': PROGRESS_SUMMARY_FINAL,
+src/records.ts:477:  'tool-workflow/summary-rejected': PROGRESS_SUMMARY_REJECTED,
+src/records.ts:478:  'tool-workflow/guardian-start': PROGRESS_GUARDIAN_START,
+src/records.ts:479:  'tool-workflow/guardian-finding': PROGRESS_GUARDIAN_FINDING,
+src/records.ts:480:  'tool-workflow/guardian-end': PROGRESS_GUARDIAN_END,
+
+判定依据：src/records.ts:472-480 与 src/client/index.js:2846-2854 是旧名→新名的折叠表（老会话仍按旧名写盘，删了历史面板就空）；
+          src/progress-tab.ts:89 与 src/client/index.js:2805 的 PROGRESS_DETAIL_EVENT_TYPE 是 stage-detail，契约 §2 冻结在旧名、不在 9 项内；
+          test/ 里的 33 条绝大多数是旧会话仍能读的回归断言（如 test/session-poison-events.spec.ts 11 条、test/progress-tab.spec.ts 13 条）。
+
+==================================================================
+F2  命题：这条 17/17 的门禁是空转的（改不改都绿）
+判定：假（命题被证伪）
+------------------------------------------------------------------
+$ git show 10418bd:test/contract-freeze.spec.ts | grep -c "tool-workflow/"
+16
+$ grep -c "tool-workflow/" test/contract-freeze.spec.ts      # 当前工作树
+1
+
+-- 改名前的实跑（2026-11-28 00:56:32，HEAD=10418bd，工作树当时干净），逐字节粘贴：
+ FAIL  test/contract-freeze.spec.ts > contract-freeze: records 的 plugin 键存在 > records 六 progress 常量与 progress-tab 侧一致
+AssertionError: expected 'plugin:grok-workflow/progress/run-sta…' to be 'tool-workflow/run-start' // Object.is equality
+
+Expected: "tool-workflow/run-start"
+Received: "plugin:grok-workflow/progress/run-start"
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 14 passed (17)
+   Start at  00:56:32
+EXIT=1
+-- 改名后同一命令：Tests 17 passed (17) / CONTRACT_EXIT=0（见 gate.log.txt 门禁 3/3）
+判定依据：同一条 spec、同一棵树，只因字符串 pin 不同就从 3 failed 变 17 passed，说明断言确实钉在名字上。
+
+==================================================================
+F3  命题：改名把 9 项之外的 stage-detail 也一起改宽了
+判定：假（命题被证伪）
+------------------------------------------------------------------
+$ grep -n "tool-workflow/" test/contract-freeze.spec.ts
+116:    expect(PROGRESS_DETAIL_EVENT_TYPE).toBe('tool-workflow/stage-detail')
+$ grep -n "tool-workflow" docs/knowledge/CONTRACT-wave-2026-11-27.md
+18:  `@deepseek-ai/dsh-tool-workflow` 同形同名，后两项是本插件唯一增量（可选，
+31:| 3 个事件常量 | `stage-detail`（仍是 `tool-workflow/` 前缀，未改名）/ `summary-final` / `summary-rejected`（`plugin:grok-workflow/pr
+判定依据：spec 只剩 :116 的 stage-detail（契约 §2 明文「不在 9 项白名单内」）；契约文档 :8 是 9 项前缀、:31 明写 stage-detail「仍是 tool-workflow/ 前缀，未改名」；:18 的 @deepseek-ai/dsh-tool-workflow 是上游包名，不是本插件事件名。
