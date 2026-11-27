@@ -10143,3 +10143,5 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，三小工不重验门禁、不跑CI；棚内3绿/3附注/两脏内容不重验 |
 | 下一波（建议未执行） | — | push判定先行→H1/DECISIONS合流判定（先c后d）→live永远最后（主代理亲手改，改前快照） |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
+| Round17主线/棚/分支 | `git status --short --branch` + `git log --oneline -3` + `git worktree list`（本轮只读实测） | `b3e0abc`（`ccd1539`+`37f5b91 --no-ff`）ahead `origin/main` 2、树干净；DEC棚内`33fe6c4`未合流；1主+3从，四棚已清五分支已删 `CONFIRMED` |
+| Round17未做/写面 | live/stash只读 + 本轮写面 | live仍`#v0.13.61`、stash三条原位（只读未改未重启）；只有三份记忆追加行（STATE 1行/HANDOFF 3行/VALIDATION 2行），产品代码0行，不删分支不动live不推送 `CONFIRMED` |

@@ -7057,3 +7057,6 @@ Issue #1 状态评论 issuecomment-6927842856。
 
 - **做了什么**：只出三份记忆增量行、未写产品代码。主线 `c7e6ea8`（`4849bdf`+gap12证据10文件8488行）ahead `origin/main` 1、树干净`CONFIRMED`（三小工同见：`status`仅`## main...origin/main [ahead 1]`、`log`首行c7e6ea8、`stash list`三条实见、`branch -a`7个`+`占用、`worktree list`1主+7从=8个在位）；H1棚内3绿未合入（wt-h1-16在位）、DECISIONS棚内3附注未合入（wt-dec-16在位）（转述主代理）；旧棚两脏仍在（gap-12/candidate-09各有`??`证据，停报未删）；live仍`#v0.13.61`（转述）、stash三条原位；分支一个没删。
 - **下一步**：主代理判ahead 1推不推（推送由主代理定，先fetch看远端+CI）→ H1/DECISIONS判合流（先c后d，证据先附注后）→ 旧棚两脏`??`证据归档后删棚 → 亲手改live（改前快照，等push+远端绿后再动，主代理亲手改）；缺口/补丁分支保持不动待判；每步先`status`确认，禁`-D`/force-push/动tag/publish/动live重启。
+## 2026-11-28 — Round17收尾（记忆沉淀，不发版，主代理CONFIRMED直接引用，不重验）
+- **做了什么**：只出三份记忆增量行、未写产品代码。主线 `b3e0abc`（`ccd1539`+`37f5b91 --no-ff`，3文件90行，H1钉子，转述tsc0/lint17w0e/3绿）ahead `origin/main` 2、树干净`CONFIRMED`；DECISIONS棚内`33fe6c4`已落盘未合流；四棚已清五分支已删（现1主+3从：main/resume-reuse/wt-dec-16/wt-h1-16）；live仍`#v0.13.61`、stash三条原位；分支一个没删。
+- **下一步**：主代理判ahead 2推不推（先fetch看远端+CI）→ DECISIONS `33fe6c4`判合流 → 亲手改live（改前快照，等push+远端绿后再动，主代理亲手改）；缺口/补丁分支保持不动待判；每步先`status`确认，禁`-D`/force-push/动tag/publish/动live重启。
