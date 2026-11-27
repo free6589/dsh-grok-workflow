@@ -10225,3 +10225,5 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | Round26 CI双红同因 | `gh run list -L 4 --json ...` + `gh run view 46074567615 --json jobs`（只读实测） | `b88008b`/`5fb048b`两条`failure`；两条任务Node22与Node24失败步同为`git diff --exit-code -- lib/`，即lib产物差 `CONFIRMED`；合流推送后转绿 `HYPOTHESIS` |
 | Round26日志/live/stash/分支 | 主代理CONFIRMED直接引用 + `git stash list` + `git branch -a` + `git worktree list` + `~/.dsh/profiles/web/package.json:13`只读 | 日志十四轮本仓零真面（巡检N1超时落盘、证伪3条、N8 `HYPOTHESIS`、N9待判重）；live仍`#v0.13.61`只读实见；stash三条原位实见；1主+3从四条在位，分支一个没删 `CONFIRMED` |
 | Round26未做/写面 | 本轮复验动作 + 写面声明 | 十四轮日志本轮未重跑`NOT_RUN`（转述）；只有三份记忆追加行（STATE 1行/HANDOFF 1块4行/VALIDATION 1节8行），产品代码0行，不删分支不动live不重启不force-push不动tag不publish不写密钥不推送 `CONFIRMED` |
+## Round27记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用）
+| Round27主线/CI/棚/日志/live/stash/写面 | 主代理亲手复验`CONFIRMED`直接引用 | 主线`6778d16`=`origin/main`树干净；CI`46076756913`绿（含lib合流）；合完棚分支已清剩resume-reuse棚；十五轮打破零真面（C1无终态run，R15-1沙箱误伤，lib合流verify `PASS`）；live仍`#v0.13.61`、stash三条原位；只有三份记忆追加行，产品代码0行，不删分支不动live不推送 `CONFIRMED` |
