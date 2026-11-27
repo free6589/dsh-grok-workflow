@@ -1,3 +1,12 @@
+## 2026-11-27 — 0.13.57 发版收口（Wave3 合流发版：四棚存盘 + 按序合流 + CI + 抬版 + 合 main + 打 tag + 双推 + 远端双绿 + 记忆 + 清棚）**（主线 `5ae4cf2` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45953054405` success + Release `45953057425` success + Release `v0.13.57` 已发布（`2026-11-27T06:39:16Z`，资产 `1048960` 字节）；删 `release/0.13.57` + 四棚分支（已合才 `-d`，`-d` 拒绝就上报不强删；worktree 先 `remove`）；12 项残留 untracked、`fix/resume-reuse`、备份、已发布 tag 一律不动；不动代码、不碰 live、不重启）**
+
+- **From:** 0.13.57 发版包工头（合流 + 发版 + 记忆 + 清棚，不碰 live） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）
+- **发版结论（`CONFIRMED`，本轮 Serena 通道实测）**：基线 `505baf8`；四棚存盘 `49a61b1`（①）/ `8037f40`（②）/ `e429950`（③）/ `a41cb6f`（⑤）；四合流 `7ccef44` → `982dd43` → `8d5926c` → `b2045ac`（ort 自动合无冲突，**无手工融合裁决**，`DECISIONS.md` 不新增条目）；carry-over `6396a2f` + lib 补齐 `b89b8c4`；prepare `24ed3c3`（八处版本号读回全 `0.13.57`）；主线合流 `5ae4cf2`；附注标签 `v0.13.57`（对象 `2cd7cd7`）；`push main` + `push tag` 均 `EXIT 0`；本地 `npm run ci` `EXIT 0`（`114 files / 2105 passed` / `82s`，发版提交上重跑）；远端 CI `45953054405` success（Node22/24 绿）+ Release `45953057425` success；Release `v0.13.57` 已发布（`2026-11-27T06:39:16Z`），资产 `dsh-grok-workflow-0.13.57.tgz` `1048960` 字节；用户条目在 `CHANGELOG.md [0.13.57]`，`[Unreleased]` 已空，本轮不重复加。
+- **环境备注**：默认 `bash` 工具全程不可用，子代理直连 shell 全部停手；全部 git/CI 操作经 Serena 通道执行。`/home` 98% 满致 `verify:lib` 首跑磁盘配额失败（非代码失败），`TMPDIR` 指 data 盘即过。
+- **已删 / 未删（收尾复验实测后填，`CONFIRMED`）**：`git worktree remove` 四棚（`.tmp/wt-step-total` / `.tmp/wt-entry-390` / `.tmp/wt-trace-legend` / `.tmp/wt-notrun`）+ `git branch -d release/0.13.57 fix/step-total-words fix/progress-entry-390 fix/trace-legend fix/notrun-truth`（已合才删；`-d` 拒绝则上报不强删）。删后带回 `git branch -a` + `git status --short --branch` + `git worktree list` + `git rev-parse main`。
+- **别动（红线）**：主检出 untracked 残留（`.progress-*.png/html`、`us-weather-week.html`、`evidence/notrun-shots/` 等取证 scratch）、`fix/resume-reuse`（脏备份分支，本轮不碰）、任何 `backup/` 分支、已发布 tag、不 force-push、不 npm publish、不碰 live、不重启。
+- **live 升级只记录、不执行**：本轮不碰 `~/.dsh`、不重载、不重启；升级需另行授权，另起一轮。
+
 ## 2026-11-27 — 0.13.56 发版收口（Wave2 最后一棒：只恢复 stash 本波 4 行 + 写记忆 + 推 main + 删本波分支）**（主线 `7060a4e` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45938090491` success + Release `45938101976` success + Release `v0.13.56` 已发布（`2026-11-27T04:09:05Z`）；删 `release/0.13.56` + `fix/soak-gaps`（已合才 `-d`，`-d` 拒绝就上报不强删）；Wave1 旧分支名若在（step-count / eta-basis / overlap-readings 相关本地分支，已合才删）；12 项 untracked 原位、`fix/resume-reuse`、备份、已发布 tag、stash@{1} 旧条一律不动；不动代码、不碰 live、不重启）**
 
 - **From:** 0.13.56 发版收尾员（只恢复 stash 本波条 + 写四个记忆文件 + 推 main + 删本波分支，不碰其余） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）

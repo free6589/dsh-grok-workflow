@@ -1,3 +1,15 @@
+## 0.13.57 发版门禁与远端结论（2026-11-27，Wave3 合流发版，包工头经 Serena 通道实测）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前，release 提交 `24ed3c3`） | `npm run ci`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | **`EXIT 0`：`114 files / 2105 passed`，`Duration 82s`** |
+| verify:lib 首跑失败→重跑过 | `npm run verify:lib` | 首跑 `EXIT 1`：`tar Cannot write: Disk quota exceeded`（`/home` 98% 满，非代码失败）；`TMPDIR` 指 data 盘后过；另发现 carry-over 的 `lib/progress-tab.*` 未随 src 提交，`b89b8c4` 重建补齐后 `verify:lib` 过 |
+| 四合流 | `git merge --no-ff` ×4（`release/0.13.57`） | `7ccef44`（①）→ `982dd43`（②）→ `8d5926c`（③）→ `b2045ac`（⑤），ort 自动合，**无冲突、无手工融合** |
+| 主线身份 | 本树 | 基线 `505baf8`；prepare `24ed3c3`（八文件，版本读回 `0.13.57`）；主线合流 `5ae4cf2`；tag `v0.13.57` 对象 `2cd7cd7` 指向 `5ae4cf2`；`push main` + `push tag` 均 `EXIT 0` |
+| 远端 CI | run `45953054405`（main，`5ae4cf2`） | **`success`**（Node22/24 绿，`1m33s`） |
+| 远端 Release | run `45953057425`（tag `v0.13.57`） | **`success`**；Release **`v0.13.57`** 已发布（`2026-11-27T06:39:16Z`），资产 `dsh-grok-workflow-0.13.57.tgz` `1048960` 字节 |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.57]` 四项 Fixed 已在发版提交中，`[Unreleased]` 为空，本轮不重复加条 |
+
 ## 0.13.56 发版门禁与远端结论（2026-11-27，Wave2 收尾，前置已证直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |
