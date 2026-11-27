@@ -1,3 +1,11 @@
+## 2026-11-28 — Round31收尾记忆小工交接（只补三份记忆增量行，不写产品代码；主代理CONFIRMED直接引用+四条只读复核）
+
+- **From:** 记忆小工（dispatcher-wrap-34/mem-worker-34，主检出只读） · **To:** 主代理lead / 下一个接手的人
+- **本轮只读实测（`CONFIRMED`）**：`git status --short --branch` → `## main...origin/main`干净；`git log --oneline -5`首行`d2a694e`；`git stash list`三条原位（foreman-stash/entry-guard两条）；`git branch --list`未见r16名、主线剩c1-28养中分支未动。
+- **主代理亲手复验转述（本小工未重跑，不夸大）**：CI四连绿`46082917309` success `CONFIRMED`；合完棚分支已清（r16-29清剩c1-28养中）`CONFIRMED`；日志十九轮N-19-1台账缺口`HYPOTHESIS`、B零补派`CONFIRMED`、A1证伪gate.ts消失；live仍`#v0.13.61` `CONFIRMED`。
+- **红线**：只追三份记忆文件增量行，未写产品代码、未删分支、未碰live/tag、不重启、不push、不写密钥、不合流、不发版。
+- **下一步**：待定（主代理定：c1-28养中分支去留+N-19-1缺口补源档重判+live亲手改窗口）；每步先`status`确认，禁`-D`/force-push/动tag/publish/动live重启。
+
 ## 2026-11-28 — Round30记忆小工交接（只补三份记忆增量行，不写产品代码；只读复核`CONFIRMED`+主代理亲手复验转述）
 
 - **From:** 记忆小工（dispatcher-wrap-33/agent-1，主检出只读） · **To:** 主代理lead / 下一个接手的人

@@ -1,3 +1,11 @@
+## Round31收尾记忆小工验证记（2026-11-28，主代理CONFIRMED直接引用+四条只读复核，不发版不推送）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净/stash/分支 | `git status --short --branch`+`git log --oneline -5`+`git stash list`+`git branch --list`（本小工只读实测） | `d2a694e`=`origin/main`、仅`## main...origin/main`干净、`log`首行d2a694e、stash三条原位、`branch --list`未见r16名分支未动 `CONFIRMED` |
+| CI/棚/日志/live | 主代理亲手复验转述（本轮未重跑`NOT_RUN`） | CI四连绿`46082917309` success `CONFIRMED`；r16-29清剩c1-28养中；日志十九轮N-19-1台账缺口`HYPOTHESIS`+B零补派`CONFIRMED`+A1证伪gate.ts消失；live仍`#v0.13.61` `CONFIRMED` |
+| 本轮写面 | — | 只有三份记忆文件的增量行；产品代码0行、不删分支不动live不重启不force-push不动tag不publish不写密钥不合流、不提交不push |
+
 ## Round30记忆小工验证记（2026-11-28，主检出只读实测+主代理亲手复验转述，不发版不推送）
 
 | state | command | result |
