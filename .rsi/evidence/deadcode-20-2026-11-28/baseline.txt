@@ -1,0 +1,12 @@
+Baseline capture — evidence worker, branch fix/deadcode-20
+Worktree: /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-dead-20
+Captured at: 2026-11-28 (session turn 1)
+
+$ git log --oneline -1
+e2a6a04 docs(memory): record round19 wrap
+
+$ git status --short --branch
+## fix/deadcode-20
+
+$ git rev-parse HEAD
+e2a6a04bf3b9635392e5a413715810a228d96e1e
