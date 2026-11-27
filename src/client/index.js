@@ -4456,11 +4456,13 @@ window.__ModuleLoader__.load({
         // mark the row the run named rather than a second guess at it.
         ...shipped === undefined ? {} : { final: { draft: run.summaryFinalDraft, seq: shipped.seq } },
       }
-      // A branch is one call and cannot see a retry, so the verdict is read off the boxes that
-      // hold a whole unit's rows: there a failure a later attempt replaced is not current.
-      const stuck = progressPanelStuck(run, nodes
+      // WHY 顶上句与卡住句同一口径：顶上句的 at 是读者站位（含分支层），卡住句
+      // 若只从任务卡读数，同一屏会出现两个步号。失败态仍从整卡读（要看到被替代的重试），
+      // 但报数用读者站位那一层的 at；blocked / rejected 直接用分支优先的站位。
+      const stuckRaw = progressPanelStuck(run, nodes
         .filter((node) => node.kind !== 'sub')
         .map((node) => ({ node, at: node.level + 1 })))
+      const stuck = stuckRaw === undefined ? undefined : { ...stuckRaw, at }
       if (stuck !== undefined) graph.stuck = stuck
       // Filled from the model it was built from, so the text and the picture cannot disagree:
       // the page lays out the parsed text, not this object.

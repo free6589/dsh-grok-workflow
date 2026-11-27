@@ -1444,7 +1444,7 @@ describe('the stuck line: one sentence, and only while something is stuck', () =
       member(1, '规划助手', '规划', 'completed'),
       member(2, '执行', '任务 1 · 建表'),
     ], { stopReason: 'error' })
-    expect(textOf(hookOf(pageOf(blocked), 'data-gw-progress-stuck'))).toBe('卡在 3：这一步没有回报')
+    expect(textOf(hookOf(pageOf(blocked), 'data-gw-progress-stuck'))).toBe('卡在 4：这一步没有回报')
     // The line is a status, a sibling after the figure, and before the Guardian card.
     const page = pageOf({ ...failedRun(), guardian: GUARDIAN })
     const order = walk(page)

@@ -588,6 +588,7 @@ describe('the fork is seven levels, one box a place', () => {
     // Nothing declared and nothing ended: the start is where this run is, not the end.
     expect(graphOf(waitingRun()).at).toBe(1)
     // A run that ended stands on the first broken box, else at its end.
+    // （统一口径后 stuck.at 与 headline.at 同为读者站位，见本文件 stuck 那节。）
     expect(graphOf(failedRun()).at).toBe(3)
     expect(graphOf(rejectedRun()).at).toBe(5)
     expect(graphOf(finishedRun()).at).toBe(7)
@@ -943,8 +944,9 @@ describe('where the run is stuck, if it is', () => {
     // The card owns its own rows, so it can say which call broke and which try that was.
     expect(graphOf(failedRun()).stuck)
       .toEqual({ nodeId: 't1', at: 3, kind: 'failed', role: '检查', attempt: 1 })
-    // A run that ended over a call nobody settled is blocked at the card that held it.
-    expect(graphOf(blockedRun()).stuck).toEqual({ nodeId: 't1', at: 3, kind: 'blocked' })
+    // A run that ended over a call nobody settled is blocked at the card that held it,
+    // but the number it reports is the reader's step (branch level), one口径 with the headline.
+    expect(graphOf(blockedRun()).stuck).toEqual({ nodeId: 't1', at: 4, kind: 'blocked' })
     // A gate that turned every draft back is the third verdict, and it rides the summary.
     expect(graphOf(rejectedRun()).stuck).toEqual({ nodeId: 'sum', at: 5, kind: 'rejected', drafts: 3 })
     // Neither a cancellation nor a failure a retry replaced is "stuck".

@@ -2516,7 +2516,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
     // No finished step was measured here — the one that finished is amber — so the page
     // prints the step and no estimate at all (`progress-panel-model` owns the measured case).
     expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-line'))).toEqual(['第 4 步，共 7 步'])
-    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-stuck')).join(' ')).toBe('卡在 3：执行 第 1 遍没过')
+    expect(texts(hookOf(pageOf(running.run), 'data-gw-progress-stuck')).join(' ')).toBe('卡在 4：执行 第 1 遍没过')
 
     // The same stream once the run ends: no retry is in flight, so nothing claims to be
     // working, and the chip says 未通过.
