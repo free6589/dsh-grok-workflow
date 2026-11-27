@@ -1,0 +1,55 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.12 [39m[90m/run/media/fish/data/dsh-tmp/wt-report-mismatch[39m
+
+ [31m❯[39m test/carryover.spec.ts [2m([22m[2m23 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 136[2mms[22m[39m
+     [32m✓[39m parses the rendered report back into objective, results, open questions and locators[32m 97[2mms[22m[39m
+     [32m✓[39m accepts the relay envelope (preamble and markers) around the report[32m 1[2mms[22m[39m
+     [32m✓[39m refuses text that carries no report signature instead of inventing a round[32m 0[2mms[22m[39m
+     [32m✓[39m only compiles plugin-authored report messages[32m 4[2mms[22m[39m
+     [32m✓[39m redacts credentials that appear in a prior report[32m 1[2mms[22m[39m
+[31m     [31m×[31m keeps bare deliverable file names as locators (receipt 3/3)[39m[32m 6[2mms[22m[39m
+     [32m✓[39m renders nothing when there is no prior round[32m 1[2mms[22m[39m
+     [32m✓[39m survives a session whose derivation throws[32m 0[2mms[22m[39m
+     [32m✓[39m carries nothing when the configured budget is zero[32m 0[2mms[22m[39m
+     [32m✓[39m takes its budget from the configured history knobs, clamped to the hard ceilings[32m 0[2mms[22m[39m
+     [32m✓[39m never exceeds the configured cap, even when the caller asks for far more[32m 1[2mms[22m[39m
+     [32m✓[39m never exceeds the hard ceiling when no budget is given at all[32m 0[2mms[22m[39m
+     [32m✓[39m keeps the newest round and says how much it dropped[32m 1[2mms[22m[39m
+     [32m✓[39m honours the round cap as well as the character cap[32m 0[2mms[22m[39m
+     [32m✓[39m marks lines dropped inside a kept round instead of cutting them silently (round 62)[32m 0[2mms[22m[39m
+     [32m✓[39m never splits a surrogate pair at the cut[32m 0[2mms[22m[39m
+     [32m✓[39m puts the earlier research result into the next round's prompts without the user repeating it[32m 13[2mms[22m[39m
+     [32m✓[39m keeps first-round prompts unchanged (no carry-over block at all)[32m 2[2mms[22m[39m
+     [32m✓[39m clamps an oversized digest inside the script before it reaches a child[32m 4[2mms[22m[39m
+     [32m✓[39m pins the script ceiling to CARRYOVER_LIMITS.chars[32m 1[2mms[22m[39m
+     [32m✓[39m ships the digest in args when there is one[32m 1[2mms[22m[39m
+     [32m✓[39m omits the key entirely when there is nothing to carry (byte-identical first round)[32m 0[2mms[22m[39m
+     [32m✓[39m clamps an oversized digest on the host side too[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/carryover.spec.ts[2m > [22mcarry-over: compiling one round[2m > [22mkeeps bare deliverable file names as locators (receipt 3/3)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m test/carryover.spec.ts:[2m167:71[22m[39m
+    [90m165|[39m     [34mexpect[39m(round)[33m.[39mnot[33m.[39m[34mtoBeNull[39m()
+    [90m166|[39m     [35mfor[39m ([35mconst[39m file [35mof[39m [[32m'a.ts'[39m[33m,[39m [32m'b.ts'[39m[33m,[39m [32m'c.ts'[39m]) {
+    [90m167|[39m       expect(round!.locators.some(locator => locator.includes(file))).…
+    [90m   |[39m                                                                       [31m^[39m
+    [90m168|[39m     }
+    [90m169|[39m   })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m22 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 17:01:07
+[2m   Duration [22m 898ms[2m (transform 574ms, setup 0ms, import 641ms, tests 136ms, environment 0ms)[22m
+

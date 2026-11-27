@@ -1,3 +1,17 @@
+## 0.13.59 发版门禁与远端结论（2026-11-27，双合流发版，前置已证直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前） | `npm run ci`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | **`EXIT 0`：`116 files / 2115 passed`** |
+| 抬版 | `5509f2e`（八文件：`package.json`/`package-lock.json`/`CHANGELOG.md`/`README.md`/`README.zh-CN.md`/`docs/LOCAL-TESTING.md`/`src/client/index.js`/`lib/client.js`） | 版本读回 **`0.13.59`**，`CHANGELOG.md [0.13.59]` 两条（回执裸文件名 + 图例第五句） |
+| 双合流 | `git merge --no-ff` ×2（`release/0.13.59`） | `89c7b31`（report-mismatch `6aa7f28`）→ `f3dde50`（legend-pending-wording `4432fc6`），ort 自动合，**无冲突、无手工融合** |
+| 主线身份 | 本树 | 基线 `c3ea2eb`；build重建 `62fc39f`；prepare `5509f2e`；主线合流 `57c8abb`；tag `v0.13.59` 对象 `e8f292b` 指向 `57c8abb`；`push main` + `push tag` 均 `RC 0` |
+| 远端 CI | run `45974894226`（main，`57c8abb`，`gh run list` 实读） | **`success`** |
+| 远端 Release | run `45974909047`（tag `v0.13.59`，`gh run list` 实读） | **`success`**；Release **`v0.13.59`** 已发布（`2026-11-27T09:36:23Z`，`gh release view` 实读），资产 `dsh-grok-workflow-0.13.59.tgz` `1051029` 字节 |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.59]` 两条已在发版提交中，`[Unreleased]` 为空，本轮不重复加条 |
+| 未做（`NOT_RUN`） | report-mismatch 棚内草稿 + Safari 实测、真人读屏差异 | `scripts/repro-r17-release-cache.mjs`（133 行）未进 `main`、不随证据提交；前置已记 `NOT_RUN` 本轮不重复执行 |
+| 阻塞（`BLOCKED`） | — | 无 |
+
 ## 0.13.58 发版门禁与远端结论（2026-11-27，Wave4 三合流发版，包工头实测，前置已证直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |

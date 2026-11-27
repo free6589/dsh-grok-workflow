@@ -1,3 +1,16 @@
+Last updated: 2026-11-27 17:45 +08:00（**0.13.59 发版完成：双合流 + prepare + build重建 + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
+基线 **`c3ea2eb`**（= 0.13.58 收尾记忆提交）（`CONFIRMED`）；
+双合流 **`89c7b31`**（report-mismatch `6aa7f28`）→ **`f3dde50`**（legend-pending-wording `4432fc6`），ort 自动合无冲突，无手工融合裁决，`DECISIONS` 不新增（`CONFIRMED`）；
+build重建 **`62fc39f`**（lib与源一致）→ 发版准备 **`5509f2e`**（八文件，版本读回 **`0.13.59`**）（`CONFIRMED`）；主线合流 **`57c8abb`**（`CONFIRMED`）；
+本地全量 `npm run ci` **`EXIT 0`：`116 files / 2115 passed`**（`CONFIRMED`，前置已证）；
+附注标签 **`v0.13.59`** 对象 **`e8f292b`** 指向 **`57c8abb`**（`CONFIRMED`）；`push main` + `push tag` 均 **`RC 0`**（`CONFIRMED`）；
+远端 CI run **`45974894226`** `success`（main）+ 远端 Release run **`45974909047`** `success`（tag）（`CONFIRMED`，`gh run list` 实读）；
+Release **`v0.13.59`** 已发布 **`2026-11-27T09:36:23Z`**，资产 `dsh-grok-workflow-0.13.59.tgz` **1051029** 字节（`CONFIRMED`，`gh release view` 实读）；
+用户条目已在发版提交中（`CHANGELOG.md [0.13.59]` 两条：回执裸文件名 + 图例第五句），`[Unreleased]` 为空（`CONFIRMED`，本树实读，本轮不重复加）。
+本轮收尾：三份 report-mismatch 日志已收进 durable（`.rsi/evidence/report-mismatch-2026-11-27/`，`.log`→`.out` 避开 `*.log` 忽略）、图例三证据已随合流提交（`.rsi/evidence/legend-pending-wording-2026-11-27/`）；删 `release/0.13.59` + 两修分支（已合才 `-d`）、删三个本波 worktree（`fix/resume-reuse` 不动）。
+本轮环境备注：默认 `bash` 工具全程不可用，全部 git/CI/证据操作经 Serena 通道；`TMPDIR=/run/media/fish/data/dsh-tmp`（`CONFIRMED`）。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 15:30 +08:00（**0.13.58 发版完成：三合流 + prepare + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
 基线 **`8f02c32`**（= 远端 `0.13.57` 已发）（`CONFIRMED`）；
 三合流 **`9ad34d2`**（火狐）→ **`3092f8d`**（走读）→ **`25daeaf`**（卫生），ort 自动合无冲突（`VALIDATION` 头尾各追加），无手工融合裁决，`DECISIONS` 不新增（`CONFIRMED`）；
