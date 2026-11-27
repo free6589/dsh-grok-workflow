@@ -178,6 +178,17 @@ describe('carry-over: compiling one round', () => {
       expect(round!.locators.some(locator => locator.includes(file))).toBe(true)
     }
   })
+
+  it('keeps office deliverable file names as locators (说明.pdf / 报告.docx / data.xlsx / slides.pptx)', () => {
+    // 办公扩展名回执：证据行引用办公交付物，但定位器扩展名表缺 pdf/docx/xlsx/pptx → 0 命中。
+    // 修法：定位器扩展名表加办公类（pdf/docx/xlsx/pptx/csv 至少），中文名一起抓。
+    const text = renderReport(reportFixture({ evidence: 'verified 说明.pdf, 报告.docx, data.xlsx and slides.pptx' }))
+    const round = parseReportRound(text)
+    expect(round).not.toBeNull()
+    for (const file of ['说明.pdf', '报告.docx', 'data.xlsx', 'slides.pptx']) {
+      expect(round!.locators.some(locator => locator.includes(file))).toBe(true)
+    }
+  })
 })
 
 describe('carry-over: graceful degradation', () => {
