@@ -1,3 +1,12 @@
+## 2026-11-27 — 0.13.56 发版收口（Wave2 最后一棒：只恢复 stash 本波 4 行 + 写记忆 + 推 main + 删本波分支）**（主线 `7060a4e` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45938090491` success + Release `45938101976` success + Release `v0.13.56` 已发布（`2026-11-27T04:09:05Z`）；删 `release/0.13.56` + `fix/soak-gaps`（已合才 `-d`，`-d` 拒绝就上报不强删）；Wave1 旧分支名若在（step-count / eta-basis / overlap-readings 相关本地分支，已合才删）；12 项 untracked 原位、`fix/resume-reuse`、备份、已发布 tag、stash@{1} 旧条一律不动；不动代码、不碰 live、不重启）**
+
+- **From:** 0.13.56 发版收尾员（只恢复 stash 本波条 + 写四个记忆文件 + 推 main + 删本波分支，不碰其余） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）
+- **发版结论（`CONFIRMED`，前置已证直接用）**：基线 `b04106c`；`fix/soak-gaps` 合入 `release/0.13.56` 为 `3c28cd6`；prepare `b54e85d`；主线合流 `7060a4e87d0d7c9b1ba11e96563ffcfc59a73445`；tag `v0.13.56` 对象 `c2b0618` 指向 `7060a4e`；`push main` + `push tag` 均 `EXIT 0`；本地 `npm run ci` `EXIT 0`（`111 files / 2078 passed` / `103s`）；远端 CI `45938090491` success + Release `45938101976` success；Release `v0.13.56` 已发布（`2026-11-27T04:09:05Z`）；用户条目在 `CHANGELOG.md [0.13.56]`，`[Unreleased]` 已空，本轮不重复加。
+- **stash（`CONFIRMED`，本树实测）**：`stash@{0}` 本波条 `wave2-temp-hide-STATE-unrelated-4lines` 已 `pop`（4 行回 `STATE.md`，该条已 drop）；`stash@{1}`（`feat/flowchart-v2` 旧条）原位未动，未 `pop` 未 `drop`。
+- **已删 / 未删（收尾复验实测后填 SHA 与清单，`CONFIRMED`）**：`git branch -d release/0.13.56 fix/soak-gaps`（已合才删；`-d` 拒绝则上报不强删）+ Wave1 旧分支名若在（`fix/step-count-unify` / `fix/eta-basis-wording` / `fix/overlap-readings-name` 相关本地分支，已合才删）。删后带回 `git branch -a` + `git status --short --branch` + `git rev-parse main`。
+- **别动（红线）**：12 项 untracked 原位、`fix/resume-reuse`（远端 `+` 超前本地的脏备份分支，本轮不碰）、任何 `backup/` 分支、已发布 tag、不动 stash@{1} 旧条、不 force-push、不碰 live、不重启。
+- **live 升级只记录、不执行**：本轮不碰 `~/.dsh`、不重载、不重启；升级需另行授权，另起一轮。
+
 ## 2026-11-27 — 0.13.55 发版收口（发版收口记忆，非施工）**（主线 `62a3e48` + tag `v0.13.55`（对象 `453c85c`）已推远端；远端 CI `45919381381` success + Release `45919390634` success + Release `v0.13.55` 已发布（`2026-11-27T00:55:07Z`，资产 `1044574` 字节）；可删 `.tmp/wt-release-055` 与本波建的 worktree；12 项 untracked 残留、`fix/resume-reuse`、任何备份一律别动；不动代码/分支/tag/远端/live）**
 
 - **From:** 0.13.55 发版收口记忆员（只写四个记忆文件，不碰代码/分支/tag/远端/live） · **To:** 下一个接手的人 / 清理工作树的人 / 做 live 升级的人（需另行授权）

@@ -1,3 +1,20 @@
+Last updated: 2026-11-27 12:15 +08:00（**0.13.56 发版完成：合流 3c28cd6 + 主线 7060a4e + prepare b54e85d + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
+基线 **`b04106c`**（0.13.55 收尾记忆提交）（`CONFIRMED`）；分支 **`release/0.13.56`** + **`fix/soak-gaps`**（`CONFIRMED`）；
+合流 **`3c28cd6`**（`fix/soak-gaps` → `release/0.13.56`）→ 主线合流 **`7060a4e87d0d7c9b1ba11e96563ffcfc59a73445`**（`Merge branch 'release/0.13.56'`）（`CONFIRMED`）；
+发版准备 **`b54e85d`**（`CONFIRMED`）；本地全量 `npm run ci` **`EXIT 0`：`111 files / 2078 passed` / `103s`**（`CONFIRMED`，前置已证）；
+附注标签 **`v0.13.56`** 对象 **`c2b0618`** 指向 **`7060a4e`**（`CONFIRMED`）；`push main` + `push tag` 均 **`EXIT 0`**（`CONFIRMED`，前置已证）；
+远端 CI run **`45938090491`** `success` + 远端 Release run **`45938101976`** `success`（`CONFIRMED`，前置已证）；
+`gh release v0.13.56` 已发布 **`2026-11-27T04:09:05Z`**（`CONFIRMED`，前置已证）；
+用户条目已在发版提交中（`CHANGELOG.md [0.13.56]`），`[Unreleased]` 为空，本轮不重复加条（`CONFIRMED`，本树实读）。
+本轮收尾实测（`CONFIRMED`）：`git checkout main && git pull --ff-only` 已与远端同步（HEAD = `origin/main` = `7060a4e`）；
+stash 本波条 `wave2-temp-hide-STATE-unrelated-4lines` 已 `pop`（4 行回 `STATE.md`，该条已 drop），`stash@{1}`（`feat/flowchart-v2` 旧条）原位未动；
+记忆提交推送与删分支见 `HANDOFF.md` 本轮条 + 收尾复验。
+以下为上一轮记录，原样保留：
+
+Last updated: 2026-11-27 09:20 +08:00（**0.13.55 收尾主代理验收：Serena 独立验对上（`CONFIRMED`）** —
+三棚已拆（`worktree list` 只剩主检出 `b04106c` + 干净 `fix/resume-reuse`）；`fix/dead-key-upgrade-note` 我亲手 `-d` 删了（已合）；`scripts/stalecache-key-test.mjs` 已不在（`ls scripts/` 8旧文件无此名，主检出无记录，包工头称非其掉落，记为无法归属、不追）；残留12项 untracked 原位保留待你裁决。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 09:10 +08:00（**0.13.55 发版完成：四合流 SHA 链 + prepare + merge + tag + 远端双绿 run id + Release 资产（`CONFIRMED`，已知事实直接用、不重验）** —
 基线 **`fc4049294358b346bb343cb862ddbcd0d8e52bea`**（`CONFIRMED`）；分支 **`release/0.13.55`**（worktree `.tmp/wt-release-055`）（`CONFIRMED`）；
 四合流按序 **`738326f5d6562d1096f6e482c32d33dbe3d9d3c1`**（① step-count-unify `4151c2f`）→ **`53fc9e6ca429f74dd8b91d5aadf30c4e7cdd0efd`**（② eta-basis-wording `1208034`）→ **`833523af15b86369802473eb71a3418cde4b7601`**（④ overlap-readings-name `af224fc`）→ **`1dd5dee449b3cfb161d40ffd76628bb2737036b7`**（⑤ dead-key-upgrade-note `f36df6c`）（`CONFIRMED`）；

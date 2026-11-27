@@ -1,3 +1,13 @@
+## 0.13.56 发版门禁与远端结论（2026-11-27，Wave2 收尾，前置已证直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前） | `npm run ci` | **`EXIT 0`：`111 files / 2078 passed`，`Duration 103s`** |
+| 主线身份 | 本树 | 基线 `b04106c`；合流 `3c28cd6`（`fix/soak-gaps` → `release/0.13.56`）；prepare `b54e85d`；主线合流 `7060a4e87d0d7c9b1ba11e96563ffcfc59a73445`；tag `v0.13.56` 对象 `c2b0618` 指向 `7060a4e`；`push main` + `push tag` 均 `EXIT 0` |
+| 远端 CI | run `45938090491` | **`success`** |
+| 远端 Release | run `45938101976` | **`success`**；Release **`v0.13.56`** 已发布（`2026-11-27T04:09:05Z`） |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.56]` 已在发版提交中，`[Unreleased]` 为空，本轮不重复加条 |
+
 ## 0.13.55 发版门禁与远端结论（2026-11-27，记忆员收口，已知事实直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |
