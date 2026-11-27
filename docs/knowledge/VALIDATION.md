@@ -10019,3 +10019,12 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 推送 | `git push origin main` | `02e54ca..88e9b87 main -> main`，`main`=`origin/main`=`88e9b87` |
 | 树 | `git status --short --branch` | 仅 `## main...origin/main` 干净 |
 | live | `grep grok-workflow ~/.dsh/profiles/web/package.json` | 仍 `#v0.13.61`，待亲手改 |
+## Round6推送验证（2026-11-28 01:45，主代理亲手复验，`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 推送 | `git push origin main` | `6c02b97..e365b7a main -> main`，`main`=`origin/main`=`e365b7a` |
+| 合流 | `git rev-list --parents -1 HEAD` | `e365b7a 6c02b97 bcd2151`，`--no-ff`无冲突 |
+| 门禁 | `npm run typecheck` + `npm run lint` + `npx vitest run`三件套 | tsc0 / 17w0e / 74/74 `PASS` |
+| 树 | `git status --short --branch` | 仅 `## main...origin/main` 干净 |
+| live | `grep grok-workflow ~/.dsh/profiles/web/package.json` | 仍 `#v0.13.61`，待亲手改 |
