@@ -29,7 +29,8 @@
  * 3. the submitted `splitHash` is byte-identical to the preview's (else
  *    `split-changed`);
  * 4. one of the messages after the preview contains the approval quote
- *    verbatim (else `approval-required`);
+ *    verbatim — one contiguous run of it, whitespace aside (see `carriesQuote`),
+ *    else `approval-required`;
  * 5. `approved === true` (else `not-approval`).
  *
  * The order is the user's story: "you never saw this" outranks "you saw it but
@@ -133,6 +134,24 @@ export interface StoredPreview {
     /** The canonical directory this split was approved in, when one was recorded. */
     root?: string;
 }
+/**
+ * Does this message carry the approval quote as one contiguous run of the user's
+ * own words?
+ *
+ * The quote is the whole sentence, not its keywords: a fragment taken out of the
+ * sentence, the pieces of it spread over two messages, or the same words in another
+ * order are all *not* the sentence, however complete the word set looks. That is
+ * why this is a substring test and not a token test — writing it as "did the
+ * message contain these words" would let a carved quote pass as an approval.
+ *
+ * Whitespace is the one thing treated as insignificant: a sentence pasted back with
+ * a wrapped line or a doubled space is the same sentence, and refusing it would be a
+ * false negative on a real yes. Punctuation, order and missing characters stay
+ * significant.
+ * @param message - one message the user authored after the preview.
+ * @param quote - the approving words as recorded.
+ */
+export declare function carriesQuote(message: string, quote: string): boolean;
 /**
  * The one rule for turning a directory into the value the ledger records.
  *

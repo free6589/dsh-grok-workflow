@@ -8,6 +8,6 @@
 export { BLOCK_INTAKE_LIMITS, BLOCK_LEDGER_VERSION, BlockIntakeError, type ApprovalKind, type BlockApproval, type BlockEntry, type BlockExecution, type BlockIntakeErrorCode, type BlockPreview, type BlockRow, type BlockStartResult, type BlockStatus, type BlockTaskRow, type VerdictCriterion, type VerdictOutcome, type VerdictReason, type VerdictRow, } from './types.js';
 export { BLOCK_LEDGER_DIR_ENV, BLOCKS_FILE, VERDICTS_FILE, blockLedgerDir, blocksFile, verdictsFile, type BlockLedgerOptions, } from './paths.js';
 export { appendBlockRow, appendVerdictRow, canonicalJson, findBlockBySplit, getBlockRow, readBlockRows, readVerdictRows, rowHashOf, sha256Hex, verdictsFor, type BlockRowsRead, type BlockStoreOptions, type SkippedLedgerLine, type VerdictRowsRead, } from './store.js';
-export { canonicalDirectory, normalizeSplit, previewBlocks, previewById, resetPreviews, splitHashOf, startBlock, type BlockEntryInput, type BlockSplit, type NormalizedBlock, type PreviewInput, type StartInput, type StoredPreview, } from './preview.js';
+export { canonicalDirectory, carriesQuote, normalizeSplit, previewBlocks, previewById, resetPreviews, splitHashOf, startBlock, type BlockEntryInput, type BlockSplit, type NormalizedBlock, type PreviewInput, type StartInput, type StoredPreview, } from './preview.js';
 export { isApproveAnswer } from './approval.js';
 //# sourceMappingURL=index.d.ts.map

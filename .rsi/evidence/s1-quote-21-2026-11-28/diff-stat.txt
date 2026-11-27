@@ -1,0 +1,16 @@
+ docs/ARCHITECTURE.md       |  2 +-
+ lib/block/index.d.ts       |  2 +-
+ lib/block/index.d.ts.map   |  2 +-
+ lib/block/index.js         |  2 +-
+ lib/block/index.js.map     |  2 +-
+ lib/block/preview.d.ts     | 21 ++++++++++++++++++++-
+ lib/block/preview.d.ts.map |  2 +-
+ lib/block/preview.js       | 28 ++++++++++++++++++++++++++--
+ lib/block/preview.js.map   |  2 +-
+ lib/block/tools.d.ts.map   |  2 +-
+ lib/block/tools.js         |  4 ++--
+ lib/block/tools.js.map     |  2 +-
+ src/block/index.ts         |  1 +
+ src/block/preview.ts       | 28 ++++++++++++++++++++++++++--
+ src/block/tools.ts         |  3 ++-
+ 15 files changed, 86 insertions(+), 17 deletions(-)
