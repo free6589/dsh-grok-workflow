@@ -151,12 +151,12 @@ const TASK_ROW = /^- (\S+): (verified|failed|blocked) \(\d+ attempts?\) — (.*)
 /** The indented reason line under a task row. */
 const TASK_ROW_REASON = /^\s+incomplete(?: \([a-z]+\))?: (.*)$/
 
-/** Locators a round's rows quote: absolute paths, URLs, and bare file names. */
+/** Locators a round's rows quote: absolute paths, URLs, and bare file names (incl. CJK). */
 const LOCATOR_PATTERNS: readonly RegExp[] = [
   /file:\/\/[^\s,;()]+/g,
   /https?:\/\/[^\s,;()]+/g,
-  /\/[\w.@-]+(?:\/[\w.@-]+)+/g,
-  /(?<![\w/.])[\w-]+(?:\.[\w-]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi,
+  /\/[\w.@\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+(?:\/[\w.@\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+)+/g,
+  /(?<![\w/.])[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+(?:\.[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi,
 ]
 
 /** Collapse whitespace, redact, and bound one line of compiled text. */
