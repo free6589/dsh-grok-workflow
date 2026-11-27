@@ -1,3 +1,18 @@
+## 0.13.61 发版门禁与远端结论（2026-11-27，收尾员本轮 Serena 通道实测复核；本地两次 ci 为前置已证直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 起点复核（本轮） | `git status --short --branch` / `git log --oneline -10` / `git branch -a` / `git tag -l 'v0.13.6*'` / `git stash list`（Serena 通道，`TMPDIR=/run/media/fish/data/dsh-tmp`） | `## main...origin/main` 干净；`main`=`689a315`；本地有 `release/0.13.61`（=`13752d2`）、`fix/entry-guard`、`fix/carry-cjk`、`fix/resume-reuse`（`+` 超前原样）；tag 含 `v0.13.61`/`v0.13.60`；stash 两条原位（`entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines`） |
+| 主线身份（本轮） | `git rev-parse main/origin/main/release/0.13.61/'v0.13.61^{}'` + `git cat-file -p v0.13.61` + `git merge-base --is-ancestor release/0.13.61 main`（同环境） | `main`=`origin/main`=`689a3158f53f…`；`release/0.13.61`=`13752d2aaa3a00…`；tag对象 `99e75fb34044b…` 剥出=`689a315…`；`release/0.13.61` 已合入 main（merged） |
+| 远端起点（本轮） | `git ls-remote origin 'refs/heads/main' 'refs/tags/v0.13.61' 'refs/heads/release/0.13.61'`（同环境） | `refs/heads/main`= `689a315…`、`refs/tags/v0.13.61`= `99e75fb…`，远端无 `refs/heads/release/0.13.61` |
+| 本地全量①（前置已证） | `npm run ci`（`release/0.13.61` @ `4a62071`，`TMPDIR=/run/media/fish/data/dsh-tmp`） | **`EXIT 0`：`293 files byte-identical`、`116 files / 2123 passed`、lint `17 warnings / 0 errors`**（不重验） |
+| 本地全量②（前置已证） | `npm run ci`（`main` @ `689a315`，同环境） | **`EXIT 0`：同上口径，`116 files / 2123 passed`**（不重验） |
+| 远端 CI（本轮 `gh` 实读） | `gh run list --branch main` | run **`45992537765`**（main @ 合流，`Merge branch 'release/0.13.61'`）`success`（`1m31s`） |
+| 远端 Release（本轮 `gh` 实读） | `gh run list` + `gh release view v0.13.61 --json …` | run **`45992555196`**（tag `v0.13.61`）`success`（`1m29s`）；Release **`v0.13.61`** 已发布 **`2026-11-27T11:43:01Z`**，非draft非prerelease，资产 `dsh-grok-workflow-0.13.61.tgz` **`1052999`** 字节 `sha256 b8137ebf…1831fc31` |
+| 用户条目 | `CHANGELOG.md` 本树实读 | `[0.13.61]` 两条（carry-cjk中文文件名定位器 + 390入口order5宿主快照，中英）已在 `13752d2` 中，`[Unreleased]` 为空，本轮不重复加条 |
+| 未做（`NOT_RUN`） | — | 本轮不重跑两次本地 ci（前置已证复用，见上）；`/run/media` 下日志不进树；live 升级只记录不执行 |
+| 阻塞（`BLOCKED`） | — | 无 |
+
 ## fix/entry-guard 390 入口守卫（2026-11-27，分支 `fix/entry-guard`，基线 `99a4088`，未推远端，未合流）(`CONFIRMED`，本树实测)
 
 | state | command（环境） | result |

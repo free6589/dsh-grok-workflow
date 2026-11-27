@@ -1,3 +1,17 @@
+Last updated: 2026-11-27 19:45 +08:00（**0.13.61 发版完成：合流 566fb80 + build 4a62071 + prepare 13752d2 + 主线 689a315 + tag v0.13.61 + 远端双绿 + Release 已发布（`CONFIRMED`；git身份/远端/分支/stash本轮经 Serena 通道实测复核，本地两次 `npm run ci` 为前置已证直接用、不重验）** —
+链 `88f21bd`（entry-guard 并入 release）→ `566fb80`（carry-cjk 并入 release）→ `4a62071`（build重建lib）→ `13752d2`（`chore(release): prepare v0.13.61`，八文件）→ `689a315`（`Merge branch 'release/0.13.61'`）（`CONFIRMED`）；
+`git rev-parse main` = `git rev-parse origin/main` = `689a3158f53f0fa0e3d1f132a5dd46cc4c11a1db`，`git rev-parse release/0.13.61` = `13752d2aaa3a0040b367999268a5621cc85c7594`，`git rev-parse 'v0.13.61^{}'` = `689a315…`，tag对象 `99e75fb34044b63ec4095e367ede32b14400f779`（`CONFIRMED`）；
+`git ls-remote origin`：`refs/heads/main` = `689a315…`、`refs/tags/v0.13.61` = `99e75fb…`，远端无 `refs/heads/release/0.13.61`（`CONFIRMED`）；`git merge-base --is-ancestor release/0.13.61 main` 成立，已合入（`CONFIRMED`）；
+本地门禁（前置已证直接用、不重验，`CONFIRMED`）：两次 `npm run ci` 均 `EXIT 0`（release提交 `4a62071` 上一次 + 主线 `689a315` 上一次），均 `verify:lib`（`293 files byte-identical`）、`116 files / 2123 passed`、lint `17 warnings / 0 errors`，环境 `TMPDIR=/run/media/fish/data/dsh-tmp`；
+远端（本轮 `gh` 实读，`CONFIRMED`）：CI run `45992537765`（main）`success`（`1m31s`）+ Release run `45992555196`（tag `v0.13.61`）`success`（`1m29s`）；
+Release `v0.13.61` 已发布 `2026-11-27T11:43:01Z`，非draft非prerelease，资产 `dsh-grok-workflow-0.13.61.tgz` `1052999` 字节 `sha256 b8137ebf…1831fc31`（`CONFIRMED`）；
+八文件（`git show --stat 13752d2` 本轮实读，`CONFIRMED`，`8 files +48 −22`）：`package.json`、`package-lock.json`、`src/client/index.js`、`lib/client.js`、`CHANGELOG.md`（`[0.13.61]` 两条：carry-cjk回执定位器保留中文交付物文件名 + 390入口钉order 5带版本号宿主快照，中英）、`README.md`、`README.zh-CN.md`、`docs/LOCAL-TESTING.md`；build提交 `4a62071` 另带 `lib/carryover.js(+map)`、`lib/delivery/index.js(+map)` 重建；
+版本读回 `package.json` `0.13.61`（`CONFIRMED`，本树实读）；
+不动（`CONFIRMED`，`git branch -a` + `git stash list` 本轮实读）：`fix/entry-guard`、`fix/carry-cjk`、`fix/resume-reuse`（`+` 超前标记原样保留）一律不动；`stash@{0}`（`entry-guard-hold-foreign-carry-cjk-hunk-not-mine`）与 `stash@{1}`（`entry-guard-temp-hold-STATE-unrelated-4lines`）两条原位不动；已发布tag（`v0.13.60`及更早）不动；线上 `0.13.54` 不动（残留/磁盘/线上0.13.54不动）；
+本轮环境备注：默认 `bash` 工具全程不可用（`cannot start "bash"`），全部 git/gh/记忆操作经 Serena 通道（`s.shell.execute_shell_command`，`session ebb9ce7d`）；`TMPDIR=/run/media/fish/data/dsh-tmp`（`CONFIRMED`）；
+红线：无force-push、未动已发布tag、未publish、未碰live/重启/`fix/resume-reuse`（`CONFIRMED`）。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 18:55 +08:00（**0.13.60 发版完成：三合流 + prepare + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，前置已证直接用、不重验）** —
 合流SHA **`ea6244b26cdd7cc8c9caeae3b01a0c458e10f55d`**（`Merge branch 'release/0.13.60'`，`--no-ff`，ort无冲突）（`CONFIRMED`）；
 release分支尖端合流前 **`cece95e5eb631a1bc7d8701897784c397995ca3f`**；抬版提交 **`7f8d615`** `chore(release): prepare v0.13.60`（`CONFIRMED`）；
