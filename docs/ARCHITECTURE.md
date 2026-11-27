@@ -513,7 +513,7 @@ user's story:
 | 1 | the preview exists in this session | `not-found` |
 | 2 | it has not expired | `preview-expired` |
 | 3 | the submitted `splitHash` is byte-identical to the preview's | `split-changed` |
-| 4 | one message after the preview contains `approval.quote` verbatim | `approval-required` |
+| 4 | one message after the preview carries `approval.quote` as one contiguous run, whitespace aside | `approval-required` |
 
 and then `approved === true`, else `not-approval`. "You never saw this" outranks "you saw it
 but it changed", which outranks "you changed it but did not say yes", so a caller that gets

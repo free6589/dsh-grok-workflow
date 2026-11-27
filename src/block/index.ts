@@ -55,6 +55,7 @@ export {
 
 export {
   canonicalDirectory,
+  carriesQuote,
   normalizeSplit,
   previewBlocks,
   previewById,

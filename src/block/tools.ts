@@ -29,6 +29,7 @@ import {
   blockLedgerDir,
   blocksFile,
   canonicalDirectory,
+  carriesQuote,
   getBlockRow,
   isApproveAnswer,
   previewBlocks,
@@ -537,7 +538,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       // keeps it. The kind follows the first message the quote was found in, so an
       // earlier typed yes is not relabelled by a card that repeats the same word.
       const declaredKind = String(approval.kind ?? 'user')
-      const matched = quote === '' ? undefined : messagesAfterPreview.find(message => message.text.includes(quote))
+      const matched = quote === '' ? undefined : messagesAfterPreview.find(message => carriesQuote(message.text, quote))
       const kind = declaredKind === 'user' && matched?.kind === 'question-reply' ? 'question-reply' : declaredKind
       // Repeated here on purpose: this is the branch that commissions work (it writes
       // the approved split and hands back the dispatch envelope), so M3.2 will read the
