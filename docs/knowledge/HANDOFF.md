@@ -1,3 +1,11 @@
+## 2026-11-27 — 0.13.55 发版收口（发版收口记忆，非施工）**（主线 `62a3e48` + tag `v0.13.55`（对象 `453c85c`）已推远端；远端 CI `45919381381` success + Release `45919390634` success + Release `v0.13.55` 已发布（`2026-11-27T00:55:07Z`，资产 `1044574` 字节）；可删 `.tmp/wt-release-055` 与本波建的 worktree；12 项 untracked 残留、`fix/resume-reuse`、任何备份一律别动；不动代码/分支/tag/远端/live）**
+
+- **From:** 0.13.55 发版收口记忆员（只写四个记忆文件，不碰代码/分支/tag/远端/live） · **To:** 下一个接手的人 / 清理工作树的人 / 做 live 升级的人（需另行授权）
+- **发版结论（`CONFIRMED`，已知事实直接用）**：基 `fc40492`；四合流 `738326f`（①）→ `53fc9e6`（②）→ `833523a`（④）→ `1dd5dee`（⑤），ort 自动合无冲突，功能并存已 grep 确认，**无手工融合裁决**；prepare `665ec9e`（八处版本号读回全 `0.13.55`）；主线合流 `62a3e48`；附注标签 `v0.13.55`（对象 `453c85c`）；`push main` + `push tag` 均 `EXIT 0`；远端 CI `45919381381` success（Node22/24 绿，`1m27s`）+ Release `45919390634` success（`1m37s`）；Release `v0.13.55` 已发布（`2026-11-27T00:55:07Z`），资产 `dsh-grok-workflow-0.13.55.tgz` `1044574` 字节；用户条目在 `CHANGELOG.md [0.13.55]`，本轮不重复加。
+- **可删（等执行者动手，本轮 shell 故障没删）**：`.tmp/wt-release-055`（`git worktree remove --force`）及本波建的 worktree、其它本波残留。删前确认 `git status` 干净、删后带回 `git status --short --branch` + `git worktree list`。
+- **别动（红线）**：12 项 untracked 残留、`fix/resume-reuse`、任何备份、旧已合分支；不 force-push、不动已发布 tag、不 npm publish、不碰 live。
+- **live 升级只记录、不执行**：本轮不碰 `~/.dsh`、不重载、不重启；升级需另行授权，另起一轮。
+
 ## 2026-11-27 — 0.13.54 发版完成（发版收口记忆，非施工）**（主线 `0b1b94e` = 远端 `origin/main`；远端 CI `45906804259` success + Release `45906832611` success + Release 已发布；已合四条分支的工作树与 `.tmp/wt-release-054` 可删；`fix/resume-reuse` 仍是脏备份（`fe6d631`，未动），等用户裁决后再动；live 升级只记录、不执行）**
 
 - **From:** 发版收口记忆员（只写四个记忆文件，不碰代码/分支/工作树/live） · **To:** 下一个接手的人 / 清理工作树的人 / 做 live 升级的人（需另行授权）

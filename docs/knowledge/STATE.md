@@ -1,3 +1,14 @@
+Last updated: 2026-11-27 09:10 +08:00（**0.13.55 发版完成：四合流 SHA 链 + prepare + merge + tag + 远端双绿 run id + Release 资产（`CONFIRMED`，已知事实直接用、不重验）** —
+基线 **`fc4049294358b346bb343cb862ddbcd0d8e52bea`**（`CONFIRMED`）；分支 **`release/0.13.55`**（worktree `.tmp/wt-release-055`）（`CONFIRMED`）；
+四合流按序 **`738326f5d6562d1096f6e482c32d33dbe3d9d3c1`**（① step-count-unify `4151c2f`）→ **`53fc9e6ca429f74dd8b91d5aadf30c4e7cdd0efd`**（② eta-basis-wording `1208034`）→ **`833523af15b86369802473eb71a3418cde4b7601`**（④ overlap-readings-name `af224fc`）→ **`1dd5dee449b3cfb161d40ffd76628bb2737036b7`**（⑤ dead-key-upgrade-note `f36df6c`）（`CONFIRMED`）；
+ort 自动合无冲突、功能并存已 grep 确认——**无手工融合裁决**，`DECISIONS.md` 不新增条目（`CONFIRMED`）；
+发版准备 **`665ec9e2f9b085cb8414acbeb6de8759dee581f1`**，八处版本号读回全 **`0.13.55`**（`CONFIRMED`）；
+主线合流 **`62a3e48588d22b8f624b62ac663c0a9c6cbf86d7`**（`CONFIRMED`）；附注标签 **`v0.13.55`** 对象 **`453c85c76afb6f7ac899a5355f8090a9c6f07`**（`CONFIRMED`）；`push main` + `push tag` 均 **`EXIT 0`**（`CONFIRMED`）；
+远端 CI run **`45919381381`** `success`（Node22/24 绿，`1m27s`）（`CONFIRMED`）；远端 Release run **`45919390634`** `success`（`1m37s`）（`CONFIRMED`）；
+Release **`v0.13.55`** 已发布 **`2026-11-27T00:55:07Z`**，资产 `dsh-grok-workflow-0.13.55.tgz` **1044574** 字节（`CONFIRMED`）；
+用户条目已在 prepare 写好（`CHANGELOG.md [0.13.55]`），本轮不重复加（`CONFIRMED`）。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 07:00 +08:00（**0.13.54 发版完成：四条合流 + 发版 + 远端双绿 + Release 已发布（`CONFIRMED`，本树实测 + `gh` 实读）** —
 分支 **`release/0.13.54`** 四条合流按序：**`7cc8db7`**（`feat/task-fork` 横排分叉）→ **`6bc62b0`**（`fix/mobile-overlap` 手机抽屉，手工融合）→ **`8c62233`**（`fix/readings-refresh` 证据订正）→ **`199b1a3`**（`fix/verdict-honest` 跳过记 `skipped`）；发版准备 **`f3bca3c`**（`chore(release): prepare v0.13.54`，`package.json` = **`0.13.54`**）；主线合流 **`0b1b94e`**（`Merge branch 'release/0.13.54'`，父 `c2351f2` + `f3bca3c`）；附注标签 **`v0.13.54`** 对象 `7f71a4e` 指向 `0b1b94e`。**远端门禁（`gh` 实读）**：CI run **`45906804259`**（`main`，`0b1b94e`）**`success`**——Node 22 与 Node 24 皆 **`105 passed (105)` / `2049 passed (2049)`**；Release run **`45906832611`**（`v0.13.54`）**`success`**，Release **`Grok Workflow for DSH v0.13.54`** 已发布（`2026-11-26T22:47:16Z`），资产 `dsh-grok-workflow-0.13.54.tgz` **1042469** 字节。以下为上一轮记录，原样保留：
 

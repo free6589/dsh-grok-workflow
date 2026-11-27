@@ -1,3 +1,16 @@
+## 0.13.55 发版门禁与远端结论（2026-11-27，记忆员收口，已知事实直接用、不重验）(`CONFIRMED`)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地全量（发版前） | `npm run ci` | **`EXIT 0`：`108 files / 2061 passed`，`Duration 84.17s`** |
+| 轻门禁① step-count-unify | 块内门禁 | `tsc 0 / oxlint 15w0e / vitest 227 passed` |
+| 轻门禁② eta-basis-wording | 块内门禁 | `tsc 0 / 15w0e / 236 passed` |
+| 轻门禁④ overlap-readings-name | 块内门禁 | `tsc 0 / 16w0e / 241 passed` |
+| 轻门禁⑤ dead-key-upgrade-note | 块内门禁 | `tsc 0 / 16w0e / 244 passed`（7 files） |
+| 远端 CI | run `45919381381` | **`success`**（Node22/24 绿，`1m27s`） |
+| 远端 Release | run `45919390634` | **`success`**（`1m37s`）；Release **`v0.13.55`** 已发布（`2026-11-27T00:55:07Z`），资产 `dsh-grok-workflow-0.13.55.tgz` **1044574** 字节 |
+| 主线身份 | 本树 | 基 `fc40492`；四合流 `738326f` → `53fc9e6` → `833523a` → `1dd5dee`（ort 自动合无冲突）；prepare `665ec9e`（八处版本号全 `0.13.55`）；主线合流 `62a3e48`；tag `v0.13.55` 对象 `453c85c`；`push main` + `push tag` 均 `EXIT 0`；用户条目 `CHANGELOG.md [0.13.55]` 已在 prepare，本轮不重复加 |
+
 ## 0.13.54 发版门禁与远端结论（2026-11-27，记忆员 `gh` 实读 + 本树实测）(`CONFIRMED`)
 
 | state | command（环境） | result |
