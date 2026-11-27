@@ -1,3 +1,11 @@
+## 2026-11-28 — Round30记忆小工交接（只补三份记忆增量行，不写产品代码；只读复核`CONFIRMED`+主代理亲手复验转述）
+
+- **From:** 记忆小工（dispatcher-wrap-33/agent-1，主检出只读） · **To:** 主代理lead / 下一个接手的人
+- **本轮只读实测（`CONFIRMED`）**：`git status --short --branch` → `## main...origin/main [ahead 2]`干净；`git log --oneline -5`首行`9ba3061`；`git log origin/main..HEAD`两条（`9ba3061`+`5d33e8a`）；`git show --stat HEAD` 1文件31行R16证据；`git diff origin/main --name-only -- src/`空（src零改动）；`git stash list`三条原位（foreman-stash/entry-guard两条）；`package.json 0.13.62` vs live`#v0.13.61`（`grep`只读，未改未重启）。
+- **主代理亲手复验转述（本小工未重跑，不夸大）**：R16口径证据tsc0/lint17w0e `CONFIRMED`；C1养B dispose补写门槛已立红2 `NOT_RUN`；日志十八轮N-18-1传输层unknown `HYPOTHESIS`，6新面其余证伪/`BLOCKED`；stash第三条原位。
+- **红线**：只追三份记忆文件增量行，未改src/、未删分支、未碰live/tag、不push、不写密钥、不合流。
+- **下一步**：主代理判ahead 2推不推（先fetch+远端绿再定）→ C1门槛红2补测另起分支 → 日志N-18-1补源档后重判 → live只许主代理快照后亲手改。
+
 ## 2026-11-28 — Round25三路收尾（记忆沉淀，不发版不推送，主代理CONFIRMED直接引用+三小工已收齐）
 
 - **From:** dispatcher-wrap-28包工头（统一写三份记忆增量行） · **To:** 主代理lead / 下一个接手的人

@@ -1,3 +1,13 @@
+## Round30记忆小工验证记（2026-11-28，主检出只读实测+主代理亲手复验转述，不发版不推送）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git status --short --branch`+`git log --oneline -5`+`git log origin/main..HEAD --oneline`+`git show --stat HEAD`（本小工只读实测） | `9ba3061`（`bdaee1c`+`5d33e8a --no-ff`，1文件31行R16证据）ahead 2、干净 `CONFIRMED` |
+| src零改动 | `git diff origin/main --name-only -- src/`（本小工只读实测） | 空输出，src零改动 `CONFIRMED`；tsc0/lint17w0e主代理转述本轮`NOT_RUN` |
+| C1/日志 | 主代理亲手复验转述（本轮未重跑`NOT_RUN`） | C1养B dispose补写门槛已立红2 `NOT_RUN`；十八轮N-18-1传输层unknown `HYPOTHESIS`，6新面其余证伪/`BLOCKED` |
+| live/stash | `grep -n dsh-grok-workflow ~/.dsh/profiles/web/package.json`（只读）+`git stash list` | live仍`#v0.13.61`（第13行实见，未改未重启）；stash三条原位 `CONFIRMED`；本仓`0.13.62` |
+| 本轮写面 | — | 只有三份记忆文件的增量行；产品代码0行、不删分支不动live不重启不push不写密钥不合流 |
+
 ## Round25三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+三小工只读实测，不发版不推送）
 
 | state | command | result |
