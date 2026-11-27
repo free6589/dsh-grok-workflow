@@ -7109,3 +7109,6 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **下一步**：主代理判ahead 2推不推（先`fetch`看远端+CI，推送后确认双红转绿）→ 补齐十四轮日志N8/N9判重口径 → 亲手改live（改前快照，等push+远端绿后再动，主代理亲手改）；`fix/lib-rebuild-25`等分支保持不动待判；每步先`status`确认，禁`-D`/force-push/动tag/publish/动live重启。
 ## 2026-11-28 — Round27收尾（记忆沉淀，不发版，主代理CONFIRMED直接引用）
 - **做了什么/下一步**：只出三份记忆增量行、未写产品代码。主线 `6778d16`=`origin/main`树干净`CONFIRMED`；CI新轮`46076756913`绿（含lib合流）`CONFIRMED`；合完棚分支已清（剩resume-reuse棚）`CONFIRMED`；日志十五轮打破零真面（C1无终态run `CONFIRMED`，R15-1沙箱误伤，lib合流verify `PASS`）；live仍`#v0.13.61`、stash三条原位；下一步主代理定，红线全守禁`-D`/force-push/动tag/publish/动live重启。
+## 2026-11-28 — Round28收尾（记忆沉淀，不发版，主代理CONFIRMED直接引用）
+- **做了什么**：只出三份记忆增量行、未写产品代码。主线 `b215042`=`origin/main`树干净`CONFIRMED`；CI双绿`46076756913`/`46079310443``CONFIRMED`；C1棚`fix/c1-staleless-28@b215042`钉子+证据未合入（4钉机制红、门禁双PASS）；日志十六轮（C1降级`HYPOTHESIS`、R16-A/B新候选、F1/F2治理缺口）；live仍`#v0.13.61`、stash三条原位；分支一个没删。
+- **下一步**：主代理定C1棚去留与十六轮R16-A/B候选判重 → 亲手改live（改前快照，等远端绿后再动，主代理亲手改）；每步先`status`确认，禁`-D`/force-push/动tag/publish/动live重启。

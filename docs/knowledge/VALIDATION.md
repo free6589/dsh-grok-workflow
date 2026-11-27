@@ -10227,3 +10227,5 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | Round26未做/写面 | 本轮复验动作 + 写面声明 | 十四轮日志本轮未重跑`NOT_RUN`（转述）；只有三份记忆追加行（STATE 1行/HANDOFF 1块4行/VALIDATION 1节8行），产品代码0行，不删分支不动live不重启不force-push不动tag不publish不写密钥不推送 `CONFIRMED` |
 ## Round27记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用）
 | Round27主线/CI/棚/日志/live/stash/写面 | 主代理亲手复验`CONFIRMED`直接引用 | 主线`6778d16`=`origin/main`树干净；CI`46076756913`绿（含lib合流）；合完棚分支已清剩resume-reuse棚；十五轮打破零真面（C1无终态run，R15-1沙箱误伤，lib合流verify `PASS`）；live仍`#v0.13.61`、stash三条原位；只有三份记忆追加行，产品代码0行，不删分支不动live不推送 `CONFIRMED` |
+## Round28记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用）
+| Round28主线/CI/C1/日志/live/stash/写面 | 主代理亲手复验`CONFIRMED`直接引用 | 主线`b215042`=`origin/main`树干净；CI双绿`46076756913`/`46079310443`；C1棚`fix/c1-staleless-28@b215042`钉子+证据未合入（4钉机制红、门禁双PASS）；十六轮（C1降级`HYPOTHESIS`、R16-A/B新候选、F1/F2治理缺口）；live仍`#v0.13.61`、stash三条原位；只有三份记忆追加行，产品代码0行，不删分支不动live不推送 `CONFIRMED` |
