@@ -1,3 +1,15 @@
+## fix/entry-guard 390 入口守卫（2026-11-27，分支 `fix/entry-guard`，基线 `99a4088`，未推远端，未合流）(`CONFIRMED`，本树实测)
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 先红 | `npx vitest run test/progress-entry.spec.ts`（`TMPDIR=/run/media/fish/data/dsh-tmp`） | **`1 failed / 5 passed`：`expected [ 'chat', 'host-new-view' ] to include 'grok-progress'`** ——宿主加 order=3 视图时 390 预算只剩 chat + 新视图，旧区间断言全绿，真缺口 |
+| 宿主加视图模拟 | STOCK 镜像 `host-new-view order 3` 后同命令（一次性模拟，事后已恢复） | **`2 failed / 5 passed`**：快照版本钉子 + 390 可达双双变红，order=5 直达与注册槽直达保持绿（入口只保自己） |
+| 后绿门禁 | `npx tsc -p tsconfig.json --noEmit` | **`EXIT 0`，0 错** |
+| 后绿门禁 | `npx oxlint src test` | **`17 warnings / 0 errors`**（198 文件，基线同数，本分支无新增） |
+| 后绿门禁 | `npx vitest run test/progress-entry.spec.ts test/client.spec.ts test/progress-tab.spec.ts test/progress-panel.spec.ts` | **`4 files / 297 passed`**（含 `lib/client.js` 逐字节重建，bundle `443055` 字节） |
+| 390 证据 | `.rsi/evidence/entry-guard-2026-11-27/390-entry-guard.png` + `README.md`（chromium headless 390x460 烘焙，可复现） | 三格：chat 0 首位 + grok-progress 5 可见 + trajectory 10 折叠；预算公式与守卫语同框 |
+| 未做（`NOT_RUN`） | 隔离家目录真机 soak（`DSH_HOME=<scratch>`）、`npm run ci` 全量 | 本轮以烘焙 PNG + spec 守卫代替；全量留给发版轮 |
+
 ## 0.13.60 发版门禁与远端结论（2026-11-27，三合流发版，前置已证直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |

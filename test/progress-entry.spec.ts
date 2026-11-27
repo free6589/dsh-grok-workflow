@@ -68,7 +68,15 @@ function visibleIdsAt(rowWidth: number, entries: Array<{ id: string, order: numb
   return preferred.slice(0, limit).map((entry) => entry.id)
 }
 
-/** The stock strip this package joins: chat 0, trajectory 10 (host-owned). */
+/**
+ * The stock strip this package joins: chat 0, trajectory 10 (host-owned).
+ *
+ * entry-guard: this snapshot is the only host knowledge this spec owns. The
+ * host adds a view (or moves a rank, or changes the fold formula) by editing
+ * HOST_SNAPSHOT below — never by touching this package's own rank. Any host
+ * change that is not mirrored here leaves the guard below red on purpose.
+ */
+const HOST_SNAPSHOT_VERSION = 1
 const STOCK = [
   { id: 'chat', order: 0 },
   { id: 'trajectory', order: 10 },
@@ -81,6 +89,66 @@ describe('progress tab: the 390 entry stays one click away', () => {
     // third rank is the one that folds. Neither neighbour moves.
     expect(progress.viewOrder).toBeGreaterThan(0)
     expect(progress.viewOrder).toBeLessThan(10)
+  })
+
+  it('entry-guard: pins its own rank at exactly 5 (a drift to 3 or 7 turns red)', () => {
+    // entry-guard: the entry only guards itself. The exact rank is the
+    // contract: any drift (3, 7, 20) breaks 390 reachability or the
+    // neighbour order, so the spec names the value instead of a range.
+    expect(progress.viewId).toBe('grok-progress')
+    expect(progress.viewOrder).toBe(5)
+  })
+
+  it('entry-guard: the host snapshot is versioned - a new host view bumps it (red otherwise)', () => {
+    // entry-guard: STOCK mirrors the real host strip. If the host ships one
+    // more view, mirroring it here (STOCK + version bump) re-runs the 390
+    // math against reality; the version pin below is that tripwire.
+    expect(HOST_SNAPSHOT_VERSION).toBe(1)
+    expect(STOCK).toEqual([
+      { id: 'chat', order: 0 },
+      { id: 'trajectory', order: 10 },
+    ])
+  })
+
+  it('entry-guard: documents the crowding physics - order 3 would fold us (nail for the next host view)', () => {
+    // entry-guard: at 390 the budget is 2 (chat first, then slot order). A
+    // host view at order 3 would take the second slot and fold grok-progress
+    // (order 5) into the overflow menu. This pins that physics with the
+    // snapshot's own formula: green today, and the assertion a STOCK update
+    // re-checks the day the host really ships such a view.
+    const crowded = [...STOCK, { id: 'host-new-view', order: 3 }, { id: progress.viewId as string, order: progress.viewOrder as number }]
+    expect(visibleIdsAt(390, crowded)).toEqual(['chat', 'host-new-view'])
+    expect(visibleIdsAt(390, crowded)).not.toContain('grok-progress')
+  })
+
+  it('entry-guard: the registered slot carries order 5, not a self-reference', () => {
+    // entry-guard: `entry.order toBe viewOrder` compares the bundle with
+    // itself and stays green on any drift. This pins the shipped value.
+    const slots: Array<{ options: Record<string, unknown> }> = []
+    const ctx = {
+      slots: {
+        inject: (_name: string, fn: () => unknown) => fn(),
+        register: (options: Record<string, unknown>) => {
+          slots.push({ options })
+          return () => {}
+        },
+      },
+    }
+    const fakeConversation = {
+      events: { register: () => () => {} },
+      views: { register: () => () => {} },
+      binding: () => ({ target: () => ({ getSnapshot: () => undefined, subscribe: () => () => {} }) }),
+    }
+    progress.mount(
+      ctx,
+      { uiConversation: fakeConversation, sessions: { binding: (id: string) => ({ sessionId: id }) } },
+      { locale: undefined, t: (key: string) => key },
+      { set: () => {} },
+      () => undefined,
+    )
+    expect(slots).toHaveLength(1)
+    expect(slots[0]!.options['id']).toBe('grok-progress')
+    expect(slots[0]!.options['order']).toBe(5)
   })
 
   it('keeps the entry on the strip at 390: the host budget holds the first two', () => {

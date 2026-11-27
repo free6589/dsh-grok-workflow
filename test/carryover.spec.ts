@@ -167,6 +167,17 @@ describe('carry-over: compiling one round', () => {
       expect(round!.locators.some(locator => locator.includes(file))).toBe(true)
     }
   })
+
+  it('keeps CJK deliverable file names as locators (说明.md / 报告.txt)', () => {
+    // 中文名回执：证据行引用中文交付物，但裸文件名正则 [\w-] 不含 CJK → 0 命中。
+    // 修法：裸文件名分支含 CJK 范围（说明.md、报告.txt 能抓到）。
+    const text = renderReport(reportFixture({ evidence: 'verified 说明.md and 报告.txt' }))
+    const round = parseReportRound(text)
+    expect(round).not.toBeNull()
+    for (const file of ['说明.md', '报告.txt']) {
+      expect(round!.locators.some(locator => locator.includes(file))).toBe(true)
+    }
+  })
 })
 
 describe('carry-over: graceful degradation', () => {
