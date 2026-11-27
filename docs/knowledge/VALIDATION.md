@@ -1,3 +1,16 @@
+## Round4四路收尾验证记（2026-11-28 01:30，包工头收三小工+主检出只读复核，未跑门禁）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线身份 | `git status --short --branch` + `git log --oneline -5 --decorate`（包工头实测） | `## main...origin/main`干净；首行`86d9ddd (HEAD -> main, origin/main, origin/HEAD)`（`CONFIRMED`） |
+| stash原位 | `git stash list`（包工头+去留小工双读一致） | 三条原位：foreman-stash/entry-guard-hold-foreign/entry-guard-temp-hold（`CONFIRMED`） |
+| 去留 | `git branch --merged origin/main` + `git branch --no-merged origin/main` + `git worktree list`（去留小工逐字带回） | 唯一未合流需留：`fix/wave-contract-freeze`（`NOT_RUN`待合）；其余merged建议删但未删；worktree另有6处残留（`CONFIRMED`只读） |
+| rename① | 主代理亲手复验转述（本轮`NOT_RUN`） | `fix/wave-contract-freeze@4d5ecfc`，9项旧名→新名，tsc0/lint17w0e/contract17/17，证据棚内`.tmp/wt-contract`，主线缺 |
+| pixel② | 转述 | `CONDITIONAL-NOGO`，ol缺`margin:0;list-style:none`，重验`NOT_RUN`（`HYPOTHESIS`） |
+| soak③ | 转述 | 真机仍`BLOCKED`（凭证PRESENT但直连上游502，旧备份沙箱不可见；旧确定性5/5+153/153有效） |
+| log④ | 转述 | 2314 sessions：P1 bash起不来109行/58session+P2 rg起不来50行同窗口系统性；候选1缺model三连错11次+候选2网搜配置名未注册；A1后缀`HYPOTHESIS`/A2-A5为`CONFIRMED`非基线/环境 |
+| 红线 | 本轮行为自查 | 只改三份记忆各首部一行；未删分支、未碰live/tag、不force-push、不publish、不写密钥、不写产品代码 |
+
 ## 记忆小工只读复核（2026-11-28 00:55，本轮只读 `CONFIRMED` + 主代理复验转述，未跑门禁）
 
 | state | command | result |

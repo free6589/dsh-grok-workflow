@@ -1,3 +1,11 @@
+## 2026-11-28 01:30 — Round4四路收尾包工头交接（只写记忆增量行，不写产品代码；三小工已收齐）
+
+- **From:** dispatcher-wrap-07包工头（主检出只读+三份记忆追加） · **To:** 主代理lead / 下一个接手的人
+- **收了什么（`CONFIRMED`）**：记忆草稿（STATE/HANDOFF/VALIDATION各一轮，含四路结论+证据位置+标签+下一波）+去留复核（`--merged/--no-merged`逐字输出：`fix/wave-contract-freeze`唯一未合流需留，其余merged建议删但不动手；stash三条原位；worktree除主区另有6处残留，其中5处对应已合分支、1处`.tmp/wt-contract@4d5ecfc`对应待合流）+下一波5条（live亲手升级/contract合流/pixel补归零重验/soak最小请求/P1P2排查起草，只建议不执行）。
+- **剩什么**：live仍`#v0.13.61`（主代理亲手改）；rename分支主线缺（`NOT_RUN`待合）；pixel重验没跑（`HYPOTHESIS`）；soak上游502（`BLOCKED`）；A1后缀待查（`HYPOTHESIS`）。
+- **红线**：未删分支、未碰live/tag、不force-push、不publish、不写密钥、不写产品代码；本轮只改三份记忆文件各首部一行。
+- **下一波一句话**：接手人按5条建议顺序派活，live只许主代理动手，其余重验/合流/排查另起分支做。
+
 ## 2026-11-28 — 记忆小工增量行（只补三份记忆，不写产品代码；本轮只读 `CONFIRMED` + 主代理复验转述）
 
 - **From:** 记忆小工（dispatcher-wrap-06/agent-1，主检出只读） · **To:** 主代理 / 下一个接手的人
