@@ -163,6 +163,19 @@ describe('人话块：只有人能用的内容', () => {
     expect(human).toContain('文件大小已核对')
   })
 
+  it('strips a line-head CJK bare file name the run did not produce', () => {
+    // 行首 CJK 裸名：`报告.ts` 处在行首时 `\b` 不存在（CJK 不是 `\w`，
+    // `\W\W` 之间没有词边界），旧正则剥不掉，人话块会把文件名递给读者。
+    // 非交付物才剥：交付物走 keep 名单原样保留，这里断言的就是非交付物路径。
+    const led = assertWorkflowReport({
+      ...completedReport(),
+      synthesis: { mode: 'deterministic', summary: '报告.ts 已核对，可以直接用。' },
+    }, OBJECTIVE, config)
+    const visible = deliverReport(led).text
+    expect(visible, 'the human block must not carry 报告.ts').not.toContain('报告.ts')
+    expect(visible).toContain('已核对')
+  })
+
   it('never words a failure as success', () => {
     const human = deliverReport(failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable'), { bilingual: true }).human
     expect(human).toContain('这次没做成')
