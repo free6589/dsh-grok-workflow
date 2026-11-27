@@ -2301,6 +2301,7 @@ describe('client progress tab: the flowchart (three screens)', () => {
       'progress.panel.etaBasis',
       'progress.panel.graph',
       'progress.panel.legend.checks',
+      'progress.panel.legend.pending',
       'progress.panel.legend.rings',
       'progress.panel.legend.traced',
       'progress.panel.legend.untraced',

@@ -1896,7 +1896,7 @@ describe('a narrow screen draws the opened calls under the figure', () => {
   })
 })
 
-describe('the trace legend: four standing words, in both languages', () => {
+describe('the trace legend: five standing words, in both languages', () => {
   it('says what a lit wire means', () => {
     expect(zh('progress.panel.legend.traced')).toBe('亮线：走过的线')
     expect(en('progress.panel.legend.traced')).toBe('Lit wire: visited')
@@ -1917,6 +1917,11 @@ describe('the trace legend: four standing words, in both languages', () => {
     expect(en('progress.panel.legend.checks')).toBe('Five dots: five checks')
   })
 
+  it('says a dimmed dot only means not run yet, never failed', () => {
+    expect(zh('progress.panel.legend.pending')).toBe('暗点是还没跑到，不是没过')
+    expect(en('progress.panel.legend.pending')).toBe('Dim means not run yet, not failed')
+  })
+
   it('prints the legend once a node is opened, and only then', () => {
     const closed = pageOf(runningRun())
     expect(hooksOf(closed, 'data-gw-progress-legend')).toHaveLength(0)
@@ -1931,5 +1936,6 @@ describe('the trace legend: four standing words, in both languages', () => {
     expect(copy).toContain('暗线：没走的线')
     expect(copy).toContain('六点：六环，走完六个阶段')
     expect(copy).toContain('五点：五验，通过五道验收')
+    expect(copy).toContain('暗点是还没跑到，不是没过')
   })
 })
