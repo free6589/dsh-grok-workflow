@@ -1,0 +1,2 @@
+npx tsc --noEmit -p tsconfig.build.json
+npx vitest run test/synth-redispatch.spec.ts test/synthesis-guardrails.spec.ts
