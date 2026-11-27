@@ -10229,3 +10229,7 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | Round27主线/CI/棚/日志/live/stash/写面 | 主代理亲手复验`CONFIRMED`直接引用 | 主线`6778d16`=`origin/main`树干净；CI`46076756913`绿（含lib合流）；合完棚分支已清剩resume-reuse棚；十五轮打破零真面（C1无终态run，R15-1沙箱误伤，lib合流verify `PASS`）；live仍`#v0.13.61`、stash三条原位；只有三份记忆追加行，产品代码0行，不删分支不动live不推送 `CONFIRMED` |
 ## Round28记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用）
 | Round28主线/CI/C1/日志/live/stash/写面 | 主代理亲手复验`CONFIRMED`直接引用 | 主线`b215042`=`origin/main`树干净；CI双绿`46076756913`/`46079310443`；C1棚`fix/c1-staleless-28@b215042`钉子+证据未合入（4钉机制红、门禁双PASS）；十六轮（C1降级`HYPOTHESIS`、R16-A/B新候选、F1/F2治理缺口）；live仍`#v0.13.61`、stash三条原位；只有三份记忆追加行，产品代码0行，不删分支不动live不推送 `CONFIRMED` |
+## Round29记忆小工增量验证（2026-11-28，主代理CONFIRMED直接引用）
+| Round29主线/树干净/stash | `git status --short --branch`+`git log --oneline -5`+`git rev-parse HEAD origin/main`+`git stash list`（本小工只读实测） | `36f89b2`=`origin/main`、仅`## main...origin/main`干净、`log`首行36f89b2、stash三条原位 `CONFIRMED` |
+| Round29 CI三连绿/R16/日志/live | 主代理亲手复验`CONFIRMED`直接引用 | CI三连绿`46076756913`/`46079310443`/`46081151435`；R16棚`fix/r16-recount-29@36f89b2`口径复核+证据未合入（8绿1红N9缺源）；日志十七轮（R17-A警告簇hygiene、D-003证伪复核、C1/R16维持）；live仍`#v0.13.61` `CONFIRMED` |
+| Round29写面 | 本轮行为自查 | 只有三份记忆增量行（STATE+5/HANDOFF+3/VALIDATION+3）；产品代码0行、不删分支不动live不重启不force-push不动tag不publish不写密钥不写产品代码、不提交不push `CONFIRMED` |
