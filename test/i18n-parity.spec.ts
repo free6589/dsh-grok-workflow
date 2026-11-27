@@ -120,6 +120,11 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.panel.durationHour', '{h} 小时 {m} 分', '{h}h {m}m'],
   ['progress.panel.trace', '看线', 'Trace its wires'],
   ['progress.panel.graph', '任务图', 'Task graph'],
+  // The trace legend (P2③): four standing words under the figure once a node is opened.
+  ['progress.panel.legend.traced', '亮线：走过的线', 'Lit wire: visited'],
+  ['progress.panel.legend.untraced', '暗线：没走的线', 'Dimmed wire: unvisited'],
+  ['progress.panel.legend.rings', '六点：六环，走完六个阶段', 'Six dots: six stages'],
+  ['progress.panel.legend.checks', '五点：五验，通过五道验收', 'Five dots: five checks'],
   // The sheet a narrow screen draws an opened list in: what it holds, and the one control
   // that puts it away. Wide pages print neither word.
   ['progress.panel.calls', '调用', 'Calls'],
