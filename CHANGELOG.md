@@ -5,6 +5,36 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.60] - 2026-11-27
+
+### Fixed / 修复
+
+- **notrun-shots evidence lives in one place only / 未跑截图证据只留一份** —
+  The notrun-shots snapshots are written to `.rsi/evidence/notrun-shots` only; the spec
+  guards that no `evidence/notrun-shots` duplicate appears at the repo root, so the same
+  shots stop being collected twice under two paths.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only where the snapshots are written.**
+  / 未跑截图快照只写 `.rsi/evidence/notrun-shots` 一处；用例守住仓库根下不再出现
+  `evidence/notrun-shots` 重复目录，同一批截图不再被两条路径各收一份。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是快照写到哪里。**
+
+- **Task count keeps the step line's look, on one clipped line / 任务计数沿用步骤行样式，单行收起** —
+  The task count sentence keeps the step sentence's 12px secondary tabular figures but holds
+  one line and clips (`nowrap` + ellipsis) instead of wrapping, so on a narrow phone a count
+  stops reading as two facts; the narrow sheet keeps this one-line rule.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only the count line's wrapping.**
+  / 任务计数句沿用步骤句的 12px 次级等宽数字，只是不再换行、超出收起（`nowrap` + 省略号），窄屏手机上一个计数不再被读成两条；窄屏样式保持这条单行规则。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是计数行的换行方式。**
+
+- **Dimmed legend dot survives a missing idle token / 暗点图例缺描边变量不断圈** —
+  The dimmed legend dot's ring now falls back through `var(--dsw-alias-state-idle-primary,
+  var(--dsw-alias-label-primary, Canvas))`, so a theme without the idle token still draws a
+  ring ending in a system colour instead of `transparent`; the spec pins all three tokens.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only the legend ring's fallback.**
+  / 暗点图例的描边圈现在按 `var(--dsw-alias-state-idle-primary, var(--dsw-alias-label-primary, Canvas))`
+  逐层兜底，缺 idle 变量的主题仍能画出落到系统色的圈、不会断成 `transparent`；用例钉住三段变量。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是图例圈的兜底写法。**
+
 ## [0.13.59] - 2026-11-27
 
 ### Fixed / 修复

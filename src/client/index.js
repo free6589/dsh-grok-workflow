@@ -210,8 +210,8 @@ window.__ModuleLoader__.load({
      * by a later round and intentionally static here so the page never phones
      * home on its own. Both must stay plain `X.Y.Z` strings (see `isVersion`).
      */
-    const PLUGIN_VERSION = '0.13.59'
-    const UPDATE_LATEST = '0.13.59'
+    const PLUGIN_VERSION = '0.13.60'
+    const UPDATE_LATEST = '0.13.60'
     const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
     /**
      * Whether the shipped version is the newest known release.
@@ -5032,6 +5032,10 @@ window.__ModuleLoader__.load({
       // The one sentence: the same step count the count line used to carry, plus the
       // measured remainder when there is one. It is meta text, so it is 12px.
       '.gw-progress-line { flex: 1 0 100%; min-width: 0; margin: 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }',
+      // The second sentence: the same meta line as the step sentence — same size, same
+      // colour, same tabular figures — but one count on one line: on a narrow phone a
+      // wrapped count reads as two facts, so it holds its line and clips instead.
+      '.gw-progress-count { flex: 1 0 100%; min-width: 0; margin: 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
       // ── the figure: a scroll box of its own, and the fork drawn inside it ─────────
       // The run is left to right at every width, so the figure scrolls sideways rather than
       // folding into a column: a stacked column would destroy the fork the page is.
@@ -5160,7 +5164,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-legend-wire[data-trace="active"] { background: var(--dsw-alias-state-business-primary); }',
       '.gw-progress-legend-wire[data-trace="dim"] { opacity: 0.4; }',
       '.gw-progress-legend-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }',
-      '.gw-progress-legend-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary); }',
+      '.gw-progress-legend-dot[data-state="pending"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dsw-alias-state-idle-primary, var(--dsw-alias-label-primary, Canvas)); }',
       // ── one call line: clock, gate and word ──────────────────────────────────────
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       // A list hangs under one card, so a row is only ever as wide as that card — 110 to 240
@@ -5240,6 +5244,7 @@ window.__ModuleLoader__.load({
       '  .gw-progress-pnode[data-kind] .gw-progress-pnode-body { min-height: 34px; padding: 4px 8px; }',
       '  .gw-progress-pnode-word { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }',
       '  .gw-progress-run { white-space: normal; overflow-wrap: anywhere; }',
+      '  .gw-progress-count { flex: 1 0 100%; min-width: 0; }',
       '}',
       // Under 480px the dock keeps one full-width button and a call line drops its clock
       // column; the figure still scrolls sideways rather than folding.
