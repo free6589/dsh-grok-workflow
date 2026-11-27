@@ -5,6 +5,41 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.57] - 2026-11-27
+
+### Fixed / 修复
+
+- **Step line and task count no longer share one number / 步句与任务数解耦** —
+  The step sentence now names the process layer it sits on, and the task count renders as its own
+  element backed by a `taskCount` model key, so the two numbers can no longer be confused with each other.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which number each
+  line reports.**
+  / 步句只报它所在的那一层，任务数另起一行、背后有 `taskCount` 模型键顶着，两个数字从此各说各的、不会再混。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是每行报哪一个数。**
+
+- **Narrow screens get a progress entry at 390px / 390 窄屏有了进度入口** —
+  The progress entry chip now mounts within the two-slot budget at 390px wide, so the progress view stays
+  reachable on a phone without moving its neighbours.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only where the entry
+  chip is allowed to mount.**
+  / 进度入口小牌现在能在 390 宽度两坑位预算里挂住，手机上点得进进度页，隔壁的东西不会被挤走。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是入口小牌允许挂在哪。**
+
+- **Trajectory legend explains the trace at a glance / 轨迹图例一眼看懂** —
+  The progress view now ships a bilingual legend (four keys, both dictionaries) that mounts only when a node
+  is opened, so the trace lines stop being a guessing game.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only the added legend copy.**
+  / 进度页多了中英双语图例（四个键、两本字典都有），只在点开节点时才挂出来，轨迹线从此不用猜。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是多了这份图例文案。**
+
+- **Skipped and not-run states each get a pinned reading / 跳过与未跑各有钉住的读数** —
+  Four snapshot guards pin the waiting / cancelled / skipped / retry readings: a skipped run lands in the ledger
+  verdict row instead of borrowing another chip, so every not-run state has a reading of its own.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only test guards, no shipped
+  behavior changed.**
+  / 四颗快照钉子把等待 / 已取消 / 跳过 / 重试四种读数钉住：跳过只进台账 verdict 行、不再借别的牌子，每个没跑的状态都有自己的读数。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；这只是测试钉子，已发布的行为没变。**
+
 ## [0.13.56] - 2026-11-27
 
 ### Added / 新增
