@@ -5,6 +5,54 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.55] - 2026-11-27
+
+### Fixed / 修复
+
+- **The stuck line and the top line now count the same step (reader's position) / 卡住句与顶上句用同一个步号（读者站位）** —
+  The top line's step number is the reader's position (it counts the branch layer), but the stuck line used to count
+  from the task cards only, so one screen could show two different step numbers. The failure state is still read from
+  the whole card (so a retry that replaced an earlier failure stays visible), but the number it reports now uses the
+  reader-position layer; blocked / rejected states use the branch-first position directly.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only which step number the stuck
+  line reports.**
+  / 顶上句的步号是读者站位（含分支层），卡住句过去只从任务卡读数，同一屏会出现两个步号。失败态仍从整卡读
+  （要看到被替代的重试），但报数改用读者站位那一层的步号；blocked / rejected 直接用分支优先的站位。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是卡住句报哪一个步号。**
+
+- **The ETA tooltip now names the unit its number rests on ("levels") / 剩余时间悬停提示按「已完成层」报数，不再叫「步骤」** —
+  The `basis` behind the "about X left" estimate counts measured level spans (one per finished column), not finished
+  calls or tasks, but the tooltip used to say "steps". Both dictionaries now say "levels" so the copy names the unit
+  the number was actually computed from.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only the tooltip wording.**
+  / 「还剩约……」那个估算背后的 `basis` 数的是已完成层的实测耗时（一列一层），不是调了几次或做了几个任务，
+  但悬停提示过去写的是「步骤」。两本字典现在都改成「层」，让文案与数字真正的底座一致。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是悬停提示的措辞。**
+
+- **Wide screens reuse the narrow sheet: an opened list can only push the page down, and every overlap note names what it measured / 宽屏复用窄屏那张表：摊开的列表只能把页面往下推，重叠读数逐条正名** —
+  At any width, an opened node's call list now lives in the panel's own column under the figure: it can only push the
+  page down, so it can never land on a neighbouring card, and nodes draw no floating box. The JS breakpoint that chose
+  the sheet is retired (the layout answers the question now, not a number in JS). Expired overlap lines are assert-only,
+  and every remaining overlap reading is pinned to what it measured (calls / trace / dim) instead of a misnamed label.
+  **Upgrade note: nothing to prepare — no setting, stored format or default changed; only where the opened list is
+  placed and what the readings are called.**
+  / 任何宽度下，点开的调用列表都落在图下面板自己那一列里：它只能把页面往下推，压不到隔壁任何一张卡，节点也不再画
+  浮层。选表的那行 JS 断点退场（现在由布局回答这个问题，而不是 JS 里一个数字）。过期的重叠行只做断言保留，
+  剩下的每条重叠读数都按它实际量的东西正名（调用数 / 轨迹 / 变暗数），不再挂错名。
+  **升级须知：不用准备任何东西——没有设置、存储格式或默认值变化；变的只是摊开列表摆在哪儿、读数叫什么。**
+
+- **Retired the dead `progress.flow.visit` key, marked every unnumbered branch with its `u1` card / 删掉已无人读的 `progress.flow.visit`，无号分支一律标出它属于 `u1` 那张卡** —
+  The visit badge left with the old edition and no code reads this key anymore, so both dictionaries drop it.
+  A run with work but no plan number shares one card (`u1`); its branches now carry `data-task="u1"`, so the markup
+  still says whose call each branch is.
+  **Upgrade note: nothing to migrate — records written before this version still read as they did; an old build
+  reading a new record skips the row it does not know (旧读新跳过) instead of failing the whole read, so no
+  downgrade is promised.**
+  / 访问号角标随旧版退场后，已没有任何代码再读这一键，两本字典一起删掉。没有任务号的工作共用 `u1` 一张卡，
+  它的分支现在都带 `data-task="u1"`，读标记的人仍能分清每条分支属于谁。
+  **升级须知：不用迁移任何东西——这个版本之前写下的记录照样读得出；旧构建读到新记录里不认识的行会跳过那一行
+  （旧读新跳过），而不是整单失败，所以不承诺降级。**
+
 ## [0.13.54] - 2026-11-27
 
 ### Changed / 变更

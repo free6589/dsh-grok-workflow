@@ -1265,13 +1265,17 @@ describe('a click opens the calls a card made', () => {
   it('opens a branch into the one call it stands for', () => {
     const view = mount(runningRun())
     const page = clickNode(view, 't1_s2')
-    const list = hookOf(page, 'data-gw-progress-node-calls')
-    expect(attr(list, 'data-gw-progress-node-calls')).toBe('t1_s2')
-    expect(hooksOf(list, 'data-gw-progress-log-row').map((row) => attr(row, 'data-gw-progress-log-row'))).toEqual(['2'])
-    expect(hooksOf(list, 'data-gw-progress-log-row').map(textOf)).toEqual([`${clockOf(2)} 执行 任务 1 · 建表 没过`])
-    // The task card above the branch holds both of its calls.
-    const task = clickNode(view, 't1')
-    expect(hooksOf(hookOf(task, 'data-gw-progress-node-calls'), 'data-gw-progress-log-row')
+    hookOf(page, 'data-gw-progress-sheet')
+    const rows = hooksOf(page, 'data-gw-progress-node-calls')
+    expect(rows).toHaveLength(1)
+    expect(attr(rows[0]!, 'data-gw-progress-node-calls')).toBe('t1_s2')
+    expect(hooksOf(rows[0]!, 'data-gw-progress-log-row').map((row) => attr(row, 'data-gw-progress-log-row'))).toEqual(['2'])
+    expect(hooksOf(rows[0]!, 'data-gw-progress-log-row').map(textOf)).toEqual([`${clockOf(2)} 执行 任务 1 · 建表 没过`])
+    // The task card above the branch holds both of its calls: both branches read the
+    // same sheet, and each group names the card it came from.
+    const taskLists = hooksOf(clickNode(view, 't1'), 'data-gw-progress-node-calls')
+    expect(taskLists.map((entry) => attr(entry, 'data-gw-progress-node-calls')).sort()).toEqual(['t1', 't1_s2'])
+    expect(hooksOf(taskLists.find((entry) => attr(entry, 'data-gw-progress-node-calls') === 't1')!, 'data-gw-progress-log-row')
       .map((row) => attr(row, 'data-gw-progress-log-row'))).toEqual(['2', '3'])
   })
 
@@ -1322,15 +1326,16 @@ describe('a click opens the calls a card made', () => {
     const rows = hooksOf(opened, 'data-gw-progress-log-row')
     expect(rows.map((row) => attr(row, 'data-gw-progress-log-row'))).toEqual(['4'])
     expect(rows.map(textOf)).toEqual([`${clockOf(4)} 汇总·第1稿 汇总 交卷`])
-    // The plan's own row in the same page says 做完: both lists are open, and the mark is on
-    // the summary's row alone.
-    const planRows = hooksOf(hookOf(clickNode(view, 'plan'), 'data-gw-progress-node-calls'), 'data-gw-progress-log-row')
-    expect(planRows.map(textOf)).toEqual([`${clockOf(1)} 规划助手 规划 做完`])
+    // The plan's own row in the same page says 做完: both groups are in the sheet, and
+    // the mark is on the summary's row alone.
+    const planLists = hooksOf(clickNode(view, 'plan'), 'data-gw-progress-node-calls')
+    const planList = planLists.find((entry) => attr(entry, 'data-gw-progress-node-calls') === 'plan')!
+    expect(hooksOf(planList, 'data-gw-progress-log-row').map(textOf)).toEqual([`${clockOf(1)} 规划助手 规划 做完`])
   })
 
-  it('opens a card into a list that fits inside the figure it floats in', () => {
-    // The list hangs under its card, and the figure is a scroll box: the page makes room for
-    // the list rather than clipping it, and drops the room again when nothing is open.
+  it('opens a card into the sheet under the figure, and the figure marks the open state', () => {
+    // The sheet is in the page flow so it can only push the page down, never across a
+    // card; the figure keeps a mark of the open state, and drops it when nothing is open.
     const view = mount(runningRun())
     expect(attr(hookOf(view(), 'data-gw-progress-figure'), 'data-open')).toBeUndefined()
     const opened = clickNode(view, 'plan')
@@ -1444,7 +1449,7 @@ describe('the stuck line: one sentence, and only while something is stuck', () =
       member(1, '规划助手', '规划', 'completed'),
       member(2, '执行', '任务 1 · 建表'),
     ], { stopReason: 'error' })
-    expect(textOf(hookOf(pageOf(blocked), 'data-gw-progress-stuck'))).toBe('卡在 3：这一步没有回报')
+    expect(textOf(hookOf(pageOf(blocked), 'data-gw-progress-stuck'))).toBe('卡在 4：这一步没有回报')
     // The line is a status, a sibling after the figure, and before the Guardian card.
     const page = pageOf({ ...failedRun(), guardian: GUARDIAN })
     const order = walk(page)
@@ -1621,17 +1626,19 @@ describe('the page stays honest', () => {
 })
 
 /**
- * The narrow width: the opened calls leave the figure.
+ * One sheet at every width: the opened calls leave the figure.
  *
- * Below the breakpoint the cards are one column, and a list that floats out from under one of
- * them lands on the card beside it — the same overlap the phone soak photographed. Making the
- * list `position: static` would not help: the cards are placed by the layout and no sibling
- * moves for another one's popup. So the list is drawn **outside** the figure, in the panel's
+ * A list that floats out from under a card lands on the card beside it — the same overlap
+ * the soaks photographed at both widths. Making the list `position: static` would not
+ * help: the cards are placed by the layout and no sibling moves for another one's popup.
+ * So the list is drawn **outside** the figure, in the panel's
  * own column under it, where it can only push the page down.
  *
- * Where the list is drawn is a render decision, not a paint one, so the page reads the
- * breakpoint in JS: `matchMedia` is the whole seam, and a test gets a phone by standing in for
- * it. No layout engine is involved anywhere below.
+ * Where the list is drawn used to be a render decision the page read from the width in
+ * JS (`matchMedia` was the whole seam, and a test got a phone by standing in for it).
+ * There is nothing left to pick by width now — one box at every width — so the page no
+ * longer reads any media query and the width helpers below only fix the stub shell's
+ * answer. No layout engine is involved anywhere below.
  */
 
 /** The listener face a real `MediaQueryList` has, as far as the page uses it. */
@@ -1674,19 +1681,22 @@ function litNodes(page: unknown): Element[] {
 }
 
 describe('a narrow screen draws the opened calls under the figure', () => {
-  it('moves the list out of the card on a phone and leaves it there on a desktop', () => {
-    // The desktop reading is the one that shipped: the list is the node's own child.
+  it('moves the list out of the card on a phone and on a desktop, into one sheet', () => {
+    // The sheet is the one box at both widths now: the floating list a node drew over its
+    // own card landed on the neighbour at desktop width (one open list over 2 cards,
+    // four over 9), so wide reuses the narrow sheet instead of keeping a second box.
     // 任务 1 made two calls (seq 2 failed, seq 3 passed), so its card aggregates two rows.
     const wide = withNarrow(false, () => clickNode(mount(runningRun()), 't1'))
-    expect(hooksOf(wide, 'data-gw-progress-sheet')).toHaveLength(0)
+    expect(hooksOf(wide, 'data-gw-progress-sheet')).toHaveLength(1)
     const wideNode = nodesOf(wide).find((node) => attr(node, 'data-gw-progress-pnode') === 't1')!
-    expect(hooksOf(wideNode, 'data-gw-progress-node-calls')).toHaveLength(1)
-    const wideRows = hooksOf(callsOf(wide), 'data-gw-progress-log-row').map(textOf)
+    expect(hooksOf(wideNode, 'data-gw-progress-node-calls')).toHaveLength(0)
+    const wideRows = hooksOf(hookOf(wide, 'data-gw-progress-node-calls'), 'data-gw-progress-log-row').map(textOf)
 
     // The phone reading: the same node, the same click, and the list is not in the card.
     const phone = onPhone(() => clickNode(mount(runningRun()), 't1'))
     const sheet = hookOf(phone, 'data-gw-progress-sheet')
     expect(classesOf(sheet)).toEqual(['gw-progress-sheet'])
+    // A node draws no list anywhere now: both widths carry the opened rows in the sheet.
     const list = callsOf(phone)
     expect(hooksOf(hookOf(phone, 'data-gw-progress-graph'), 'data-gw-progress-sheet')).toHaveLength(0)
     for (const node of nodesOf(phone)) expect(hooksOf(node, 'data-gw-progress-node-calls')).toHaveLength(0)
@@ -1719,14 +1729,13 @@ describe('a narrow screen draws the opened calls under the figure', () => {
     expect(ruleWith('.gw-progress-sheet .gw-progress-node-calls')).toContain('position: static')
   })
 
-  it('reads the breakpoint in JS, at the one number the stylesheet uses', () => {
+  it('reads no media query in JS: the sheet is the one box at every width', () => {
     const queries: string[] = []
     withNarrow(true, () => pageOf(runningRun()), queries)
-    expect(queries).toContain('(max-width: 720px)')
-    // The same number, written twice, on purpose: the stylesheet wraps the cards and the page
-    // decides where the list lives. A drift between them is a phone whose list is drawn in a
-    // box that no longer fits.
-    expect(mediaBlock('max-width: 720px')).not.toBe('')
+    withNarrow(false, () => pageOf(runningRun()), queries)
+    // WHY no query: there is nothing left to pick by width — one sheet everywhere — so
+    // the page must not ask the shell about the width at all.
+    expect(queries).toEqual([])
     const narrow = ruleWith('.gw-progress-sheet')!
     expect(narrow).toContain('max-height: min(50vh, 240px)')
     expect(narrow).toContain('overflow-y: auto')
@@ -1848,8 +1857,8 @@ describe('a narrow screen draws the opened calls under the figure', () => {
     const order = walk(opened)
     expect(order.indexOf(room[0]!)).toBeGreaterThan(order.indexOf(hookOf(opened, 'data-gw-progress-dock')))
     expect(ruleWith('.gw-progress-sheet-room')).toContain('height: 35vh')
-    // A wide page keeps its floating list and reserves nothing.
-    expect(roomOf(withNarrow(false, () => clickNode(mount(runningRun()), 'plan')))).toHaveLength(0)
+    // A wide page draws the same sheet and reserves the same room.
+    expect(roomOf(withNarrow(false, () => clickNode(mount(runningRun()), 'plan')))).toHaveLength(1)
     // Closed again: the room goes with the sheet.
     const view2 = mount(runningRun())
     clickNode(view2, 'plan')
@@ -1873,12 +1882,12 @@ describe('a narrow screen draws the opened calls under the figure', () => {
     expect(asked).toHaveLength(1)
   })
 
-  it('words the sheet in both languages, and keeps its two words out of the wide page', () => {
+  it('words the sheet in both languages, and reads it at both widths', () => {
     expect(zh('progress.panel.calls')).toBe('调用')
     expect(en('progress.panel.calls')).toBe('Calls')
     expect(zh('progress.panel.collapse')).toBe('收起')
     expect(en('progress.panel.collapse')).toBe('Hide')
-    // On a desktop neither word is on the page at all: the sheet only exists at a narrow width.
+    // Both widths draw the same sheet now, so both read the same two words.
     expect(pageTexts(pageOf(runningRun(), { fillDraft: () => true }))).not.toContain(zh('progress.panel.calls'))
     const phone = onPhone(() => clickNode(mount(runningRun()), 'plan'))
     const copy = pageTexts(phone)

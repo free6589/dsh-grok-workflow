@@ -76,7 +76,8 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.chip.done', '已完成', 'Done'],
   ['progress.chip.failed', '未通过', 'Not passed'],
   ['progress.chip.cancelled', '已取消', 'Cancelled'],
-  // The seven leg words and the three badges (visit, draft, attempt).
+  // The seven leg words and the two badges (draft, attempt). The visit badge retired
+  // with the old edition (no code reads it): it is listed under REDESIGN_DELETED now.
   ['progress.flow.start', '起点', 'Start'],
   ['progress.flow.plan', '规划', 'Plan'],
   ['progress.flow.execute', '执行', 'Execute'],
@@ -84,7 +85,6 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.flow.review', '复核', 'Review'],
   ['progress.flow.summarize', '汇总', 'Summarize'],
   ['progress.flow.end', '终点', 'End'],
-  ['progress.flow.visit', '第 {n} 次', 'Visit {n}'],
   ['progress.flow.draft', '第 {n} 稿', 'Draft {n}'],
   ['progress.flow.attempt', '第 {n} 遍', 'Attempt {n}'],
   // The fork panel (2026-11-26, contract §26): the acceptance as a place rather than a leg, the
@@ -111,7 +111,7 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   // eleven replace the count line and the flow's label, which are gone.
   ['progress.panel.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
   ['progress.panel.eta', '还剩约 {time}', 'about {time} left'],
-  ['progress.panel.etaBasis', '按 {n} 个已完成步骤的实测耗时推算', 'from the {n} finished steps actually measured'],
+  ['progress.panel.etaBasis', '按 {n} 个已完成层的实测耗时推算', 'from the {n} finished levels actually measured'],
   ['progress.panel.stuck.failed', '卡在 {at}：{role} 第 {n} 遍没过', 'Stuck at {at}: attempt {n} of {role} did not pass'],
   ['progress.panel.stuck.blocked', '卡在 {at}：这一步没有回报', 'Stuck at {at}: this step never reported back'],
   ['progress.panel.stuck.rejected', '卡在 {at}：{n} 稿全被退回', 'Stuck at {at}: every draft was rejected ({n})'],
@@ -233,6 +233,9 @@ const REDESIGN_DELETED: readonly string[] = [
   // The fork panel's own retirement (2026-11-26): the acceptance became a place on the figure,
   // and the user acceptance click that used to sit in the dock went with it.
   'progress.dock.accept',
+  // Dead-key retirement (wave1-05): the visit badge left with the old edition and no code
+  // reads it, so both dictionaries drop it instead of reserving a dead slot.
+  'progress.flow.visit',
 ]
 
 /** The namespaces §19.3 deletes whole; no key may carry one of these prefixes. */
