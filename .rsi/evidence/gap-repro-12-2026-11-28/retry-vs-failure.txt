@@ -1,0 +1,68 @@
+# 重派（attempt 2）标签 vs 失败任务对照
+
+line  1049 run=caeda128 task=14  label=执行（尝试 2）
+line  1052 run=caeda128 task=15  label=检查（尝试 2）
+line  1191 run=0b784383 task=5   label=执行（尝试 2）
+line  1194 run=0b784383 task=6   label=检查（尝试 2）
+line  3002 run=686af548 task=17  label=执行（尝试 2）
+line  3009 run=686af548 task=19  label=执行（尝试 2）
+line  3015 run=686af548 task=21  label=执行（尝试 2）
+line  3018 run=686af548 task=22  label=检查（尝试 2）
+line  3025 run=686af548 task=24  label=检查（尝试 2）
+line  3032 run=686af548 task=26  label=检查（尝试 2）
+line  3903 run=7f8bc0a1 task=5   label=执行（尝试 2）
+line  3906 run=7f8bc0a1 task=6   label=检查（尝试 2）
+line  4384 run=b6d2e7fa task=5   label=执行（尝试 2）
+line  4460 run=b6d2e7fa task=6   label=检查（尝试 2）
+line  5226 run=3c65ec20 task=5   label=执行（尝试 2）
+line  5400 run=3c65ec20 task=6   label=检查（尝试 2）
+line  6190 run=1871388f task=11  label=执行（尝试 2）
+line  6193 run=1871388f task=12  label=检查（尝试 2）
+line  6209 run=1871388f task=17  label=执行（尝试 2）
+line  6792 run=1871388f task=19  label=检查（尝试 2）
+line  6963 run=1871388f task=23  label=执行（尝试 2）
+line  7023 run=1871388f task=24  label=检查（尝试 2）
+line  7093 run=9c5b95fb task=18  label=执行（尝试 2）
+line  7135 run=9c5b95fb task=21  label=检查（尝试 2）
+line  7141 run=9c5b95fb task=23  label=执行（尝试 2）
+line  7145 run=9c5b95fb task=24  label=检查（尝试 2）
+line  7244 run=3dfb84fd task=16  label=执行（尝试 2）
+line  7250 run=3dfb84fd task=18  label=执行（尝试 2）
+line  7256 run=3dfb84fd task=20  label=检查（尝试 2）
+line  7265 run=3dfb84fd task=23  label=执行（尝试 2）
+line  7268 run=3dfb84fd task=24  label=检查（尝试 2）
+line  7302 run=3dfb84fd task=27  label=检查（尝试 2）
+line  7384 run=c1cdab54 task=18  label=执行（尝试 2）
+line  7396 run=c1cdab54 task=21  label=检查（尝试 2）
+
+# 686af548 的 30 个任务：start 次数（1=无重派）
+task 1   starts=1 label=规划助手
+task 2   starts=1 label=执行
+task 3   starts=1 label=执行
+task 4   starts=1 label=执行
+task 5   starts=1 label=执行
+task 6   starts=1 label=执行
+task 7   starts=1 label=检查
+task 8   starts=1 label=执行
+task 9   starts=1 label=执行
+task 10  starts=1 label=执行
+task 11  starts=1 label=监督
+task 12  starts=1 label=检查
+task 13  starts=1 label=检查
+task 14  starts=1 label=执行
+task 15  starts=1 label=监督
+task 16  starts=1 label=监督
+task 17  starts=1 label=执行（尝试 2）
+task 18  starts=1 label=检查
+task 19  starts=1 label=执行（尝试 2）
+task 20  starts=1 label=监督
+task 21  starts=1 label=执行（尝试 2）
+task 22  starts=1 label=检查（尝试 2）
+task 23  starts=1 label=监督
+task 24  starts=1 label=检查（尝试 2）
+task 25  starts=1 label=监督
+task 26  starts=1 label=检查（尝试 2）
+task 27  starts=1 label=检查
+task 28  starts=1 label=监督
+task 29  starts=1 label=监督
+task 30  starts=1 label=汇总助手
