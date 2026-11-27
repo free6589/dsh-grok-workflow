@@ -1,3 +1,23 @@
+## 0.13.62 发版门禁与远端结论（2026-11-28，主代理亲手复验；`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线身份 | `git rev-parse main/origin/main` + `git ls-remote origin refs/heads/main refs/tags/v0.13.62` | `main`=`origin/main`=`45458f2`；远端同值；`v0.13.62`对象`9a9185e9`剥出=`45458f2` |
+| 本地全量 | `npm run ci`（发版包工头在`45458f2`，前置已证直接用） | `EXIT 0`：`117 files / 2129 passed`、lint `17w0e`、`293 files byte-identical` |
+| 远端 CI | `gh run view 46029767853` | `completed success`（`45458f2`） |
+| 远端 Release | `gh run view 46029823458` + `gh release view v0.13.62` | `completed success`；Release已发布`2026-11-27T16:01:24Z`，资产`1056641`字节`sha256 b75faf02…1cd11`，非draft非prerelease |
+| 主检出 | `git status --short --branch` | 已快进到`45458f2`，三份记忆为本轮收尾行；旧脏`M src/records.ts`已随发版消失 |
+
+## release/0.13.62 cjk 合流手工裁决（2026-11-27，记忆小工主检出实测，非门禁；`CONFIRMED` 实测部分 + `NOT_RUN` 门禁部分）
+
+| state | command | result |
+| --- | --- | --- |
+| 合流链 | `git log --format='%H %P %s' -4 release/0.13.62`（主检出） | `c049388` → `41080e8`（poison，第二父 `260611b`）→ `7990872`（office，第二父 `606f27b`）→ `d7ef18e`（cjk，第二父 `11c0ac6`）= HEAD `d7ef18e9…` |
+| 手工裁决 DECISION 建议行 | `git show 606f27b/c049388/11c0ac6/release/0.13.62 -- src/delivery/index.ts` 对读裸文件名正则（主检出实测） | release/0.13.62 中 `src/delivery/index.ts` 采用 cjk lookbehind 结构（左缘 `(?:^\|(?<=[^…]))` + 右缘镜像否定前瞻 + 4 行注释）与 office 扩展名并集（`pdf\|docx\|xlsx\|pptx`），即 DECISION 建议：cjk 结构 + office 扩展名表 |
+| poison 证据 | `git ls-tree release/0.13.62` + 逐文件 `git show … \| wc -l`（主检出实测） | 证据目录仅 release 分支有、主检出无（证伪：基线“7文件409行”不符，实测 6 文件 296 行：54+174+11+15+37+5；`test/session-poison-events.spec.ts` 亦仅 release 有）；D-180 在 release `DECISIONS.md` 第 5521 行 |
+| 未做（`NOT_RUN`） | 全量 `npm run ci` / prepare / tag / push | 本轮只补记忆，不跑门禁，留发版轮 |
+| 阻塞（`BLOCKED`） | — | 无；主检出唯一脏 `M src/records.ts` 不动不提交 |
+
 ## 0.13.61 发版门禁与远端结论（2026-11-27，收尾员本轮 Serena 通道实测复核；本地两次 ci 为前置已证直接用、不重验）(`CONFIRMED`)
 
 | state | command（环境） | result |

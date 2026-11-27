@@ -1,11 +1,15 @@
-## 2026-11-27 — fix/session-poison-events 施工移交（未提交：九记录改插件通道 + 旧会话已修，未发版）
+## 2026-11-28 — 0.13.62 发版收尾（主线 `45458f2` = 远端 `origin/main`，远端双绿 + Release 已发布；只收记忆 + 同步主检出，不动其余）
 
-- **From:** 修通道的人（分支 `fix-session-poison-events`） · **To:** 合流 + 发版的人
-- **分支 / 基线（`CONFIRMED`）**：`fix-session-poison-events` @ `c049388`（= `main`）；一任务一分支；`fix/guardian-chip`、`fix/status-inline`、`fix/pixel-sweep`、`fix/cjk-strip`、`fix/office-ext`、`fix/resume-reuse` 一律没碰。
-- **做了什么（`CONFIRMED`，本分支 worktree 实测）**：九个进度记录从 `tool-workflow/*` 搬到 `plugin:grok-workflow/progress/*`（`appendPluginRecord`，`ignorable:true`）；读侧（fold、`/grok status`、页面）双认新旧名；payload 形状不变；`stage-detail` 只读不动。门禁：`tsc 0` / `oxlint 17w0e`（基线同数）/ 定向 `6 files 319 passed` + 相邻 `9 files 155 passed`。
-- **旧会话（`CONFIRMED`，用户已批准动存档）**：`session-9f1a5732…`（112 条）+ `session-bc80a4a8…`（13 条）已转新名，转后 `validateStoredEvents` 双 PASS；备份在树外 `/tmp/session-fix-bak-offtree/`（`133c36bb…1a14af` + `57d30867…aab2e8`）；恢复办法：备份拷回原路径即可。
-- **没做 / 别动**：未提交、未推远端、未合流、未发版、未抬版本；`CHANGELOG` 未加条（留给发版轮）；真机隔离 soak `NOT_RUN`；live 未碰。
-- **下一步**：验收 diff → 合流（合流后跑一次全量 `npm run ci`）→ 发版轮决定版本号。决断 `D-180`，门禁 `VALIDATION.md` 本轮条。
+- **From:** 0.13.62 发版收尾（主代理亲手复验） · **To:** 下一个接手的人
+- **发版结论（`CONFIRMED`）**：三合流 `41080e8` → `7990872` → `d7ef18e` + prepare `45458f2`；`main` = `origin/main` = `45458f2`；tag `v0.13.62` 对象 `9a9185e9` 剥出=`45458f2`；本地 `npm run ci` `EXIT 0`（`117 files / 2129 passed` / `17w0e` / `293 files byte-identical`）；远端 CI `46029767853` `success` + Release `46029823458` `success`；Release `v0.13.62` 已发布 `2026-11-27T16:01:24Z`，资产 `1056641` 字节 `sha256 b75faf02…1cd11`。主检出已快进，旧脏 `M src/records.ts` 已随发版消失。
+- **可删建议（不动手）**：`release/0.13.61`、`fix/entry-guard`、`fix/carry-cjk`（均已合）；`fix/guardian-chip`、`fix/status-inline`（空壳）；`fix/pixel-sweep` 有脏活不合不删；`fix/resume-reuse` 不动；stash四条原位不动。
+- **红线**：无force-push、未动已发布tag、未publish、未碰live/重启。
+
+## 2026-11-27 — release/0.13.62 记忆轮移交（只补 STATE/HANDOFF/VALIDATION 各一行，不合流不跑门禁不发版；`CONFIRMED` 实测 + `NOT_RUN` 门禁）**
+
+- **From:** 记忆小工（dispatcher-merge-03/agent-5，主检出实测） · **To:** 主代理（统一收口的人）
+- **可删分支建议（`CONFIRMED`，`merge-base --is-ancestor`+分支tip+worktree实测）**：`fix/entry-guard`（=`e9dd699`，已合 main）、`fix/carry-cjk`（=`bc7bd43`，已合 main）待删（已合 main，本轮合流后满 24h 规则一并建议删）；`fix/guardian-chip`（=`c049388` 无自有提交，worktree 干净）与 `fix/status-inline`（=`c049388` 无自有提交，worktree 干净）为空壳建议删；`fix/pixel-sweep` 有脏活（`src/client/index.js`+`lib/client.js`+2 spec 在 `wt-pixel` 棚内未提交）不合不删；`fix/resume-reuse`（=`fe6d631` 脏备份）不动。发版轮待办（`NOT_RUN`）：全量 `npm run ci` + prepare + tag 另起一轮。
+- **红线**：主检出唯一脏 `M src/records.ts` 绝不动、不提交；不碰 live、不 force-push、不动 tag、不 publish、不写密钥、不改版本号。
 
 ## 2026-11-27 — 0.13.61 发版收尾（只写记忆 + 推 main + 删本波 `release/0.13.61` 分支棚，不碰其余）**（主线 `689a315` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45992537765` success + Release `45992555196` success + Release `v0.13.61` 已发布（`2026-11-27T11:43:01Z`，资产 `1052999` 字节 `sha256 b8137ebf…1831fc31`）；只删本波建的本地 `release/0.13.61`（已合才 `-d`，`-d` 失败就报告不强删；远端无此分支则不动）；`fix/entry-guard`、`fix/carry-cjk`、`fix/resume-reuse`、其他分支、任何 tag、两个 stash 一律不动；不动代码、不碰 live、不重启）**
 
