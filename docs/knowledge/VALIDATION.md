@@ -10099,3 +10099,13 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | stash | 主代理亲手复验（本轮直接引用） | 三条原位 `CONFIRMED` |
 | 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已复验，本小工不重复验证、不跑命令 |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、补丁分支不动 |
+## Round13记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用，不重验）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | 主代理CONFIRMED（本轮直接引用） | `ab0e44a`（`8e0fde3`+`2633bb6 --no-ff`，4文件90行纯证据）ahead `origin/main` 2、树干净 `CONFIRMED` |
+| B补派 | 主代理CONFIRMED（本轮直接引用） | `fix/gap-redispatch-13@8e0fde3`棚内`M1+??2`（`src/script.ts 55+/1-`，21/21绿，红3/7对照，证据4文件，未合入） |
+| 日志 | 主代理CONFIRMED/HYPOTHESIS（本轮直接引用） | 四轮：本仓零真面，D/F入库`CONFIRMED`，E/G `HYPOTHESIS`，证伪2条 |
+| live/stash | 主代理CONFIRMED（本轮直接引用） | live仍`#v0.13.61`、stash三条原位；只读未改、未重载、未重启 |
+| 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，本小工不重验、不跑验证命令，补丁/缺口分支不动 |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
