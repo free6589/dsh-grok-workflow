@@ -1,0 +1,7 @@
+{
+  "state": "waiting",
+  "chip": "等你点头",
+  "chipState": "waiting",
+  "dockState": "start",
+  "dockButton": "开工"
+}
