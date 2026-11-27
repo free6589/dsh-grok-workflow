@@ -7016,3 +7016,7 @@ Issue #1 状态评论 issuecomment-6927842856。
   host 复算 266/65/87 三数均 `BLOCKED`（缺源档），旧口径偏大（含回显 + 未去重 + 含非启动失败）`CONFIRMED`，P1 定级否；
   live 只读复核仍 `#v0.13.61`（`~/.dsh/profiles/web/package.json:13`），实例活着，等主代理亲手改前留快照；stash 三条原位。
 - **下一步**：主代理亲手把 live 那一行钉到目标版本 → 补齐 `BLOCKED` 项缺的源档（probe 目录口径、host 三数）后再判；记忆三份本轮**只追加**，旧行一个字没改。
+## 2026-11-28 01:58 +08:00 — Round8收尾（记忆沉淀，不发版，主代理亲手复验`CONFIRMED`）
+
+- **做了什么**：主线 `bbc9324` = `origin/main`，树干净（`git status --short --branch` 仅 `## main...origin/main`，`git log --oneline -3` 首行 `bbc9324`）；contract删棚阻塞（已合但棚内 `??` 证据目录卡住、分支被占用，均停报未强删）；旧棚复核（5已合待删留清单，2证据目录待确认：wt-contract `contract-rename-2026-11-28/` 4文件、wt-soak `soak-gaps-062-2026-11-28/` 3文件）；日志挖新二轮8新异常面（对照 `CONFIRMED`×5/`HYPOTHESIS`×1，候选2个，证伪3成立，无 `BLOCKED`）；live仍 `#v0.13.61`实例活；stash三条原位。三小工只读+草稿，包工头只写三份记忆增量行，未写产品代码。
+- **下一步**：主代理亲手改live → contract证据归档后删棚 → 旧棚逐个删（soak先归档）→ 日志候选2个隔离跟进；每步先 `status` 确认干净，已合用 `-d`，禁 `-D`/force-push。

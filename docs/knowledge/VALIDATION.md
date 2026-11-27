@@ -10041,3 +10041,15 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | host 复算 | 266 / 65 / 87 | 三数均 `BLOCKED`（缺源档）；旧口径偏大（含回显 + 未去重 + 含非启动失败）`CONFIRMED`；P1 定级否 |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |
 | 未做（`NOT_RUN`） | 发版、全量 `npm run ci`、真机 soak | 本轮只沉淀记忆，没产品改动可跑；这不是绿灯 |
+## Round8记忆沉淀验证（2026-11-28 01:58 +08:00，主代理亲手复验，`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | `git log --oneline -3` | 首行 `bbc9324 docs(memory): record round7 wrap` |
+| 树 | `git status --short --branch` | 仅 `## main...origin/main`，无改动、无未推送 |
+| contract删棚 | `git -C .tmp/wt-contract status --short --branch` | `?? .rsi/evidence/contract-rename-2026-11-28/`（4文件：diff.stat.txt/falsify.txt/gate.log.txt/README.md），阻塞成立，已合未删停报 |
+| 旧棚 | `git worktree list` + 各棚 `status --short --branch` | 1主+6从；5已合待删（resume-reuse/fe6d631、session-poison/session-poison-events、office/606f27b、soak/3f26b71、CJK/11c0ac6），2证据目录待确认（contract+soak `soak-gaps-062-2026-11-28/` 3文件） |
+| 日志二轮 | 转主代理复验 | 8新异常面，对照 `CONFIRMED`×5/`HYPOTHESIS`×1，候选2个，证伪3成立，无 `BLOCKED` |
+| live | 只读复核 | 仍 `#v0.13.61`，实例活，未改、未重载、未重启 |
+| stash | `git stash list` | 三条原位：`foreman-stash` / `entry-guard-hold-foreign-carry-cjk-hunk-not-mine` / `entry-guard-temp-hold-STATE-unrelated-4lines` |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动 |
