@@ -522,6 +522,26 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
       .toContain('--dsw-alias-state-business-primary')
   })
 
+  it('keeps the task count on one line, in the same family as the step sentence', () => {
+    // The count is the step sentence's sibling: the same 12px secondary meta line, but a
+    // count that never wraps — on a narrow phone a wrapped count reads as two facts.
+    const count = ruleOf('.gw-progress-count')
+    const line = ruleOf('.gw-progress-line')
+    expect(count, 'the count sentence has no style of its own').toBeDefined()
+    expect(line, 'the step sentence rule is gone').toBeDefined()
+    expect(count!).toContain('flex: 1 0 100%')
+    expect(count).toContain('font-size: 12px')
+    expect(count).toContain('var(--dsw-alias-label-secondary')
+    expect(count).toContain('white-space: nowrap')
+    expect(count).not.toContain('white-space: normal')
+    expect(line).toContain('font-size: 12px')
+    expect(line).toContain('var(--dsw-alias-label-secondary')
+    // The narrow sheet lets the run name wrap, but the count stays one clipped line.
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 720px)'))
+    expect(narrow).toContain('.gw-progress-count')
+    expect(narrow).not.toContain('.gw-progress-count { white-space: normal')
+  })
+
   it('makes the node that opens a real button, with a focus ring of its own', () => {
     // A div is not focusable, so the body that carries a control must say it is one — and it
     // must keep the box it had, so the figure does not change shape with the interaction.
