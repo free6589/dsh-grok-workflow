@@ -15,11 +15,11 @@
  *    落成 skipped 的那一幕 + 同页 waiting 图（见 REPORT 说明）。
  *  D retry    重试态 attempt2/第 2 遍：同一任务第二遍。
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const OUT = join(process.cwd(), 'evidence', 'notrun-shots')
+const OUT = join(process.cwd(), '.rsi', 'evidence', 'notrun-shots') // dedup fix: single copy lives in .rsi; root evidence/ is not used
 mkdirSync(OUT, { recursive: true })
 
 /* ---------------- stub react + bundle ---------------- */
@@ -124,6 +124,14 @@ function readingOf(run: unknown, extra: Record<string, unknown> = {}) {
     dockButton: dockFill ? texts(dockFill).join(' ') : null,
   }
 }
+
+describe('notrun-shots 去重：根下 evidence/ 不再出现（单份在 .rsi）', () => {
+  it('no root duplicate: evidence/notrun-shots must not exist, .rsi copy is the single source', () => {
+    expect(OUT).toContain(join('.rsi', 'evidence', 'notrun-shots'))
+    expect(existsSync(join(process.cwd(), 'evidence', 'notrun-shots'))).toBe(false)
+    expect(existsSync(join(process.cwd(), '.rsi', 'evidence', 'notrun-shots'))).toBe(true)
+  })
+})
 
 describe('NOT_RUN 真快门：四态 PNG + 读数（先红后绿的绿）', () => {
   it('A 等你点头 waiting：胶囊等你点头 + 开工按钮', () => {
