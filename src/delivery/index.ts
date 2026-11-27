@@ -383,7 +383,7 @@ const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
   [/\b[A-Za-z]:\\[^\s"'`]+/g, ' '],
   [/(?:^|[\s(（"'=])(?:~|\.{1,2})?\/[\w.@%+\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+(?:\/[\w.@%+\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+)+/g, ' '],
   // Bare file names (incl. CJK): a reader does not open `answer.ts` from a chat message.
-  [/\b[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+(?:\.[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi, ' '],
+  [/\b[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+(?:\.[\w\-\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|pdf|docx|xlsx|pptx|png|jpe?g|svg|zip|gz)\b/gi, ' '],
   // Digests and the hex dump of a file (`od`, `xxd`), abbreviated commits.
   [/\b(?:sha-?(?:1|256|512)|md5|sha1sum|sha256sum|sha512sum|md5sum)\b/gi, ' '],
   [/\b[0-9a-f]{8,64}\b/gi, ' '],
