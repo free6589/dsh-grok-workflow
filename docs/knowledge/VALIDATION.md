@@ -1,3 +1,12 @@
+## Round22三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+去留小工只读佐证，不发版）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git status --short --branch`+`git log --oneline -5`+`git diff origin/main --stat`（去留小工只读实测） | `06213be`（`41b5967`+`68a39da --no-ff`，18文件369+/17-，S1绕闸）ahead 2、仅`## main...origin/main [ahead 2]`干净 `CONFIRMED` |
+| 棚/分支去留 | 去留小工`branch -a/worktree/stash`只读复核 | `fix/deadcode-20`在位待删，worktree 1主+2从全留，stash三条原位，与现状一致无分歧 `CONFIRMED` |
+| 日志十轮 | 主代理亲手复验转述（本轮未重跑`NOT_RUN`） | 本仓零真面：方法学C2，新N4/N5，S1已合流订正，170绿换214 |
+| live/stash | `git stash list`实测+live转述 | live仍`#v0.13.61`；stash三条原位 `CONFIRMED` |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码0行、不删分支不动live不重启不force-push不动tag不publish不写密钥不推送 |
 ## Round20三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+本包工头只读佐证，不发版）
 
 | state | command | result |
