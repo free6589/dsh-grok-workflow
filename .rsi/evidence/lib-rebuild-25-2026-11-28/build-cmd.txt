@@ -1,0 +1,2 @@
+$ npm run build
+EXIT:0 (rerun for log capture)
