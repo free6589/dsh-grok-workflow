@@ -4331,3 +4331,4 @@ tgz **1027274 字节**、`file:` 钉法、版本读回 `0.13.53`、符号链接 
 **`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级——本会话写不进 `~/.dsh`，只读读到插件目录已是 **`0.13.53`** 但依赖行**仍浮动**
 （`github:free6589/dsh-grok-workflow`），`~/.dsh/profiles/web` 的 mtime **`19:41:49`** 晚于发布那一轮读到的 `19:20:42`，
 **谁装的 `HYPOTHESIS`**，需要一个对 `~/.dsh` 有写权限的人把那一行钉到 `#v0.13.53`；本块**没写 `~/.dsh`、没重载、没重启** 3080 上的实例。）
+Last updated: 2026-11-28 01:35 +08:00（**Round5收尾：contract合流d01b21b+证据88e9b87已推远端（`CONFIRMED`，主代理亲手复验）** — 主线 `88e9b87` = `origin/main`（`push 02e54ca..88e9b87`，`rev-parse`双读同值）；合流 `d01b21b`（`02e54ca`+`4d5ecfc --no-ff`无冲突，门禁tsc0/lint17w0e/contract17/17）；证据 `88e9b87`（两孤儿包10文件458行，主树已收）；pixel已rebase到02e54ca补ol归零待合（`HYPOTHESIS`）；probe分叉（/models 401/502 `BLOCKED` vs /responses 200 `PASS`）；host排查bash 266/65系统性`CONFIRMED`；live仍`#v0.13.61`待主代理亲手改；stash三条原位；红线全守）—

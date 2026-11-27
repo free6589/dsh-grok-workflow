@@ -10012,3 +10012,10 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 旧会话手术 | 旧九名 → 新 `plugin:grok-workflow/progress/*` 名 + 补 `ignorable:true`；其余行字节不动；seq 连续性逐个校验 | `session-9f1a5732…` 转 112 条、`session-bc80a4a8…` 转 13 条；转后 `validateStoredEvents`（harness 真校验函数）**双 PASS** |
 | 未做（`NOT_RUN`） | `npm run ci` 全量、真机隔离 soak、发版 | 块内只跑碰到的 spec（AGENTS.md §12）；全量与 soak 留给发版轮 |
 | 阻塞（`BLOCKED`） | — | 无 |
+## Round5推送验证（2026-11-28 01:35，主代理亲手复验，`CONFIRMED`）
+
+| state | command | result |
+| --- | --- | --- |
+| 推送 | `git push origin main` | `02e54ca..88e9b87 main -> main`，`main`=`origin/main`=`88e9b87` |
+| 树 | `git status --short --branch` | 仅 `## main...origin/main` 干净 |
+| live | `grep grok-workflow ~/.dsh/profiles/web/package.json` | 仍 `#v0.13.61`，待亲手改 |
