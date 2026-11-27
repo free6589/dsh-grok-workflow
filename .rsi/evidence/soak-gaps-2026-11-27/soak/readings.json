@@ -1,0 +1,2048 @@
+{
+ "note": "soak-gaps 取证：失败工作流（判腿常拒401，run-end error）上的 7 真机缺口；blocked/跳过上报走逻辑块用例直断。",
+ "url": "http://127.0.0.1:3441/?token=<redacted>",
+ "tabPath": "tab",
+ "openedIds": [
+  "t1",
+  "t2",
+  "t3"
+ ],
+ "entries": {
+  "done-1500": {
+   "screenshot": "done-1500.png",
+   "width": 1500,
+   "mounted": true,
+   "w": 1500,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 0,
+   "callRows": 0,
+   "traceActive": 0,
+   "traceDim": 0,
+   "sheetCount": 0,
+   "sheetRect": null,
+   "sheetRows": 0,
+   "sheetGroups": 0,
+   "sheetTitle": null,
+   "roomPresent": false,
+   "roomHeight": null,
+   "composerTop": 1432,
+   "sheetBottom": null,
+   "gap": null,
+   "aboveComposer": null,
+   "inViewport": null,
+   "overlapAreaTotal": null,
+   "dockOverlap": 0,
+   "mq720": false,
+   "mq480": false,
+   "mq721": true,
+   "sw": 1500,
+   "cw": 1500,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 0
+  },
+  "both-1500": {
+   "screenshot": "both-1500.png",
+   "width": 1500,
+   "opened": [
+    "t1",
+    "t2",
+    "t3"
+   ],
+   "mounted": true,
+   "w": 1500,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 280,
+    "top": 1465,
+    "right": 1493,
+    "bottom": 1705,
+    "width": 1213,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 560,
+   "composerTop": 1432,
+   "sheetBottom": 1705,
+   "gap": -273,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": false,
+   "mq480": false,
+   "mq721": true,
+   "sw": 1500,
+   "cw": 1500,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-390": {
+   "screenshot": "sheet-390.png",
+   "width": 390,
+   "mounted": true,
+   "w": 390,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1561,
+    "right": 383,
+    "bottom": 1801,
+    "width": 383,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 295.39,
+   "composerTop": 676,
+   "sheetBottom": 1801,
+   "gap": -1125,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": true,
+   "mq721": false,
+   "sw": 390,
+   "cw": 390,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-360": {
+   "screenshot": "sheet-360.png",
+   "width": 360,
+   "mounted": true,
+   "w": 360,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1561,
+    "right": 353,
+    "bottom": 1801,
+    "width": 353,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 280,
+   "composerTop": 632,
+   "sheetBottom": 1801,
+   "gap": -1169,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": true,
+   "mq721": false,
+   "sw": 360,
+   "cw": 360,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-421": {
+   "screenshot": "sheet-421.png",
+   "width": 421,
+   "mounted": true,
+   "w": 421,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1561,
+    "right": 414,
+    "bottom": 1801,
+    "width": 414,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 315,
+   "composerTop": 732,
+   "sheetBottom": 1801,
+   "gap": -1069,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": true,
+   "mq721": false,
+   "sw": 421,
+   "cw": 421,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-499": {
+   "screenshot": "sheet-499.png",
+   "width": 499,
+   "mounted": true,
+   "w": 499,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1561,
+    "right": 492,
+    "bottom": 1801,
+    "width": 492,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 315,
+   "composerTop": 732,
+   "sheetBottom": 1801,
+   "gap": -1069,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": false,
+   "mq721": false,
+   "sw": 499,
+   "cw": 499,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-720": {
+   "screenshot": "sheet-720.png",
+   "width": 720,
+   "mounted": true,
+   "w": 720,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1561,
+    "right": 713,
+    "bottom": 1801,
+    "width": 713,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 315,
+   "composerTop": 732,
+   "sheetBottom": 1801,
+   "gap": -1069,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": false,
+   "mq721": false,
+   "sw": 720,
+   "cw": 720,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-721": {
+   "screenshot": "sheet-721.png",
+   "width": 721,
+   "mounted": true,
+   "w": 721,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 0,
+    "top": 1465,
+    "right": 714,
+    "bottom": 1705,
+    "width": 714,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 315,
+   "composerTop": 732,
+   "sheetBottom": 1705,
+   "gap": -973,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": false,
+   "mq480": false,
+   "mq721": true,
+   "sw": 721,
+   "cw": 721,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "sheet-1500": {
+   "screenshot": "sheet-1500.png",
+   "width": 1500,
+   "mounted": true,
+   "w": 1500,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 3,
+   "callRows": 24,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 1,
+   "sheetRect": {
+    "left": 280,
+    "top": 1465,
+    "right": 1493,
+    "bottom": 1705,
+    "width": 1213,
+    "height": 240
+   },
+   "sheetRows": 24,
+   "sheetGroups": 3,
+   "sheetTitle": "调用",
+   "roomPresent": true,
+   "roomHeight": 560,
+   "composerTop": 1432,
+   "sheetBottom": 1705,
+   "gap": -273,
+   "aboveComposer": false,
+   "inViewport": false,
+   "overlapAreaTotal": 0,
+   "dockOverlap": 0,
+   "mq720": false,
+   "mq480": false,
+   "mq721": true,
+   "sw": 1500,
+   "cw": 1500,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 12
+  },
+  "drag-800-600-800": {
+   "screenshot": "sheet-721.png",
+   "width": 800,
+   "dragProbe": {
+    "before": {
+     "w": 800,
+     "mq720": false,
+     "pnodes": 32,
+     "sheetRows": 24
+    },
+    "mid": {
+     "w": 600,
+     "mq720": true,
+     "pnodes": 32,
+     "sheetRows": 24
+    },
+    "after": {
+     "w": 800,
+     "mq720": false,
+     "pnodes": 32,
+     "sheetRows": 24
+    },
+    "stableAfterDrag": true
+   }
+  },
+  "closed-390": {
+   "screenshot": "closed-390.png",
+   "width": 390,
+   "mounted": true,
+   "w": 390,
+   "chip": "未通过",
+   "chipState": "failed",
+   "line": "第 3 步，共 7 步 · 还剩约 3 分 30 秒",
+   "dock": "",
+   "dockState": "none",
+   "dockBtn": null,
+   "dockFillCount": 0,
+   "filledLine": null,
+   "stuck": "卡在 3：检查 第 1 遍没过",
+   "stuckPresent": true,
+   "guardianPresent": true,
+   "guardianState": "finished",
+   "guardianBlocks": [
+    {
+     "name": "status",
+     "text": "Guardian 监控\n监控结束"
+    },
+    {
+     "name": "budget",
+     "text": "子任务存活判断预算 · 7200 秒"
+    },
+    {
+     "name": "count",
+     "text": "0 条处置记录"
+    },
+    {
+     "name": "findings",
+     "text": "暂无处置记录"
+    }
+   ],
+   "pnodes": 32,
+   "cards": [
+    {
+     "id": "start",
+     "kind": "start"
+    },
+    {
+     "id": "plan",
+     "kind": "plan"
+    },
+    {
+     "id": "t1",
+     "kind": "task"
+    },
+    {
+     "id": "t2",
+     "kind": "task"
+    },
+    {
+     "id": "t3",
+     "kind": "task"
+    },
+    {
+     "id": "t1_s1",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s7",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s8",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s9",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s14",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s16",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s17",
+     "kind": "sub"
+    },
+    {
+     "id": "t1_s18",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s2",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s4",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s5",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s6",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s13",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s19",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s20",
+     "kind": "sub"
+    },
+    {
+     "id": "t2_s21",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s3",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s10",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s11",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s12",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s15",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s22",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s23",
+     "kind": "sub"
+    },
+    {
+     "id": "t3_s24",
+     "kind": "sub"
+    },
+    {
+     "id": "sum",
+     "kind": "summarize"
+    },
+    {
+     "id": "accept",
+     "kind": "accept"
+    },
+    {
+     "id": "end",
+     "kind": "end"
+    }
+   ],
+   "nodeCalls": 0,
+   "callRows": 0,
+   "traceActive": 19,
+   "traceDim": 45,
+   "sheetCount": 0,
+   "sheetRect": null,
+   "sheetRows": 0,
+   "sheetGroups": 0,
+   "sheetTitle": null,
+   "roomPresent": false,
+   "roomHeight": null,
+   "composerTop": 676,
+   "sheetBottom": null,
+   "gap": null,
+   "aboveComposer": null,
+   "inViewport": null,
+   "overlapAreaTotal": null,
+   "dockOverlap": 0,
+   "mq720": true,
+   "mq480": true,
+   "mq721": false,
+   "sw": 390,
+   "cw": 390,
+   "noHS": true,
+   "edges": 54,
+   "edgeKinds": "chain,fork,fork,fork,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,branch,join,chain,chain",
+   "attemptDots": 0,
+   "failedRows": 0
+  }
+ }
+}
