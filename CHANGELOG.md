@@ -5,6 +5,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.56] - 2026-11-27
+
+### Added / 新增
+
+- **Real-device gap guards landed in one pass / 真机缺口一次补齐** —
+  Seventeen soak-gap regression guards now pin the Wave2 real-device gaps in a single run:
+  responsive sheets, retry/backoff copy, and the failing-workflow states that used to slip
+  through between passes. A failed soak now fails the gate instead of leaking into the next wave.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; the guards only
+  lock in behavior the release already shipped.**
+  / 17 条真机缺口回归守卫一次跑完：把过去会在两波之间漏过去的响应式表、重试退避文案、失败工作流
+  状态一次性钉住。真机 soak 挂了就直接拦门，不会再漏进下一波。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；守卫只是把本就该有的行为锁住。**
+
 ## [0.13.55] - 2026-11-27
 
 ### Fixed / 修复
