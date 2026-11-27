@@ -1,3 +1,13 @@
+## Round9四路收尾验证记（2026-11-28 02:30，包工头收三小工+统一写记忆，未跑门禁）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线身份 | `git status --short --branch` + `git log --oneline -5`（记忆+去留双小工只读一致） | 仅`## main...origin/main [ahead 1]`干净；首行`5c29bc7 chore(evidence): collect soak-gaps-062 proof pack`，次行`ea471da`（`CONFIRMED`） |
+| 棚/分支 | `git branch -a` + `git worktree list`（去留小工逐字带回） | contract/soak/office/poison棚分支已无`CONFIRMED`；candidate棚`.tmp/wt-candidate-09 ea471da`在`CONFIRMED`（“未合”沿用转述`HYPOTHESIS`，未跑`--merged`）；`fix/carry-cjk`/`fix/entry-guard`仍在不动`CONFIRMED`；cjk外盘残留本地不可见`NOT_RUN` |
+| stash原位 | `git stash list`（双小工双读一致） | 三条原位：foreman-stash/entry-guard-hold-foreign-carry-cjk-hunk-not-mine/entry-guard-temp-hold-STATE-unrelated-4lines（`CONFIRMED`） |
+| live/soak包 | 主代理转述（本轮未读盘未数） | live仍`#v0.13.61`、soak包3文件136行，均`HYPOTHESIS` |
+| 红线 | 本轮行为自查 | 只改三份记忆各首部一行；未删分支、未碰live/tag、不force-push、不publish、不写密钥、不写产品代码、不推送；未做的发版推送记`NOT_RUN`，不是绿灯 |
+
 ## Round4四路收尾验证记（2026-11-28 01:30，包工头收三小工+主检出只读复核，未跑门禁）
 
 | state | command | result |

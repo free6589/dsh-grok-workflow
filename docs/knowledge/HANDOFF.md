@@ -1,3 +1,11 @@
+## 2026-11-28 02:30 — Round9四路收尾包工头交接（只写记忆增量行，不写产品代码；三小工已收齐）
+
+- **From:** dispatcher-wrap-12包工头（主检出未动+统一写三份记忆增量行） · **To:** 主代理lead / 下一个接手的人
+- **收了什么（`CONFIRMED`）**：记忆草稿（STATE/HANDOFF/VALIDATION各一轮，已统一落盘）+去留复核（status仅`## main...origin/main [ahead 1]`干净、log首行`5c29bc7`、branch无contract/soak/office/poison名、worktree仅主区+candidate棚+resume棚3处、stash三条同名原位）+下一波4条（ahead1看密钥再推/live快照后亲手改/cjk盘先定位再清/candidate先看证据对新主线跑检查再判，只建议不执行）。
+- **剩什么**：live仍`#v0.13.61`（主代理亲手改，未验`HYPOTHESIS`）；soak包3文件136行（未数`HYPOTHESIS`）；candidate证据未合（未跑`--merged`，沿用转述）；cjk外盘残留（本地不可见`NOT_RUN`）。
+- **红线**：未删分支、未碰live/tag、不force-push、不publish、不写密钥、不写产品代码、不推送；本轮只改三份记忆文件各首部一行。
+- **下一波一句话**：接手人按4条建议顺序派活，live只许主代理动手，合流/清盘/推送另起步骤做。
+
 ## 2026-11-28 01:30 — Round4四路收尾包工头交接（只写记忆增量行，不写产品代码；三小工已收齐）
 
 - **From:** dispatcher-wrap-07包工头（主检出只读+三份记忆追加） · **To:** 主代理lead / 下一个接手的人
