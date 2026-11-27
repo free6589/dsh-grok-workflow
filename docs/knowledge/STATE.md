@@ -1,3 +1,7 @@
+Last updated: 2026-11-27 15:10 +08:00（**fix/screen-reader-walk 未提交施工中（`CONFIRMED`，本树实测）** —
+分支 **`fix/screen-reader-walk`**（基线 **`8f02c32`**，`git branch -a` 无他人同任务活分支可复用判断：`fix/browser-firefox-safari` 在 `057d834` 做浏览器三态，与读屏无关）；改动 **`src/client/index.js` + `lib/client.js`（重建逐字节）+ `test/client.spec.ts` + `test/i18n-parity.spec.ts` + 新 `test/progress-screen-walk.spec.ts` + `.rsi/evidence/screen-reader-walk/`**；门禁 `tsc 0错 / oxlint 17w0e（基线同数）/ 5 files 301 passed`；`git status` 剩本分支改动 + 主检出遗留 untracked（`.progress-*`、`us-weather-week.html`、`evidence/` 等，他人掉落不动）；未推远端，未合流。
+以下为上一轮记录，原样保留：
+
 Last updated: 2026-11-27 14:45 +08:00（**0.13.57 发版完成：四合流 + prepare + 主线 + tag + 远端双绿 + Release 已发布（`CONFIRMED`，本轮包工头经 Serena 通道实测）** —
 基线 **`505baf8`**（= 远端 `origin/main`，推前 `ls-remote` 对过）（`CONFIRMED`）；分支 **`release/0.13.57`**（`CONFIRMED`）；
 四棚存盘提交 **`49a61b1`**（① step-total）→ **`8037f40`**（② entry-390）→ **`e429950`**（③ trace-legend）→ **`a41cb6f`**（⑤ notrun）（`CONFIRMED`）；

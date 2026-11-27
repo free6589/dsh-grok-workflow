@@ -1,3 +1,12 @@
+## 2026-11-27 — fix/screen-reader-walk 施工移交（未提交：5 处 aria + 5 断言 + 走读证据，未推远端）
+
+- **From:** 读屏走读执行者（Wave4 第二路） · **To:** 主代理（合流 + 验收的人）
+- **分支 / 基线（`CONFIRMED`）**：`fix/screen-reader-walk` @ `8f02c32`（= `main` = `origin/main`）；`git branch -a` 确认无他人同任务活分支（`fix/browser-firefox-safari@057d834` 做浏览器三态，与读屏无关）；一任务一分支，未复用。
+- **做了什么（`CONFIRMED`，本树实测）**：先红（新 `test/progress-screen-walk.spec.ts` 5 断言在基线树上 `5 failed`）→ 后绿（`src/client/index.js` 只加 aria 属性 5 处 + 新 i18n 键 `progress.panel.list` + `progress.panel.graph` 加参 `{run}`，`lib/client.js` 重建逐字节，`test/i18n-parity.spec.ts` + `test/client.spec.ts` 键表同步更新）；门禁 `tsc 0错 / oxlint 17w0e（基线同数）/ 5 files 301 passed`（exact 命令 + `TMPDIR=/run/media/fish/data/dsh-tmp` 见 VALIDATION 本轮条）。
+- **证据**：`.rsi/evidence/screen-reader-walk/WALKTHROUGH.md`（三态地标→chip→步骤句→任务句→图→卡→卡住句各一段 + 点开 plan 后 region/list 咬合 + 卡住句 `卡在 2：X-do 第 1 遍没过`）+ `reading-order.json`（机读底本）；断言文件 `test/progress-screen-walk.spec.ts`。
+- **没做 / 别动**：真人 NVDA/VoiceOver、Firefox/Safari 读屏差异、`npm run ci` 全量（块内只跑碰到的 spec，AGENTS §12）、live（0.13.54） untouched、未推远端、未合流；主检出遗留 untracked（`.progress-*`、`us-weather-week.html`、`evidence/` 等）是他人掉落，原位不动。
+- **下一步（给主代理）**：验收本分支 diff（`git diff 8f02c32 --stat`：src + lib + 2 个旧 spec + 1 个新 spec + 证据目录）→ 合流决策 → 删分支（24h 内）。
+
 ## 2026-11-27 — 0.13.57 发版收口（Wave3 合流发版：四棚存盘 + 按序合流 + CI + 抬版 + 合 main + 打 tag + 双推 + 远端双绿 + 记忆 + 清棚）**（主线 `5ae4cf2` = 远端 `origin/main`（推前 `ls-remote` 对过）；远端 CI `45953054405` success + Release `45953057425` success + Release `v0.13.57` 已发布（`2026-11-27T06:39:16Z`，资产 `1048960` 字节）；删 `release/0.13.57` + 四棚分支（已合才 `-d`，`-d` 拒绝就上报不强删；worktree 先 `remove`）；12 项残留 untracked、`fix/resume-reuse`、备份、已发布 tag 一律不动；不动代码、不碰 live、不重启）**
 
 - **From:** 0.13.57 发版包工头（合流 + 发版 + 记忆 + 清棚，不碰 live） · **To:** 下一个接手的人 / 做 live 升级的人（需另行授权）

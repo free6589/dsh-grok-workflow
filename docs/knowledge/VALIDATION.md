@@ -1,3 +1,15 @@
+## fix/screen-reader-walk 读屏走读（分支 `fix/screen-reader-walk`，基线 `8f02c32`，未提交，`CONFIRMED`）
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| typecheck | `npx tsc -p tsconfig.json --noEmit`（`TMPDIR=/run/media/fish/data/dsh-tmp`，本树） | **`EXIT 0`，0 错** |
+| lint | `npx oxlint src test`（同环境） | **`17 warnings / 0 errors`**（197 files / 96 rules；基线同为 17w0e，本分支无新增） |
+| 走读钉子（红→绿） | `npx vitest run test/progress-screen-walk.spec.ts`（同环境） | 红：`5 failed`（`header aria-label` / 图名含运行名 / sheet region / list 名 / stuck atomic 缺失，基线树实测）；绿：补 aria 后 **`5 passed`** |
+| 相邻回归 | `npx vitest run test/progress-screen-walk.spec.ts test/progress-panel.spec.ts test/progress-tab.spec.ts test/i18n-parity.spec.ts test/client.spec.ts`（同环境） | **`5 files / 301 passed`**（含 `lib/client.js` 逐字节比对；`lib/` 已重建） |
+| 走读记录 | `.rsi/evidence/screen-reader-walk/WALKTHROUGH.md` + `reading-order.json`（自动化等价：渲染树 DOM 顺序遍历，本机无 orca/nvda，走读顺序 = NVDA/VoiceOver 浏览模式顺序） | 三态（waiting/running/done/failed）地标→chip→步骤句→任务句→图→卡→卡住句各一段；点开 `plan` 后 sheet region + list 咬合 `aria-controls`；卡住句 `卡在 2：X-do 第 1 遍没过` |
+| 补 aria 清单 | `src/client/index.js`（只加属性，不改文案行为 CSS）+ 新键 `progress.panel.list`（中英）+ `progress.panel.graph` 加参 `{run}` | `header[aria-label=run.name]` / 图 `aria-label={run} 的任务图` / sheet `role=region + aria-label=调用：{卡名}` / list `aria-label={卡名} 的调用` / stuck `aria-atomic=true`；断言见 `test/progress-screen-walk.spec.ts` 5 项 |
+| 未做（`NOT_RUN`） | 真人 NVDA / VoiceOver 实测、Firefox/Safari 读屏差异、live 档案升级 | 本机无读屏软件、无 safari/webkit 引擎；`lib/` 重建仅为满足逐字节门禁，无行为改动 |
+
 ## 0.13.57 发版门禁与远端结论（2026-11-27，Wave3 合流发版，包工头经 Serena 通道实测）(`CONFIRMED`)
 
 | state | command（环境） | result |
