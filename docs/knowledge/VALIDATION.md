@@ -1,3 +1,12 @@
+## Round20三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用+本包工头只读佐证，不发版）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git status --short --branch`+`git log --oneline -3`（本包工头只读实测） | `e2a6a04`=`origin/main`、仅`## main...origin/main`干净 `CONFIRMED` |
+| 棚/分支去留 | 主代理口径+去留小工`branch -a/worktree/stash`只读复核 | 删9实7删2留沿用主代理，去留小工提示5可删4留差异待定`HYPOTHESIS`；carry-cjk冻结/deadcode-20棚在位`CONFIRMED`未合入 |
+| 日志八轮 | 主代理亲手复验转述（本轮未重跑`NOT_RUN`） | 本仓零真面：巡检8新面`HYPOTHESIS`，N1/N2死代码`CONFIRMED`，S1机制`CONFIRMED`野外`NOT_OBSERVED`，E/G/C6/C7 `BLOCKED` |
+| live/stash | `git stash list`+`git branch`实测+live转述 | live仍`#v0.13.61`（主线0.13.62差一版）；stash三条原位 `CONFIRMED` |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码0行、不删分支不动live不重启不force-push不动tag不publish不写密钥不推送 |
 ## Round19三路收尾验证记（2026-11-28，主代理CONFIRMED直接引用，不重验，不发版）
 
 | state | command | result |

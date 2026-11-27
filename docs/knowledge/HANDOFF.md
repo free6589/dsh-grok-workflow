@@ -1,3 +1,8 @@
+## 2026-11-28 — Round20三路收尾（记忆沉淀，不发版，主代理CONFIRMED直接引用，三小工已收齐）
+
+- **From:** dispatcher-wrap-23包工头（统一写三份记忆增量行） · **To:** 主代理lead / 下一个接手的人
+- **做了什么**：只出三份记忆增量行、未写产品代码。主线 `e2a6a04`=`origin/main`树干净`CONFIRMED`（本包工头实测）；删9实7删2留沿用主代理口径，去留小工提示5可删4留差异待定；carry-cjk冻结/deadcode-20棚在位`CONFIRMED`未合入；日志八轮本仓零真面（巡检8新面`HYPOTHESIS`，N1/N2`CONFIRMED`，S1机制`CONFIRMED`野外`NOT_OBSERVED`，E/G/C6/C7 `BLOCKED`）；live仍`#v0.13.61`（主线0.13.62差一版）、stash三条原位。
+- **下一步**：去留差异由主代理定（分支不动，删另行定）→ live只许主代理快照后亲手改 → 死代码不合流只棚内看 → S1野外不跟仓内可补小单测；每步先`status`确认，禁删分支/动live/重启/force-push/动tag/publish/写密钥/写产品代码。
 ## 2026-11-28 — Round19三路收尾（记忆沉淀，不发版，主代理CONFIRMED直接引用，不重验）
 
 - **做了什么**：只出三份记忆增量行、未写产品代码。主线 `fbc8557`=`origin/main`树干净`CONFIRMED`；全量复核17分支删9留8冻结不动；DEC分支已删棚已清；日志七轮本仓零真面（H1/D/F合流`CONFIRMED`，E/G/C6/C7 `BLOCKED`，新N1/N2死代码`CONFIRMED`）；live仍`#v0.13.61`、stash三条原位。
