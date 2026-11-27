@@ -1,3 +1,14 @@
+## Round12三路收尾验证记（2026-11-28，包工头收三小工+统一写记忆，未跑门禁）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git status --short --branch`（本包工头实测） | 仅`## main...origin/main`，无改动 `CONFIRMED` |
+| 主线 | `git log --oneline -3`（本包工头实测） | 首行`9977211 docs(memory): record round11 wrap`，次行`46600d1` `CONFIRMED` |
+| B缺口 | 主代理亲手复验（本轮直接引用） | seq3043/3044失败后20行零补派、bounded-retry耗尽无补派、补丁草稿7/7绿未合入 `CONFIRMED`；另案run-end=error仍交付记`HYPOTHESIS` |
+| 补丁待合 | 主代理亲手复验+去留小工`git branch -a`/`worktree list` | `8359fd2`落后1，4文件90行，主树缺，需rebase到9977211后合；同名分支未见，`fix/gap-repro-12`在位同点9977211 |
+| A等源档 | 主代理亲手复验（本轮直接引用） | `BLOCKED`缺源档；live仍`#v0.13.61`未改未重启 |
+| stash | `git stash list`（本包工头实测） | 三条原位（foreman-stash/entry-guard-hold-foreign/entry-guard-temp-hold）`CONFIRMED` |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码0行、`~/.dsh`0行、分支/tag/远端0变动、补丁/缺口分支不动 |
 ## Round9四路收尾验证记（2026-11-28 02:30，包工头收三小工+统一写记忆，未跑门禁）
 
 | state | command | result |
