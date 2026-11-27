@@ -10121,3 +10121,13 @@ Safari/WebKit: `NOT_RUN` — no local engine, `playwright install webkit` needs 
 | 下一波 | 只读建议（建议小工） | push先fetch+看CI由主代理定；live本轮不动；D/F逐块合；E/G维持HYPOTHESIS |
 | 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，本小工不重验门禁、不跑CI |
 | 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
+## Round15记忆沉淀验证（2026-11-28，主代理CONFIRMED直接引用，不重验；三小工只读复核）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线 | `git status --short --branch` + `git log --oneline -5`（本小工实跑） | `3b0faf7`（`736bb4d`+`2525b3c --no-ff`，3文件181行，D/F钉子，转述tsc0/lint17w0e/4绿）ahead `origin/main` 2、树干净 `CONFIRMED` |
+| 旧棚 | 主代理CONFIRMED（本轮直接引用） | gap-12/candidate-09各有`??`证据，停报未删 |
+| 日志 | 主代理CONFIRMED/HYPOTHESIS（本轮直接引用） | 五轮：gap-13已合订正，D-003/D-017/triage3证伪，H1虚拟键`HYPOTHESIS`，E/G维持`HYPOTHESIS BLOCKED` |
+| live/stash | 主代理CONFIRMED + `git stash list`实见三条 | live仍`#v0.13.61`、stash三条原位；只读未改、未重载、未重启 |
+| 未做（`NOT_RUN`） | 本轮复验动作 | 主代理已CONFIRMED，本小工不重验门禁、不跑CI |
+| 本轮写面 | — | 只有三份记忆文件的追加行；产品代码 0 行、`~/.dsh` 0 行、分支/tag/远端 0 变动、不删分支不动live不重启不force-push不动tag不publish不写密钥 |
