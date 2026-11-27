@@ -450,8 +450,8 @@ describe('client progress tab: the stylesheet keeps its own rules', () => {
     expect(sideways[0]!.trim().startsWith('.gw-progress-figure')).toBe(true)
     expect(progress.css).not.toContain('scroll-snap-type')
     expect(progress.css).not.toContain('scroll-snap')
-    // The one scroll box is a node's own opened list, and it scrolls down.
-    expect(ruleOf('.gw-progress-node-calls')).toContain('overflow-y: auto')
+    // The one scroll box that scrolls down is the sheet (pixel-sweep: float retired).
+    expect(ruleOf('.gw-progress-sheet')).toContain('overflow-y: auto')
   })
 
   it('carries the five-state chip and the breathing current node, and no other motion', () => {

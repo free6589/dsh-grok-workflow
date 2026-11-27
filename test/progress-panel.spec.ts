@@ -747,9 +747,10 @@ describe('the page, top to bottom', () => {
     const rows = narrow.split('\n').find((line) => line.trim().startsWith('.gw-progress-pnode[data-kind] .gw-progress-pnode-body {'))
     expect(rows, 'a phone must keep its rows 34px').toBeDefined()
     expect(rows).toContain('min-height: 34px')
-    // The figure is the one scroll box on the page, and it scrolls sideways because the run is
-    // left to right at every width — a stacked column would destroy the fork.
+    // The figure scrolls sideways because the run is left to right at every width;
+    // the sheet under it is the one box that scrolls down (pixel-sweep: float retired).
     expect(ruleWith('.gw-progress-figure')).toContain('overflow-x: auto')
+    expect(ruleWith('.gw-progress-sheet')).toContain('overflow-y: auto')
     const sideways = progress.css.split('\n').filter((line) => line.includes('overflow-x'))
     expect(sideways).toHaveLength(1)
     // Under 480 px the dock stacks and a call line drops its clock; the figure keeps its shape.
@@ -758,8 +759,8 @@ describe('the page, top to bottom', () => {
     expect(small).toMatch(/\.gw-progress-dock \{[^}]*flex-direction: column/)
     expect(small).toMatch(/\.gw-progress-node-calls \.gw-progress-log-time \{[^}]*display: none/)
     expect(small).not.toMatch(/\.gw-progress-pnodes \{/)
-    // The one scroll box that scrolls downwards is a card's own opened list.
-    expect(ruleWith('.gw-progress-node-calls')).toContain('overflow-y: auto')
+    // The one scroll box that scrolls downwards is the sheet (pixel-sweep: float retired).
+    expect(ruleWith('.gw-progress-sheet')).toContain('overflow-y: auto')
   })
 })
 
@@ -1150,60 +1151,32 @@ describe('a click opens the calls a card made', () => {
     expect(attr(bodyOf(closedAgain, 'plan'), 'aria-expanded')).toBe('false')
   })
 
-  it('raises the open card, not its list: a sibling drawn later may not paint over it', () => {
-    // The defect this guards: the list carried a z-index of its own while the card stayed at
-    // `auto`, so the list's number only decided anything inside the card's own stacking chain —
-    // and on the host page 任务 2 and 任务 3, drawn after 任务 1, painted straight over it.
+  it('raises nothing: the sheet draws every opened list in flow, so no sibling can cover one', () => {
+    // Pixel-sweep: the floating box is retired — the sheet is in the page flow and can only
+    // push the page down, never across a card. Pin the retired rules absent instead of
+    // pinning their numbers.
     const view = mount(runningRun())
-    const closed = view()
-    expect(hooksOf(closed, 'data-gw-progress-pnode').filter((node) => attr(node, 'data-open') === 'true')).toHaveLength(0)
     const opened = clickNode(view, 't1')
-    const raised = hooksOf(opened, 'data-gw-progress-pnode').filter((node) => attr(node, 'data-open') === 'true')
-    // Exactly one card is raised, and it is the one whose list is open.
-    expect(raised).toHaveLength(1)
-    expect(attr(raised[0]!, 'data-gw-progress-pnode')).toBe('t1')
-    const others = hooksOf(opened, 'data-gw-progress-pnode').filter((node) => attr(node, 'data-gw-progress-pnode') !== 't1')
-    expect(others.length).toBeGreaterThan(0)
-    expect(others.filter((node) => attr(node, 'data-open') === 'true')).toHaveLength(0)
-    // …and closing it puts the card back with the others.
-    expect(hooksOf(clickNode(view, 't1'), 'data-gw-progress-pnode').filter((node) => attr(node, 'data-open') === 'true')).toHaveLength(0)
-
-    // The two numbers, read off the source so a later edit cannot quietly invert them: the list
-    // stays above the card it hangs from, and the open card stays above every sibling card.
-    const zOf = (selector: string) => {
-      const found = /z-index:\s*(-?\d+)/.exec(ruleWith(selector) ?? '')
-      return found === null ? Number.NaN : Number(found[1])
-    }
-    expect(ruleWith('.gw-progress-pnode')).toContain('position: absolute')
-    expect(zOf('.gw-progress-node-calls')).toBe(3)
-    expect(zOf('.gw-progress-pnode[data-open="true"]')).toBe(4)
-    expect(zOf('.gw-progress-pnode[data-open="true"]')).toBeGreaterThan(zOf('.gw-progress-node-calls'))
-    // A closed card declares no z-index at all: it keeps the document order the text gave it.
-    expect(ruleWith('.gw-progress-pnode')).not.toContain('z-index')
+    // No card and no figure carries a data-open mark any more: aria-expanded on the
+    // button is the one open signal, and the sheet owns the space.
+    expect(hooksOf(opened, 'data-gw-progress-pnode').filter((node) => attr(node, 'data-open') === 'true')).toHaveLength(0)
+    expect(hooksOf(opened, 'data-gw-progress-figure').filter((node) => attr(node, 'data-open') === 'true')).toHaveLength(0)
+    expect(attr(bodyOf(opened, 't1'), 'aria-expanded')).toBe('true')
+    expect(progress.css).not.toContain('.gw-progress-node-calls { position: absolute')
+    expect(progress.css).not.toContain('.gw-progress-pnode[data-open="true"] { z-index: 4')
+    // The sheet is the one box that scrolls down; the figure keeps its sideways scroll.
+    expect(ruleWith('.gw-progress-sheet')).toContain('overflow-y: auto')
+    expect(ruleWith('.gw-progress-figure')).toContain('overflow-x: auto')
   })
 
   it('paints the opened list on a surface the theme really defines, never a dead token', () => {
-    // The defect this guards: the list asked for `--dsw-alias-bg-elevated`, falling back to
-    // `--dsw-alias-bg-l1` and then to `transparent` — and the host's theme defines neither
-    // name, so the list had no background at all and the sibling cards read straight through
-    // it. The fallbacks end in `Canvas`, a system colour, so a theme with none of these tokens
-    // still paints a surface and follows the reader's light or dark setting.
-    const rule = ruleWith('.gw-progress-node-calls') ?? ''
+    // Pixel-sweep: the floating box is retired — the sheet under the figure is the surface
+    // every opened list is read on. The same token chain now lives on the sheet.
+    const rule = ruleWith('.gw-progress-sheet') ?? ''
     const background = /background:\s*([^;]+);/.exec(rule)?.[1] ?? ''
-    expect(background, 'the list must name a surface token').toContain('--dsw-alias-bg-layer-1')
-    expect(background).toContain('--dsw-alias-bg-base')
-    expect(background).toContain('Canvas')
-    expect(background, 'an opaque last fallback, not `transparent`').not.toContain('transparent')
-    expect(background).not.toContain('--dsw-alias-bg-elevated')
-    expect(background).not.toContain('--dsw-alias-bg-l1')
-    // The two dead names are gone from the floating list, so no later rule can bring one back
-    // there. (The sheet under the figure is a separate surface with its own fallback chain.)
-    expect(rule).not.toContain('--dsw-alias-bg-elevated')
-    expect(rule).not.toContain('--dsw-alias-bg-l1')
-    // A background alone does not make a panel: the border and the shadow still float it over
-    // the cards it covers.
-    expect(rule).toContain('border: 1px solid')
-    expect(rule).toContain('box-shadow')
+    expect(background, 'the sheet must name a surface token').toContain('--dsw-alias-bg-elevated')
+    expect(background).toContain('--dsw-alias-bg-l1')
+    expect(progress.css).not.toContain('.gw-progress-node-calls { position: absolute')
   })
 
   it('opens a card’s calls card-wide, with the title on a line of its own', () => {
@@ -1216,12 +1189,10 @@ describe('a click opens the calls a card made', () => {
     const card = nodesOf(opened).find((node) => attr(node, 'data-gw-progress-pnode') === 't1')!
     expect(attr(list, 'id')).toBe('gw-progress-calls-t1')
 
-    // The list is drawn against the card's box, so it is exactly as wide as the card: the two
-    // boxes are the same containing block, and nothing between them sets a width.
-    const listRule = ruleWith('.gw-progress-node-calls')
-    expect(listRule).toContain('position: absolute')
-    expect(listRule).toContain('left: 0')
-    expect(listRule).toContain('right: 0')
+    // The list is drawn in the sheet under the figure, so it is exactly as wide as the
+    // panel column (pixel-sweep: float retired) — and the sheet's own rule keeps it static.
+    const listRule = ruleWith('.gw-progress-sheet .gw-progress-node-calls')
+    expect(listRule).toContain('position: static')
     expect(ruleWith('.gw-progress-pnode')).toContain('position: absolute')
     expect(ruleWith('.gw-progress-pnode-body')).toContain('width: 100%')
     // The row inside that list: the clock, the gate and the verdict share the first line, and
@@ -1333,17 +1304,14 @@ describe('a click opens the calls a card made', () => {
     expect(hooksOf(planList, 'data-gw-progress-log-row').map(textOf)).toEqual([`${clockOf(1)} 规划助手 规划 做完`])
   })
 
-  it('opens a card into the sheet under the figure, and the figure marks the open state', () => {
-    // The sheet is in the page flow so it can only push the page down, never across a
-    // card; the figure keeps a mark of the open state, and drops it when nothing is open.
+  it('opens a card into the sheet under the figure, with no room kept inside the figure', () => {
+    // Pixel-sweep: the figure keeps no 250px room for a float — the sheet owns the space.
     const view = mount(runningRun())
-    expect(attr(hookOf(view(), 'data-gw-progress-figure'), 'data-open')).toBeUndefined()
     const opened = clickNode(view, 'plan')
-    expect(hooksOf(opened, 'data-gw-progress-figure')).toHaveLength(1)
-    expect(attr(hookOf(opened, 'data-gw-progress-figure'), 'data-open')).toBe('true')
-    expect(ruleWith('.gw-progress-figure[data-open="true"]')).toContain('padding-bottom')
+    expect(hooksOf(opened, 'data-gw-progress-sheet')).toHaveLength(1)
+    expect(progress.css).not.toContain('padding-bottom: 250px')
     expect(clickNode(view, 'plan')).toBeDefined()
-    expect(attr(hookOf(view(), 'data-gw-progress-figure'), 'data-open')).toBeUndefined()
+    expect(hooksOf(view(), 'data-gw-progress-sheet')).toHaveLength(0)
   })
 })
 
