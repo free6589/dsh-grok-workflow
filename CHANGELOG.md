@@ -5,6 +5,18 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.63] - 2026-11-28
+
+### Changed / 变化
+
+- **守卫提示搬进右上角小方块，进度页更清爽 / Guardian badge moves to the corner, progress page breathes** —
+  以前进度页底下有一大排守卫信息，占地方。现在它搬到右上角，变成一个 14 像素的小方块：平时只显示一个颜色（绿=看着呢），点一下才展开看详情（存活判断、处置记录都在）。任务列表能多看两三行，不用来回翻。
+  以前的大块代码按功能拆成了小块，修显示不用碰流程，修流程不用碰显示，以后改起来更稳。
+  **升级须知：不用迁移任何东西——没有设置、存储格式或默认值变化；变的只是守卫信息摆在哪、代码分了几个文件装。**
+  / The Guardian monitor used to sit at the bottom of the progress page as a big block. Now it lives in the top-right corner as a small 14px badge: just a color at rest (green = watching), click to expand for details (liveness budget, disposition records). The task list shows two or three more rows without scrolling.
+  The client bundle and workflow script were also split into smaller files by feature, so display fixes no longer touch flow logic and vice versa.
+  **Upgrade note: nothing to migrate — no setting, stored format or default changed; only where the Guardian info sits and how the code is filed.**
+
 ## [0.13.62] - 2026-11-27
 
 ### Fixed / 修复
