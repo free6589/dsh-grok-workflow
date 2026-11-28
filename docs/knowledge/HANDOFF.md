@@ -1,3 +1,11 @@
+## 2026-11-28 — v0.13.64 发版收尾交接（agent-9 后台收尾，release+tag+push+Release 全绿）
+
+- **From:** agent-9 · **To:** lead
+- **做了什么**：审阅 `origin/main...HEAD` 全量 diff（三类截断检测+恢复策略+25用例+记忆文件，无 secrets、无残留）；补版本同步（README双语/LOCAL-TESTING/client bundle preamble+index.js+rebuild lib/CHANGELOG [0.13.64]小节）使 `npm run ci` exit 0（125文件/2204测试）；提交 release commit `3e695d9`；打 annotated tag `v0.13.64`→`3e695d9`；fetch 确认远端未前进后 push main + push tag；远端 Release run `46130375398` success，Release v0.13.64 已发布（https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.64，带 dsh-grok-workflow-0.13.64.tgz）；记忆三份已追收尾行。
+- **证据**：`npm run ci` exit 0（125 passed / 2204 passed，命令逐字，输出尾部 `CI-EXIT:0`）`CONFIRMED`；`gh run view 46130375398 --json status,conclusion` = completed/success；`gh release view v0.13.64` 显示 published 2026-11-28T09:26:30Z + tgz 资产。
+- **没做**：未 force-push、未改写历史、未 publish npm、未碰 live `~/.dsh`。
+- **下一步**：lead 按 AGENTS.md §13 决定是否升级 live profile 到 `#v0.13.64`（读回确认版本）。
+
 ## 2026-11-28 — 子代理断流续传实现交接（agent-7 后台完成，`fix/resume-truncation-33`，CI 全绿，待 lead 定夺推送）
 
 - **From:** agent-7 · **To:** lead

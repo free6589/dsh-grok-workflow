@@ -1,3 +1,13 @@
+## v0.13.64 发版验证记（2026-11-28，agent-9 后台收尾；release commit `3e695d9`，tag `v0.13.64`）
+
+| state | command | result |
+| --- | --- | --- |
+| 版本同步 | README.md/README.zh-CN.md/LOCAL-TESTING.md/client bundle（preamble+index.js+rebuild lib）0.13.63→0.13.64 + CHANGELOG [0.13.64] 小节 | `git diff --stat` 9 文件 `CONFIRMED` |
+| 全量门禁 | `npm run ci` | exit 0：125 文件 / 2204 测试全绿 `CONFIRMED`（首次跑 8 失败全系版本断言，同步后复绿） |
+| release | `git commit -m "release: v0.13.64 ..."` + `git tag -a v0.13.64 -m ... 3e695d9` | commit `3e695d9`，tag→`3e695d9` `CONFIRMED` |
+| 推送 | `git fetch origin`（远端仍 `2b43fa8`，未前进）→ `git push origin main` → `git push origin v0.13.64` | `2b43fa8..3e695d9 main->main` + `[new tag] v0.13.64` `CONFIRMED`，无 force-push |
+| 远端 Release | `gh run watch 46130375398 --exit-status` / `gh run view 46130375398 --json status,conclusion` / `gh release view v0.13.64` | completed/success，Release 已发布 https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.64（2026-11-28T09:26:30Z，带 dsh-grok-workflow-0.13.64.tgz）`CONFIRMED` |
+
 ## 子代理断流续传验证记（2026-11-28，`fix/resume-truncation-33`，agent-7 后台实现；CI 全绿未发版）
 
 | state | command | result |
