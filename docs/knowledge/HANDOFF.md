@@ -1,3 +1,11 @@
+## 2026-11-28 — 子代理断流续传实现交接（agent-7 后台完成，`fix/resume-truncation-33`，CI 全绿，待 lead 定夺推送）
+
+- **From:** agent-7 · **To:** lead
+- **做了什么**：实现三类截断检测+续传（`src/resume/truncation.ts` 415行 / `continuation.ts` 209行 / `bridge.ts` 196行 / `test/resume-continuation.spec.ts` 400行25用例），补上诊断发现的 `block-start index=-1` 负槽形缺口，修 spec 篡改用例无效 fixtures（failed→completed 才真改字节），`index.ts` 统一导出；记忆三份已追增量行（STATE 首行 + D-181 + VALIDATION 首条）。
+- **证据**：`npx tsc --noEmit` exit 0；定向 45/45 绿；`npm run ci` exit 0（125 文件 / 2204 测试）`CONFIRMED`；诊断现场：A 189 turn/end 全 completed（fileline 76/5587）、B turn 4/5 error 逐字（fileline 1061/1070）+ turn 3 用户 abort（fileline 746）、C completed+2783字半截（fileline 159/161）；插件库 4412 检索 ≥10 候选全部判不可直接复用（只覆盖 error 单类）。
+- **没做**：未提交、未推送（分支 `fix/resume-truncation-33` 在本地，4 个新文件 untracked + 3 记忆文件 modified）；未发版；未碰 live/DSH 核心。
+- **下一步**：lead 定夺：①审阅 4 新文件后提交+推送分支；②是否合入 main；③发版窗口另定。每步先 `git status` 确认，禁 force-push/动 tag/publish/动 live。
+
 ## 2026-11-28 — 线上升级v0.13.61→v0.13.62交接（用户批准，主代理亲手改，只动插件行，读回确认）
 
 ## 2026-11-28 — 台账N-19-1晚到交卷+Round32修正交接（dispatcher-ledger-fix包工头最终轮，三小工收齐）
