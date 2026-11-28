@@ -38,9 +38,9 @@
 - `npm run lint` → `Found 14 warnings and 0 errors`（205 files；警告为既有）。
 - `npx vitest run test/client.spec.ts` → 153 passed。
 - 引用 `src/client/index.js` 的其余 22 个 spec，分两批：
-  `config-limits-repair/contract-freeze/dead-key-upgrade-note/i18n-parity/mode-surface/notrun-shots/overlap-readings-name/panel-links/pixel-sweep/progress-connector/progress-entry/progress-hint-absent` → 141 passed；
-  `progress-panel-model/progress-panel/progress-screen-walk/progress-tab/soak-gaps-logic/soak-gaps-responsive/soak-gaps-retry/step-count-unify/step-total-words/update-entry` → 212 passed。
-- 合计 23 个 client 相关 spec：506 passed，0 failed。
+  第一批 12 个（config-limits-repair/contract-freeze/dead-key-upgrade-note/i18n-parity/mode-surface/notrun-shots/overlap-readings-name/panel-links/pixel-sweep/progress-connector/progress-entry/progress-hint-absent）→ 140 passed + 1 failed（`test/notrun-shots.spec.ts` 的 C 跳过上报用例；对照 main 同跑同样失败，为 main 预存、分支未引入回归）；
+  第二批 10 个（progress-panel-model/progress-panel/progress-screen-walk/progress-tab/soak-gaps-logic/soak-gaps-responsive/soak-gaps-retry/step-count-unify/step-total-words/update-entry）→ 203 passed + 9 skipped（total 212）。
+- 合计 23 个 client 相关 spec：496 passed + 9 skipped + 1 failed（失败为 main 预存，分支零新增失败）。
 - `test/client.spec.ts` 内含 `lib/client.js` 与源码逐字节一致断言，一并通过。
 
 ## 未做
