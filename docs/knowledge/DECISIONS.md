@@ -5521,6 +5521,16 @@ spine 为空，pre-fix 形状会进脊柱。
 - **Consequences:** 下一个决策从 D-180 起顺延时，需先确认 D-179 是否已被认领。
 - **Evidence:** 本文件 `grep -n "^## D-17"`（D-178 不存在、D-179 不存在，写下时实测）。
 
+## D-181 · 子代理断流续传：三类截断检测 + false-normal 重分类为 interrupted/redrive（2026-11-28，`fix/resume-truncation-33`，未发版）
+
+- **Status:** `CONFIRMED`
+- **Date:** 2026-11-28
+- **Context:** 子代理可被三种方式切断：turn 以 error 关闭且已有部分产出（`turn-error`）、reasoning 流索引重复/倒退（`reasoning-index-anomaly`，含 `block-start index=-1` 负槽形）、engine 报 `completed` 但载荷半截（`stop-false-normal`：缺 required structured / 尾部截断 marker / 未闭 code fence / 未闭 JSON 容器）。插件库 4412 yml 检索 ≥10 候选（turn/error 重试、重启恢复、按类型路由、checkpoint 持久化等）全部只覆盖 error/interrupted/max-tokens 单类触发且只有"发 continue/重试"一种动作，无"三类×四策略×有界"方案，必须自研。
+- **Decision:** 新增 `src/resume/truncation.ts`（检测，三类按 turn-error > reasoning-index > stop-false-normal 优先级，一因一判）、`src/resume/continuation.ts`（`planContinuation`：truncated→`interrupted`+`redrive`，artifacts 保留；completed 被搬动计 false-normal；gated 免疫）、`src/resume/bridge.ts`（`resumeCheckpointFromRun`：verified+cut→`evidence-incomplete`、failed+cut→`interrupted`、unfinished+cut→`interrupted`）；`test/resume-continuation.spec.ts` 25 用例钉死三类+重分类+全链路（bridge→validate→plan→continuation）+ digest 门。
+- **Alternatives rejected:** 直接复用插件库候选（无一覆盖 stop-false-normal 与 reasoning-index 负槽形）；policy 单独处理（policy 按 journal 状态判，`completed` 直接 retain，false-normal 必须走 continuation 路径）。
+- **Consequences:** 断流→redrive 全靠 truncation+continuation 在集成时补上；`max-tokens`/`aborted` 检测器明确判 clean（调用方边界，非流截断）；重试仍受既有 `FIXED_MAX_RETRIES=1`（硬上限 3）约束。
+- **Evidence:** `npm run ci` exit 0（125 文件 / 2204 测试，含新增 25 + resume-validator 20）；诊断证据链见 HANDOFF 本轮条。
+
 ## D-180 · 进度与守望者记录改走插件自有通道，不再写 `tool-workflow/*` 会话事件（2026-11-27，`fix/session-poison-events`，未发版）
 
 - **Status:** `CONFIRMED`

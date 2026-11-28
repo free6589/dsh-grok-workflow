@@ -1,3 +1,13 @@
+## 子代理断流续传验证记（2026-11-28，`fix/resume-truncation-33`，agent-7 后台实现；CI 全绿未发版）
+
+| state | command | result |
+| --- | --- | --- |
+| tsc | `npx tsc -p tsconfig.json --noEmit` | exit 0 `CONFIRMED` |
+| resume 定向 | `TMPDIR=$PWD/.tmp npx vitest run test/resume-continuation.spec.ts test/resume-validator.spec.ts` | 2 文件 / 45 测试全绿 `CONFIRMED` |
+| 全量门禁 | `npm run ci` | exit 0：125 文件 / 2204 测试全绿 `CONFIRMED` |
+| 断流现场 | 只读三会话解包（/tmp，不写仓） | A 189 turn/end 全 completed（fileline 76/5587）；B turn 4/5 error（fileline 1061/1070，reasoning-delta index 报错逐字）+ turn 3 用户 abort（fileline 746）；C turn/end completed 但 payload 2783 字半截（fileline 159/161）= stop-false-normal `CONFIRMED` |
+| 插件库检索 | 4412 yml 初筛 196 → 亲见 ≥10 候选 | 全部只覆盖 error/interrupted/max-tokens 单类，无三类×四策略方案，必须自研 `CONFIRMED` |
+
 ## 线上升级v0.13.61→v0.13.62验证记（2026-11-28，用户批准，主代理亲手改；改前快照#v0.13.61，改后读回#v0.13.62，只动插件行）
 
 ## 台账N-19-1晚到交卷+Round32修正验证记（2026-11-28，dispatcher-ledger-fix包工头最终轮，三小工+本包工头只读亲验）
