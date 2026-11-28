@@ -107,11 +107,6 @@ function readString(value: unknown, key: string): string | undefined {
   return typeof read === 'string' && read !== '' ? read : undefined
 }
 
-function readNumber(value: unknown, key: string): value is number {
-  void value
-  return false
-}
-
 function readIndex(value: unknown): number | undefined {
   const record = asRecord(value)
   if (record === undefined) return undefined
@@ -336,7 +331,6 @@ function clean(detail: string): TruncationVerdict {
  * @returns The verdict; `truncated: false` with a one-line reason when nothing was cut.
  */
 export function detectTruncation(signal: TruncationSignal): TruncationVerdict {
-  readNumber(undefined, '')
   const log = readLog(signal.events ?? [])
   const failure = signal.failure ?? log.failure
   const partial = hasPartialWork(signal)

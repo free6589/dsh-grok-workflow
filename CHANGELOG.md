@@ -5,6 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Interrupted child runs are detected and re-driven on resume / 断流的子任务可被识别并在续传时重跑** —
+  Resume now detects three truncation classes when a child run was cut off mid-stream —
+  an error-closed turn with partial output (`turn-error`),
+  a repeated or reversed reasoning-stream index (`reasoning-index-anomaly`),
+  and a `completed` stop word over a visibly incomplete payload
+  (`stop-false-normal`: missing required structured result, explicit truncation
+  marker, unclosed code fence, or unclosed JSON container) —
+  and re-drives the cut task (`interrupted` + `redrive`, artifacts kept, never replanned).
+  A `completed` mark proven cut counts as a false normal; a `gated` task is immune.
+  Detection is pure, synchronous and bounded (4k-char tail window, 400-event window).
+  / 续传现在能识别子任务被中途切断的三种情形——报错结束但已有部分产出、推理流序号重复或倒退、
+  报完成但载荷明显半截（缺结构化结果、截断标记、未闭代码围栏或 JSON 容器）——
+  并把被切断的任务重跑（记为中断＋重跑，保留已有产出，不重新规划）。
+  被证明半截的"已完成"记为误报完成；人工门控任务不受影响。检测是纯同步有界扫描。
+
 ## [0.13.62] - 2026-11-27
 
 ### Fixed / 修复

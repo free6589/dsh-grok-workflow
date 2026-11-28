@@ -179,7 +179,6 @@ export function resumeCheckpointFromRun(
       seq: index + 1,
       ...(task.title === undefined ? {} : { title: task.title }),
       status: resumeStatusFor(task.status, truncated),
-      ...(options.artifacts === undefined && verdict === undefined ? {} : {}),
       ...(artifacts?.outputs !== undefined ? { outputs: [...artifacts.outputs] } : {}),
       ...(artifacts?.files !== undefined ? { files: [...artifacts.files] } : {}),
       ...(evidence.length === 0 ? {} : { evidence }),
