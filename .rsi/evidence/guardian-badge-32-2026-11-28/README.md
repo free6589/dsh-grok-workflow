@@ -49,4 +49,16 @@ npx vitest run test/client.spec.ts test/progress-panel.spec.ts
 
 - 只提交到本分支 `fix/guardian-badge-32`，不合并 main、不 push。
 - 本次改动文件：`src/client/progress-tab.js`（3 处样式）→ 重建 `src/client/index.js` + `lib/client.js` → `test/client.spec.ts`（+5 行断言）。`src/client/i18n.js`、`test/progress-panel.spec.ts` 的其余 diff 是建分支时带过来的上一轮改动，未动。
-- 工作区 `.tmp/badge32/` 为本次量测草稿（gitignored），未提交；`git status --short` 无 `*.log/*.tgz/*.bak` 残留。
+## 5. 补提交（2026-11-28 一次性修理工 agent-24，新提交，不改写 f3c295d）
+
+- 起因（agent-23 验收结论）：已提交内容几何全过，但漏了工作区两件未提交改动——隔离区 assemble exit 1（offset 21924 处 bundle 含 `progress.badge.details.*` 键但源 `src/client/i18n.js` 无键）+ `test/progress-panel.spec.ts` 2 failed（顺序断言还是旧的图内 Guardian 顺序）。
+- 补了什么（提交 `27dea3d`，只 2 个文件，+14/−3）：
+  1. `src/client/i18n.js`（+7 行）：EN `progress.badge.details.show/hide` = Show/Hide run details；ZH = 显示运行详情/收起运行详情（含两行注释说明徽标行为）。
+  2. `test/progress-panel.spec.ts`（10 行）：顺序断言更新为 Guardian 瓦片折叠进页头详情的新结构——`guardian > bar`、`figure > guardian`、`stuck > guardian`（原来 `stuck < guardian` 反了）。
+- bundle 重建验证：`node scripts/assemble-client.mjs` EXIT 0（442105 bytes → src/client/index.js）；`node scripts/build-client.mjs` EXIT 0（450117 bytes → lib/client.js）。重建前后 `src/client/index.js` 与 `lib/client.js` 内容无变化（`grep -c progress.badge.details.show`：index.js 4、lib/client.js 4、i18n.js 2；`git status` 无 bundle 修改），说明 HEAD 内 bundle 早已含键、本次只是把源键补齐使源与 bundle 一致。`git show HEAD:src/client/i18n.js` 无此键（0 处）佐证之前确实是源漏了。
+- 门禁（本次逐字命令 + exit code）：
+  - `npx tsc --noEmit` → EXIT 0
+  - `npm run lint` → EXIT 0（14 warnings, 0 errors，与基线一致均为既有）
+  - `npx vitest run test/client.spec.ts test/progress-panel.spec.ts test/progress-tab.spec.ts test/panel-links.spec.ts` → EXIT 0（Test Files 4 passed, Tests 310 passed）
+- 提交记录：`27dea3d fix(guardian-badge-32): 补齐i18n双语键+顺序断言，重建bundle源键一致`（新提交，未 amend f3c295d）。本节为第二个提交的内容。
+- 未动：分支仍为 `fix/guardian-badge-32`，未合并 main，未 push；`.rsi/evidence/locate-guardian-2026-11-28/` 未动。
