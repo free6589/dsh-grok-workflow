@@ -3289,7 +3289,7 @@ describe('client progress tab: the button fills the box instead of sending', () 
     expect(texts(view.run()).join('\n')).not.toContain('已填进输入框')
   })
 
-  it('keeps the page inert apart from its readings and the one card a reader points at', () => {
+  it('keeps the page inert apart from its readings, its corner badges and the one card a reader points at', () => {
     const record = recorder()
     const run: ProgressRun = {
       runId: 'r-inert',
@@ -3305,18 +3305,21 @@ describe('client progress tab: the button fills the box instead of sending', () 
     const view = renderWith(injectedProps(servicesOf(record)), run)
     const tree = walk(view.run())
     const controls = tree.filter((element) => element.props['onClick'] !== undefined)
-    // Three kinds of control, and nothing else: a card with calls opens them, a card that is
-    // only a mark still lights its own wires, and the empty figure drops the trace. A finished
-    // run has no fourth: its dock is empty.
+    // Four kinds of control, and nothing else: a card with calls opens them, a card that is
+    // only a mark still lights its own wires, the empty figure drops the trace, and the
+    // header's corner badge toggles the run's two detail sentences. A finished run has no
+    // dock: its footer is empty, and no Guardian was recorded so it drew no badge.
     const kinds = controls.map((element) =>
       element.props['data-gw-progress-dock-fill'] === true ? 'dock'
         : element.props['data-gw-progress-pnode-open'] !== undefined ? 'node'
           : element.props['data-gw-progress-pnode'] !== undefined ? 'mark'
             : element.props['data-gw-progress-graph'] !== undefined ? 'figure'
-              : 'stray')
+              : element.props['data-gw-progress-corner'] === true ? 'badge'
+                : 'stray')
     expect(kinds.filter((kind) => kind === 'stray')).toEqual([])
     expect(kinds.filter((kind) => kind === 'dock')).toHaveLength(0)
     expect(kinds.filter((kind) => kind === 'figure')).toHaveLength(1)
+    expect(kinds.filter((kind) => kind === 'badge')).toHaveLength(1)
     // `执行` handed its row to `任务 1`, so the task card is the control and the task's branch
     // is a control of its own; the summary draft is a card with a call. The plan and the four
     // places of the run are marks.
@@ -3331,6 +3334,135 @@ describe('client progress tab: the button fills the box instead of sending', () 
     }
     // …and no click on any of them wrote anything: this page has no side effect but the dock.
     expect(record.calls).toEqual([])
+  })
+})
+
+
+/**
+ * The header's corner badge is the page's one details toggle.
+ *
+ * Collapsed it is only the run's state colour (a 14px square with no word on it); opened it
+ * shows the two detail sentences and, when the stream recorded a monitor, the Guardian's
+ * tiles with them. The interaction and where the details stand are pinned here.
+ */
+describe('client progress tab: the corner badge and its opened details', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const t = translator('zh')
+
+  /** The run the badge is tested on: finished, no monitor, so the details are two sentences. */
+  function plainRun(): ProgressRun {
+    return {
+      runId: 'r-badge',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [{ seq: 1, label: '执行', phase: '任务 1 · 搭建', childId: 'c1', order: 0, outcome: 'completed' }],
+      summaryFinalDraft: 1,
+      stopReason: 'completed',
+    }
+  }
+
+  function render(run: ProgressRun) {
+    const snapshot = { runs: [run], activeRun: run }
+    return renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select(snapshot),
+    })
+  }
+
+  function badgeOf(tree: unknown): Element {
+    const badge = walk(tree).find((element) => element.props['data-gw-progress-corner'] === true)
+    expect(badge, 'the header draws no corner badge').toBeDefined()
+    return badge!
+  }
+
+  function detailsOf(tree: unknown): Element {
+    const details = walk(tree).find((element) => element.props['data-gw-progress-details'] === true)
+    expect(details, 'the header draws no details block').toBeDefined()
+    return details!
+  }
+
+  it('starts collapsed: the badge is a square with only the state colour, and the details stay hidden', () => {
+    const tree = render(plainRun()).run()
+    const badge = badgeOf(tree)
+    expect(badge.props['type']).toBe('button')
+    expect(badge.props['aria-expanded']).toBe(false)
+    expect(badge.props['aria-label']).toBe('显示运行详情')
+    expect(badge.props['title']).toBe('显示运行详情')
+    // The face is a fill span with the run's state on it, and it carries no word.
+    const fill = walk(badge).find((element) => element.props['className'] === 'gw-progress-corner-fill')
+    expect(fill, 'the badge paints no state colour').toBeDefined()
+    expect(fill!.props['data-state']).toBe('done')
+    expect(texts(fill!)).toEqual([])
+    expect(progress.css).toMatch(/\.gw-progress-corner \{[^}]*width: 14px/)
+    expect(progress.css).toMatch(/\.gw-progress-corner \{[^}]*height: 14px/)
+    expect(progress.css).toMatch(/\.gw-progress-corner \{[^}]*margin-inline-start: 0/)
+    expect(progress.css).not.toMatch(/\.gw-progress-corner \{[^}]*margin-inline-start: -/)
+    expect(progress.css).toMatch(/\.gw-progress-details \{[^}]*flex: 1 0 100%/)
+    expect(progress.css).toMatch(/\.gw-progress-details \{[^}]*width: 100%/)
+    expect(progress.css).toMatch(/\.gw-progress-guardian-blocks > \* \{[^}]*min-width: 120px/)
+    expect(progress.css).toMatch(/\.gw-progress-corner-fill\[data-state="done"\] \{[^}]*background: var\(--dsw-alias-state-success-primary\)/)
+    // Collapsed, the details block answers `hidden`: the figure is the page's first screen.
+    const details = detailsOf(tree)
+    expect(details.props['hidden']).toBe(true)
+    // A run without a monitor draws no tiles anywhere.
+    expect(walk(tree).some((element) => element.props['data-gw-progress-guardian'] === true)).toBe(false)
+  })
+
+  it('opens on click: the two sentences come back inside the details, and the badge offers hiding', () => {
+    const view = render(plainRun())
+    const badge = badgeOf(view.run())
+    ;(badge.props['onClick'] as () => void)()
+    const opened = view.run()
+    const openedBadge = badgeOf(opened)
+    expect(openedBadge.props['aria-expanded']).toBe(true)
+    expect(openedBadge.props['aria-label']).toBe('收起运行详情')
+    const details = detailsOf(opened)
+    expect(details.props['hidden']).toBe(false)
+    // The two original sentences, in the order the page always read them, with the count
+    // sentence verbatim; the step sentence's own numbers ride on the run, so only its
+    // shape is pinned here. The third details slot is the Guardian panel, which is `null`
+    // on a monitor-less run.
+    const lines = (details.children as Array<Element | null>).filter((child): child is Element =>
+      child !== null && (child.props['className'] === 'gw-progress-line' || child.props['className'] === 'gw-progress-count'))
+    expect(lines).toHaveLength(2)
+    expect(lines[0]!.props['className']).toBe('gw-progress-line')
+    expect(lines[1]!.props['className']).toBe('gw-progress-count')
+    expect(texts(lines[0]!).join('')).toMatch(/^第 \d+ 步，共 \d+ 步（\d+ 层流程）$/)
+    expect(texts(lines[1]!).join('')).toBe('图上 1 个任务')
+    // Clicking again folds the details back: the square is the page's resting state.
+    ;(openedBadge.props['onClick'] as () => void)()
+    const folded = view.run()
+    expect(badgeOf(folded).props['aria-expanded']).toBe(false)
+    expect(detailsOf(folded).props['hidden']).toBe(true)
+  })
+
+  it('opens the Guardian tiles with the sentences when the stream recorded a monitor', () => {
+    const run: ProgressRun = {
+      ...plainRun(),
+      guardian: {
+        started: true,
+        armed: true,
+        budgetMs: 300_000,
+        ended: false,
+        cancelled: false,
+        findings: [{ seq: 3, label: '执行 3', signal: 'timeout', action: 'rescue', reason: 'workflow guardian rescued child with guidance', atMs: 2_000 }],
+      },
+    }
+    const view = render(run)
+    // With the details closed the tiles are folded with everything else.
+    expect(detailsOf(view.run()).props['hidden']).toBe(true)
+    const badge = badgeOf(view.run())
+    ;(badge.props['onClick'] as () => void)()
+    const opened = view.run()
+    const details = detailsOf(opened)
+    expect(details.props['hidden']).toBe(false)
+    // The four tiles stand inside the opened details, in the order the band used to read.
+    const tiles = walk(details).filter((element) => element.props['data-gw-progress-guardian-block'] !== undefined)
+    expect(tiles.map((tile) => tile.props['data-gw-progress-guardian-block'])).toEqual(['status', 'budget', 'count', 'findings'])
+    expect(texts(details).join('\n')).toContain('Guardian 监控')
+    expect(texts(details).join('\n')).toContain('监控中')
+    expect(texts(details).join('\n')).toContain('已排队发送恢复指引')
   })
 })
 
@@ -3379,7 +3511,8 @@ describe('client progress tab: Guardian monitor side lane', () => {
     expect(copy).toContain('Guardian 监控')
     expect(copy).toContain('监控中')
     expect(copy).toContain('已排队发送恢复指引')
-    // Only the colour changed: the mint surface is mixed from a semantic token.
+    // Only the colour changed: the mint surface is mixed from a semantic token, and the
+    // card keeps its old 14px corner radius now that the opened details carry it in flow.
     expect(progress.css).toContain('color-mix(in srgb, var(--dsw-alias-state-success-primary)')
     expect(progress.css).toMatch(/\.gw-progress-guardian \{[^}]*border-radius: 14px/)
   })
@@ -3578,17 +3711,21 @@ describe('client progress tab: nodes, calls and the wire layer', () => {
     return at === -1 ? '' : progress.css.slice(at)
   }
 
-  it('reads down the page: the header, the figure, the Guardian, then the dock', () => {
+  it('reads down the page: the header with its details, the figure, then the dock', () => {
     const page = pageOf(withGuardian(runOf(twoTasks)))
     const order = walk(page)
     const at = (hook: string) => order.indexOf(elementOf(page, hook))
     expect(at('data-gw-progress-bar')).toBeGreaterThanOrEqual(0)
+    // The Guardian's tiles stand inside the header's opened details, before the figure:
+    // the band under the figure is retired, and the details block is the page's one place
+    // that carries them, in flow at the page's own width.
+    expect(elementsOf(elementOf(page, 'data-gw-progress-details'), 'data-gw-progress-guardian')).toHaveLength(1)
+    expect(at('data-gw-progress-figure')).toBeGreaterThan(at('data-gw-progress-guardian'))
     expect(at('data-gw-progress-figure')).toBeGreaterThan(at('data-gw-progress-bar'))
     expect(at('data-gw-progress-graph')).toBeGreaterThan(at('data-gw-progress-figure'))
     // The wire layer sits inside the figure, before the nodes it is drawn behind.
     expect(at('data-gw-progress-wires')).toBeGreaterThan(at('data-gw-progress-graph'))
     expect(at('data-gw-progress-pnodes')).toBeGreaterThan(at('data-gw-progress-wires'))
-    expect(at('data-gw-progress-guardian')).toBeGreaterThan(at('data-gw-progress-pnodes'))
     expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-guardian'))
     // The count line is retired: the header's one sentence carries the step count, and it is
     // the only place the page says how far the run has got.
