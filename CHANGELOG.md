@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.64] - 2026-11-28
+
 ### Added / 新增
 
 - **Interrupted child runs are detected and re-driven on resume / 断流的子任务可被识别并在续传时重跑** —
