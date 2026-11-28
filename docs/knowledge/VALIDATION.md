@@ -1,3 +1,13 @@
+## 台账N-19-1晚到交卷+Round32修正验证记（2026-11-28，dispatcher-ledger-fix包工头最终轮，三小工+本包工头只读亲验）
+
+| state | command | result |
+| --- | --- | --- |
+| 主线树干净 | `git rev-parse HEAD`+`git rev-parse origin/main`+`git status --short --branch`+`git log --oneline -3`（本包工头只读亲验） | 双读同值`fad32ba4744`、仅`## main...origin/main`干净、`log`首行fad32ba `CONFIRMED` |
+| 台账37行/缺四轮 | `wc -l .rsi/ledger.jsonl`+`grep -o '"round": [^,]*'`（本包工头只读亲验，复核小工同验） | 37行；2..41缺18/23/24/26四int+多20r一行对上37，漏行非真缺 `CONFIRMED` |
+| evidence四目录/git提交/第5str | `ls -d .rsi/evidence/round-018 ...026`+`git log --oneline -- .rsi/ledger.jsonl`（本包工头只读亲验） | 四目录均在位EXIT0 `CONFIRMED`；触ledger提交≥4（首四0eb5d8f/9abab07/01272af/7825ca7，题面“四提交”定义待主代理明确）；第5str本轮未复现`NOT_RUN` |
+| Round32修正 | 记忆对照 | Round32曾记台账`NOT_RUN`未交卷系晚到误记，现修正为已交卷`CONFIRMED` |
+| 补账口径/写面 | 建议小工+本轮行为自查 | 推荐ledger单补（evidence+git已齐不动，三处齐补=造证据否决），执行另行定本轮不补；只有三份记忆增量行，产品代码0行、不动ledger/evidence/代码、不提交不push、不碰live不重启不force-push不动tag不publish不写密钥 `CONFIRMED` |
+
 ## Round32三路收尾记忆小工验证记（2026-11-28，主代理/包工头CONFIRMED直接引用+三条只读复核，不发版不推送）
 
 | state | command | result |
