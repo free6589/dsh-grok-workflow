@@ -4363,3 +4363,4 @@ Last updated: 2026-11-28（**Round28三路收尾：记忆沉淀，不发版（�
 Last updated: 2026-11-28（**Round29记忆小工增量行：只补三份记忆，不写产品代码（主代理亲手复验`CONFIRMED`直接引用）** — 主线 `36f89b2`=`origin/main`树干净`CONFIRMED`（`status`仅`## main...origin/main`、`rev-parse`双读同值、`log`首行36f89b2、`stash list`三条实见）；
 CI三连绿`46076756913`/`46079310443`/`46081151435``CONFIRMED`；R16棚内口径复核+证据未合入（`fix/r16-recount-29@36f89b2`，8绿1红N9缺源）`CONFIRMED`；日志十七轮（R17-A警告簇hygiene、D-003证伪复核、C1/R16维持）；live仍`#v0.13.61`、stash三条原位`CONFIRMED`；
 红线全守：只写三份记忆增量行、不删分支不动live不重启不force-push不动tag不publish不写密钥不写产品代码、不提交不push、分支不动）—
+Last updated: 2026-11-28（**v0.13.63发版完成：Guardian小方块+两大文件拆分，用户说人话版说明** — 主线815bb51=origin/main树干净；CHANGELOG人话版（守卫搬右上角+代码拆小块）；package.json 0.13.63；全量ci 124/2179绿；远端CI+Release双绿，Release v0.13.63已发布带tgz；红线全守）—
