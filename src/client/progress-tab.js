@@ -2377,6 +2377,25 @@
       '.gw-progress-chip[data-state="running"] .gw-progress-chip-dot { animation: gw-progress-pulse 1.7s ease-in-out infinite; }',
       '.gw-progress-chip[data-state="done"] { border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent); color: var(--dsw-alias-state-success-primary); }',
       '.gw-progress-chip[data-state="failed"], .gw-progress-chip[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-state-warn-primary); }',
+      // The corner badge: a small square at the header's top right, past the chip, whose
+      // face is only the run's state colour. It is the header's toggle: the two detail
+      // lines below stay in the DOM for the reader who opened them and for the tests that
+      // read them, but collapsed they answer `hidden`, so the page's first screen is the
+      // figure instead of two meta sentences.
+      '.gw-progress-corner { position: static; flex: none; align-self: center; width: 14px; height: 14px; margin: 0; margin-inline-start: 0; padding: 0; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 3px; background: transparent; cursor: pointer; }',
+      '.gw-progress-corner:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }',
+      '.gw-progress-corner-fill { position: absolute; inset: 2px; border-radius: 1px; background: var(--dsw-alias-state-idle-primary); }',
+      '.gw-progress-corner-fill[data-state="waiting"] { background: var(--dsw-alias-state-business-primary); }',
+      '.gw-progress-corner-fill[data-state="running"] { background: var(--dsw-alias-state-business-primary); animation: gw-progress-breathe 1.7s ease-in-out infinite; }',
+      '.gw-progress-corner-fill[data-state="done"] { background: var(--dsw-alias-state-success-primary); }',
+      '.gw-progress-corner-fill[data-state="failed"], .gw-progress-corner-fill[data-state="cancelled"] { background: var(--dsw-alias-state-warn-primary); }',
+      // The details wrapper takes the whole row the two sentences shared, and holds
+      // everything the badge opens: the two sentences, then the monitor's tiles.
+      // It is the header's full-width second row: it always spans the row on its own
+      // (`flex-basis: 100%` + `align-self: stretch`), so a narrow inline width on it
+      // can never squeeze the tiles into a glyph-wide strip.
+      '.gw-progress-details { display: flex; flex-direction: column; gap: 6px; flex: 1 0 100%; align-self: stretch; width: 100%; box-sizing: border-box; min-width: 0; }',
+      '.gw-progress-details[hidden] { display: none; }',
       // The one sentence: the same step count the count line used to carry, plus the
       // measured remainder when there is one. It is meta text, so it is 12px.
       '.gw-progress-line { flex: 1 0 100%; min-width: 0; margin: 0; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }',
@@ -2549,13 +2568,22 @@
       '.gw-progress-dock-fill:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }',
       '.gw-progress-filled { margin: 0; text-align: center; font-size: 12px; color: var(--dsw-alias-state-success-primary); }',
       '.gw-progress-empty { padding: 14px 4px; color: var(--dsw-alias-label-secondary, inherit); }',
-      // ── the Guardian lane (kept from the previous page, colour only) ──────────────
-      '.gw-progress-guardian { box-sizing: border-box; min-width: 0; margin-top: 16px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
+      // ── the Guardian: four tiles inside the opened details ──────────────────────
+      // The wide four-tile band is retired: no band stands under the figure on its own, and
+      // no second square is drawn. The tiles are part of the details the page's one corner
+      // badge opens, and they stand in the page's flow under the header, at the page's own
+      // width, so nothing floats over the figure and nothing squeezes a tile into a column
+      // of single glyphs. Every old marker (aside, blocks, tiles, findings) stays in the
+      // tree for the reader and the specs.
+      '.gw-progress-guardian { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; min-width: 0; margin: 2px 0 0; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, var(--dsw-alias-border-l2, currentColor)); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian[data-state="active"] { border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, transparent); }',
       '.gw-progress-guardian[data-state="cancelled"] { border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 38%, var(--dsw-alias-border-l2, currentColor)); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 5%, transparent); }',
       // The lane reads as blocks, not as a head plus a list: two tiles a row, and the
-      // findings (or the sentence that there are none) across the whole width.
+      // findings (or the sentence that there are none) across the whole width. Each tile
+      // holds at least a thumb-wide column (`minmax(120px, 1fr)`), so a squeezed ancestor
+      // wraps whole words instead of stacking one glyph per line.
       '.gw-progress-guardian-blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }',
+      '.gw-progress-guardian-blocks > * { min-width: 120px; }',
       '.gw-progress-guardian-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 6px 8px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 6%, transparent); }',
       '.gw-progress-guardian-block[data-gw-progress-guardian-block="findings"] { grid-column: 1 / -1; padding: 0; border-color: transparent; background: transparent; }',
       '.gw-progress-guardian-block-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
@@ -2576,7 +2604,7 @@
       // Motion is decoration here: the card's colour and its spoken state word already say
       // "current", so a reader who asked for less motion loses nothing.
       '@media (prefers-reduced-motion: reduce) {',
-      '  .gw-progress-pnode[data-state="doing"] .gw-progress-pnode-dot, .gw-progress-ring[data-state="doing"], .gw-progress-check[data-state="doing"], .gw-progress-chip[data-state="running"] .gw-progress-chip-dot { animation: none; }',
+      '  .gw-progress-pnode[data-state="doing"] .gw-progress-pnode-dot, .gw-progress-ring[data-state="doing"], .gw-progress-check[data-state="doing"], .gw-progress-chip[data-state="running"] .gw-progress-chip-dot, .gw-progress-corner-fill[data-state="running"] { animation: none; }',
       '}',
       // Under 720px the figure keeps its direction and every row drops to 34px: the cards
       // wrap their word instead of being cut, because a task name on a phone is worth two
@@ -3218,6 +3246,19 @@
      * full width under them. It carries no copy of its own — every word here is a
      * `progress.guardian.*` key the lane already shipped.
      */
+    /**
+     * The Guardian: the four tiles the opened details carry.
+     *
+     * The wide band is retired, and so is the second square it had grown: one corner badge
+     * opens the run's details, and the monitor's tiles are part of them. What stays is
+     * everything the band said — the same aside marker and state, the same four tiles in the
+     * same order, the same words — inside a block that stands in the page's flow, so no card
+     * is ever covered and no 14px box squeezes it. The tile vocabulary (blocks, grid,
+     * findings) is untouched, so the specs that read it keep reading it.
+     * @param guardian - the run's recorded Guardian lifecycle, when the stream wrote one.
+     * @param t - translator.
+     * @returns the block, or `null` when no monitor was recorded.
+     */
     function ProgressGuardianPanel(guardian, t) {
       if (guardian === undefined || guardian === null || guardian.started !== true) return null
       const findings = Array.isArray(guardian.findings) ? guardian.findings : []
@@ -3338,6 +3379,11 @@
       // to the session.
       const [opened, setOpened] = useState(EMPTY_PANEL_OPENED)
       const [traced, setTraced] = useState(undefined)
+      // The page's one "show the details" toggle: the corner badge opens the run's two
+      // sentences and, when the stream recorded a monitor, the Guardian's four tiles with
+      // them. It starts closed — the collapsed square is the point of the badge — and the
+      // details it opens stand in the page's flow under the header, so nothing floats.
+      const [detailsOpen, setDetailsOpen] = useState(false)
       const graphRef = useRef(null)
       const sheetRef = useRef(null)
       const [measure, setMeasure] = useState(EMPTY_PANEL_MEASURE)
@@ -3487,6 +3533,22 @@
         },
         h('span', { className: 'gw-progress-chip-dot', 'aria-hidden': 'true' }),
         t(PROGRESS_CHIP_KEY[graph.state] === undefined ? 'progress.chip.running' : PROGRESS_CHIP_KEY[graph.state])),
+        h('button', {
+          type: 'button',
+          className: 'gw-progress-corner',
+          'data-gw-progress-corner': true,
+          'data-state': graph.state,
+          'aria-expanded': detailsOpen,
+          'aria-label': t(detailsOpen ? 'progress.badge.details.hide' : 'progress.badge.details.show'),
+          title: t(detailsOpen ? 'progress.badge.details.hide' : 'progress.badge.details.show'),
+          onClick: () => setDetailsOpen(!detailsOpen),
+        },
+        h('span', { className: 'gw-progress-corner-fill', 'data-state': graph.state, 'aria-hidden': 'true' })),
+        h('div', {
+          className: 'gw-progress-details',
+          'data-gw-progress-details': true,
+          hidden: !detailsOpen,
+        },
         h('p', {
           className: 'gw-progress-line',
           'data-gw-progress-line': true,
@@ -3495,7 +3557,10 @@
         h('p', {
           className: 'gw-progress-count',
           'data-gw-progress-count': true,
-        }, progressPanelTaskLine(graph, t)))
+        }, progressPanelTaskLine(graph, t)),
+        // The monitor's four tiles are part of the same details: one badge opens
+        // everything the page used to print, and the block only exists while it is open.
+        ProgressGuardianPanel(run.guardian, t)))
       const stuck = graph === undefined ? undefined : graph.stuck
       return h('section', {
         className: 'gw-progress',
@@ -3526,7 +3591,6 @@
             // step and the verdict in one pass, never a fragment of a sentence.
             : h('p', { className: 'gw-progress-stuck', 'data-gw-progress-stuck': true, role: 'status', 'aria-atomic': 'true' },
               progressPanelStuckText(stuck, t)),
-          ProgressGuardianPanel(run.guardian, t),
           h('footer', { className: 'gw-progress-foot' },
             h('div', { className: 'gw-progress-dock', 'data-gw-progress-dock': true, 'data-state': dock },
               dockButton,
