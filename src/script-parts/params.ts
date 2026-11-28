@@ -1,16 +1,5 @@
-import { TASK_LIMITS } from '../input.js'
-import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS, FIXED_SWITCH_ON, FIXED_SWITCH_ON_WITHOUT_RATE_LIMIT } from '../config.js'
-import { CARRYOVER_LIMITS, INHERITANCE_LIMITS } from '../carryover.js'
-import { GUARDIAN_MAX_WAITS } from '../timeout.js'
-import { shardCountFor, shardsSource } from '../shards.js'
-import { REPLAN_LIMITS, replanMergeSource } from '../replan.js'
-import { STEERING_TOOL_NAME } from '../steering.js'
-import { CAPTAIN_MEMORY_LIMITS } from '../captain-memory.js'
-import { upstreamDigestSource } from '../upstream.js'
-import { namingSource, phaseLabel, runTitle } from '../naming.js'
-import type { NamingLanguage } from '../naming.js'
+import { namingSource } from '../naming.js'
 import { REDACTION_RULES } from '../redact.js'
-import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisPolicy } from '../types.js'
 
 /**
  * Render the shared redaction rules (src/redact.ts) as script-realm JS source.
