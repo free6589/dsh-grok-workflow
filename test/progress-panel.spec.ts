@@ -569,7 +569,10 @@ describe('the page, top to bottom', () => {
     // The wire layer sits inside the figure, before the cards it is drawn behind.
     expect(at('data-gw-progress-wires')).toBeGreaterThan(at('data-gw-progress-graph'))
     expect(at('data-gw-progress-pnodes')).toBeGreaterThan(at('data-gw-progress-wires'))
-    expect(at('data-gw-progress-guardian')).toBeGreaterThan(at('data-gw-progress-pnodes'))
+    // The Guardian's tiles fold into the header's details: they stand before the figure,
+    // in flow, and the dock still closes the page after everything else.
+    expect(at('data-gw-progress-guardian')).toBeGreaterThan(at('data-gw-progress-bar'))
+    expect(at('data-gw-progress-figure')).toBeGreaterThan(at('data-gw-progress-guardian'))
     expect(at('data-gw-progress-dock')).toBeGreaterThan(at('data-gw-progress-guardian'))
     // The figure wraps the graph, and the Guardian is a sibling of both, never a column in it.
     expect(walk(hookOf(page, 'data-gw-progress-figure')).some((element) => element === hookOf(page, 'data-gw-progress-graph'))).toBe(true)
@@ -1418,11 +1421,12 @@ describe('the stuck line: one sentence, and only while something is stuck', () =
       member(2, '执行', '任务 1 · 建表'),
     ], { stopReason: 'error' })
     expect(textOf(hookOf(pageOf(blocked), 'data-gw-progress-stuck'))).toBe('卡在 4：这一步没有回报')
-    // The line is a status, a sibling after the figure, and before the Guardian card.
+    // The line is a status, a sibling after the figure; the Guardian's tiles are folded
+    // into the header's details, so they stand before it, not after.
     const page = pageOf({ ...failedRun(), guardian: GUARDIAN })
     const order = walk(page)
     expect(order.indexOf(hookOf(page, 'data-gw-progress-stuck'))).toBeGreaterThan(order.indexOf(hookOf(page, 'data-gw-progress-graph')))
-    expect(order.indexOf(hookOf(page, 'data-gw-progress-stuck'))).toBeLessThan(order.indexOf(hookOf(page, 'data-gw-progress-guardian')))
+    expect(order.indexOf(hookOf(page, 'data-gw-progress-stuck'))).toBeGreaterThan(order.indexOf(hookOf(page, 'data-gw-progress-guardian')))
   })
 })
 

@@ -124,6 +124,10 @@
       'progress.chip.done': 'Done',
       'progress.chip.failed': 'Not passed',
       'progress.chip.cancelled': 'Cancelled',
+      // The header's corner badge: collapsed it is only the state colour, opened it shows
+      // the run's two detail sentences again.
+      'progress.badge.details.show': 'Show run details',
+      'progress.badge.details.hide': 'Hide run details',
       // The seven leg words, the two badges and the per-task attempt count.
       'progress.flow.start': 'Start',
       'progress.flow.plan': 'Plan',
@@ -403,6 +407,9 @@
       'progress.chip.done': '已完成',
       'progress.chip.failed': '未通过',
       'progress.chip.cancelled': '已取消',
+      // 页头右上角的小方块徽标：平时只有状态色，点开才显示原来的两条详情。
+      'progress.badge.details.show': '显示运行详情',
+      'progress.badge.details.hide': '收起运行详情',
       // 七个腿词、两个角标、一个任务在一条腿里试了几遍。
       'progress.flow.start': '起点',
       'progress.flow.plan': '规划',
