@@ -313,8 +313,11 @@ describe('built artifacts agree with the source constants', () => {
     return readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8')
   }
 
-  it('lib/script.js carries objectiveChars 32000 and no 4000 objective cap', () => {
-    const script = source('lib/script.js')
+  it('lib/script-parts carries objectiveChars 32000 and no 4000 objective cap', () => {
+    // Since the script split (fix/split-script-30), lib/script.js is a re-export
+    // shell; the guest text lives in lib/script-parts/*.js (concatenated at
+    // runtime by assembleWorkflowScript, pinned byte-identical to the old bundle).
+    const script = source('lib/script-parts/routing.js') + source('lib/script-parts/prompts.js')
     expect(script).toContain('objectiveChars: 32000')
     expect(script).not.toMatch(/objectiveChars:\s*4_?000/)
     expect(script).not.toContain('objective <= 4000')
